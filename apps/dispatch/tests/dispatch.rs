@@ -232,3 +232,63 @@ fn rejects_bad_definitions() {
     assert_eq!(out.status.code(), Some(1));
     assert!(stderr(&out).contains("file does not exist"), "{}", stderr(&out));
 }
+
+fn run_root(t: &Tree, args: &[&str]) -> Output {
+    Command::new(BIN).args(args).env("XDG_CACHE_HOME", t.root.join("cache")).env_remove("CLYOPS_MAX_WIDTH").output().unwrap()
+}
+
+#[test]
+fn root_mode_works_without_a_definition_file() {
+    let t = Tree::new("root");
+    t.file("scripts/.clyops", "description: Root tools\nignore: lib\n", false);
+    t.tool("scripts/check.sh", "Run the checks");
+    t.tool("scripts/media/to-pcm", "Convert");
+    t.tool("scripts/lib/helper", "Helper");
+    let root = t.root.join("scripts");
+    let root = root.to_str().unwrap();
+
+    let text = stdout(&run_root(&t, &["--root", root, "--name", "whspr"]));
+    assert!(text.starts_with("Usage: whspr <command> [args...]\n\nRoot tools\n\nGroups:\n  media"), "{text}");
+    assert!(text.contains("  check                         Run the checks\n") && !text.contains("helper"), "{text}");
+
+    // Without --name, the directory names the program; --root=DIR works too.
+    let text = stdout(&run_root(&t, &[&format!("--root={root}"), "media"]));
+    assert!(text.starts_with("Usage: scripts media <command>"), "{text}");
+
+    let out = run_root(&t, &["--root", root, "media", "to-pcm", "a"]);
+    assert_eq!((stdout(&out).as_str(), out.status.code()), ("to-pcm a\n", Some(3)));
+
+    let data = stdout(&run_root(&t, &["--root", root, "--name", "whspr", "--bash-completion", "--", "media"]));
+    assert!(data.starts_with("#clyops-completion 1\nskip\t1\ncmd\tto-pcm\tConvert\n"), "{data}");
+}
+
+#[test]
+fn root_mode_completion_scripts_call_the_dispatcher_directly() {
+    let t = Tree::new("rootcomp");
+    t.tool("it's/x", "X");
+    let root = t.root.join("it's");
+    let root = root.to_str().unwrap();
+    let real = std::fs::canonicalize(BIN).unwrap();
+
+    let bash = stdout(&run_root(&t, &["--root", root, "--name", "whspr", "--completion", "bash"]));
+    let call = format!("'{}' '--root' '{}' '--name' 'whspr' --bash-completion", real.display(), root.replace('\'', "'\\''"));
+    assert!(bash.contains(&call), "{bash}");
+    assert!(bash.ends_with("complete -F _clyops_whspr whspr\n"));
+
+    let fish = stdout(&run_root(&t, &["--root", root, "--name", "whspr", "--completion", "fish"]));
+    assert!(fish.contains(&format!("'--root' '{}' '--name' 'whspr' --bash-completion", root.replace('\'', "\\'"))), "{fish}");
+
+    let zsh = stdout(&run_root(&t, &["--root", root, "--name", "whspr", "--completion", "zsh"]));
+    assert!(zsh.contains("'--name' 'whspr' --bash-completion") && !zsh.contains("\"${words[1]}\" --bash-completion"), "{zsh}");
+}
+
+#[test]
+fn root_mode_errors() {
+    let t = Tree::new("rooterr");
+    let out = run_root(&t, &["--name", "x"]);
+    assert!(stderr(&out).contains("--name only applies with --root") && out.status.code() == Some(1));
+    let out = run_root(&t, &["--root"]);
+    assert!(stderr(&out).contains("Option --root requires an argument") && out.status.code() == Some(1));
+    let out = run_root(&t, &["--root", "/nonexistent-dir"]);
+    assert!(stderr(&out).contains("--root /nonexistent-dir") && out.status.code() == Some(1));
+}

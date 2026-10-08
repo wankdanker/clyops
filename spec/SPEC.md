@@ -417,6 +417,20 @@ description: whisper.c toolchain
 ignore: lib, docx
 ```
 
+Without a definition file, `clyops-dispatch --root DIR [--name NAME] ...` does
+the same for `DIR`, named `NAME` (default: the directory's name); `DIR/.clyops`
+supplies `description` and `ignore`. This suits a shell alias or function:
+
+```sh
+alias whspr='clyops-dispatch --root ~/whisper.c/scripts --name whspr'          # bash, fish
+whspr() { clyops-dispatch --root ~/whisper.c/scripts --name whspr "$@"; }       # zsh, bash, fish
+```
+
+zsh expands aliases before completing, so there the function form is needed.
+With `--root`, `--completion` prints a script that calls
+`clyops-dispatch --root DIR --name NAME` instead of the typed program name, which
+an alias would not resolve inside the script.
+
 Lines are `key: value`; blank lines and `#` comments are ignored, and unknown
 keys are errors. Keys: `description` (help text), `dir` (tools directory,
 relative to the definition; default: the definition's directory) and `ignore`

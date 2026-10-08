@@ -42,6 +42,21 @@ The tools are found next to the real file, so the symlink can live anywhere.
 
 A group directory can hold a `.clyops` file with its own `description` and `ignore`.
 
+## Or just an alias
+
+No definition file needed: point `--root` at the tools directory and name the command. A
+`.clyops` file in that directory gives it a description and an ignore list.
+
+```sh
+alias whspr='clyops-dispatch --root ~/whisper.c/scripts --name whspr'          # bash, fish
+whspr() { clyops-dispatch --root ~/whisper.c/scripts --name whspr "$@"; }       # zsh (also bash, fish)
+eval "$(whspr --completion bash)"
+```
+
+zsh expands aliases before completing them, so use the function form there. The completion script
+printed in this mode calls `clyops-dispatch --root … --name …` itself, so completion works for the
+alias or function name.
+
 ## Use it
 
 ```sh

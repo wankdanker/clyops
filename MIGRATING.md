@@ -50,6 +50,11 @@ description: whisper.c toolchain
 ignore: lib, docx, package
 ```
 
+Or skip the file and define `whspr` in your shell instead:
+`alias whspr='clyops-dispatch --root ~/whisper.c/scripts --name whspr'` (bash, fish), or the
+function `whspr() { clyops-dispatch --root ~/whisper.c/scripts --name whspr "$@"; }` (zsh), with
+`description` and `ignore` in `scripts/.clyops`.
+
 `whspr <command>` works as before, and scripts can now be moved into folders, which become groups
 (`whspr media to-pcm`). `whspr --list` still prints the command names.
 `eval "$(whspr --completion bash)"` (or zsh, fish) replaces `lib/whisper-completion.bash`.

@@ -36,10 +36,16 @@ check() { # shell line expected actual
     if [[ "$3" == "$4" ]]; then echo "ok - $1: [$2]"; else echo "not ok - $1: [$2] expected [$3], got [$4]"; failures=$((failures + 1)); fi
 }
 
+# Root mode: the same tree run as an alias or function, with no definition file.
+root_alias="alias rt='clyops-dispatch --root $work/tree --name rt'"
+root_function="rt() { clyops-dispatch --root $work/tree --name rt \"\$@\"; }"
+
 # --- bash: call the completion function the way readline would.
-bash_complete() {
+bash_complete() { # line [setup]
     local prog=${1%% *}
     bash --norc --noprofile <<EOF 2>&1
+shopt -s expand_aliases
+${2:-}
 eval "\$($prog --completion bash)"
 COMP_WORDS=($1); [[ "$1" == *" " ]] && COMP_WORDS+=(""); COMP_CWORD=\$(( \${#COMP_WORDS[@]} - 1 ))
 _clyops_$prog
@@ -62,11 +68,15 @@ check bash "tools media demo --col"        "--color "                "$(bash_com
 check bash "tools media demo --color "     "always auto never "      "$(bash_complete "tools media demo --color ")"
 check bash "tools media demo in.txt "      "fast slow "              "$(bash_complete "tools media demo in.txt ")"
 check bash "tools media demo -n 3 in.txt " "fast slow "              "$(bash_complete "tools media demo -n 3 in.txt ")"
+check bash "rt (alias) "                   "hello media tools "      "$(bash_complete "rt " "$root_alias")"
+check bash "rt (alias) media demo --color " "always auto never "     "$(bash_complete "rt media demo --color " "$root_alias")"
+check bash "rt (alias) tools media "       "demo "                   "$(bash_complete "rt tools media " "$root_alias")"
 
 # --- fish: complete -C prints what fish would offer.
 if command -v fish >/dev/null; then
-    fish_complete() {
+    fish_complete() { # line [setup]
         fish --no-config <<EOF 2>&1 | cut -f1 | sort | tr '\n' ' '
+${2:-}
 ${1%% *} --completion fish | source
 complete -C '$1'
 EOF
@@ -81,6 +91,8 @@ EOF
     check fish "tools media demo --col"    "--color "              "$(fish_complete "tools media demo --col")"
     check fish "tools media demo in.txt "  "fast slow "            "$(fish_complete "tools media demo in.txt ")"
     check fish "tools media demo --color=" "--color=always --color=auto --color=never " "$(fish_complete "tools media demo --color=")"
+    check fish "rt (alias) "               "hello media tools "    "$(fish_complete "rt " "$root_alias")"
+    check fish "rt (alias) media demo in.txt " "fast slow "        "$(fish_complete "rt media demo in.txt " "$root_alias")"
 else
     echo "skip - fish not installed"
 fi
@@ -91,6 +103,7 @@ if command -v zsh >/dev/null; then
 zmodload zsh/zpty
 zpty z zsh -f -i
 zpty -w z "PATH=$PATH; DEMO_ROOT=$DEMO_ROOT; XDG_CACHE_HOME=$XDG_CACHE_HOME; PS1='> '; autoload -U compinit; compinit -u"
+[[ -n "$2" ]] && zpty -w z "$2"
 zpty -w z "eval \"\$(${1%% *} --completion zsh)\""
 zpty -w z 'print -r -- READY$((1+1))'
 zpty -r -m z out '*READY2*'
@@ -101,13 +114,13 @@ while zpty -r -t z chunk; do out+=$chunk; done
 print -r -- "${out//$'\e'\[[0-9;?]#[a-zA-Z]/}"
 zpty -d z
 EOF
-    zsh_complete() {
-        zsh -f "$work/complete.zsh" "$1" 2>&1 | tr -d '\r\a\017' | tr '\n' ' '
+    zsh_complete() { # line [setup]
+        zsh -f "$work/complete.zsh" "$1" "${2:-}" 2>&1 | tr -d '\r\a\017' | tr '\n' ' '
     }
-    zsh_offers() { # line words...
+    zsh_offers() { # line words... (set $zsh_setup for a setup line)
         local line=$1 out want
         shift
-        out=$(zsh_complete "$line")
+        out=$(zsh_complete "$line" "${zsh_setup:-}")
         for want in "$@"; do
             if [[ "$out" == *"$want"* ]]; then echo "ok - zsh: [$line] offers $want"
             else echo "not ok - zsh: [$line] lacks $want: $out"; failures=$((failures + 1)); fi
@@ -120,6 +133,11 @@ EOF
     zsh_offers "tools media " demo
     zsh_offers "tools media demo --color " always auto never
     zsh_offers "tools media demo in.txt " fast slow
+    # zsh expands aliases before completing, so root mode uses a function there.
+    zsh_setup=$root_function
+    zsh_offers "rt " hello media tools
+    zsh_offers "rt media demo --color " always auto never
+    zsh_setup=""
 else
     echo "skip - zsh not installed"
 fi

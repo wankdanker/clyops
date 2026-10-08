@@ -10,7 +10,12 @@
 //! ```
 //!
 //! Executables next to it become subcommands named after their basename, and
-//! subdirectories become groups of subcommands.
+//! subdirectories become groups of subcommands. Without a definition file, a
+//! shell alias works too:
+//!
+//! ```text
+//! alias whspr='clyops-dispatch --root ~/whisper.c/scripts --name whspr'
+//! ```
 
 use clyops::{die, wrap_text, Cli};
 use std::collections::HashMap;
@@ -99,7 +104,8 @@ fn command_name(file_name: &str) -> String {
 struct Dispatcher {
     prog: String,
     root: PathBuf,
-    definition: PathBuf,
+    /// The definition file, when run from one (not with --root).
+    definition: Option<PathBuf>,
     description: String,
     root_ignore: Vec<String>,
 }
@@ -118,7 +124,20 @@ impl Dispatcher {
         if !root.is_dir() {
             die(1, &format!("{}: dir '{}' is not a directory", real.display(), root.display()));
         }
-        Dispatcher { prog, root, definition: real, description: settings.description, root_ignore: settings.ignore }
+        Dispatcher { prog, root, definition: Some(real), description: settings.description, root_ignore: settings.ignore }
+    }
+
+    /// `--root DIR [--name NAME]`: no definition file; the root's optional
+    /// `.clyops` file gives the description and ignore list.
+    fn from_root(root: &Path, name: Option<String>) -> Dispatcher {
+        let root = fs::canonicalize(root).unwrap_or_else(|e| die(1, &format!("--root {}: {e}", root.display())));
+        if !root.is_dir() {
+            die(1, &format!("--root {} is not a directory", root.display()));
+        }
+        let file = root.join(".clyops");
+        let settings = if file.is_file() { read_settings(&file, false) } else { Settings::default() };
+        let prog = name.unwrap_or_else(|| root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
+        Dispatcher { prog, root, definition: None, description: settings.description, root_ignore: settings.ignore }
     }
 
     /// Settings for a group directory (its optional `.clyops` file).
@@ -156,7 +175,7 @@ impl Dispatcher {
                 if self.has_commands(&path) {
                     by_name.insert(file_name.clone(), Entry::Group { name: file_name, path });
                 }
-            } else if is_executable(&path) && fs::canonicalize(&path).ok().as_deref() != Some(self.definition.as_path()) {
+            } else if is_executable(&path) && fs::canonicalize(&path).ok() != self.definition {
                 by_name.entry(name.clone()).or_insert(Entry::Command { name, path });
             }
         }
@@ -474,8 +493,45 @@ fn exec(path: &Path, args: &[OsString]) -> ! {
     }
 }
 
-fn dispatch(definition: &Path, args: &[OsString]) -> ! {
-    let d = Dispatcher::load(definition);
+/// Quote for bash and zsh.
+fn sh_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "'\\''"))
+}
+
+/// Quote for fish.
+fn fish_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'"))
+}
+
+/// The completion script for `shell`. The scripts call the program by the
+/// name typed on the command line; with --root that name is an alias the
+/// script cannot run, so it calls clyops-dispatch with the same options.
+fn completion_script(d: &Dispatcher, shell: &str) -> Option<String> {
+    let mut cli = Cli::new();
+    cli.name(&d.prog);
+    let script = cli.completion_script(shell)?;
+    if d.definition.is_some() {
+        return Some(script);
+    }
+    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("clyops-dispatch"));
+    let parts = [
+        exe.to_string_lossy().into_owned(),
+        "--root".into(),
+        d.root.to_string_lossy().into_owned(),
+        "--name".into(),
+        d.prog.clone(),
+    ];
+    let (typed, quote): (&str, fn(&str) -> String) = match shell {
+        "bash" => ("\"${COMP_WORDS[0]}\" --bash-completion", sh_quote),
+        "zsh" => ("\"${words[1]}\" --bash-completion", sh_quote),
+        _ => ("command $tokens[1] --bash-completion", fish_quote),
+    };
+    let invocation = parts.iter().map(|p| quote(p)).collect::<Vec<_>>().join(" ");
+    assert!(script.contains(typed), "completion template no longer calls `{typed}`");
+    Some(script.replace(typed, &format!("{invocation} --bash-completion")))
+}
+
+fn dispatch(d: Dispatcher, args: &[OsString]) -> ! {
     let words: Vec<String> = args.iter().map(|a| a.to_string_lossy().into_owned()).collect();
 
     // Requests the dispatcher answers itself come before any subcommand.
@@ -487,9 +543,7 @@ fn dispatch(definition: &Path, args: &[OsString]) -> ! {
         }
         Some("--completion") => {
             let shell = words.get(1).map(String::as_str).unwrap_or("");
-            let mut cli = Cli::new();
-            cli.name(&d.prog);
-            match cli.completion_script(shell) {
+            match completion_script(&d, shell) {
                 Some(script) => {
                     print!("{script}");
                     std::process::exit(0)
@@ -527,19 +581,46 @@ fn dispatch(definition: &Path, args: &[OsString]) -> ! {
 #[rustfmt::skip]
 fn main() {
     let args: Vec<OsString> = std::env::args_os().collect();
+    // `--root DIR [--name NAME]` before the subcommand: no definition file.
+    let (mut root, mut name, mut i) = (None, None, 1);
+    while let Some(arg) = args.get(i).map(|a| a.to_string_lossy().into_owned()) {
+        let (key, inline) = match arg.split_once('=') {
+            Some((k, v)) => (k.to_string(), Some(v.to_string())),
+            None => (arg.clone(), None),
+        };
+        if key != "--root" && key != "--name" {
+            break;
+        }
+        let value = match inline {
+            Some(v) => v,
+            None => {
+                i += 1;
+                args.get(i).map(|a| a.to_string_lossy().into_owned()).unwrap_or_else(|| die(1, &format!("Option {key} requires an argument")))
+            }
+        };
+        if key == "--root" { root = Some(PathBuf::from(value)) } else { name = Some(value) }
+        i += 1;
+    }
+    match (root, name) {
+        (Some(root), name) => dispatch(Dispatcher::from_root(&root, name), &args[i..]),
+        (None, Some(_)) => die(1, "--name only applies with --root"),
+        (None, None) => {}
+    }
     // Run from a definition's shebang (or as `clyops-dispatch DEFINITION ...`).
     if let Some(first) = args.get(1) {
         if Path::new(first).is_file() {
-            dispatch(Path::new(first), &args[2..]);
+            dispatch(Dispatcher::load(Path::new(first)), &args[2..]);
         }
     }
 
     let mut cli = Cli::new();
     cli.name("clyops-dispatch");
-    cli.description("Turn a directory of tools into one command with nested subcommands, help and shell completion. Start a definition file with '#!/usr/bin/env clyops-dispatch' and run it: executables next to it become subcommands named after their basename, and subdirectories become groups.");
-    cli.epilog("Definition file keys (one 'key: value' per line):\n  description  shown at the top of the help\n  dir          tools directory, relative to the definition (default: its own directory)\n  ignore       comma-separated names to leave out\n\nA group directory can hold a .clyops file with 'description' and 'ignore'.");
-    cli.arg("definition", "Dispatcher definition file", "", "file:exists");
+    cli.description("Turn a directory of tools into one command with nested subcommands, help and shell completion. Start a definition file with '#!/usr/bin/env clyops-dispatch' and run it, or alias a name to 'clyops-dispatch --root DIR --name NAME': executables in the directory become subcommands named after their basename, and subdirectories become groups.");
+    cli.epilog("Definition file keys (one 'key: value' per line):\n  description  shown at the top of the help\n  dir          tools directory, relative to the definition (default: its own directory)\n  ignore       comma-separated names to leave out\n\nA group directory (and the --root directory) can hold a .clyops file with 'description' and 'ignore'.\n\nExample:\n  alias whspr='clyops-dispatch --root ~/whisper.c/scripts --name whspr'");
+    cli.arg("definition", "Dispatcher definition file (or use --root)", "", "file:exists");
     cli.arg_variadic("args", "Subcommand and its arguments", "");
+    cli.opt("ROOT", "root", "", "optional", "Tools directory, instead of a definition file").rule("dir:exists");
+    cli.opt("NAME", "name", "", "optional", "Program name for help and completion with --root (default: the directory name)");
     let values = cli.run();
     // Reached only when the definition was not a regular file.
     die(1, &format!("Not a dispatcher definition: {}", values.str("definition")));

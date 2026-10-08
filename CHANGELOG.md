@@ -27,7 +27,8 @@ of 103 cases:
 A native binary that turns a directory of tools into one command: executables become
 subcommands, folders become nested groups, with help listing each level's commands and their
 descriptions, and bash/zsh/fish completion through every level into each command's own options.
-Replaces whisper.c's `whspr`.
+Defined by a small shebang file, or by a shell alias such as
+`alias whspr='clyops-dispatch --root ~/whisper.c/scripts --name whspr'`. Replaces whisper.c's `whspr`.
 
 ### clyops runner
 
