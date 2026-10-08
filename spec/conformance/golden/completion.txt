@@ -1,0 +1,36 @@
+#clyops-completion 1
+opt	--config	-c	value	file	{tmp}/conf	Config file to load
+opt	--verbose	-v	flag	none	-	Enable verbose output
+opt	--no-verbose	-	flag	none	-	Enable verbose output
+opt	--quiet	-q	flag	none	-	Suppress output
+opt	--no-quiet	-	flag	none	-	Suppress output
+opt	--color	-	value	choice	auto,always,never	When to use color
+opt	--out	-o	value	file	-	Output path
+opt	--notes	-	value	default	-	Free-form notes. This description is deliberately long so that the help output has to wrap it onto several lines at the default width of one hundred columns.
+opt	--count	-n	value	none	-	Number of iterations
+opt	--ratio	-	value	none	-	Mix ratio
+opt	--enabled	-	value	choice	true,false	Enable processing
+opt	--no-enabled	-	flag	none	-	Enable processing
+opt	--tag	-t	value	none	-	Tag to attach
+opt	--no-cache	-	flag	none	-	Disable the cache
+opt	--no-no-cache	-	flag	none	-	Disable the cache
+opt	--key	-k	value	default	-	API key
+opt	--host	-H	value	host	-	Server host
+opt	--port	-p	value	none	-	Server port
+opt	--endpoint	-	value	none	-	Endpoint URL
+opt	--addr	-	value	host	-	Bind address
+opt	--id	-	value	none	-	Request identifier
+opt	--email	-	value	none	-	Contact email
+opt	--date	-	value	none	-	Start date
+opt	--code	-	value	none	-	Three-letter code
+opt	--level	-	value	none	-	Level
+opt	--size	-	value	none	-	Size code
+opt	--data-dir	-d	value	dir	-	Data directory
+opt	--src	-	value	file	-	Source file
+opt	--dest	-	value	file	-	Destination file
+opt	--include	-I	value	file	-	Include directory
+opt	--help	-h	flag	none	-	Show this help message and exit
+opt	--no-help	-	flag	none	-	Show this help message and exit
+arg	input	single	file	-	Input file
+arg	mode	single	choice	fast,slow	Processing mode
+arg	rest	variadic	default	-	Extra items

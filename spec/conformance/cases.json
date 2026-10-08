@@ -1,0 +1,1649 @@
+[
+  {
+    "name": "defaults",
+    "args": [
+      "in.txt"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "CONFIG": null,
+        "VERBOSE": false,
+        "QUIET": false,
+        "COLOR": "auto",
+        "OUT": "{tmp}/out.txt",
+        "NOTES": null,
+        "COUNT": 3,
+        "RATIO": 0.5,
+        "ENABLED": true,
+        "TAG": [],
+        "NO_CACHE": false,
+        "KEY": "secret",
+        "HOST": "localhost",
+        "PORT": 8080,
+        "ENDPOINT": null,
+        "ADDR": null,
+        "ID": null,
+        "EMAIL": null,
+        "DATE": null,
+        "CODE": null,
+        "LEVEL": null,
+        "SIZE": null,
+        "DATA_DIR": null,
+        "SRC": null,
+        "DEST": null,
+        "INCLUDE": [],
+        "HELP": false,
+        "input": "{tmp}/in.txt",
+        "mode": "fast",
+        "rest": []
+      },
+      "sources": {
+        "config": "unset",
+        "verbose": "default",
+        "count": "default",
+        "key": "env",
+        "tag": "unset",
+        "notes": "unset",
+        "help": "default"
+      }
+    }
+  },
+  {
+    "name": "help long",
+    "args": [
+      "--help"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@help.txt"
+    }
+  },
+  {
+    "name": "help short wins over missing positional",
+    "args": [
+      "-h"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@help.txt"
+    }
+  },
+  {
+    "name": "help after a scan error still shows help",
+    "args": [
+      "--help",
+      "--bogus"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@help.txt"
+    }
+  },
+  {
+    "name": "help with narrow width",
+    "args": [
+      "--help"
+    ],
+    "env": {
+      "CLYOPS_MAX_WIDTH": "60"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "@help-60.txt"
+    }
+  },
+  {
+    "name": "help shows config values",
+    "args": [
+      "--help",
+      "-c",
+      "demo.conf"
+    ],
+    "files": {
+      "demo.conf": "demo:count=5\nshared:host=example.com\n"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "@help-config.txt"
+    }
+  },
+  {
+    "name": "json schema",
+    "args": [
+      "--help-json-schema"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@schema.json"
+    }
+  },
+  {
+    "name": "bash completion data",
+    "args": [
+      "--bash-completion"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@completion.txt"
+    }
+  },
+  {
+    "name": "missing positional",
+    "args": [],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Missing required positional argument: input",
+        "Usage: demo <input>"
+      ]
+    }
+  },
+  {
+    "name": "missing required option",
+    "args": [
+      "in.txt"
+    ],
+    "env": {
+      "KEY": null
+    },
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Missing required argument(s): --key",
+        "Usage: demo"
+      ]
+    }
+  },
+  {
+    "name": "required option from cli",
+    "args": [
+      "in.txt",
+      "--key",
+      "abc"
+    ],
+    "env": {
+      "KEY": null
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "KEY": "abc"
+      },
+      "sources": {
+        "key": "cli"
+      }
+    }
+  },
+  {
+    "name": "unknown long option",
+    "args": [
+      "in.txt",
+      "--bogus"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Unknown option: --bogus"
+      ]
+    }
+  },
+  {
+    "name": "unknown short option",
+    "args": [
+      "in.txt",
+      "-z"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Unknown option: -z"
+      ]
+    }
+  },
+  {
+    "name": "unexpected positional is impossible with variadic",
+    "args": [
+      "in.txt",
+      "slow",
+      "a",
+      "b",
+      "c"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "mode": "slow",
+        "rest": [
+          "a",
+          "b",
+          "c"
+        ]
+      }
+    }
+  },
+  {
+    "name": "options interleaved with variadic",
+    "args": [
+      "in.txt",
+      "slow",
+      "a",
+      "-v",
+      "b",
+      "--count",
+      "4",
+      "c"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "rest": [
+          "a",
+          "b",
+          "c"
+        ],
+        "VERBOSE": true,
+        "COUNT": 4
+      }
+    }
+  },
+  {
+    "name": "double dash ends options",
+    "args": [
+      "in.txt",
+      "fast",
+      "--",
+      "-v",
+      "--count"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "rest": [
+          "-v",
+          "--count"
+        ],
+        "VERBOSE": false
+      }
+    }
+  },
+  {
+    "name": "single dash is positional",
+    "args": [
+      "-"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "input": "-"
+      }
+    }
+  },
+  {
+    "name": "long option with equals",
+    "args": [
+      "in.txt",
+      "--count=7",
+      "--host=example.com"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 7,
+        "HOST": "example.com"
+      },
+      "sources": {
+        "count": "cli",
+        "host": "cli"
+      }
+    }
+  },
+  {
+    "name": "long option with separate value",
+    "args": [
+      "in.txt",
+      "--count",
+      "7"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 7
+      }
+    }
+  },
+  {
+    "name": "long option missing value at end",
+    "args": [
+      "in.txt",
+      "--count"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Option --count requires an argument"
+      ]
+    }
+  },
+  {
+    "name": "long option value may not start with double dash",
+    "args": [
+      "in.txt",
+      "--count",
+      "--verbose"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Option --count requires an argument"
+      ]
+    }
+  },
+  {
+    "name": "long option value may be a negative number",
+    "args": [
+      "in.txt",
+      "--level",
+      "-5"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "LEVEL": -5
+      }
+    }
+  },
+  {
+    "name": "empty value via equals",
+    "args": [
+      "in.txt",
+      "--notes="
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "NOTES": ""
+      },
+      "sources": {
+        "notes": "cli"
+      }
+    }
+  },
+  {
+    "name": "last scalar wins",
+    "args": [
+      "in.txt",
+      "--count",
+      "2",
+      "--count",
+      "9"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 9
+      }
+    }
+  },
+  {
+    "name": "short flag cluster",
+    "args": [
+      "in.txt",
+      "-vq"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "VERBOSE": true,
+        "QUIET": true
+      },
+      "sources": {
+        "verbose": "cli",
+        "quiet": "cli"
+      }
+    }
+  },
+  {
+    "name": "short value attached",
+    "args": [
+      "in.txt",
+      "-n5"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 5
+      }
+    }
+  },
+  {
+    "name": "short value separate",
+    "args": [
+      "in.txt",
+      "-n",
+      "6"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 6
+      }
+    }
+  },
+  {
+    "name": "flags then value in a cluster",
+    "args": [
+      "in.txt",
+      "-vn",
+      "2"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "VERBOSE": true,
+        "COUNT": 2
+      }
+    }
+  },
+  {
+    "name": "flags then attached value in a cluster",
+    "args": [
+      "in.txt",
+      "-vqn8"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "VERBOSE": true,
+        "QUIET": true,
+        "COUNT": 8
+      }
+    }
+  },
+  {
+    "name": "short value missing",
+    "args": [
+      "in.txt",
+      "-n"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Option -n requires an argument"
+      ]
+    }
+  },
+  {
+    "name": "short value may not start with dash",
+    "args": [
+      "in.txt",
+      "-n",
+      "-5"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Option -n requires an argument"
+      ]
+    }
+  },
+  {
+    "name": "no- disables a flag",
+    "args": [
+      "in.txt",
+      "-v",
+      "--no-verbose"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "VERBOSE": false
+      },
+      "sources": {
+        "verbose": "cli"
+      }
+    }
+  },
+  {
+    "name": "no- on a bool option",
+    "args": [
+      "in.txt",
+      "--no-enabled"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "ENABLED": false
+      }
+    }
+  },
+  {
+    "name": "no- on a value option is an error",
+    "args": [
+      "in.txt",
+      "--no-count"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Option --no-count can only be used with flag/boolean options"
+      ]
+    }
+  },
+  {
+    "name": "no- on an unknown option",
+    "args": [
+      "in.txt",
+      "--no-bogus"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Unknown option: --no-bogus"
+      ]
+    }
+  },
+  {
+    "name": "option literally named no-cache",
+    "args": [
+      "in.txt",
+      "--no-cache"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "NO_CACHE": true
+      }
+    }
+  },
+  {
+    "name": "flag with boolean value",
+    "args": [
+      "in.txt",
+      "--verbose=yes",
+      "--quiet=OFF"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "VERBOSE": true,
+        "QUIET": false
+      }
+    }
+  },
+  {
+    "name": "flag with non-boolean value",
+    "args": [
+      "in.txt",
+      "--verbose=maybe"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Option --verbose expects a boolean value, got 'maybe'"
+      ]
+    }
+  },
+  {
+    "name": "array option accumulates",
+    "args": [
+      "in.txt",
+      "--tag",
+      "a",
+      "-t",
+      "b",
+      "--tag=c",
+      "-td"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "TAG": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ]
+      },
+      "sources": {
+        "tag": "cli"
+      }
+    }
+  },
+  {
+    "name": "array elements are validated",
+    "args": [
+      "in.txt",
+      "--tag",
+      "ok",
+      "--tag",
+      "waytoolongtag"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--tag must be at most 8 characters, got 13"
+      ]
+    }
+  },
+  {
+    "name": "array path option resolves each element",
+    "args": [
+      "in.txt",
+      "-I",
+      "inc",
+      "-I",
+      "/abs/dir",
+      "-I",
+      "../up"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "INCLUDE": [
+          "{tmp}/inc",
+          "/abs/dir",
+          "{tmp_parent}/up"
+        ]
+      }
+    }
+  },
+  {
+    "name": "env overrides default",
+    "args": [
+      "in.txt"
+    ],
+    "env": {
+      "COUNT": "4",
+      "VERBOSE": "true",
+      "HOST": "env.example.com"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 4,
+        "VERBOSE": true,
+        "HOST": "env.example.com"
+      },
+      "sources": {
+        "count": "env",
+        "verbose": "env"
+      }
+    }
+  },
+  {
+    "name": "empty env is ignored",
+    "args": [
+      "in.txt"
+    ],
+    "env": {
+      "COUNT": ""
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 3
+      },
+      "sources": {
+        "count": "default"
+      }
+    }
+  },
+  {
+    "name": "env flag must be boolean",
+    "args": [
+      "in.txt"
+    ],
+    "env": {
+      "VERBOSE": "sometimes"
+    },
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Environment variable VERBOSE must be a boolean, got 'sometimes'"
+      ]
+    }
+  },
+  {
+    "name": "env flag false word",
+    "args": [
+      "in.txt"
+    ],
+    "env": {
+      "VERBOSE": "0"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "VERBOSE": false
+      },
+      "sources": {
+        "verbose": "env"
+      }
+    }
+  },
+  {
+    "name": "cli overrides env",
+    "args": [
+      "in.txt",
+      "--count",
+      "2"
+    ],
+    "env": {
+      "COUNT": "4"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 2
+      },
+      "sources": {
+        "count": "cli"
+      }
+    }
+  },
+  {
+    "name": "env value is validated",
+    "args": [
+      "in.txt"
+    ],
+    "env": {
+      "PORT": "99999"
+    },
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--port must be a valid port (1-65535), got '99999'"
+      ]
+    }
+  },
+  {
+    "name": "env path resolves against root",
+    "args": [
+      "in.txt"
+    ],
+    "cwd": "sub",
+    "dirs": [
+      "sub"
+    ],
+    "env": {
+      "OUT": "env-out.txt"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "OUT": "{tmp}/env-out.txt",
+        "input": "{tmp}/sub/in.txt"
+      }
+    }
+  },
+  {
+    "name": "default path resolves against root, cli against cwd",
+    "args": [
+      "in.txt",
+      "--src",
+      "../file.txt"
+    ],
+    "cwd": "sub",
+    "dirs": [
+      "sub"
+    ],
+    "files": {
+      "file.txt": "x"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "OUT": "{tmp}/out.txt",
+        "SRC": "{tmp}/file.txt",
+        "input": "{tmp}/sub/in.txt"
+      }
+    }
+  },
+  {
+    "name": "path passthrough values",
+    "args": [
+      "https://example.com/x",
+      "--out",
+      "-",
+      "-I",
+      "pulse:sink",
+      "-I",
+      "disabled"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "input": "https://example.com/x",
+        "OUT": "-",
+        "INCLUDE": [
+          "pulse:sink",
+          "disabled"
+        ]
+      }
+    }
+  },
+  {
+    "name": "scheme passthrough needs two letters",
+    "args": [
+      "in.txt",
+      "-I",
+      "rtp://host:5004",
+      "-I",
+      "x:y"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "INCLUDE": [
+          "rtp://host:5004",
+          "{tmp}/x:y"
+        ]
+      }
+    }
+  },
+  {
+    "name": "path is normalized lexically",
+    "args": [
+      "./a/../b/./c.txt"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "input": "{tmp}/b/c.txt"
+      }
+    }
+  },
+  {
+    "name": "config file applies values",
+    "args": [
+      "in.txt",
+      "-c",
+      "demo.conf"
+    ],
+    "files": {
+      "demo.conf": "# comment\n\ndemo:count=5\ndemo:verbose=true\nshared:host = cfg.example.com \nother:port=1\ndemo:tag=one\ndemo:unknown=ignored\ndemo:noequals\n"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "CONFIG": "{tmp}/demo.conf",
+        "COUNT": 5,
+        "VERBOSE": true,
+        "HOST": "cfg.example.com",
+        "PORT": 8080,
+        "TAG": [
+          "one"
+        ]
+      },
+      "sources": {
+        "config": "cli",
+        "count": "config",
+        "verbose": "config",
+        "host": "config",
+        "port": "default",
+        "tag": "config"
+      }
+    }
+  },
+  {
+    "name": "config keys may have leading dashes",
+    "args": [
+      "in.txt",
+      "-c",
+      "demo.conf"
+    ],
+    "files": {
+      "demo.conf": "demo:--count=6\n"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 6
+      }
+    }
+  },
+  {
+    "name": "cli overrides config",
+    "args": [
+      "in.txt",
+      "-c",
+      "demo.conf",
+      "--count",
+      "2",
+      "-v"
+    ],
+    "files": {
+      "demo.conf": "demo:count=5\ndemo:verbose=false\n"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 2,
+        "VERBOSE": true
+      },
+      "sources": {
+        "count": "cli",
+        "verbose": "cli"
+      }
+    }
+  },
+  {
+    "name": "config overrides env",
+    "args": [
+      "in.txt",
+      "-c",
+      "demo.conf"
+    ],
+    "env": {
+      "COUNT": "4"
+    },
+    "files": {
+      "demo.conf": "demo:count=5\n"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 5
+      },
+      "sources": {
+        "count": "config"
+      }
+    }
+  },
+  {
+    "name": "config flag false word",
+    "args": [
+      "in.txt",
+      "-c",
+      "demo.conf"
+    ],
+    "env": {
+      "VERBOSE": "true"
+    },
+    "files": {
+      "demo.conf": "demo:verbose=off\n"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "VERBOSE": false
+      },
+      "sources": {
+        "verbose": "config"
+      }
+    }
+  },
+  {
+    "name": "config flag must be boolean",
+    "args": [
+      "in.txt",
+      "-c",
+      "demo.conf"
+    ],
+    "files": {
+      "demo.conf": "demo:verbose=perhaps\n"
+    },
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Config value for --verbose must be a boolean, got 'perhaps'"
+      ]
+    }
+  },
+  {
+    "name": "config path from env",
+    "args": [
+      "in.txt"
+    ],
+    "env": {
+      "CONFIG": "demo.conf"
+    },
+    "files": {
+      "demo.conf": "demo:count=5\n"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 5,
+        "CONFIG": "{tmp}/demo.conf"
+      },
+      "sources": {
+        "config": "env"
+      }
+    }
+  },
+  {
+    "name": "config disabled",
+    "args": [
+      "in.txt",
+      "-c",
+      "disabled"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "CONFIG": "disabled",
+        "COUNT": 3
+      }
+    }
+  },
+  {
+    "name": "config not found",
+    "args": [
+      "in.txt",
+      "-c",
+      "missing.conf"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Config file not found: {tmp}/missing.conf"
+      ]
+    }
+  },
+  {
+    "name": "config found via search dir",
+    "args": [
+      "in.txt",
+      "-c",
+      "found.conf"
+    ],
+    "files": {
+      "conf/found.conf": "demo:count=8\n"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 8,
+        "CONFIG": "{tmp}/conf/found.conf"
+      }
+    }
+  },
+  {
+    "name": "cwd wins over search dir",
+    "args": [
+      "in.txt",
+      "-c",
+      "found.conf"
+    ],
+    "files": {
+      "conf/found.conf": "demo:count=8\n",
+      "found.conf": "demo:count=9\n"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 9,
+        "CONFIG": "{tmp}/found.conf"
+      }
+    }
+  },
+  {
+    "name": "explicit relative config skips search dirs",
+    "args": [
+      "in.txt",
+      "-c",
+      "./found.conf"
+    ],
+    "files": {
+      "conf/found.conf": "demo:count=8\n"
+    },
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Config file not found: {tmp}/found.conf"
+      ]
+    }
+  },
+  {
+    "name": "config include and override order",
+    "args": [
+      "in.txt",
+      "-c",
+      "main.conf"
+    ],
+    "files": {
+      "main.conf": "demo:count=2\n@include \"inc/base.conf\"\ndemo:host=main.example.com\n",
+      "inc/base.conf": "demo:count=7\ndemo:host=base.example.com\ndemo:port=9000\n"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 7,
+        "HOST": "main.example.com",
+        "PORT": 9000
+      }
+    }
+  },
+  {
+    "name": "config path values resolve against defining file",
+    "args": [
+      "in.txt",
+      "-c",
+      "main.conf"
+    ],
+    "files": {
+      "main.conf": "@include inc/base.conf\ndemo:src=main-src.txt\n",
+      "inc/base.conf": "demo:out=base-out.txt\n",
+      "main-src.txt": "x"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "OUT": "{tmp}/inc/base-out.txt",
+        "SRC": "{tmp}/main-src.txt"
+      }
+    }
+  },
+  {
+    "name": "config circular include",
+    "args": [
+      "in.txt",
+      "-c",
+      "a.conf"
+    ],
+    "files": {
+      "a.conf": "@include b.conf\n",
+      "b.conf": "@include a.conf\n"
+    },
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Circular config include detected: {tmp}/a.conf"
+      ]
+    }
+  },
+  {
+    "name": "config include missing",
+    "args": [
+      "in.txt",
+      "-c",
+      "a.conf"
+    ],
+    "files": {
+      "a.conf": "@include nope.conf\n"
+    },
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Config file not found: {tmp}/nope.conf"
+      ]
+    }
+  },
+  {
+    "name": "config crlf line endings",
+    "args": [
+      "in.txt",
+      "-c",
+      "win.conf"
+    ],
+    "files": {
+      "win.conf": "demo:count=4\r\ndemo:host=crlf.example.com\r\n"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 4,
+        "HOST": "crlf.example.com"
+      }
+    }
+  },
+  {
+    "name": "config value is validated",
+    "args": [
+      "in.txt",
+      "-c",
+      "bad.conf"
+    ],
+    "files": {
+      "bad.conf": "demo:count=50\n"
+    },
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--count must be <= 10, got 50"
+      ]
+    }
+  },
+  {
+    "name": "int not a number",
+    "args": [
+      "in.txt",
+      "--count",
+      "abc"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--count must be an integer, got 'abc'",
+        "Usage: demo"
+      ]
+    }
+  },
+  {
+    "name": "int below range",
+    "args": [
+      "in.txt",
+      "--count",
+      "0"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--count must be >= 1, got 0"
+      ]
+    }
+  },
+  {
+    "name": "int above range",
+    "args": [
+      "in.txt",
+      "--count",
+      "11"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--count must be <= 10, got 11"
+      ]
+    }
+  },
+  {
+    "name": "int range bounds inclusive",
+    "args": [
+      "in.txt",
+      "--count",
+      "10"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 10
+      }
+    }
+  },
+  {
+    "name": "float ok",
+    "args": [
+      "in.txt",
+      "--ratio",
+      ".25"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "RATIO": 0.25
+      }
+    }
+  },
+  {
+    "name": "float not a number",
+    "args": [
+      "in.txt",
+      "--ratio",
+      "1e3"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--ratio must be a number, got '1e3'"
+      ]
+    }
+  },
+  {
+    "name": "float above range",
+    "args": [
+      "in.txt",
+      "--ratio",
+      "1.5"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--ratio must be <= 1, got 1.5"
+      ]
+    }
+  },
+  {
+    "name": "bool words",
+    "args": [
+      "in.txt",
+      "--enabled",
+      "NO"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "ENABLED": false
+      }
+    }
+  },
+  {
+    "name": "bool invalid",
+    "args": [
+      "in.txt",
+      "--enabled",
+      "nah"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--enabled must be a boolean (true/false, yes/no, 1/0, on/off), got 'nah'"
+      ]
+    }
+  },
+  {
+    "name": "choice invalid",
+    "args": [
+      "in.txt",
+      "--color",
+      "blue"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--color must be one of: auto, always, never, got 'blue'"
+      ]
+    }
+  },
+  {
+    "name": "positional choice invalid",
+    "args": [
+      "in.txt",
+      "medium"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "mode must be one of: fast, slow, got 'medium'"
+      ]
+    }
+  },
+  {
+    "name": "string exact length",
+    "args": [
+      "in.txt",
+      "--size",
+      "abc"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--size must be exactly 4 characters, got 3"
+      ]
+    }
+  },
+  {
+    "name": "empty array element is kept and not validated",
+    "args": [
+      "in.txt",
+      "--tag="
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "TAG": [
+          ""
+        ]
+      }
+    }
+  },
+  {
+    "name": "hostname invalid",
+    "args": [
+      "in.txt",
+      "--host",
+      "bad_host"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--host must be a valid hostname, got 'bad_host'"
+      ]
+    }
+  },
+  {
+    "name": "port invalid",
+    "args": [
+      "in.txt",
+      "-p",
+      "0"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--port must be a valid port (1-65535), got '0'"
+      ]
+    }
+  },
+  {
+    "name": "url ok and invalid",
+    "args": [
+      "in.txt",
+      "--endpoint",
+      "ftp://x"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--endpoint must be a valid URL, got 'ftp://x'"
+      ]
+    }
+  },
+  {
+    "name": "valid misc values",
+    "args": [
+      "in.txt",
+      "--endpoint",
+      "https://api.example.com:8443/v1",
+      "--addr",
+      "10.0.0.1",
+      "--id",
+      "123e4567-e89b-12d3-a456-426614174000",
+      "--email",
+      "a.b@example.org",
+      "--date",
+      "2026-10-08",
+      "--code",
+      "ABC",
+      "--level",
+      "-12",
+      "--size",
+      "abcd"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "ENDPOINT": "https://api.example.com:8443/v1",
+        "ADDR": "10.0.0.1",
+        "ID": "123e4567-e89b-12d3-a456-426614174000",
+        "EMAIL": "a.b@example.org",
+        "DATE": "2026-10-08",
+        "CODE": "ABC",
+        "LEVEL": -12,
+        "SIZE": "abcd"
+      }
+    }
+  },
+  {
+    "name": "ipv6 address",
+    "args": [
+      "in.txt",
+      "--addr",
+      "fe80::1"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "ADDR": "fe80::1"
+      }
+    }
+  },
+  {
+    "name": "ip invalid",
+    "args": [
+      "in.txt",
+      "--addr",
+      "localhost"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--addr must be a valid IP address, got 'localhost'"
+      ]
+    }
+  },
+  {
+    "name": "uuid invalid",
+    "args": [
+      "in.txt",
+      "--id",
+      "1234"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--id must be a valid UUID, got '1234'"
+      ]
+    }
+  },
+  {
+    "name": "email invalid",
+    "args": [
+      "in.txt",
+      "--email",
+      "nobody"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--email must be a valid email address, got 'nobody'"
+      ]
+    }
+  },
+  {
+    "name": "date invalid",
+    "args": [
+      "in.txt",
+      "--date",
+      "10/08/2026"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--date must be in YYYY-MM-DD format, got '10/08/2026'"
+      ]
+    }
+  },
+  {
+    "name": "regex invalid",
+    "args": [
+      "in.txt",
+      "--code",
+      "abc"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--code does not match required pattern, got 'abc'"
+      ]
+    }
+  },
+  {
+    "name": "file exists ok and dir exists ok",
+    "args": [
+      "in.txt",
+      "--src",
+      "s.txt",
+      "-d",
+      "data"
+    ],
+    "files": {
+      "s.txt": "x"
+    },
+    "dirs": [
+      "data"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "SRC": "{tmp}/s.txt",
+        "DATA_DIR": "{tmp}/data"
+      }
+    }
+  },
+  {
+    "name": "file exists missing",
+    "args": [
+      "in.txt",
+      "--src",
+      "nope.txt"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--src file does not exist: {tmp}/nope.txt"
+      ]
+    }
+  },
+  {
+    "name": "file exists rejects directory",
+    "args": [
+      "in.txt",
+      "--src",
+      "data"
+    ],
+    "dirs": [
+      "data"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--src file does not exist: {tmp}/data"
+      ]
+    }
+  },
+  {
+    "name": "dir exists missing",
+    "args": [
+      "in.txt",
+      "--data-dir",
+      "nodir"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--data-dir directory does not exist: {tmp}/nodir"
+      ]
+    }
+  },
+  {
+    "name": "file writable new file in existing dir",
+    "args": [
+      "in.txt",
+      "--dest",
+      "new.txt"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "DEST": "{tmp}/new.txt"
+      }
+    }
+  },
+  {
+    "name": "file writable in missing dir",
+    "args": [
+      "in.txt",
+      "--dest",
+      "nodir/new.txt"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--dest directory is not writable: {tmp}/nodir"
+      ]
+    }
+  }
+]

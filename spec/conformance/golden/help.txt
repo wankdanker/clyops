@@ -1,0 +1,63 @@
+Usage: demo <input> [<mode>] [<rest...>] [OPTIONS]
+
+Demo program for the clyops conformance suite. It registers one of every kind of option and argument
+so that each implementation can be checked against the same help text, schema and resolved values.
+
+Positional Arguments:
+  input                         Input file (accepts: path)
+  mode                          Processing mode (default: fast, accepts: choices: fast, slow)
+  rest                          Extra items (variadic)
+
+Required Commands:
+  sh [installed]                POSIX shell (install dash)
+
+Config:
+  -c, --config=<value>          Config file to load (accepts: path)
+
+Output:
+  -v, --verbose                 Enable verbose output
+  -q, --quiet                   Suppress output
+      --color=<value>           When to use color (default: auto, accepts: choices: auto, always,
+                                never)
+  -o, --out=<value>             Output path (default: out.txt, accepts: path)
+      --notes=<value>           Free-form notes. This description is deliberately long so that the
+                                help output has to wrap it onto several lines at the default width
+                                of one hundred columns.
+
+Options:
+  -n, --count=<value>           Number of iterations (default: 3, accepts: integer: 1-10)
+      --ratio=<value>           Mix ratio (default: 0.5, accepts: number: 0-1)
+      --enabled=<value>         Enable processing (default: true, accepts: true/false, yes/no, 1/0,
+                                on/off)
+  -t, --tag=<value>             Tag to attach (multiple, accepts: text: 1-8 chars)
+      --no-cache                Disable the cache
+
+Auth:
+  -k, --key=<value>             API key (required)
+
+Network:
+  -H, --host=<value>            Server host (default: localhost, accepts: hostname)
+  -p, --port=<value>            Server port (default: 8080, accepts: port: 1-65535)
+      --endpoint=<value>        Endpoint URL (accepts: URL)
+      --addr=<value>            Bind address (accepts: IP address)
+
+Validation:
+      --id=<value>              Request identifier (accepts: UUID)
+      --email=<value>           Contact email (accepts: email address)
+      --date=<value>            Start date (accepts: date: YYYY-MM-DD)
+      --code=<value>            Three-letter code (accepts: pattern: ^[A-Z]{3}$)
+      --level=<value>           Level (accepts: integer)
+      --size=<value>            Size code (accepts: text: 4 chars)
+
+Files:
+  -d, --data-dir=<value>        Data directory (accepts: existing directory)
+      --src=<value>             Source file (accepts: existing file)
+      --dest=<value>            Destination file (accepts: writable file)
+  -I, --include=<value>         Include directory (multiple, accepts: path)
+
+Global:
+  -h, --help                    Show this help message and exit
+
+Examples:
+  demo in.txt slow a b --tag x --tag y
+  demo in.txt -vc demo.conf
