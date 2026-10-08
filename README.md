@@ -104,6 +104,22 @@ The script asks the program for its options at completion time
 (`mytool --bash-completion`), so completion follows the code with no
 regeneration step.
 
+## clyops-dispatch
+
+[apps/dispatch](apps/dispatch) turns a directory of tools into one command. A tiny definition
+file such as `scripts/whspr`
+
+```
+#!/usr/bin/env clyops-dispatch
+description: whisper.c toolchain
+```
+
+makes every executable next to it a subcommand (`whspr check`) and every folder a group of
+subcommands (`whspr media to-pcm`), at any depth. `whspr` and `whspr media` list what's
+available with descriptions from each tool, and `eval "$(whspr --completion bash)"` (or zsh, fish)
+completes group and command names, then the chosen command's own options. It ships as a native
+binary for Linux, macOS and Windows in each release.
+
 ## clyops runner
 
 [apps/runner](apps/runner) is a desktop app (Tauri + React) that lists the clyops tools in a
@@ -129,6 +145,7 @@ packages/
   rust/                   crate clyops (only dependency: regex)
   c/                      C11 + POSIX, Makefile and CMake
 apps/
+  dispatch/               clyops-dispatch: a directory of tools as one command with subcommands
   runner/                 desktop UI for clyops tools (Tauri + React)
 tools/
   check-schema.py         validate --help-json-schema output against spec/schema.json
@@ -148,6 +165,7 @@ make completions    # completion files in sync + real-shell tests (needs zsh/fis
 make lint           # tsc, ruff, mypy, rustfmt, clippy, shellcheck
 make check          # everything
 make rust           # build + test + conformance for one package (js, bash, python, rust, c)
+make dispatch       # build + test clyops-dispatch
 ```
 
 Requirements: Node 18+, Python 3.9+, Rust 1.70+, a C11 compiler, Bash 4.3+.
@@ -184,6 +202,7 @@ matches every manifest, and attaches to one GitHub release:
 
 - **clyops runner installers:** Linux x64/arm64 (`.deb`, `.rpm`, `.AppImage`), macOS universal
   (`.dmg`), Windows x64 (`.msi`, setup `.exe`).
+- **clyops-dispatch** binaries for Linux x64/arm64, macOS universal and Windows x64.
 - **libclyops** prebuilt for Linux x64/arm64 and macOS universal, plus a source tarball.
 - The npm tarball, Python wheel and sdist, Rust `.crate` and `clyops.sh`.
 - `SHA256SUMS`.

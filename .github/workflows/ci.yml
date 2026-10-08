@@ -113,6 +113,22 @@ jobs:
       - if: matrix.toolchain == 'stable'
         run: cargo package --allow-dirty
 
+  dispatch:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults: { run: { working-directory: apps/dispatch } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { components: "clippy, rustfmt" }
+      - if: runner.os == 'Linux'
+        run: cargo fmt --check && cargo clippy --all-targets -- -D warnings
+      # The integration tests drive Unix fixtures; Windows checks that it builds.
+      - run: cargo test --locked
+
   c:
     strategy:
       fail-fast: false

@@ -4,6 +4,7 @@
 | | |
 | --- | --- |
 | **clyops runner** | Linux: `.deb`, `.rpm` or `.AppImage` (x64 `amd64`/`x86_64`, arm64 `arm64`/`aarch64`) · macOS: `_universal.dmg` · Windows: `_x64-setup.exe` or `_x64_en-US.msi` |
+| **clyops-dispatch** | `clyops-dispatch-<version>-<platform>.tar.gz` (Linux x64/arm64, macOS universal) or `-windows-x64.zip` |
 | **C** | `libclyops-<version>-<platform>.tar.gz` (static library + header) or `-src.tar.gz` |
 | **Bash** | `clyops.sh` |
 | **JavaScript / TypeScript** | `clyops-<version>.tgz` (`npm install ./clyops-<version>.tgz`) |

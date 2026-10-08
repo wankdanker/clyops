@@ -20,6 +20,7 @@ on:
       - "apps/runner/src-tauri/tauri.conf.json"
       - "apps/runner/src-tauri/Cargo.toml"
       - "apps/runner/src-tauri/icons/**"
+      - "apps/dispatch/Cargo.toml"
   workflow_dispatch:
 
 permissions:
@@ -103,6 +104,60 @@ jobs:
           path: out/*
           if-no-files-found: error
 
+  # The dispatcher as a native binary.
+  dispatch:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04, platform: linux-x64 }
+          - { os: ubuntu-22.04-arm, platform: linux-arm64 }
+          - { os: macos-latest, platform: macos-universal }
+          - { os: windows-latest, platform: windows-x64 }
+    runs-on: ${{ matrix.os }}
+    defaults: { run: { shell: bash } }
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - name: Build
+        working-directory: apps/dispatch
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            cargo build --release --locked --target aarch64-apple-darwin
+            cargo build --release --locked --target x86_64-apple-darwin
+            mkdir -p target/release
+            lipo -create target/aarch64-apple-darwin/release/clyops-dispatch \
+              target/x86_64-apple-darwin/release/clyops-dispatch -output target/release/clyops-dispatch
+            lipo -info target/release/clyops-dispatch
+          else
+            cargo build --release --locked
+          fi
+      - name: Package
+        run: |
+          name="clyops-dispatch-$VERSION-${{ matrix.platform }}"
+          mkdir -p "out/$name"
+          cp LICENSE apps/dispatch/README.md "out/$name/"
+          if [ "$RUNNER_OS" = Windows ]; then
+            cp apps/dispatch/target/release/clyops-dispatch.exe "out/$name/"
+            (cd out && 7z a "$name.zip" "$name" > /dev/null)
+          else
+            cp apps/dispatch/target/release/clyops-dispatch "out/$name/"
+            tar -czf "out/$name.tar.gz" -C out "$name"
+          fi
+          ls -l out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dispatch-${{ matrix.platform }}
+          path: |
+            out/*.tar.gz
+            out/*.zip
+          if-no-files-found: error
+
   # Prebuilt static library + header. The C package needs POSIX (regex.h,
   # getline), so there is no native Windows build.
   c:
@@ -179,7 +234,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: [verify, runner, c, packages]
+    needs: [verify, runner, dispatch, c, packages]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     env:

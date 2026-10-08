@@ -40,6 +40,22 @@ renaming functions. These are the differences.
   `parseStringRegex`, `timestamp`.
 * `date:YYYY-MM-DD` values stay strings (they were `Date` objects).
 
+## `whspr` → `clyops-dispatch`
+
+Replace the `scripts/whspr` script with a definition file of the same name:
+
+```
+#!/usr/bin/env clyops-dispatch
+description: whisper.c toolchain
+ignore: lib, docx, package
+```
+
+`whspr <command>` works as before, and scripts can now be moved into folders, which become groups
+(`whspr media to-pcm`). `whspr --list` still prints the command names.
+`eval "$(whspr --completion bash)"` (or zsh, fish) replaces `lib/whisper-completion.bash`.
+Descriptions come from each script's `--help-json-schema`, so scripts show one once they're on
+clyops.
+
 ## Behavior changes in both
 
 * **`--help`/`-h` is built in.** It no longer depends on an option whose

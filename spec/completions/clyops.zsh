@@ -3,15 +3,20 @@
 # Enable with:  eval "$(__CLYOPS_PROG__ --completion zsh)"
 #   or install:  __CLYOPS_PROG__ --completion zsh > "${fpath[1]}/___CLYOPS_PROG__"
 _clyops___CLYOPS_FUNC__() {
-    local data line esc action
-    local -a f specs
-    data=$("${words[1]}" --bash-completion 2>/dev/null) || return 1
+    local data line esc action skip=0
+    local -a f specs cmds
+    # The words before the cursor let a dispatcher answer for the subcommand being typed.
+    data=$("${words[1]}" --bash-completion -- "${(@)words[2,CURRENT-1]}" 2>/dev/null) || return 1
     [[ "$data" == "#clyops-completion 1"* ]] || return 1
 
     for line in "${(@f)data}"; do
         [[ "$line" == \#* ]] && continue
         f=("${(@ps:\t:)line}")
-        if [[ "$f[1]" == opt ]]; then
+        if [[ "$f[1]" == skip ]]; then
+            skip=$f[2]
+        elif [[ "$f[1]" == cmd ]]; then
+            cmds+=("${f[2]//:/\\:}:$f[3]")
+        elif [[ "$f[1]" == opt ]]; then
             esc="${${${${f[7]//\\/\\\\}//\[/\\[}//\]/\\]}//:/\\:}"
             if [[ "$f[4]" == flag ]]; then
                 specs+=("$f[2][$esc]")
@@ -27,6 +32,21 @@ _clyops___CLYOPS_FUNC__() {
             if [[ "$f[3]" == variadic ]]; then specs+=("*:$esc:$action"); else specs+=(":$esc:$action"); fi
         fi
     done
+    # Past a dispatched subcommand, complete its words as if they were the whole line.
+    if (( skip )); then
+        words=("${words[1]}" "${(@)words[2+skip,-1]}")
+        (( CURRENT -= skip ))
+    fi
+    # A dispatcher group: complete its subcommands.
+    if (( ${#cmds} )) && [[ "${words[CURRENT]}" != -* ]]; then
+        _describe -t commands command cmds
+        return
+    fi
+    # A dispatched program without completion data: fall back to file names.
+    if (( skip && ${#specs} == 0 )); then
+        _files
+        return
+    fi
     _arguments -s -S : "${specs[@]}"
 }
 

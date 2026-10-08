@@ -22,6 +22,13 @@ of 103 cases:
 - `--completion bash|zsh|fish` prints a completion script for the program, tested in real shells.
 - Logging helpers `info`, `warn`, `error`, `success` and `die`.
 
+### clyops-dispatch
+
+A native binary that turns a directory of tools into one command: executables become
+subcommands, folders become nested groups, with help listing each level's commands and their
+descriptions, and bash/zsh/fish completion through every level into each command's own options.
+Replaces whisper.c's `whspr`.
+
 ### clyops runner
 
 A desktop app that lists the clyops tools in a directory, builds a form for each from its schema,

@@ -337,6 +337,16 @@ opt  --LONG  -S|-  flag|value  KIND  VALUES|-  DESCRIPTION
 arg  NAME    single|variadic   KIND  VALUES|-  DESCRIPTION
 ```
 
+The scripts call `prog --bash-completion -- WORD...` with the words typed
+after the program name, up to the word being completed. A program built on a
+clyops library ignores them. A dispatcher (section 12) uses them to answer for
+the subcommand being typed, with two more records:
+
+```
+skip  N                  the first N words are subcommand names; complete as if the line started after them
+cmd   NAME  DESCRIPTION  a subcommand that can be typed at this position
+```
+
 Tabs and newlines inside descriptions become spaces. Each flag is followed by a
 `--no-LONG` record (`-`, `flag`, `none`, `-`). Value options validated by
 `bool` or `choice:true,false`/`choice:false,true` are also followed by a
@@ -395,3 +405,78 @@ stderr, where `LEVEL` is `info`, `warning`, `error`, `success` or `error` (for
 `die`). The level is colored only when stderr is a terminal and `NO_COLOR` is
 unset. Setting `CLYOPS_SILENT=true` (or the package's silent switch) suppresses
 everything except `die` and parse errors.
+
+## 12. Dispatchers (`clyops-dispatch`)
+
+A dispatcher turns a directory of tools into one command with nested
+subcommands. It is a definition file whose shebang runs `clyops-dispatch`:
+
+```
+#!/usr/bin/env clyops-dispatch
+description: whisper.c toolchain
+ignore: lib, docx
+```
+
+Lines are `key: value`; blank lines and `#` comments are ignored, and unknown
+keys are errors. Keys: `description` (help text), `dir` (tools directory,
+relative to the definition; default: the definition's directory) and `ignore`
+(comma-separated names to leave out). The definition's real path (symlinks
+resolved) locates the tools, so it can be symlinked into `PATH`; the name it is
+run by is the program name.
+
+**The tree.** In each directory, ignoring hidden entries:
+
+* an executable file is a **command** named after its file name without the
+  last extension (`media-to-pcm.sh` → `media-to-pcm`); the first in sorted
+  order wins when two share a name;
+* a subdirectory containing at least one command (at any depth) is a **group**
+  with the same name, and shadows a command of that name. An optional
+  `.clyops` file in it accepts `description` and `ignore`.
+
+`prog a b c ARGS...` follows `a` and `b` through groups and runs command `c`
+with `ARGS` (replacing the process on Unix), in the caller's directory.
+
+**Help.** `prog`, `prog --help` and `prog GROUP [--help]` print:
+
+```
+Usage: prog GROUP... <command> [args...]
+
+DESCRIPTION
+
+Groups:
+  NAME   DESCRIPTION
+Commands:
+  NAME   DESCRIPTION
+Global:
+  -h, --help                Show this help message and exit
+      --completion=<value>  Print a completion script for bash, zsh or fish
+
+Run 'prog GROUP... <command> --help' for a command's options.
+```
+
+laid out like section 7. A command's description is the first line of the
+`description` in its `--help-json-schema` output; a nested dispatcher's is
+read from its definition. Descriptions are cached in
+`$XDG_CACHE_HOME/clyops-dispatch/` (else `~/.cache`) until the file's size or
+modification time changes. `prog GROUP --list` prints the names at that level.
+An unknown command or option is an error (`Unknown command: X`), followed by
+the help on stderr, exit 1.
+
+**Which programs are run.** To describe or complete a command the dispatcher
+runs it, so only clyops programs are run: files containing `#clyops-completion`
+(compiled C and Rust programs), `clyops.sh`, `import clyops`, `from clyops`,
+`'clyops'` or `"clyops"` (Bash, Python and JavaScript scripts), or a
+`clyops-tool` comment (any wrapper can opt in); and files whose shebang names
+`clyops-dispatch` (nested dispatchers). Others are listed without a description
+and complete file names.
+
+**Completion.** `prog --completion SHELL` prints the section 9.1 script for the
+dispatcher's name. `prog --bash-completion -- WORD...` follows the words like
+running does:
+
+* at a group: `skip N` (the group words) and a `cmd` record per entry, plus
+  `--help` and `--completion` option records;
+* at a command: `skip N` (the words up to and including the command) followed
+  by the command's own records from `COMMAND --bash-completion -- REST...`; a
+  nested dispatcher's `skip` is added to N;
+* at an unknown word: only the header.

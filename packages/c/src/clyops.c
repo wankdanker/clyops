@@ -1516,10 +1516,13 @@ static char* replace_all(const char* text, const char* from, const char* to) {
 }
 
 char* clyops_completion_script(const clyops_t* cli, const char* shell) {
-    const char* template = streq(shell, "bash") ? CLYOPS_COMPLETION_BASH
-                         : streq(shell, "zsh")  ? CLYOPS_COMPLETION_ZSH
-                         : streq(shell, "fish") ? CLYOPS_COMPLETION_FISH : NULL;
-    if (!template) return NULL;
+    const char* const* lines = streq(shell, "bash") ? CLYOPS_COMPLETION_BASH
+                             : streq(shell, "zsh")  ? CLYOPS_COMPLETION_ZSH
+                             : streq(shell, "fish") ? CLYOPS_COMPLETION_FISH : NULL;
+    if (!lines) return NULL;
+    sbuf joined = {0};
+    for (; *lines; lines++) sb_put(&joined, *lines);
+    char* template = sb_take(&joined);
     const char* name = cli->name ? cli->name : "cli";
     char* func = xstrdup(name);
     for (char* p = func; *p; p++) if (!isalnum((unsigned char)*p) && *p != '_') *p = '_';
@@ -1527,5 +1530,6 @@ char* clyops_completion_script(const clyops_t* cli, const char* shell) {
     char* out = replace_all(step, "__CLYOPS_PROG__", name);
     free(step);
     free(func);
+    free(template);
     return out;
 }

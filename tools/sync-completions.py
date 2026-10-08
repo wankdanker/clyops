@@ -22,12 +22,14 @@ def load():
     return out
 
 
-def c_literal(text):
+def c_lines(text):
+    # One literal per line, NULL-terminated: a single literal would exceed the
+    # 4095 characters ISO C requires compilers to support.
     lines = []
     for line in text.splitlines(True):
         esc = line.replace("\\", "\\\\").replace('"', '\\"').replace("\t", "\\t").replace("\n", "\\n")
-        lines.append(f'    "{esc}"')
-    return "\n".join(lines)
+        lines.append(f'    "{esc}",')
+    return "\n".join(lines + ["    NULL"])
 
 
 def ansi_c(text):
@@ -53,7 +55,7 @@ def outputs(scripts):
     files["packages/rust/src/completions.rs"] = rust
     c = f"/* {HEADER} */\n#ifndef CLYOPS_COMPLETIONS_H\n#define CLYOPS_COMPLETIONS_H\n\n"
     for s in SHELLS:
-        c += f"static const char CLYOPS_COMPLETION_{s.upper()}[] =\n{c_literal(scripts[s])};\n\n"
+        c += f"static const char* const CLYOPS_COMPLETION_{s.upper()}[] = {{\n{c_lines(scripts[s])}\n}};\n\n"
     files["packages/c/src/completions.h"] = c + "#endif\n"
     return files
 

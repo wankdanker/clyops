@@ -30,6 +30,10 @@ FILES = [
     ("apps/runner/src-tauri/tauri.conf.json", TOP),
     ("apps/runner/src-tauri/Cargo.toml", r'(?m)^version = "([^"]+)"'),
     ("apps/runner/src-tauri/Cargo.lock", r'name = "clyops-runner"\nversion = "([^"]+)"'),
+    ("apps/dispatch/Cargo.toml", r'(?m)^version = "([^"]+)"'),
+    ("apps/dispatch/Cargo.toml", r'clyops = \{ path = "../../packages/rust", version = "([^"]+)" \}'),
+    ("apps/dispatch/Cargo.lock", r'name = "clyops-dispatch"\nversion = "([^"]+)"'),
+    ("apps/dispatch/Cargo.lock", r'name = "clyops"\nversion = "([^"]+)"'),
 ]
 
 

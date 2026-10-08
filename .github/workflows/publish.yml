@@ -61,11 +61,16 @@ jobs:
   crates:
     if: inputs.crates
     runs-on: ubuntu-latest
-    defaults: { run: { working-directory: packages/rust } }
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with: { ref: "${{ inputs.tag }}" }
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo publish
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: clyops
+        working-directory: packages/rust
+        run: cargo publish
+      # Depends on the clyops crate just published; cargo publish waits for the index.
+      - name: clyops-dispatch
+        working-directory: apps/dispatch
+        run: cargo publish --locked

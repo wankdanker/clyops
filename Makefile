@@ -7,15 +7,16 @@
 #   make lint            linters/formatters (where installed)
 #   make check           all of the above
 #   make <lang>          build + unit tests + conformance for one package (js bash python rust c)
+#   make dispatch        build + test clyops-dispatch
 
 IMPLS := js ts bash python rust c
 
-.PHONY: all build test conformance completions lint check clean js bash python rust c \
-        build-js build-rust build-c test-js test-bash test-python test-rust test-c
+.PHONY: all build test conformance completions lint check clean js bash python rust c dispatch \
+        build-js build-rust build-c build-dispatch test-js test-bash test-python test-rust test-c test-dispatch
 
 all: build
 
-build: build-js build-rust build-c
+build: build-js build-rust build-c build-dispatch
 
 build-js:
 	cd packages/js && ( [ -d node_modules ] || npm ci ) && npm run build
@@ -26,7 +27,10 @@ build-rust:
 build-c:
 	$(MAKE) -C packages/c
 
-test: test-js test-bash test-python test-rust test-c
+build-dispatch:
+	cd apps/dispatch && cargo build
+
+test: test-js test-bash test-python test-rust test-c test-dispatch
 
 test-js: build-js
 	cd packages/js && npm test
@@ -43,6 +47,9 @@ test-rust:
 test-c: build-c
 	$(MAKE) -C packages/c test
 
+test-dispatch:
+	cd apps/dispatch && cargo test
+
 conformance: build
 	python3 tools/conformance.py $(IMPLS)
 
@@ -56,6 +63,7 @@ lint:
 	cd packages/js && npm run typecheck
 	cd packages/python && ruff check src tests examples && mypy src
 	cd packages/rust && cargo fmt --check && cargo clippy --all-targets -- -D warnings
+	cd apps/dispatch && cargo fmt --check && cargo clippy --all-targets -- -D warnings
 	@if command -v shellcheck >/dev/null; then shellcheck -S warning packages/bash/clyops.sh packages/bash/examples/demo.sh packages/bash/test/test.sh tools/*.sh; fi
 
 check: lint test conformance completions
@@ -75,7 +83,10 @@ rust: test-rust build-rust
 c: test-c
 	python3 tools/conformance.py c
 
+dispatch: build-dispatch test-dispatch
+
 clean:
 	cd packages/js && rm -rf dist
 	cd packages/rust && cargo clean
+	cd apps/dispatch && cargo clean
 	$(MAKE) -C packages/c clean
