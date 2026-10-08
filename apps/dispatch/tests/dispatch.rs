@@ -267,16 +267,22 @@ fn root_mode_completion_scripts_call_the_dispatcher_directly() {
     let t = Tree::new("rootcomp");
     t.tool("it's/x", "X");
     let root = t.root.join("it's");
+    // The script embeds the canonical root (on macOS, /var is a symlink to /private/var).
+    let canonical = std::fs::canonicalize(&root).unwrap();
+    let canonical = canonical.to_str().unwrap();
     let root = root.to_str().unwrap();
     let real = std::fs::canonicalize(BIN).unwrap();
 
     let bash = stdout(&run_root(&t, &["--root", root, "--name", "whspr", "--completion", "bash"]));
-    let call = format!("'{}' '--root' '{}' '--name' 'whspr' --bash-completion", real.display(), root.replace('\'', "'\\''"));
+    let call = format!("'{}' '--root' '{}' '--name' 'whspr' --bash-completion", real.display(), canonical.replace('\'', "'\\''"));
     assert!(bash.contains(&call), "{bash}");
     assert!(bash.ends_with("complete -F _clyops_whspr whspr\n"));
 
     let fish = stdout(&run_root(&t, &["--root", root, "--name", "whspr", "--completion", "fish"]));
-    assert!(fish.contains(&format!("'--root' '{}' '--name' 'whspr' --bash-completion", root.replace('\'', "\\'"))), "{fish}");
+    assert!(
+        fish.contains(&format!("'--root' '{}' '--name' 'whspr' --bash-completion", canonical.replace('\'', "\\'"))),
+        "{fish}"
+    );
 
     let zsh = stdout(&run_root(&t, &["--root", root, "--name", "whspr", "--completion", "zsh"]));
     assert!(zsh.contains("'--name' 'whspr' --bash-completion") && !zsh.contains("\"${words[1]}\" --bash-completion"), "{zsh}");
