@@ -1,0 +1,14 @@
+[package]
+name = "clyops"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+description = "Declarative one-line-per-option CLI parsing: validation, help text, JSON schema, config files and completion."
+license = "MIT"
+repository = "https://github.com/wankdanker/clyops"
+keywords = ["cli", "argv", "options", "parser", "completion"]
+categories = ["command-line-interface"]
+readme = "README.md"
+
+[dependencies]
+regex = { version = "1", default-features = false, features = ["std", "unicode-perl"] }
