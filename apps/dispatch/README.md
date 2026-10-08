@@ -6,13 +6,13 @@ after its file, with folders becoming groups of subcommands at any depth.
 
 ```
 scripts/
-  whspr                  ← the dispatcher
-  check.sh               → whspr check
+  mytool                 ← the dispatcher
+  check.sh               → mytool check
   media/
     .clyops              (description: Media conversion tools)
-    to-pcm.sh            → whspr media to-pcm
+    to-pcm.sh            → mytool media to-pcm
     fp/
-      index.py           → whspr media fp index
+      index.py           → mytool media fp index
 ```
 
 ## Install
@@ -27,11 +27,11 @@ A dispatcher is a small text file whose shebang runs `clyops-dispatch`:
 
 ```
 #!/usr/bin/env clyops-dispatch
-description: whisper.c toolchain
+description: mytool toolchain
 ignore: lib, docx
 ```
 
-Make it executable and symlink it into your `PATH` (`ln -s "$PWD/scripts/whspr" ~/.local/bin/`).
+Make it executable and symlink it into your `PATH` (`ln -s "$PWD/scripts/mytool" ~/.local/bin/`).
 The tools are found next to the real file, so the symlink can live anywhere.
 
 | Key | Meaning |
@@ -48,9 +48,9 @@ No definition file needed: point `--root` at the tools directory and name the co
 `.clyops` file in that directory gives it a description and an ignore list.
 
 ```sh
-alias whspr='clyops-dispatch --root ~/whisper.c/scripts --name whspr'          # bash, fish
-whspr() { clyops-dispatch --root ~/whisper.c/scripts --name whspr "$@"; }       # zsh (also bash, fish)
-eval "$(whspr --completion bash)"
+alias mytool='clyops-dispatch --root ~/mytool/scripts --name mytool'          # bash, fish
+mytool() { clyops-dispatch --root ~/mytool/scripts --name mytool "$@"; }       # zsh (also bash, fish)
+eval "$(mytool --completion bash)"
 ```
 
 zsh expands aliases before completing them, so use the function form there. The completion script
@@ -60,11 +60,11 @@ alias or function name.
 ## Use it
 
 ```sh
-whspr                      # commands and groups, with descriptions
-whspr media                # the media group
-whspr media to-pcm in.wav  # runs scripts/media/to-pcm.sh in.wav
-whspr media to-pcm --help  # the command's own help
-eval "$(whspr --completion bash)"   # or zsh / fish
+mytool                     # commands and groups, with descriptions
+mytool media               # the media group
+mytool media to-pcm in.wav # runs scripts/media/to-pcm.sh in.wav
+mytool media to-pcm --help # the command's own help
+eval "$(mytool --completion bash)"  # or zsh / fish
 ```
 
 Completion covers group and command names at every level, then the chosen command's own options

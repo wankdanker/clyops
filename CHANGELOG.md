@@ -28,9 +28,9 @@ A native binary that turns a directory of tools into one command: executables be
 subcommands, folders become nested groups, with help listing each level's commands and their
 descriptions, and bash/zsh/fish completion through every level into each command's own options.
 Defined by a small shebang file, or by a shell alias such as
-`alias whspr='clyops-dispatch --root ~/whisper.c/scripts --name whspr'`. Replaces whisper.c's `whspr`.
+`alias mytool='clyops-dispatch --root ~/mytool/scripts --name mytool'`.
 
 ### clyops runner
 
 A desktop app that lists the clyops tools in a directory, builds a form for each from its schema,
-runs them and streams their output. Started as whisper.c's Script Runner.
+runs them and streams their output.

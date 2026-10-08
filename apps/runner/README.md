@@ -43,15 +43,3 @@ loads a real tool. Build the C demo it uses first with `make -C ../../packages/c
 | Templates directory | `CLYOPS_RUNNER_TEMPLATES_DIR` → directory saved in Settings → app data dir |
 
 Tools run with their own directory as the working directory.
-
-## Coming from whisper.c's Script Runner
-
-This app started as `resources/script-runner` in whisper.c. Differences:
-
-- Any executable is discovered and run directly (it was `.sh`/`.py` files run through `bash`).
-- Only clyops tools get forms. A script still on whisper.c's `cli.sh`/`cli.js` reports
-  "Not a clyops tool" until it's migrated (see [MIGRATING.md](../../MIGRATING.md)).
-- `WHISPER_SCRIPTS_DIR` / `WHISPER_HOME` are replaced by `CLYOPS_RUNNER_DIR`, and
-  `SCRIPT_RUNNER_TEMPLATES_DIR` by `CLYOPS_RUNNER_TEMPLATES_DIR`.
-- The app identifier changed, so settings and templates start fresh. Templates are plain JSON
-  files: copy them over from the old app's data directory, or point the templates setting at it.

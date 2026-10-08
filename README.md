@@ -107,18 +107,18 @@ regeneration step.
 ## clyops-dispatch
 
 [apps/dispatch](apps/dispatch) turns a directory of tools into one command. A tiny definition
-file such as `scripts/whspr`
+file such as `scripts/mytool`
 
 ```
 #!/usr/bin/env clyops-dispatch
-description: whisper.c toolchain
+description: mytool toolchain
 ```
 
-makes every executable next to it a subcommand (`whspr check`) and every folder a group of
-subcommands (`whspr media to-pcm`), at any depth. `whspr` and `whspr media` list what's
-available with descriptions from each tool, and `eval "$(whspr --completion bash)"` (or zsh, fish)
+makes every executable next to it a subcommand (`mytool check`) and every folder a group of
+subcommands (`mytool media to-pcm`), at any depth. `mytool` and `mytool media` list what's
+available with descriptions from each tool, and `eval "$(mytool --completion bash)"` (or zsh, fish)
 completes group and command names, then the chosen command's own options. Without a definition
-file, an alias does the same: `alias whspr='clyops-dispatch --root ~/whisper.c/scripts --name whspr'`.
+file, an alias does the same: `alias mytool='clyops-dispatch --root ~/mytool/scripts --name mytool'`.
 It ships as a native binary for Linux, macOS and Windows in each release.
 
 ## clyops runner
@@ -212,11 +212,6 @@ Running the workflow by hand builds everything as a dry run without releasing. P
 npm, PyPI and crates.io is a separate manual workflow ([publish.yml](.github/workflows/publish.yml)).
 It needs the `NPM_TOKEN` and `CARGO_REGISTRY_TOKEN` secrets, plus PyPI trusted publishing for
 `publish.yml` with environment `pypi`.
-
-## Origins
-
-clyops grew out of `scripts/lib/cli.sh` and `cli.js` in whisper.c. See
-[MIGRATING.md](MIGRATING.md) for the differences from those libraries.
 
 ## License
 

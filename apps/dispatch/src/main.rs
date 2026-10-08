@@ -5,7 +5,7 @@
 //!
 //! ```text
 //! #!/usr/bin/env clyops-dispatch
-//! description: whisper.c toolchain
+//! description: mytool toolchain
 //! ignore: lib, docx
 //! ```
 //!
@@ -14,7 +14,7 @@
 //! shell alias works too:
 //!
 //! ```text
-//! alias whspr='clyops-dispatch --root ~/whisper.c/scripts --name whspr'
+//! alias mytool='clyops-dispatch --root ~/mytool/scripts --name mytool'
 //! ```
 
 use clyops::{die, wrap_text, Cli};
@@ -616,7 +616,7 @@ fn main() {
     let mut cli = Cli::new();
     cli.name("clyops-dispatch");
     cli.description("Turn a directory of tools into one command with nested subcommands, help and shell completion. Start a definition file with '#!/usr/bin/env clyops-dispatch' and run it, or alias a name to 'clyops-dispatch --root DIR --name NAME': executables in the directory become subcommands named after their basename, and subdirectories become groups.");
-    cli.epilog("Definition file keys (one 'key: value' per line):\n  description  shown at the top of the help\n  dir          tools directory, relative to the definition (default: its own directory)\n  ignore       comma-separated names to leave out\n\nA group directory (and the --root directory) can hold a .clyops file with 'description' and 'ignore'.\n\nExample:\n  alias whspr='clyops-dispatch --root ~/whisper.c/scripts --name whspr'");
+    cli.epilog("Definition file keys (one 'key: value' per line):\n  description  shown at the top of the help\n  dir          tools directory, relative to the definition (default: its own directory)\n  ignore       comma-separated names to leave out\n\nA group directory (and the --root directory) can hold a .clyops file with 'description' and 'ignore'.\n\nExample:\n  alias mytool='clyops-dispatch --root ~/mytool/scripts --name mytool'");
     cli.arg("definition", "Dispatcher definition file (or use --root)", "", "file:exists");
     cli.arg_variadic("args", "Subcommand and its arguments", "");
     cli.opt("ROOT", "root", "", "optional", "Tools directory, instead of a definition file").rule("dir:exists");

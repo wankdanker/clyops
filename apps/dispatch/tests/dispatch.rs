@@ -247,8 +247,8 @@ fn root_mode_works_without_a_definition_file() {
     let root = t.root.join("scripts");
     let root = root.to_str().unwrap();
 
-    let text = stdout(&run_root(&t, &["--root", root, "--name", "whspr"]));
-    assert!(text.starts_with("Usage: whspr <command> [args...]\n\nRoot tools\n\nGroups:\n  media"), "{text}");
+    let text = stdout(&run_root(&t, &["--root", root, "--name", "mytool"]));
+    assert!(text.starts_with("Usage: mytool <command> [args...]\n\nRoot tools\n\nGroups:\n  media"), "{text}");
     assert!(text.contains("  check                         Run the checks\n") && !text.contains("helper"), "{text}");
 
     // Without --name, the directory names the program; --root=DIR works too.
@@ -258,7 +258,7 @@ fn root_mode_works_without_a_definition_file() {
     let out = run_root(&t, &["--root", root, "media", "to-pcm", "a"]);
     assert_eq!((stdout(&out).as_str(), out.status.code()), ("to-pcm a\n", Some(3)));
 
-    let data = stdout(&run_root(&t, &["--root", root, "--name", "whspr", "--bash-completion", "--", "media"]));
+    let data = stdout(&run_root(&t, &["--root", root, "--name", "mytool", "--bash-completion", "--", "media"]));
     assert!(data.starts_with("#clyops-completion 1\nskip\t1\ncmd\tto-pcm\tConvert\n"), "{data}");
 }
 
@@ -273,19 +273,20 @@ fn root_mode_completion_scripts_call_the_dispatcher_directly() {
     let root = root.to_str().unwrap();
     let real = std::fs::canonicalize(BIN).unwrap();
 
-    let bash = stdout(&run_root(&t, &["--root", root, "--name", "whspr", "--completion", "bash"]));
-    let call = format!("'{}' '--root' '{}' '--name' 'whspr' --bash-completion", real.display(), canonical.replace('\'', "'\\''"));
+    let bash = stdout(&run_root(&t, &["--root", root, "--name", "mytool", "--completion", "bash"]));
+    let call =
+        format!("'{}' '--root' '{}' '--name' 'mytool' --bash-completion", real.display(), canonical.replace('\'', "'\\''"));
     assert!(bash.contains(&call), "{bash}");
-    assert!(bash.ends_with("complete -F _clyops_whspr whspr\n"));
+    assert!(bash.ends_with("complete -F _clyops_mytool mytool\n"));
 
-    let fish = stdout(&run_root(&t, &["--root", root, "--name", "whspr", "--completion", "fish"]));
+    let fish = stdout(&run_root(&t, &["--root", root, "--name", "mytool", "--completion", "fish"]));
     assert!(
-        fish.contains(&format!("'--root' '{}' '--name' 'whspr' --bash-completion", canonical.replace('\'', "\\'"))),
+        fish.contains(&format!("'--root' '{}' '--name' 'mytool' --bash-completion", canonical.replace('\'', "\\'"))),
         "{fish}"
     );
 
-    let zsh = stdout(&run_root(&t, &["--root", root, "--name", "whspr", "--completion", "zsh"]));
-    assert!(zsh.contains("'--name' 'whspr' --bash-completion") && !zsh.contains("\"${words[1]}\" --bash-completion"), "{zsh}");
+    let zsh = stdout(&run_root(&t, &["--root", root, "--name", "mytool", "--completion", "zsh"]));
+    assert!(zsh.contains("'--name' 'mytool' --bash-completion") && !zsh.contains("\"${words[1]}\" --bash-completion"), "{zsh}");
 }
 
 #[test]

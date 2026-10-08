@@ -413,7 +413,7 @@ subcommands. It is a definition file whose shebang runs `clyops-dispatch`:
 
 ```
 #!/usr/bin/env clyops-dispatch
-description: whisper.c toolchain
+description: mytool toolchain
 ignore: lib, docx
 ```
 
@@ -422,8 +422,8 @@ the same for `DIR`, named `NAME` (default: the directory's name); `DIR/.clyops`
 supplies `description` and `ignore`. This suits a shell alias or function:
 
 ```sh
-alias whspr='clyops-dispatch --root ~/whisper.c/scripts --name whspr'          # bash, fish
-whspr() { clyops-dispatch --root ~/whisper.c/scripts --name whspr "$@"; }       # zsh, bash, fish
+alias mytool='clyops-dispatch --root ~/mytool/scripts --name mytool'          # bash, fish
+mytool() { clyops-dispatch --root ~/mytool/scripts --name mytool "$@"; }       # zsh, bash, fish
 ```
 
 zsh expands aliases before completing, so there the function form is needed.
