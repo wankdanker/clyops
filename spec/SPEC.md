@@ -17,7 +17,7 @@ shows the same demo CLI so the styles can be compared side by side:
 
 ```sh
 clyops_opt PORT port p 8080 "Server port" Network port                       # Bash
-cli.getOpt('PORT', 'port', 'p', '8080', 'Server port', 'Network', 'port');    // JS / TS
+cli.opt('PORT', 'port', 'p', '8080', 'Server port', 'Network', 'port');    // JS / TS
 cli.opt("PORT", "port", "p", "8080", "Server port", group="Network", rule="port")  # Python
 cli.opt("PORT", "port", "p", "8080", "Server port").group("Network").rule("port"); // Rust
 clyops_opt(cli, "PORT", "port", "8080", .short_name = 'p', .description = "Server port", .group = "Network", .rule = "port"); // C

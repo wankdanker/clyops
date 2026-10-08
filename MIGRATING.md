@@ -23,10 +23,14 @@ renaming functions. These are the differences.
 
 ## JavaScript: renamed or removed
 
-* The `Cli` class keeps `getOpt`, `getOptArray`, `getArg`, `getArgVariadic`,
-  `setDescription`, `setEpilog`, `setConfig`, `setPathSearch`,
+* Registration is `opt`, `optArray`, `arg` and `argVariadic`, matching the
+  other languages (Python's `opt`/`opt_array`/`arg`/`arg_variadic`). The old
+  `getOpt`, `getOptArray`, `getArg` and `getArgVariadic` still work as
+  deprecated aliases with the same arguments.
+* `setDescription`, `setEpilog`, `setConfig`, `setPathSearch`,
   `requireCommand`, `parse`, `run`, `usage`, `jsonSchema` and
-  `completionData`. The constructor takes `{ name, root, cwd, env }`.
+  `completionData` keep their names. The constructor takes
+  `{ name, root, cwd, env }`.
 * `run()` is synchronous and returns the values (it was `async`).
 * `parse()` returns `{ status: 'ok' | 'help' | 'error', … }` instead of a boolean.
 * Logging drops the module argument: `info(fmt, …args)` instead of

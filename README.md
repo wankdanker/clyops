@@ -14,7 +14,7 @@ output, error messages and completion when you port it from Bash to Rust.
 clyops_opt PORT port p 8080 "Server port" Network port                      # Bash
 ```
 ```js
-cli.getOpt('PORT', 'port', 'p', '8080', 'Server port', 'Network', 'port');    // JavaScript / TypeScript
+cli.opt('PORT', 'port', 'p', '8080', 'Server port', 'Network', 'port');    // JavaScript / TypeScript
 ```
 ```python
 cli.opt("PORT", "port", "p", "8080", "Server port", "Network", "port")       # Python

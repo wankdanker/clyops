@@ -10,19 +10,20 @@ const { Cli, info } = require('clyops');   // or: import { Cli, info } from 'cly
 
 const cli = new Cli();
 cli.setDescription('Copy files to a server.');
-cli.getArg('SRC', 'File to send', '', 'file:exists');
-cli.getArgVariadic('EXTRA', 'More files', 'file:exists');
-cli.getOpt('HOST', 'host', 'H', 'localhost', 'Server', 'Network', 'hostname');
-cli.getOpt('PORT', 'port', 'p', '22', 'Port', 'Network', 'port');
-cli.getOpt('VERBOSE', 'verbose', 'v', 'flag', 'Chatty');
-cli.getOpt('CONFIG', 'config', 'c', 'optional', 'Config file', 'Config', 'path');
+cli.arg('SRC', 'File to send', '', 'file:exists');
+cli.argVariadic('EXTRA', 'More files', 'file:exists');
+cli.opt('HOST', 'host', 'H', 'localhost', 'Server', 'Network', 'hostname');
+cli.opt('PORT', 'port', 'p', '22', 'Port', 'Network', 'port');
+cli.opt('VERBOSE', 'verbose', 'v', 'flag', 'Chatty');
+cli.opt('CONFIG', 'config', 'c', 'optional', 'Config file', 'Config', 'path');
 cli.setConfig('config', 'send:');
 const args = cli.run();
 
 info('sending %s to %s:%d', args.SRC, args.HOST, args.PORT);
 ```
 
-`run()` handles `--help`, `--help-json-schema`, `--completion <shell>` and errors (exiting the
+Registration is `opt`, `optArray`, `arg` and `argVariadic` (`getOpt`, `getOptArray`, `getArg` and
+`getArgVariadic` remain as deprecated aliases). `run()` handles `--help`, `--help-json-schema`, `--completion <shell>` and errors (exiting the
 process). `parse()` does the same work without exiting and returns `{ status: 'ok' | 'help' | 'error' }`.
 Values are typed: `PORT` is a number, flags are booleans, array options and variadics are arrays.
 

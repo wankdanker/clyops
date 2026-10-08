@@ -401,7 +401,7 @@ export class Cli {
    * Register an option. `defaultValue` is a default, `'flag'` for a boolean
    * flag, `'optional'` for no default, or `''` to make the option required.
    */
-  getOpt(varName: string, long: string, short: string, defaultValue: string, description: string,
+  opt(varName: string, long: string, short: string, defaultValue: string, description: string,
     group = 'Options', validation: Validation = ''): this {
     const kind = defaultValue === 'flag' ? 'flag' : 'value';
     const dflt = defaultValue === 'flag' || defaultValue === 'optional' ? '' : defaultValue;
@@ -410,21 +410,30 @@ export class Cli {
   }
 
   /** Register a repeatable option whose values accumulate into a list. */
-  getOptArray(varName: string, long: string, short: string, description: string,
+  optArray(varName: string, long: string, short: string, description: string,
     group = 'Options', validation: Validation = ''): this {
     return this.addOption({ varName, long, short, kind: 'array', defaultValue: '', required: false,
       description, group, validation, searchDirs: [] });
   }
 
   /** Register a positional argument. An empty default makes it required. */
-  getArg(name: string, description: string, defaultValue = '', validation: Validation = ''): this {
+  arg(name: string, description: string, defaultValue = '', validation: Validation = ''): this {
     return this.addArg({ name, description, defaultValue, validation, variadic: false });
   }
 
   /** Register a final positional argument that collects all remaining tokens. */
-  getArgVariadic(name: string, description: string, validation: Validation = ''): this {
+  argVariadic(name: string, description: string, validation: Validation = ''): this {
     return this.addArg({ name, description, defaultValue: '', validation, variadic: true });
   }
+
+  /** @deprecated Use {@link Cli.opt}; kept for scripts written against `getOpt`. */
+  getOpt(...args: Parameters<Cli['opt']>): this { return this.opt(...args); }
+  /** @deprecated Use {@link Cli.optArray}. */
+  getOptArray(...args: Parameters<Cli['optArray']>): this { return this.optArray(...args); }
+  /** @deprecated Use {@link Cli.arg}. */
+  getArg(...args: Parameters<Cli['arg']>): this { return this.arg(...args); }
+  /** @deprecated Use {@link Cli.argVariadic}. */
+  getArgVariadic(...args: Parameters<Cli['argVariadic']>): this { return this.argVariadic(...args); }
 
   private addOption(opt: OptionDef): this {
     if (this.byLong.has(opt.long)) throw new Error(`Duplicate option --${opt.long}`);

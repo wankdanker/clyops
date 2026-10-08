@@ -6,10 +6,10 @@ import * as esm from 'clyops';
 const { Cli, validate, resolvePath, wrapText, describeRule } = createRequire(import.meta.url)('clyops');
 
 const make = () => new Cli({ name: 't', env: {}, cwd: '/work', root: '/root' })
-  .getArg('file', 'File', '', 'path')
-  .getOpt('COUNT', 'count', 'n', '2', 'Count', 'Options', 'int:1-5')
-  .getOpt('FAST', 'fast', 'f', 'flag', 'Fast')
-  .getOptArray('TAG', 'tag', 't', 'Tags');
+  .arg('file', 'File', '', 'path')
+  .opt('COUNT', 'count', 'n', '2', 'Count', 'Options', 'int:1-5')
+  .opt('FAST', 'fast', 'f', 'flag', 'Fast')
+  .optArray('TAG', 'tag', 't', 'Tags');
 
 test('ESM and CJS builds export the same API', () => {
   assert.equal(typeof esm.Cli, 'function');
@@ -35,16 +35,24 @@ test('parse reports errors and help without exiting', () => {
 });
 
 test('environment is read by variable name', () => {
-  const cli = new Cli({ name: 't', env: { COUNT: '3' } }).getOpt('COUNT', 'count', '', '1', 'Count', 'Options', 'int');
+  const cli = new Cli({ name: 't', env: { COUNT: '3' } }).opt('COUNT', 'count', '', '1', 'Count', 'Options', 'int');
   cli.parse([]);
   assert.equal(cli.get('COUNT'), 3);
   assert.equal(cli.source('count'), 'env');
 });
 
+test('deprecated get* aliases register the same way', () => {
+  const cli = new Cli({ name: 't', env: {} })
+    .getArg('file', 'File').getArgVariadic('rest', 'Rest')
+    .getOpt('N', 'n', '', '1', 'N', 'Options', 'int').getOptArray('T', 't', '', 'Tags');
+  assert.deepEqual(cli.parse(['a', 'b', '--n', '2', '--t', 'x']), { status: 'ok' });
+  assert.deepEqual([cli.get('file'), cli.get('rest'), cli.get('N'), cli.get('T')], ['a', ['b'], 2, ['x']]);
+});
+
 test('registration errors throw', () => {
-  assert.throws(() => new Cli().getOpt('A', 'a', '', '', 'A', 'Options', /** @type {any} */ ('nope')), /Unknown validation rule 'nope' for --a/);
-  assert.throws(() => new Cli().getOpt('A', 'a', 'x', '', 'A').getOpt('B', 'b', 'x', '', 'B'), /duplicate short option -x/);
-  assert.throws(() => new Cli().getArgVariadic('r', 'R').getArg('x', 'X'), /after a variadic/);
+  assert.throws(() => new Cli().opt('A', 'a', '', '', 'A', 'Options', /** @type {any} */ ('nope')), /Unknown validation rule 'nope' for --a/);
+  assert.throws(() => new Cli().opt('A', 'a', 'x', '', 'A').opt('B', 'b', 'x', '', 'B'), /duplicate short option -x/);
+  assert.throws(() => new Cli().argVariadic('r', 'R').arg('x', 'X'), /after a variadic/);
 });
 
 test('validate converts and explains', () => {
