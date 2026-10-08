@@ -111,6 +111,9 @@ directory, builds a form for each from `--help-json-schema`, runs them and strea
 It works the same for tools in any of the languages, and its tests load a real clyops tool, so
 schema changes that would break it fail CI.
 
+Installers for Linux, macOS and Windows are attached to each
+[release](https://github.com/wankdanker/clyops/releases).
+
 ## Repository layout
 
 ```
@@ -168,12 +171,27 @@ Write the library, write `examples/demo.*` registering the CLI described in
 
 ## Releases
 
-Packages are versioned independently and released by tag from CI:
-`js-v1.2.3` (npm), `python-v1.2.3` (PyPI), `rust-v1.2.3` (crates.io),
-`bash-v1.2.3` and `c-v1.2.3` (GitHub releases). The workflow runs the full
-suite first and checks that the tag matches the package version. Publishing
-needs the `NPM_TOKEN` and `CARGO_REGISTRY_TOKEN` secrets and PyPI trusted
-publishing configured for `release.yml` (environment `pypi`).
+Everything in the repo shares one version, and one tag releases it all:
+
+```sh
+python3 tools/version.py set 0.2.0     # bump every manifest
+# add a "## [0.2.0]" section to CHANGELOG.md, commit, then:
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+The [Release workflow](.github/workflows/release.yml) runs the full suite, checks that the tag
+matches every manifest, and attaches to one GitHub release:
+
+- **clyops runner installers:** Linux x64/arm64 (`.deb`, `.rpm`, `.AppImage`), macOS universal
+  (`.dmg`), Windows x64 (`.msi`, setup `.exe`).
+- **libclyops** prebuilt for Linux x64/arm64 and macOS universal, plus a source tarball.
+- The npm tarball, Python wheel and sdist, Rust `.crate` and `clyops.sh`.
+- `SHA256SUMS`.
+
+Running the workflow by hand builds everything as a dry run without releasing. Publishing to
+npm, PyPI and crates.io is a separate manual workflow ([publish.yml](.github/workflows/publish.yml)).
+It needs the `NPM_TOKEN` and `CARGO_REGISTRY_TOKEN` secrets, plus PyPI trusted publishing for
+`publish.yml` with environment `pypi`.
 
 ## Origins
 

@@ -13,6 +13,14 @@ it, and streams the output, so any program built with any clyops package gets a 
   command line, or paste a command line to fill the form.
 - **Templates:** save and reload form values per tool.
 
+## Install
+
+Download the installer for your platform from the
+[latest release](https://github.com/wankdanker/clyops/releases/latest): `.deb`, `.rpm` or
+`.AppImage` on Linux, `.dmg` on macOS (universal), `.msi` or setup `.exe` on Windows. The builds
+are not signed with a paid certificate yet: on macOS right-click the app and choose **Open** the
+first time, and on Windows choose **More info → Run anyway**.
+
 ## Development
 
 Requirements: Node 18+, Rust stable, and the [Tauri system dependencies](https://tauri.app/start/prerequisites/)

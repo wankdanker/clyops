@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- clyops: one eye on the command line -->
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="#111827"/>
+  <path d="M192 512 C 320 300, 704 300, 832 512 C 704 724, 320 724, 192 512 Z" fill="#f9fafb"/>
+  <circle cx="512" cy="512" r="150" fill="#3b82f6"/>
+  <circle cx="512" cy="512" r="70" fill="#111827"/>
+  <circle cx="560" cy="466" r="28" fill="#f9fafb"/>
+  <path d="M352 800 L 432 800" stroke="#3b82f6" stroke-width="40" stroke-linecap="round"/>
+  <path d="M216 760 L 280 800 L 216 840" fill="none" stroke="#3b82f6" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,120 +1,198 @@
 name: Release
 
-# Each package is versioned and released independently by pushing a tag:
+# Pushing a tag vX.Y.Z builds every artifact and attaches them all to one
+# GitHub release. The tag must match the monorepo version (tools/version.py).
 #
-#   js-v0.1.0      -> npm (clyops)                 needs secret NPM_TOKEN
-#   python-v0.1.0  -> PyPI (clyops)                needs PyPI trusted publishing for this workflow
-#   rust-v0.1.0    -> crates.io (clyops)           needs secret CARGO_REGISTRY_TOKEN
-#   bash-v0.1.0    -> GitHub release with clyops.sh
-#   c-v0.1.0       -> GitHub release with a source tarball
+# Running the workflow by hand (Actions → Release → Run workflow) is a dry run:
+# everything is built and kept as workflow artifacts, nothing is released.
 #
-# The tag version must match the version in the package manifest.
+# Publishing to npm, PyPI and crates.io is a separate, manual step: publish.yml.
 
 on:
   push:
-    tags: ["js-v*", "python-v*", "rust-v*", "bash-v*", "c-v*"]
+    tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  meta:
+  verify:
     runs-on: ubuntu-latest
     outputs:
-      package: ${{ steps.parse.outputs.package }}
-      version: ${{ steps.parse.outputs.version }}
-    steps:
-      - id: parse
-        run: |
-          tag="${GITHUB_REF_NAME}"
-          echo "package=${tag%%-v*}" >> "$GITHUB_OUTPUT"
-          echo "version=${tag#*-v}" >> "$GITHUB_OUTPUT"
-
-  # Releases only go out from a commit that passes the whole suite.
-  verify:
-    needs: meta
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22 }
-      - uses: dtolnay/rust-toolchain@stable
-      - run: sudo apt-get update -q && sudo apt-get install -y -q zsh fish
-      - run: make build test conformance completions
-      - name: Check tag matches manifest version
-        env:
-          PKG: ${{ needs.meta.outputs.package }}
-          VERSION: ${{ needs.meta.outputs.version }}
-        run: |
-          case "$PKG" in
-            js) actual=$(node -p "require('./packages/js/package.json').version") ;;
-            python) actual=$(sed -n 's/^version = "\(.*\)"/\1/p' packages/python/pyproject.toml) ;;
-            rust) actual=$(sed -n 's/^version = "\(.*\)"/\1/p' packages/rust/Cargo.toml | head -1) ;;
-            bash) actual=$(sed -n 's/^CLYOPS_VERSION="\(.*\)"/\1/p' packages/bash/clyops.sh) ;;
-            c) actual=$(sed -n 's/^#define CLYOPS_VERSION "\(.*\)"/\1/p' packages/c/include/clyops.h) ;;
-            *) echo "unknown package $PKG"; exit 1 ;;
-          esac
-          [ "$actual" = "$VERSION" ] || { echo "tag says $VERSION but $PKG is at $actual"; exit 1; }
-
-  js:
-    needs: [meta, verify]
-    if: needs.meta.outputs.package == 'js'
-    runs-on: ubuntu-latest
-    permissions: { contents: read, id-token: write }
-    defaults: { run: { working-directory: packages/js } }
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22, registry-url: "https://registry.npmjs.org" }
-      - run: npm ci && npm run build
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-  python:
-    needs: [meta, verify]
-    if: needs.meta.outputs.package == 'python'
-    runs-on: ubuntu-latest
-    permissions: { contents: read, id-token: write }
-    environment: pypi
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.13" }
-      - run: pip install build && python -m build packages/python
-      - uses: pypa/gh-action-pypi-publish@release/v1
-        with: { packages-dir: packages/python/dist }
-
-  rust:
-    needs: [meta, verify]
-    if: needs.meta.outputs.package == 'rust'
-    runs-on: ubuntu-latest
-    defaults: { run: { working-directory: packages/rust } }
-    steps:
-      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo publish
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - id: version
+        name: Version matches the tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            version=$(python3 tools/version.py --tag "$GITHUB_REF_NAME")
+          else
+            version=$(python3 tools/version.py)
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - run: sudo apt-get update -q && sudo apt-get install -y -q zsh fish
+      - run: pip install jsonschema && python3 tools/check-schema.py
+      - run: make build test conformance completions
 
-  github:
-    needs: [meta, verify]
-    if: needs.meta.outputs.package == 'bash' || needs.meta.outputs.package == 'c'
-    runs-on: ubuntu-latest
+  # Desktop installers for the runner app.
+  runner:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # 22.04 keeps the Linux packages compatible with older glibc.
+          - { os: ubuntu-22.04, platform: linux-x64 }
+          - { os: ubuntu-22.04-arm, platform: linux-arm64 }
+          - { os: macos-latest, platform: macos-universal, target: universal-apple-darwin }
+          - { os: windows-latest, platform: windows-x64 }
+    runs-on: ${{ matrix.os }}
+    defaults: { run: { shell: bash } }
     steps:
       - uses: actions/checkout@v4
-      - name: Package
-        env:
-          PKG: ${{ needs.meta.outputs.package }}
-          VERSION: ${{ needs.meta.outputs.version }}
-        run: |
-          mkdir -p out
-          if [ "$PKG" = bash ]; then
-            cp packages/bash/clyops.sh out/clyops.sh
-          else
-            tar -czf "out/libclyops-$VERSION.tar.gz" -C packages c/include c/src c/Makefile c/CMakeLists.txt --transform "s,^c,libclyops-$VERSION,"
-          fi
-      - uses: softprops/action-gh-release@v2
+      - uses: actions/setup-node@v4
         with:
-          files: out/*
-          generate_release_notes: true
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/runner/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: apps/runner/src-tauri, key: "${{ matrix.platform }}" }
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev \
+            libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - name: Build installers
+        working-directory: apps/runner
+        run: |
+          npm ci
+          npx tauri build ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+      - name: Collect
+        run: |
+          bundle=apps/runner/src-tauri/target/${{ matrix.target && format('{0}/', matrix.target) || '' }}release/bundle
+          mkdir -p out
+          shopt -s nullglob
+          for f in "$bundle"/deb/*.deb "$bundle"/rpm/*.rpm "$bundle"/appimage/*.AppImage \
+                   "$bundle"/dmg/*.dmg "$bundle"/msi/*.msi "$bundle"/nsis/*.exe; do
+            cp "$f" out/
+          done
+          ls -l out
+          [ -n "$(ls out)" ] || { echo "no installers were produced"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runner-${{ matrix.platform }}
+          path: out/*
+          if-no-files-found: error
+
+  # Prebuilt static library + header. The C package needs POSIX (regex.h,
+  # getline), so there is no native Windows build.
+  c:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04, platform: linux-x64 }
+          - { os: ubuntu-22.04-arm, platform: linux-arm64 }
+          - { os: macos-latest, platform: macos-universal }
+    runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: make -C packages/c test
+      - if: runner.os == 'macOS'
+        name: Universal library (arm64 + x86_64)
+        working-directory: packages/c
+        run: |
+          for arch in arm64 x86_64; do
+            make "build-$arch/libclyops.a" BUILD="build-$arch" CFLAGS="-std=c11 -O2 -Wall -Wextra -Wpedantic -Werror -arch $arch"
+          done
+          lipo -create build-arm64/libclyops.a build-x86_64/libclyops.a -output build/libclyops.a
+          lipo -info build/libclyops.a
+      - name: Package
+        run: |
+          name="libclyops-$VERSION-${{ matrix.platform }}"
+          mkdir -p "out/$name/include" "out/$name/lib"
+          cp packages/c/include/clyops.h "out/$name/include/"
+          cp packages/c/build/libclyops.a "out/$name/lib/"
+          cp LICENSE packages/c/README.md "out/$name/"
+          tar -czf "out/$name.tar.gz" -C out "$name"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: c-${{ matrix.platform }}
+          path: out/*.tar.gz
+          if-no-files-found: error
+
+  # Platform-independent packages: what the registries get, attached to the
+  # release as well.
+  packages:
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - uses: dtolnay/rust-toolchain@stable
+      - run: mkdir -p out
+      - name: npm package
+        working-directory: packages/js
+        run: npm ci && npm run build && npm pack --pack-destination ../../out
+      - name: Python wheel and sdist
+        run: pip install build && python -m build packages/python --outdir out
+      - name: Rust crate
+        working-directory: packages/rust
+        run: cargo package && cp "target/package/clyops-$VERSION.crate" ../../out/
+      - name: Bash library and C sources
+        run: |
+          cp packages/bash/clyops.sh out/clyops.sh
+          tar -czf "out/libclyops-$VERSION-src.tar.gz" -C packages \
+            --transform "s,^c,libclyops-$VERSION," c/include c/src c/Makefile c/CMakeLists.txt c/README.md
+      - run: ls -l out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: out/*
+          if-no-files-found: error
+
+  release:
+    needs: [verify, runner, c, packages]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS && cat SHA256SUMS
+      - name: Release notes from CHANGELOG.md
+        run: |
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || { echo "CHANGELOG.md has no section for $VERSION"; exit 1; }
+          cat docs/release-footer.md >> notes.md
+      - name: Create the release
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "clyops $VERSION" --notes-file notes.md --verify-tag
