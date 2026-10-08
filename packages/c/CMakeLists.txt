@@ -1,0 +1,17 @@
+cmake_minimum_required(VERSION 3.10)
+project(clyops C)
+
+add_library(clyops src/clyops.c)
+target_include_directories(clyops PUBLIC include)
+set_target_properties(clyops PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
+
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+  enable_testing()
+  add_executable(demo examples/demo.c)
+  target_link_libraries(demo clyops)
+  add_executable(test_clyops tests/test_clyops.c)
+  target_link_libraries(test_clyops clyops)
+  add_test(NAME test_clyops COMMAND test_clyops)
+  install(TARGETS clyops ARCHIVE DESTINATION lib)
+  install(FILES include/clyops.h DESTINATION include)
+endif()
