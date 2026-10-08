@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clyops"
+version = "0.1.0"
+description = "Declarative one-line-per-option CLI parsing: validation, help text, JSON schema, config files and completion."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+keywords = ["cli", "argv", "options", "parser", "argparse", "help", "completion"]
+classifiers = ["Programming Language :: Python :: 3", "License :: OSI Approved :: MIT License", "Environment :: Console"]
+
+[project.urls]
+Homepage = "https://github.com/wankdanker/clyops"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+clyops = ["py.typed"]
+
+[tool.ruff]
+line-length = 130
+target-version = "py38"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# One registration per line, however long the description.
+"examples/*" = ["E501"]
+
+[tool.mypy]
+strict_optional = true
