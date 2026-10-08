@@ -52,6 +52,7 @@ completions: build
 
 lint:
 	python3 tools/sync-completions.py --check
+	python3 tools/check-schema.py
 	cd packages/js && npm run typecheck
 	cd packages/python && ruff check src tests examples && mypy src
 	cd packages/rust && cargo fmt --check && cargo clippy --all-targets -- -D warnings

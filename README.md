@@ -83,7 +83,7 @@ Each package's README shows the same program in its own language:
 | **Paths** | path values become absolute, relative to wherever they came from: the cwd for the command line, the config file's directory for config values, the project root for defaults; optional search directories for bare names |
 | **Config files** | `prefix:key=value` lines, several prefixes per program, `@include` with cycle detection |
 | **Help** | generated `--help`, grouped and wrapped, showing defaults, accepted values and config values |
-| **Introspection** | `--help-json-schema` describes the whole interface for UIs and tooling |
+| **Introspection** | `--help-json-schema` describes the whole interface ([spec/schema.json](spec/schema.json)) for UIs and tooling such as the [runner](apps/runner) |
 | **Completion** | `--completion bash\|zsh\|fish` prints a script that completes options, choices, files, directories and hosts |
 | **Logging** | `info`, `warn`, `error`, `success`, `die` with timestamps and colors (TTY only, `NO_COLOR` aware, `CLYOPS_SILENT`) |
 | **Required commands** | declare external tools a script needs; help shows whether each is installed |
@@ -104,11 +104,19 @@ The script asks the program for its options at completion time
 (`mytool --bash-completion`), so completion follows the code with no
 regeneration step.
 
+## clyops runner
+
+[apps/runner](apps/runner) is a desktop app (Tauri + React) that lists the clyops tools in a
+directory, builds a form for each from `--help-json-schema`, runs them and streams their output.
+It works the same for tools in any of the languages, and its tests load a real clyops tool, so
+schema changes that would break it fail CI.
+
 ## Repository layout
 
 ```
 spec/
   SPEC.md                 behavior contract for every implementation
+  schema.json             JSON Schema of --help-json-schema output
   completions/            bash/zsh/fish completion templates (embedded into each package)
   conformance/            shared demo CLI definition, cases and golden outputs
 packages/
@@ -117,7 +125,10 @@ packages/
   python/                 pure standard library (PyPI: clyops)
   rust/                   crate clyops (only dependency: regex)
   c/                      C11 + POSIX, Makefile and CMake
+apps/
+  runner/                 desktop UI for clyops tools (Tauri + React)
 tools/
+  check-schema.py         validate --help-json-schema output against spec/schema.json
   conformance.py          run the shared cases against one or more implementations
   test-completions.sh     drive the completion scripts in real bash, zsh and fish
   sync-completions.py     embed spec/completions into each package

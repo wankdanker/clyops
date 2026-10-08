@@ -1,0 +1,23 @@
+[package]
+name = "clyops-runner"
+version = "0.1.0"
+description = "Desktop UI that builds forms for clyops tools and runs them"
+license = "MIT"
+repository = "https://github.com/wankdanker/clyops"
+publish = false
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1.6", features = ["v4"] }
+chrono = "0.4"
+tauri-plugin-clipboard-manager = "2.3.2"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

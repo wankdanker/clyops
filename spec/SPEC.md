@@ -326,7 +326,7 @@ line of its own).
 `default` is `"false"` for flags and `""` for `optional`. `type` is
 `boolean` (flags and `bool`), `integer` (`int*`, `port`), `number` (`float*`),
 `choice` (`choice:*`), `path` (`path`, `file:*`, `dir:*`) or `string`.
-`choices` lists the `choice:` values. Output is indented with two spaces.
+`choices` lists the `choice:` values. Output is indented with two spaces. [schema.json](schema.json) is the formal JSON Schema of this output.
 
 ## 9. Completion data (`--bash-completion`)
 
