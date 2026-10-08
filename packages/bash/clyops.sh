@@ -11,9 +11,14 @@
 #
 # Internal state lives in _CLYOPS_* globals; locals in functions that assign
 # caller variables are prefixed with _c_ so they cannot shadow them.
+#
+# SC2178: _c_list is a nameref to a per-option list array, not a string.
+# shellcheck disable=SC2178
 
 if [[ -n "${_CLYOPS_LOADED:-}" ]]; then return 0; fi
 _CLYOPS_LOADED=1
+# shellcheck disable=SC2034  # public: read by callers
+CLYOPS_VERSION="0.1.0"
 
 if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 3) )); then
     echo "clyops.sh requires bash 4.3 or newer (found $BASH_VERSION)" >&2
@@ -379,7 +384,7 @@ _clyops_set_cli() { # long value
 }
 
 _clyops_scan() {
-    local pos=0 end_of_options="" token name value opt cluster j c next
+    local pos=0 end_of_options="" token name value opt cluster j c
     local nargs=${#_CLYOPS_ARGS[@]}
     while (( $# > 0 )); do
         token="$1"; shift
@@ -480,7 +485,7 @@ _clyops_load_config() {
     local opt="$_CLYOPS_CONFIG_OPT" file="" src=cli key
     [[ -v "_CLYOPS_KIND[$opt]" ]] || return 0
     if [[ "${_CLYOPS_HAS[$opt]:-}" ]]; then file="${_CLYOPS_RAW[$opt]}"
-    elif [[ -v "_CLYOPS_ENV[$opt]" ]]; then file="${_CLYOPS_ENV[$opt]}"; src=env
+    elif [[ -v "_CLYOPS_ENV[$opt]" ]]; then file="${_CLYOPS_ENV[$opt]}"; src="env"
     elif [[ -n "${_CLYOPS_DEFAULT[$opt]}" ]]; then file="${_CLYOPS_DEFAULT[$opt]}"; src=default
     fi
     [[ -z "$file" || "$file" == disabled ]] && return 0
@@ -528,7 +533,7 @@ _clyops_resolve_values() {
                 _clyops_bool_word "$value" || { _CLYOPS_ERROR="Environment variable ${_CLYOPS_VAR[$long]} must be a boolean, got '$value'"; return 1; }
                 value="$_r"
             fi
-            _CLYOPS_RAW[$long]="$value"; _CLYOPS_HAS[$long]=1; _CLYOPS_SRC[$long]=env
+            _CLYOPS_RAW[$long]="$value"; _CLYOPS_HAS[$long]=1; _CLYOPS_SRC[$long]="env"
         elif [[ "${_CLYOPS_KIND[$long]}" == flag ]]; then
             _CLYOPS_RAW[$long]=false; _CLYOPS_HAS[$long]=1; _CLYOPS_SRC[$long]=default
         elif [[ -n "${_CLYOPS_DEFAULT[$long]}" ]]; then
@@ -981,7 +986,7 @@ clyops_json_schema() {
 _clyops_completion_kind() { # rule search-dirs -> _r "kind<TAB>values"
     local rule="$1" dirs="$2" kind=default values=""
     case "$rule" in
-        path|file:*) kind=file; values="$dirs" ;;
+        path|file:*) kind="file"; values="$dirs" ;;
         dir:*) kind=dir; values="$dirs" ;;
         choice:*) kind=choice; values="${rule#choice:}" ;;
         bool) kind=choice; values="true,false" ;;

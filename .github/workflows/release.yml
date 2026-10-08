@@ -1,0 +1,120 @@
+name: Release
+
+# Each package is versioned and released independently by pushing a tag:
+#
+#   js-v0.1.0      -> npm (clyops)                 needs secret NPM_TOKEN
+#   python-v0.1.0  -> PyPI (clyops)                needs PyPI trusted publishing for this workflow
+#   rust-v0.1.0    -> crates.io (clyops)           needs secret CARGO_REGISTRY_TOKEN
+#   bash-v0.1.0    -> GitHub release with clyops.sh
+#   c-v0.1.0       -> GitHub release with a source tarball
+#
+# The tag version must match the version in the package manifest.
+
+on:
+  push:
+    tags: ["js-v*", "python-v*", "rust-v*", "bash-v*", "c-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      package: ${{ steps.parse.outputs.package }}
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - id: parse
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          echo "package=${tag%%-v*}" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#*-v}" >> "$GITHUB_OUTPUT"
+
+  # Releases only go out from a commit that passes the whole suite.
+  verify:
+    needs: meta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: dtolnay/rust-toolchain@stable
+      - run: sudo apt-get update -q && sudo apt-get install -y -q zsh fish
+      - run: make build test conformance completions
+      - name: Check tag matches manifest version
+        env:
+          PKG: ${{ needs.meta.outputs.package }}
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          case "$PKG" in
+            js) actual=$(node -p "require('./packages/js/package.json').version") ;;
+            python) actual=$(sed -n 's/^version = "\(.*\)"/\1/p' packages/python/pyproject.toml) ;;
+            rust) actual=$(sed -n 's/^version = "\(.*\)"/\1/p' packages/rust/Cargo.toml | head -1) ;;
+            bash) actual=$(sed -n 's/^CLYOPS_VERSION="\(.*\)"/\1/p' packages/bash/clyops.sh) ;;
+            c) actual=$(sed -n 's/^#define CLYOPS_VERSION "\(.*\)"/\1/p' packages/c/include/clyops.h) ;;
+            *) echo "unknown package $PKG"; exit 1 ;;
+          esac
+          [ "$actual" = "$VERSION" ] || { echo "tag says $VERSION but $PKG is at $actual"; exit 1; }
+
+  js:
+    needs: [meta, verify]
+    if: needs.meta.outputs.package == 'js'
+    runs-on: ubuntu-latest
+    permissions: { contents: read, id-token: write }
+    defaults: { run: { working-directory: packages/js } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, registry-url: "https://registry.npmjs.org" }
+      - run: npm ci && npm run build
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  python:
+    needs: [meta, verify]
+    if: needs.meta.outputs.package == 'python'
+    runs-on: ubuntu-latest
+    permissions: { contents: read, id-token: write }
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - run: pip install build && python -m build packages/python
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with: { packages-dir: packages/python/dist }
+
+  rust:
+    needs: [meta, verify]
+    if: needs.meta.outputs.package == 'rust'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: packages/rust } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  github:
+    needs: [meta, verify]
+    if: needs.meta.outputs.package == 'bash' || needs.meta.outputs.package == 'c'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package
+        env:
+          PKG: ${{ needs.meta.outputs.package }}
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          mkdir -p out
+          if [ "$PKG" = bash ]; then
+            cp packages/bash/clyops.sh out/clyops.sh
+          else
+            tar -czf "out/libclyops-$VERSION.tar.gz" -C packages c/include c/src c/Makefile c/CMakeLists.txt --transform "s,^c,libclyops-$VERSION,"
+          fi
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true

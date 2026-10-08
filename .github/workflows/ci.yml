@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Spec-level checks: generated files in sync, and the completion scripts
+  # driven in real bash, zsh and fish against every implementation.
+  spec:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: dtolnay/rust-toolchain@stable
+      - run: sudo apt-get update -q && sudo apt-get install -y -q zsh fish shellcheck
+      - run: python3 tools/sync-completions.py --check
+      - run: shellcheck -S warning packages/bash/clyops.sh packages/bash/examples/demo.sh packages/bash/test/test.sh tools/*.sh
+      - run: make build
+      - run: make conformance
+      - run: make completions
+
+  js:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        node: [18, 20, 22]
+        include:
+          - { os: macos-latest, node: 22 }
+    runs-on: ${{ matrix.os }}
+    defaults: { run: { working-directory: packages/js } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: packages/js/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - run: python3 ../../tools/conformance.py js ts
+
+  bash:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      # macOS ships bash 3.2; clyops needs 4.3+.
+      - if: runner.os == 'macOS'
+        run: brew install bash && echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
+      - run: bash --version | head -1
+      - run: bash packages/bash/test/test.sh
+      - run: python3 tools/conformance.py bash
+
+  python:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.9", "3.11", "3.13"]
+        include:
+          - { os: macos-latest, python: "3.13" }
+    runs-on: ${{ matrix.os }}
+    defaults: { run: { working-directory: packages/python } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ matrix.python }}" }
+      - run: pip install ruff mypy build
+      - run: ruff check src tests examples
+      - run: mypy src
+      - run: python -m unittest discover -s tests
+      - run: python ../../tools/conformance.py python
+      - run: python -m build
+
+  rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        toolchain: [stable]
+        include:
+          - { os: ubuntu-latest, toolchain: "1.70" }
+    runs-on: ${{ matrix.os }}
+    defaults: { run: { working-directory: packages/rust } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          components: clippy, rustfmt
+      - if: matrix.toolchain == 'stable'
+        run: cargo fmt --check && cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+      - run: cargo build --examples
+      - run: python3 ../../tools/conformance.py rust
+      - if: matrix.toolchain == 'stable'
+        run: cargo package --allow-dirty
+
+  c:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, cc: gcc }
+          - { os: ubuntu-latest, cc: clang }
+          - { os: macos-latest, cc: clang }
+          - { os: ubuntu-latest, cc: clang, sanitize: true }
+    runs-on: ${{ matrix.os }}
+    env:
+      CC: ${{ matrix.cc }}
+    steps:
+      - uses: actions/checkout@v4
+      - if: ${{ !matrix.sanitize }}
+        run: make -C packages/c test
+      - if: ${{ matrix.sanitize }}
+        run: make -C packages/c test CFLAGS="-std=c11 -g -O1 -Wall -Wextra -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined"
+      - run: python3 tools/conformance.py c
+      - name: CMake build
+        run: cmake -S packages/c -B packages/c/cmake-build && cmake --build packages/c/cmake-build && ctest --test-dir packages/c/cmake-build

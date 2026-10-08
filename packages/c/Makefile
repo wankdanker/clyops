@@ -22,7 +22,7 @@ $(BUILD)/test_clyops: tests/test_clyops.c $(BUILD)/libclyops.a
 $(BUILD):
 	mkdir -p $@
 
-test: $(BUILD)/test_clyops
+test: all
 	$(BUILD)/test_clyops
 
 clean:

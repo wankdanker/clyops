@@ -17,6 +17,8 @@
 #ifndef CLYOPS_H
 #define CLYOPS_H
 
+#define CLYOPS_VERSION "0.1.0"
+
 #include <stddef.h>
 
 #ifdef __cplusplus
