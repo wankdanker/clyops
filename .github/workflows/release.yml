@@ -3,14 +3,23 @@ name: Release
 # Pushing a tag vX.Y.Z builds every artifact and attaches them all to one
 # GitHub release. The tag must match the monorepo version (tools/version.py).
 #
-# Running the workflow by hand (Actions → Release → Run workflow) is a dry run:
-# everything is built and kept as workflow artifacts, nothing is released.
+# Running it by hand (Actions → Release → Run workflow), or a push to main that
+# changes the release or installer configuration, is a dry run: everything is
+# built and kept as workflow artifacts, nothing is released.
 #
 # Publishing to npm, PyPI and crates.io is a separate, manual step: publish.yml.
 
 on:
   push:
     tags: ["v*"]
+    # Path filters apply to branch pushes only; tag pushes always run.
+    branches: [main]
+    paths:
+      - ".github/workflows/release.yml"
+      - "apps/runner/package.json"
+      - "apps/runner/src-tauri/tauri.conf.json"
+      - "apps/runner/src-tauri/Cargo.toml"
+      - "apps/runner/src-tauri/icons/**"
   workflow_dispatch:
 
 permissions:
