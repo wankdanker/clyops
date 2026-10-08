@@ -19,4 +19,8 @@ printf 'demo:count=5\nshared:host=example.com\n' > "$tmp/demo.conf"
 args=(--help -c demo.conf); demo > "$golden/help-config.txt"
 args=(--help-json-schema); demo > "$golden/schema.json"
 args=(--bash-completion); demo | sed "s|$tmp|{tmp}|g" > "$golden/completion.txt"
+
+for shell in bash zsh fish; do
+    args=(--completion "$shell"); demo > "$golden/completion-$shell.$shell"
+done
 echo "wrote goldens from $impl"

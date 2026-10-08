@@ -20,6 +20,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Union
 
+from ._completions import SCRIPTS as _COMPLETION_SCRIPTS
+
 __all__ = [
     "Cli", "Values", "ParseResult", "ValidationError", "validate", "resolve_path", "describe_rule", "wrap_text",
     "info", "warn", "error", "success", "die", "set_silent",
@@ -728,6 +730,13 @@ class Cli:
         if "--bash-completion" in head:
             sys.stdout.write(self.completion_data())
             sys.exit(0)
+        if "--completion" in head:
+            shell = head[head.index("--completion") + 1] if head.index("--completion") + 1 < len(head) else ""
+            script = self.completion_script(shell)
+            if script is None:
+                die(1, f"Unknown shell '{shell}' (expected bash, zsh or fish)")
+            sys.stdout.write(script)
+            sys.exit(0)
 
         result = self.parse(argv)
         if result.status == "help":
@@ -865,6 +874,15 @@ class Cli:
             } for o in self._options],
             "requiredCommands": [{"command": c, "description": d, "installHint": h} for c, d, h in self._commands],
         }, indent=2, ensure_ascii=False)
+
+    def completion_script(self, shell: str) -> Optional[str]:
+        """Shell script that enables completion for this program (spec section 9):
+        eval "$(prog --completion bash)". None for an unknown shell."""
+        template = _COMPLETION_SCRIPTS.get(shell)
+        if template is None:
+            return None
+        func = re.sub(r"[^A-Za-z0-9_]", "_", self.name)
+        return template.replace("__CLYOPS_FUNC__", func).replace("__CLYOPS_PROG__", self.name)
 
     def completion_data(self) -> str:
         """Tab-separated completion records (spec section 9)."""

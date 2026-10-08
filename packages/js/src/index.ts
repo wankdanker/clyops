@@ -2,6 +2,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { format } from 'node:util';
+import { COMPLETION_SCRIPTS } from './completions.js';
 
 export type Scalar = string | number | boolean;
 export type Value = Scalar | Scalar[] | null;
@@ -700,6 +701,13 @@ export class Cli {
     const head = end >= 0 ? argv.slice(0, end) : argv;
     if (head.includes('--help-json-schema')) { this.ensureHelp(); process.stdout.write(this.jsonSchema() + '\n'); process.exit(0); }
     if (head.includes('--bash-completion')) { this.ensureHelp(); process.stdout.write(this.completionData()); process.exit(0); }
+    const shellAt = head.indexOf('--completion');
+    if (shellAt >= 0) {
+      const script = this.completionScript(head[shellAt + 1] ?? '');
+      if (script === undefined) die(1, "Unknown shell '%s' (expected bash, zsh or fish)", head[shellAt + 1] ?? '');
+      process.stdout.write(script);
+      process.exit(0);
+    }
 
     const result = this.parse(argv);
     if (result.status === 'help') {
@@ -844,6 +852,15 @@ export class Cli {
       })),
       requiredCommands: this.commands.map((c) => ({ command: c.command, description: c.description, installHint: c.installHint })),
     }, null, 2);
+  }
+
+  /**
+   * Shell script that enables completion for this program (spec section 9):
+   * `eval "$(prog --completion bash)"`. Undefined for an unknown shell.
+   */
+  completionScript(shell: string): string | undefined {
+    const template = Object.prototype.hasOwnProperty.call(COMPLETION_SCRIPTS, shell) ? COMPLETION_SCRIPTS[shell] : undefined;
+    return template?.split('__CLYOPS_FUNC__').join(this.name.replace(/[^A-Za-z0-9_]/g, '_')).split('__CLYOPS_PROG__').join(this.name);
   }
 
   /** Tab-separated completion records (spec section 9). */

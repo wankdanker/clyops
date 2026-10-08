@@ -129,6 +129,52 @@
     }
   },
   {
+    "name": "bash completion script",
+    "args": [
+      "--completion",
+      "bash"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@completion-bash.bash"
+    }
+  },
+  {
+    "name": "zsh completion script",
+    "args": [
+      "--completion",
+      "zsh"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@completion-zsh.zsh"
+    }
+  },
+  {
+    "name": "fish completion script",
+    "args": [
+      "--completion",
+      "fish"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@completion-fish.fish"
+    }
+  },
+  {
+    "name": "completion script for unknown shell",
+    "args": [
+      "--completion",
+      "tcsh"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Unknown shell 'tcsh' (expected bash, zsh or fish)"
+      ]
+    }
+  },
+  {
     "name": "missing positional",
     "args": [],
     "expect": {

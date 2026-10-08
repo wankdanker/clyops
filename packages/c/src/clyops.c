@@ -2,6 +2,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "clyops.h"
+#include "completions.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -995,6 +996,11 @@ void clyops_run(clyops_t* cli, int argc, char** argv) {
     for (int i = 1; i < argc && !streq(argv[i], "--"); i++) {
         if (streq(argv[i], "--help-json-schema")) out = clyops_json_schema(cli);
         else if (streq(argv[i], "--bash-completion")) out = clyops_completion_data(cli);
+        else if (streq(argv[i], "--completion")) {
+            const char* shell = i + 1 < argc ? argv[i + 1] : "";
+            out = clyops_completion_script(cli, shell);
+            if (!out) clyops_die(1, "Unknown shell '%s' (expected bash, zsh or fish)", shell);
+        }
         if (out) {
             fputs(out, stdout);
             if (streq(argv[i], "--help-json-schema")) fputc('\n', stdout);
@@ -1496,4 +1502,30 @@ char* clyops_completion_data(clyops_t* cli) {
         free(desc);
     }
     return sb_take(&b);
+}
+
+static char* replace_all(const char* text, const char* from, const char* to) {
+    sbuf b = {0};
+    size_t n = strlen(from);
+    for (const char* hit; (hit = strstr(text, from)); text = hit + n) {
+        sb_putn(&b, text, (size_t)(hit - text));
+        sb_put(&b, to);
+    }
+    sb_put(&b, text);
+    return sb_take(&b);
+}
+
+char* clyops_completion_script(const clyops_t* cli, const char* shell) {
+    const char* template = streq(shell, "bash") ? CLYOPS_COMPLETION_BASH
+                         : streq(shell, "zsh")  ? CLYOPS_COMPLETION_ZSH
+                         : streq(shell, "fish") ? CLYOPS_COMPLETION_FISH : NULL;
+    if (!template) return NULL;
+    const char* name = cli->name ? cli->name : "cli";
+    char* func = xstrdup(name);
+    for (char* p = func; *p; p++) if (!isalnum((unsigned char)*p) && *p != '_') *p = '_';
+    char* step = replace_all(template, "__CLYOPS_FUNC__", func);
+    char* out = replace_all(step, "__CLYOPS_PROG__", name);
+    free(step);
+    free(func);
+    return out;
 }

@@ -31,6 +31,7 @@ select = ["E", "F", "W", "I", "B"]
 [tool.ruff.lint.per-file-ignores]
 # One registration per line, however long the description.
 "examples/*" = ["E501"]
+"src/clyops/_completions.py" = ["E501"]
 
 [tool.mypy]
 strict_optional = true

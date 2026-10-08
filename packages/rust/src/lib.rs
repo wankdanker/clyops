@@ -11,6 +11,8 @@
 //! println!("{} {} {}", args.str("input"), args.int("PORT"), args.bool("VERBOSE"));
 //! ```
 
+mod completions;
+
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
@@ -1308,6 +1310,16 @@ impl Cli {
                 print!("{}", self.completion_data());
                 std::process::exit(0);
             }
+            if a == "--completion" {
+                let shell = argv.iter().map(AsRef::as_ref).skip_while(|x| *x != "--completion").nth(1).unwrap_or("");
+                match self.completion_script(shell) {
+                    Some(script) => {
+                        print!("{script}");
+                        std::process::exit(0);
+                    }
+                    None => die(1, &format!("Unknown shell '{shell}' (expected bash, zsh or fish)")),
+                }
+            }
         }
         match self.parse(argv) {
             Parsed::Ok => self.values.clone(),
@@ -1550,6 +1562,19 @@ impl Cli {
             ),
         ])
         .pretty()
+    }
+
+    /// Shell script that enables completion for this program (spec section 9):
+    /// `eval "$(prog --completion bash)"`. `None` for an unknown shell.
+    pub fn completion_script(&self, shell: &str) -> Option<String> {
+        let template = match shell {
+            "bash" => completions::BASH,
+            "zsh" => completions::ZSH,
+            "fish" => completions::FISH,
+            _ => return None,
+        };
+        let func: String = self.name.chars().map(|c| if c.is_ascii_alphanumeric() || c == '_' { c } else { '_' }).collect();
+        Some(template.replace("__CLYOPS_FUNC__", &func).replace("__CLYOPS_PROG__", &self.name))
     }
 
     /// Tab-separated completion records (spec section 9).

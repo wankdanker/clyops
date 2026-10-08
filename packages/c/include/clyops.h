@@ -102,6 +102,8 @@ char* clyops_usage(clyops_t* cli);
 char* clyops_json_schema(clyops_t* cli);
 char* clyops_completion_data(clyops_t* cli);
 char* clyops_values_json(const clyops_t* cli);
+/** Script enabling completion in "bash", "zsh" or "fish" (spec section 9); NULL for an unknown shell. */
+char* clyops_completion_script(const clyops_t* cli, const char* shell);
 
 /* Logging: "YYYY-MM-DD HH:MM:SS [level] message" on stderr, printf-style. */
 void clyops_set_silent(int silent);

@@ -127,7 +127,9 @@ Error messages:
 
 1. If `argv` (before any `--`) contains `--help-json-schema`, print the JSON
    schema (section 8) to stdout and exit 0. Likewise `--bash-completion`
-   prints completion data (section 9).
+   prints completion data (section 9), and `--completion SHELL` prints the
+   shell's completion script (section 9); an unknown or missing shell is an
+   error, `Unknown shell 'SHELL' (expected bash, zsh or fish)`, exit 1.
 2. Register the built-in help option (1.4), then scan the command line (2).
 3. If scanning succeeded and a config option is configured, load the config
    file (4).
@@ -350,7 +352,32 @@ Tabs and newlines inside descriptions become spaces. Each flag is followed by a
 | `int*`, `float*`, `port`, `uuid`, `url`, `email`, `date:*`, `regex:*`, `string*` | `none` | |
 | none | `default` | |
 
-`completions/clyops.bash` consumes this format.
+### 9.1 Shell completion scripts
+
+Every program can install its own completion. `--completion bash|zsh|fish`
+prints a script that registers completion for the program's name:
+
+```sh
+eval "$(prog --completion bash)"                                   # ~/.bashrc
+eval "$(prog --completion zsh)"                                    # ~/.zshrc (after compinit)
+prog --completion zsh > "${fpath[1]}/_prog"                        # or install for autoload
+prog --completion fish > ~/.config/fish/completions/prog.fish      # fish
+```
+
+The scripts are the templates in `spec/completions/` with `__CLYOPS_PROG__`
+replaced by the program name and `__CLYOPS_FUNC__` by the name with every
+character outside `[A-Za-z0-9_]` replaced by `_`. Each package embeds the same
+templates (`tools/sync-completions.py`), so the output is byte-identical across
+languages. At completion time the scripts run `prog --bash-completion` and use
+the records above, so they never go stale:
+
+* option names, short and long, with descriptions (zsh, fish);
+* option values by kind: choices, files and directories (including the
+  option's search dirs), host names;
+* positional arguments by position, skipping options and their values, with
+  the variadic argument repeating.
+
+`tools/test-completions.sh` drives the scripts in real bash, zsh and fish.
 
 ## 10. Resolved values as JSON
 
