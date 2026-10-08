@@ -18,7 +18,7 @@ import shutil
 import sys
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence, Union
+from typing import Dict, List, NoReturn, Optional, Sequence, Union
 
 from ._completions import SCRIPTS as _COMPLETION_SCRIPTS
 
@@ -70,7 +70,7 @@ def success(msg: str) -> None:
     _emit("success", msg)
 
 
-def die(code: int, msg: str):
+def die(code: int, msg: str) -> NoReturn:
     """Print an error and exit with `code`. Never suppressed."""
     _emit("error", msg, force=True)
     sys.exit(code)
