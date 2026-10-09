@@ -17,7 +17,7 @@
     "tools"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "type": "module",
   "bin": {
@@ -38,7 +38,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test --test-timeout=60000 test/*.test.mjs",
+    "test": "node --test test/*.test.mjs",
     "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {

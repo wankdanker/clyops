@@ -53,7 +53,7 @@ async function exercise(client) {
 
 const env = { PATH: process.env.PATH, KEY: 'k' };
 
-test('stdio server', async () => {
+test('stdio server', { timeout: 60_000 }, async () => {
   const root = tree();
   const client = new Client({ name: 'test', version: '1' });
   await client.connect(new StdioClientTransport({ command: process.execPath, args: [cli, '--root', root, '--cwd', root], env, stderr: 'pipe' }));
@@ -84,7 +84,7 @@ after(() => {
   server.close();
 });
 
-test('streamable HTTP handler', async () => {
+test('streamable HTTP handler', { timeout: 60_000 }, async () => {
   const client = new Client({ name: 'test', version: '1' });
   await client.connect(new StreamableHTTPClientTransport(url));
   try {

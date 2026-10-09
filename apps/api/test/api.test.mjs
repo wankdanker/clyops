@@ -147,7 +147,7 @@ test('API key', async () => {
   assert.equal(doc.components.securitySchemes.apiKey.scheme, 'bearer');
 });
 
-test('MCP at /mcp, behind the API key', async () => {
+test('MCP at /mcp, behind the API key', { timeout: 60_000 }, async () => {
   const client = new Client({ name: 'test', version: '1' });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`)));
   try {

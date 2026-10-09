@@ -11,6 +11,8 @@ npm install -g clyops-api
 clyops-api --root ~/mytool/scripts            # http://127.0.0.1:8080
 ```
 
+Needs Node 20 or later.
+
 ```
 scripts/
   check.sh            → POST /tools/check
