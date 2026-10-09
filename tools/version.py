@@ -11,6 +11,9 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+sys.path.insert(0, os.path.join(ROOT, "packages", "python", "src"))
+from clyops import Cli  # noqa: E402
+
 # (file, regex whose group 1 is the version). Edits replace only that span, so
 # every file keeps its formatting.
 TOP = r'(?m)^  "version": "([^"]+)"'
@@ -72,11 +75,20 @@ def set_version(version):
 
 
 def main():
-    args = sys.argv[1:]
-    if args[:1] == ["set"] and len(args) == 2:
-        if not re.fullmatch(r"\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?", args[1]):
-            sys.exit(f"not a semantic version: {args[1]}")
-        set_version(args[1])
+    cli = Cli(name="version.py", root=ROOT)
+    cli.set_description("Check or update the version across every monorepo manifest.")
+    cli.set_epilog("Examples:\n  python3 tools/version.py\n  python3 tools/version.py --tag v0.1.0\n"
+                   "  python3 tools/version.py set 0.2.0")
+    cli.arg("command", "Action to perform", "check", "choice:check,set")
+    cli.arg_variadic("version", "New semantic version for set", r"regex:^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?\Z")
+    cli.opt("TAG", "tag", default="optional", description="Release tag that must match the version")
+    args = cli.run()
+    if args.command == "set":
+        if len(args.version) != 1:
+            sys.exit("set requires exactly one semantic version")
+        set_version(args.version[0])
+    elif args.version:
+        sys.exit("check does not accept a version argument")
     found = current()
     versions = {v for _, v in found}
     if len(versions) != 1 or None in versions:
@@ -84,9 +96,8 @@ def main():
             print(f"  {v}\t{rel}")
         sys.exit("versions disagree")
     version = versions.pop()
-    if args[:1] == ["--tag"]:
-        if len(args) != 2 or args[1] != f"v{version}":
-            sys.exit(f"tag {args[1:]} does not match version {version} (expected v{version})")
+    if cli.is_set("tag") and args.TAG != f"v{version}":
+        sys.exit(f"tag {args.TAG} does not match version {version} (expected v{version})")
     print(version)
 
 

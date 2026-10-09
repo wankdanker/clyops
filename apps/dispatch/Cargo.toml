@@ -1,6 +1,6 @@
 [package]
 name = "clyops-dispatch"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.70"
 description = "Turn a directory of clyops tools into one command with nested subcommands, help and shell completion."
@@ -15,5 +15,5 @@ name = "clyops-dispatch"
 path = "src/main.rs"
 
 [dependencies]
-clyops = { path = "../../packages/rust", version = "0.1.0" }
+clyops = { path = "../../packages/rust", version = "0.2.0" }
 serde_json = "1"

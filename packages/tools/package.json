@@ -1,6 +1,6 @@
 {
   "name": "clyops-tools",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Discover, describe and run a directory of clyops tools from Node: schemas, JSON input to argv, JSON Schema.",
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/wankdanker/clyops.git", "directory": "packages/tools" },

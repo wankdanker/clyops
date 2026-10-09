@@ -1,6 +1,6 @@
 {
   "name": "clyops-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Give an AI agent a directory of clyops tools over MCP (stdio or streamable HTTP), with each tool's input schema from its --help-json-schema.",
   "license": "MIT",
   "repository": {
@@ -43,8 +43,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
-    "clyops": "0.1.0",
-    "clyops-tools": "0.1.0"
+    "clyops": "0.2.0",
+    "clyops-tools": "0.2.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
