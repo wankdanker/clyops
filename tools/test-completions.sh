@@ -13,7 +13,10 @@ for i in "${!cmd[@]}"; do [[ ${cmd[i]} == packages/* ]] && cmd[i]="$here/${cmd[i
 work=$(mktemp -d)
 mkdir -p "$work/bin" "$work/root/conf" "$work/root/data"
 printf '#!/bin/sh\n# clyops-tool\nexec %s "$@"\n' "$(printf '%q ' "${cmd[@]}")" > "$work/bin/demo"
-chmod +x "$work/bin/demo"
+# The commands demo sits next to the demo, named tasks (tools/conformance.py).
+cmd[${#cmd[@]}-1]=$(sed 's/\(.*\)demo/\1tasks/' <<< "${cmd[${#cmd[@]}-1]}")
+printf '#!/bin/sh\n# clyops-tool\nexec %s "$@"\n' "$(printf '%q ' "${cmd[@]}")" > "$work/bin/tasks"
+chmod +x "$work/bin/demo" "$work/bin/tasks"
 touch "$work/root/conf/a.conf" "$work/root/conf/b.conf" "$work/root/in.txt"
 
 # A dispatcher "tools" with a plain command and a "media" group holding the demo.
@@ -25,7 +28,8 @@ printf '#!/usr/bin/env clyops-dispatch\ndescription: Test tools\n' > "$work/tree
 printf 'description: Media tools\n' > "$work/tree/media/.clyops"
 printf '#!/bin/sh\necho hello\n' > "$work/tree/hello"
 cp "$work/bin/demo" "$work/tree/media/demo"
-chmod +x "$work/tree/tools" "$work/tree/hello" "$work/tree/media/demo"
+cp "$work/bin/tasks" "$work/tree/media/tasks"
+chmod +x "$work/tree/tools" "$work/tree/hello" "$work/tree/media/demo" "$work/tree/media/tasks"
 ln -s "$work/tree/tools" "$work/bin/tools"
 
 export PATH="$work/bin:$work/dispatch:$PATH" DEMO_ROOT="$work/root" XDG_CACHE_HOME="$work/cache"
@@ -63,14 +67,21 @@ check bash "demo -d "           "conf data "               "$(bash_complete "dem
 check bash "demo --no-v"        "--no-verbose "            "$(bash_complete "demo --no-v")"
 check bash "tools "                        "hello media "            "$(bash_complete "tools ")"
 check bash "tools --comp"                  "--completion "           "$(bash_complete "tools --comp")"
-check bash "tools media "                  "demo "                   "$(bash_complete "tools media ")"
+check bash "tools media "                  "demo tasks "             "$(bash_complete "tools media ")"
 check bash "tools media demo --col"        "--color "                "$(bash_complete "tools media demo --col")"
 check bash "tools media demo --color "     "always auto never "      "$(bash_complete "tools media demo --color ")"
 check bash "tools media demo in.txt "      "fast slow "              "$(bash_complete "tools media demo in.txt ")"
 check bash "tools media demo -n 3 in.txt " "fast slow "              "$(bash_complete "tools media demo -n 3 in.txt ")"
 check bash "rt (alias) "                   "hello media tools "      "$(bash_complete "rt " "$root_alias")"
 check bash "rt (alias) media demo --color " "always auto never "     "$(bash_complete "rt media demo --color " "$root_alias")"
-check bash "rt (alias) tools media "       "demo "                   "$(bash_complete "rt tools media " "$root_alias")"
+check bash "tasks "                        "db send "                "$(bash_complete "tasks ")"
+check bash "tasks db "                     "migrate status "         "$(bash_complete "tasks db ")"
+check bash "tasks db migrate --d"          "--dry-run "              "$(bash_complete "tasks db migrate --d")"
+check bash "tasks db --u"                  "--url "                  "$(bash_complete "tasks db --u")"
+check bash "tasks send --email a@b.co --w" "--webhook "              "$(bash_complete "tasks send --email a@b.co --w")"
+check bash "tools media tasks db "         "migrate status "         "$(bash_complete "tools media tasks db ")"
+check bash "tools media tasks db migrate --d" "--dry-run "           "$(bash_complete "tools media tasks db migrate --d")"
+check bash "rt (alias) tools media "       "demo tasks "             "$(bash_complete "rt tools media " "$root_alias")"
 
 # --- fish: complete -C prints what fish would offer.
 if command -v fish >/dev/null; then
@@ -87,10 +98,14 @@ EOF
     check fish "demo --enabled "   "false true "           "$(fish_complete "demo --enabled ")"
     check fish "demo -d "          "conf/ data/ "          "$(fish_complete "demo -d ")"
     check fish "tools "                    "hello media "          "$(fish_complete "tools ")"
-    check fish "tools media "              "demo "                 "$(fish_complete "tools media ")"
+    check fish "tools media "              "demo tasks "           "$(fish_complete "tools media ")"
     check fish "tools media demo --col"    "--color "              "$(fish_complete "tools media demo --col")"
     check fish "tools media demo in.txt "  "fast slow "            "$(fish_complete "tools media demo in.txt ")"
     check fish "tools media demo --color=" "--color=always --color=auto --color=never " "$(fish_complete "tools media demo --color=")"
+    check fish "tasks "                    "db send "              "$(fish_complete "tasks ")"
+    check fish "tasks db "                 "migrate status "       "$(fish_complete "tasks db ")"
+    check fish "tasks db migrate --d"      "--dry-run "            "$(fish_complete "tasks db migrate --d")"
+    check fish "tools media tasks db "     "migrate status "       "$(fish_complete "tools media tasks db ")"
     check fish "rt (alias) "               "hello media tools "    "$(fish_complete "rt " "$root_alias")"
     check fish "rt (alias) media demo in.txt " "fast slow "        "$(fish_complete "rt media demo in.txt " "$root_alias")"
 else
@@ -133,6 +148,10 @@ EOF
     zsh_offers "tools media " demo
     zsh_offers "tools media demo --color " always auto never
     zsh_offers "tools media demo in.txt " fast slow
+    zsh_offers "tasks " db send "Database tasks"
+    zsh_offers "tasks db " migrate status
+    zsh_offers "tasks db migrate --d" --dry-run
+    zsh_offers "tools media tasks db " migrate status
     # zsh expands aliases before completing, so root mode uses a function there.
     zsh_setup=$root_function
     zsh_offers "rt " hello media tools
