@@ -17,7 +17,7 @@ require "pathname"
 require_relative "clyops/completions"
 
 module Clyops
-  VERSION = "0.1.0"
+  VERSION = "0.2.0"
 
   # -------------------------------------------------------------------------
   # Logging

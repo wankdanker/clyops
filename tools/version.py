@@ -26,6 +26,7 @@ FILES = [
     ("packages/python/pyproject.toml", r'(?m)^version = "([^"]+)"'),
     ("packages/python/src/clyops/__init__.py", r'(?m)^__version__ = "([^"]+)"'),
     ("packages/rust/Cargo.toml", r'(?m)^version = "([^"]+)"'),
+    ("packages/rust/Cargo.lock", r'name = "clyops"\nversion = "([^"]+)"'),
     ("packages/bash/clyops.sh", r'(?m)^CLYOPS_VERSION="([^"]+)"'),
     ("packages/c/include/clyops.h", r'(?m)^#define CLYOPS_VERSION "([^"]+)"'),
     ("packages/go/clyops.go", r'(?m)^const Version = "([^"]+)"'),

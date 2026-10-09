@@ -3,27 +3,38 @@
 All packages in this repository share one version. Each release's notes on GitHub come from its
 section here.
 
-## [Unreleased]
+## [0.2.0] - 2026-10-09
 
-- **Ruby** (`packages/ruby`, gem `clyops`) and **Java** (`packages/java`, Maven
-  `io.github.wankdanker:clyops`, Java 17+): the eighth and ninth implementations, standard
-  library only, passing the full conformance suite and the real-shell completion tests.
-- **Go** (`packages/go`): the seventh implementation, standard library only, passing the full
-  conformance suite and the real-shell completion tests. Released as the Go module
+### New languages
+
+Three more implementations with the same one-line registration, each passing the full
+conformance suite (now run against nine implementations) and the real-shell completion tests:
+
+- **Go** (`packages/go`): standard library only, Go 1.21+. Released as the Go module
   `github.com/wankdanker/clyops/packages/go`, tagged `packages/go/vX.Y.Z` with each release.
+- **Ruby** (`packages/ruby`, gem `clyops`): standard library only, Ruby 3.1+.
+- **Java** (`packages/java`, Maven `io.github.wankdanker:clyops`): no dependencies, Java 17+.
+
+### Running tools from Node, over HTTP and for AI agents
+
 - **clyops-tools** (npm): discover a directory of tools, load their schemas, map JSON input onto
-  a command line ([spec §13](spec/SPEC.md#13-json-input-toargv)), JSON Schema of that input, and
-  run them.
+  a command line ([spec §13](spec/SPEC.md#13-json-input-toargv)), give the JSON Schema of that
+  input, and run them.
 - **clyops-jobs** (npm): a job engine for clyops tools: config-bound functions with templated
   options, artifacts, job records and an in-memory queue.
 - **clyops-api** (npm): serve a directory of tools as an HTTP API, with an endpoint per tool,
-  request validation and an OpenAPI document from each tool's schema, async jobs and MCP at `/mcp`.
+  request validation and an OpenAPI document from each tool's schema, and async jobs.
 - **clyops-mcp** (npm): a directory of tools as MCP tools for AI agents, over stdio
-  (`clyops-mcp --root DIR`) or streamable HTTP; clyops-api serves it at `/mcp`.
+  (`clyops-mcp --root DIR`) or streamable HTTP; clyops-api also serves it at `/mcp`.
 - Hot reload: clyops-api and clyops-mcp follow the tools directory as tools are added, changed
-  or removed (`watchTools` in clyops-tools); `--no-watch` turns it off.
+  or removed; `--no-watch` turns it off.
+
+### Other changes
+
 - The JavaScript packages form one npm workspace at the repository root, and all need Node 20+
   (Node 18 is end-of-life).
+- `tools/version.py` uses clyops for its own command line and also keeps the Rust package's
+  `Cargo.lock` in step.
 
 ## [0.1.0] - 2026-10-08
 
