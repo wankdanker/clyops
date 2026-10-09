@@ -59,6 +59,8 @@ fn read_settings(path: &Path, allow_dir: bool) -> Settings {
             "description" => settings.description = value,
             "ignore" => settings.ignore = value.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
             "dir" if allow_dir => settings.dir = Some(value),
+            // Which tools clyops-api and clyops-mcp serve; running them here is up to the user.
+            "allow" | "deny" => {}
             other => die(1, &format!("{}:{}: unknown key '{other}'", path.display(), n + 1)),
         }
     }

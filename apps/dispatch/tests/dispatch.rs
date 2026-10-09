@@ -221,6 +221,17 @@ fn prints_completion_scripts_named_after_the_dispatcher() {
 }
 
 #[test]
+fn accepts_server_settings() {
+    let t = Tree::new("serverkeys");
+    t.file("tools", "description: T\nallow: media/*\ndeny: media/secret\n", true);
+    t.file("media/.clyops", "description: Media\nallow: x\n", false);
+    t.file("media/hello", "#!/bin/sh\necho hi\n", true);
+    let out = t.run("tools", &["media", "hello"]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert_eq!(stdout(&out), "hi\n");
+}
+
+#[test]
 fn rejects_bad_definitions() {
     let t = Tree::new("bad");
     t.file("tools", "descripton: typo\n", true);

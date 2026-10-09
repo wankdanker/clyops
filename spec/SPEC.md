@@ -546,8 +546,10 @@ an alias would not resolve inside the script.
 
 Lines are `key: value`; blank lines and `#` comments are ignored, and unknown
 keys are errors. Keys: `description` (help text), `dir` (tools directory,
-relative to the definition; default: the definition's directory) and `ignore`
-(comma-separated names to leave out). The definition's real path (symlinks
+relative to the definition; default: the definition's directory), `ignore`
+(comma-separated names to leave out), and `allow` and `deny`
+(comma-separated tool patterns that servers such as clyops-api and
+clyops-mcp apply, section 13; the dispatcher accepts and ignores them). The definition's real path (symlinks
 resolved) locates the tools, so it can be symlinked into `PATH`; the name it is
 run by is the program name.
 
@@ -643,6 +645,28 @@ except `-`, URLs (`scheme://...`) and the `disabled`/`false` sentinels.
 Without one, the tool resolves them against its working directory as usual
 (section 6).
 
+**Secrets** (section 1.5). A caller may pass secret options in the
+environment, under their variable names, instead of on the command line where
+other users can see them in `ps`; array options stay on the command line.
+Then a value in the tool's config file takes precedence, as usual. Command
+lines shown or logged replace a secret's value with `***`.
+
+**Commands** (section 1.7). Each command without commands of its own is a
+tool: its words follow the program's (`tasks db migrate`), its command line
+starts with them, and its schema has the command's arguments, the options of
+the command and of every command above it (nearest first), the nearest
+declared effects, stdin and stdout, and every relationship and required
+command on the way.
+
+**Serving tools.** A server exposing tools to callers (an API, an MCP
+server) can limit which: `allow` and `deny` patterns are globs over a tool's
+words joined by `/` (`*` within a word, `**` across words; a tool must match
+an `allow` pattern when there are any, and no `deny` pattern), from its own
+options and from the root `.clyops` file (both apply); a read-only mode
+serves only tools declaring the `read-only` effect. Path inputs can be
+confined to directories: the value, resolved like above with symlinks
+followed, must lie inside one of them, and values with a scheme are refused.
+
 **JSON Schema.** The input's JSON Schema has one property per argument and
 option (except `help`) under the key above. Types follow the validation rule:
 `int` → `integer` with `minimum`/`maximum` from the bounds, `float` →
@@ -651,5 +675,9 @@ string `enum`, `string:` bounds → `minLength`/`maxLength`, `regex:` →
 `pattern`, and `ip`, `hostname`, `url`, `email`, `uuid` and `date` → `pattern`
 with the section 5 regex; everything else is a string. Array options and
 variadics are arrays of that. Descriptions and typed defaults are carried
-over. Required arguments are required; options are not, since a tool may get
-a required option from its environment or a config file.
+over; secret options are marked `writeOnly: true` and `format: "password"`.
+Required arguments are required; options are not, since a tool may get
+a required option from its environment or a config file. Each pair of
+`exclusive` options becomes an `allOf` entry `{"not": {"required": [A, B], …}}`
+(a flag given as `false` or a `null` value doesn't count); the other
+relationships are left to the tool, like required options.
