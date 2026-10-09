@@ -145,7 +145,8 @@ test('job records', () => {
 
 test('JobQueue runs with a concurrency limit and keeps records', async () => {
   const changes = [];
-  const queue = new JobQueue({ concurrency: 1, prefix: 'q', keep: 2, onChange: (r) => changes.push(`${r.job_id}:${r.status}`) });
+  const dropped = [];
+  const queue = new JobQueue({ concurrency: 1, prefix: 'q', keep: 2, onChange: (r) => changes.push(`${r.job_id}:${r.status}`), onDrop: (r) => dropped.push(r.job_id) });
   const order = [];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const a = queue.add('a', async ({ stage }) => { order.push('a+'); stage('half'); await sleep(30); order.push('a-'); return 1; });
@@ -163,6 +164,34 @@ test('JobQueue runs with a concurrency limit and keeps records', async () => {
   await assert.rejects(c.done);
   assert.equal(c.record.error, 'cancelled');
   assert.equal(queue.get(a.record.job_id), undefined, 'only the newest 2 finished jobs are kept');
+  assert.deepEqual(dropped, [a.record.job_id]);
   assert.deepEqual(queue.list().map((r) => r.function), ['b', 'c']);
   assert.ok(changes.includes(`${b.record.job_id}:error`));
+});
+
+test('runScriptFunction feeds stdin from a file, writes stdout to one and redacts secrets', async () => {
+  const root = workspace();
+  const cat = join(root, 'scripts/upper.sh');
+  writeFileSync(cat, `#!/bin/sh\n# clyops-tool\nexec node -e '
+const { Cli } = require(${JSON.stringify(join(repo, 'packages/js/dist/cjs/index.js'))});
+const cli = new Cli({ name: "upper" });
+cli.opt("TOKEN", "token", "", "optional", "Token", "Auth", "secret");
+cli.setStdin("Text", "text/plain"); cli.setStdout("Upper case", "text/plain");
+cli.run(process.argv.slice(1));
+process.stdin.on("data", (d) => process.stdout.write(String(d).toUpperCase()));
+' -- "$@"\n`);
+  chmodSync(cat, 0o755);
+  writeFileSync(join(root, 'in.txt'), 'hello');
+  const config = {
+    functions: { up: { script: 'scripts/upper.sh', stdin: '${paths.in}', stdout: 'out/${job.id}.txt', artifacts: { required: true } } },
+    up: { token: 's3cret' },
+  };
+  const fn = resolveFunctionConfig(root, config, 'up');
+  const context = { job: { id: 'j1' }, paths: { in: 'in.txt', work_dir: join(root, 'work'), artifacts_dir: join(root, 'done') } };
+  const result = await runScriptFunction(fn, { configRoot: root, context, env, cwd: root });
+  assert.equal(result.exitCode, 0, result.stderr);
+  assert.equal(readFileSync(join(root, 'work/out/j1.txt'), 'utf8'), 'HELLO');
+  assert.equal(result.stdout, '');
+  assert.ok(result.command.includes('***') && !result.command.includes('s3cret'));
+  assert.deepEqual(copyConfiguredArtifacts(fn, context).map((a) => a.key), ['done/j1.txt']);
 });

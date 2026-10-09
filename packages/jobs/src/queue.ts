@@ -22,6 +22,8 @@ export interface QueueOptions {
   keep?: number;
   /** Called on every change, e.g. to persist records. */
   onChange?: (record: JobRecord) => void;
+  /** Called when a finished job is dropped (beyond `keep`), e.g. to remove its files. */
+  onDrop?: (record: JobRecord) => void;
 }
 
 export class JobQueue<R = unknown> {
@@ -90,6 +92,11 @@ export class JobQueue<R = unknown> {
     if (next) next();
     else this.running -= 1;
     this.finished.push(id);
-    while (this.finished.length > (this.opts.keep ?? 1000)) this.jobs.delete(this.finished.shift()!);
+    while (this.finished.length > (this.opts.keep ?? 1000)) {
+      const dropped = this.finished.shift()!;
+      const job = this.jobs.get(dropped);
+      this.jobs.delete(dropped);
+      if (job) this.opts.onDrop?.(job.record);
+    }
   }
 }

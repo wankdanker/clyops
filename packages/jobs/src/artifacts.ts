@@ -62,19 +62,20 @@ export function findFilesByArtifactPattern(pattern: string, context: TemplateCon
     .sort();
 }
 
-/** A function's `artifacts` as a list of include patterns. */
+/** A function's `artifacts` as a list of include patterns, plus its `stdout` file. */
 export function artifactIncludePatterns(fn: ResolvedFunction): string[] {
+  const stdout = fn.definition.stdout ? [String(fn.definition.stdout)] : [];
   const artifacts = fn.definition.artifacts as unknown;
-  if (!artifacts) return [];
-  if (typeof artifacts === 'string') return [artifacts];
-  if (Array.isArray(artifacts)) return artifacts.map(String);
+  if (!artifacts) return stdout;
+  if (typeof artifacts === 'string') return [artifacts, ...stdout];
+  if (Array.isArray(artifacts)) return [...artifacts.map(String), ...stdout];
   if (typeof artifacts === 'object') {
     const a = artifacts as { include?: unknown; includes?: unknown; patterns?: unknown };
     const include = a.include || a.includes || a.patterns;
-    if (typeof include === 'string') return [include];
-    if (Array.isArray(include)) return include.map(String);
+    if (typeof include === 'string') return [include, ...stdout];
+    if (Array.isArray(include)) return [...include.map(String), ...stdout];
   }
-  return [];
+  return stdout;
 }
 
 /** How many artifacts a function must produce: `min`, or 1 for `required: true`. */

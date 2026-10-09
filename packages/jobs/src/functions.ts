@@ -1,16 +1,18 @@
 // Config-bound functions: which tool a function runs and with what options.
 //
-//   { "functions": { "<name>": { "key", "script", "positionals"?, "artifacts"?, "result"? } },
+//   { "functions": { "<name>": { "key", "script", "positionals"?, "stdin"?, "stdout"?, "artifacts"?, "result"? } },
 //     "defaults":  { "<key>": { <tool options> } },
 //     "<key>":     { <overrides> } }
 //
 // Tool options are mapped onto the tool's command line through its
 // --help-json-schema (spec section 13), after `${dot.path}` / `{{dot.path}}`
 // templates are rendered against a context the trigger builds.
-import { inputKeys, loadSchema, run, shellQuote, tail, toArgv, type RunResult, type Schema } from 'clyops-tools';
-import { basename } from 'node:path';
+import { inputKeys, loadSchema, redactArgv, start, shellQuote, tail, toArgv, type RunResult, type Schema } from 'clyops-tools';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { finished } from 'node:stream/promises';
+import { basename, dirname, isAbsolute, resolve } from 'node:path';
 import { renderConfigValue, renderResultMap, renderTemplateString, type TemplateContext } from './template.js';
-import { deepMerge, objectValue, resolveScriptPath, type Json } from './util.js';
+import { deepMerge, ensureDir, objectValue, resolveScriptPath, type Json } from './util.js';
 
 /** Where engine diagnostics go; a trigger installs its own with configureLogging. */
 const LOGGER = {
@@ -32,6 +34,10 @@ export interface FunctionDefinition {
   key?: string;
   script?: string;
   positionals?: unknown[];
+  /** A template for a file fed to the tool's stdin, e.g. '${media.path}'. */
+  stdin?: string;
+  /** A template for the file the tool's stdout is written to; it also counts as an artifact. */
+  stdout?: string;
   artifacts?: unknown;
   result?: unknown;
   [key: string]: unknown;
@@ -111,15 +117,42 @@ export interface FunctionRun extends RunResult {
   stderrTail: string[];
 }
 
-/** Run a function's tool, collecting stdout (a tool may print its result) and stderr. */
+/** A function's `stdin` or `stdout` template rendered, a relative one against `base`. */
+function streamPath(template: string | undefined, opts: CommandOptions, base: string): string | undefined {
+  if (!template) return undefined;
+  const rendered = opts.context ? renderTemplateString(template, opts.context) : template;
+  return isAbsolute(rendered) ? rendered : resolve(base, rendered);
+}
+
+/**
+ * Run a function's tool. Its stdin is the function's `stdin` file, if any;
+ * stdout goes to its `stdout` file, else is collected (a tool may print its
+ * result), and stderr is collected. Secret options are `***` in `command`.
+ */
 export async function runScriptFunction(
   fn: ResolvedFunction,
   opts: CommandOptions & { timeoutMs?: number; env?: NodeJS.ProcessEnv; cwd?: string; signal?: AbortSignal; onStderr?: (chunk: string) => void },
 ): Promise<FunctionRun> {
-  const [file, ...argv] = await buildFunctionCommand(fn, opts);
-  LOGGER.verbose('command: %s', shellQuote([file, ...argv]));
-  const result = await run(file, argv, { cwd: opts.cwd, env: opts.env, timeoutMs: opts.timeoutMs, signal: opts.signal, onStderr: opts.onStderr });
-  return { ...result, stderrTail: tail(result.stderr) };
+  const schema = await loadSchema(fn.script);
+  const [file, ...argv] = await buildFunctionCommand(fn, opts, schema);
+  const command = [file, ...redactArgv(schema, argv)];
+  LOGGER.verbose('command: %s', shellQuote(command));
+  // stdin is input, like a path option; stdout is an artifact, found like one.
+  const workDir = (opts.context?.paths as { work_dir?: string } | undefined)?.work_dir;
+  const stdinPath = streamPath(fn.definition.stdin, opts, opts.configRoot);
+  const stdoutPath = streamPath(fn.definition.stdout, opts, workDir ?? opts.configRoot);
+  const started = start(file, argv, {
+    cwd: opts.cwd, env: opts.env, timeoutMs: opts.timeoutMs, signal: opts.signal, onStderr: opts.onStderr,
+    stdin: stdinPath ? createReadStream(stdinPath) : undefined,
+    stdout: stdoutPath ? 'stream' : 'text',
+  });
+  let written: Promise<void> | undefined;
+  if (stdoutPath) {
+    ensureDir(dirname(stdoutPath));
+    written = finished(started.stdout.pipe(createWriteStream(stdoutPath)));
+  }
+  const [result] = await Promise.all([started.result, written]);
+  return { ...result, command, stderrTail: tail(result.stderr) };
 }
 
 /** The result record every function shares, plus its rendered `result` map. */
