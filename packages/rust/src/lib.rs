@@ -678,6 +678,7 @@ struct Opt {
     group: String,
     rule: String,
     search_dirs: Vec<String>,
+    secret: bool,
 }
 
 impl Opt {
@@ -736,13 +737,20 @@ impl<'a> OptRef<'a> {
         self.cli.options[self.index].group = group.to_string();
         self
     }
-    /// Validation rule (spec section 5). Panics on an unknown rule.
+    /// Validation rule (spec section 5); `secret` or `secret:RULE` marks a secret
+    /// (spec section 1.5). Panics on an unknown rule.
     pub fn rule(self, rule: &str) -> Self {
         let long = self.cli.options[self.index].long.clone();
+        let (secret, rule) = match rule.strip_prefix("secret") {
+            Some("") => (true, ""),
+            Some(r) if r.starts_with(':') => (true, &r[1..]),
+            _ => (false, rule),
+        };
         if !known_rule(rule) {
             panic!("Unknown validation rule '{rule}' for --{long}");
         }
         self.cli.options[self.index].rule = rule.to_string();
+        self.cli.options[self.index].secret = secret;
         self
     }
 }
@@ -782,6 +790,16 @@ pub struct Cli {
     sources: HashMap<String, &'static str>,
     config: HashMap<String, (String, String)>,
     values: Values,
+    effects: Vec<String>,
+    stdin: Option<(String, String)>,
+    stdout: Option<(String, String)>,
+    constraints: Vec<(&'static str, Vec<String>)>,
+    children: Vec<Cli>,
+    word: String,
+    // The ancestors' option names, for checking relationships at registration.
+    inherited: Vec<String>,
+    // The command selected by the last parse, as indexes into `children`.
+    selected: Vec<usize>,
 }
 
 impl Default for Cli {
@@ -812,6 +830,14 @@ impl Cli {
             sources: HashMap::new(),
             config: HashMap::new(),
             values: Values::default(),
+            effects: Vec::new(),
+            stdin: None,
+            stdout: None,
+            constraints: Vec::new(),
+            children: Vec::new(),
+            word: String::new(),
+            inherited: Vec::new(),
+            selected: Vec::new(),
         }
     }
 
@@ -842,6 +868,104 @@ impl Cli {
     pub fn epilog(&mut self, text: &str) -> &mut Self {
         self.epilog = text.into();
         self
+    }
+
+    /// What running the program does: read-only, idempotent, destructive, network.
+    pub fn effects(&mut self, effects: &[&str]) -> &mut Self {
+        for e in effects {
+            if !["read-only", "idempotent", "destructive", "network"].contains(e) {
+                panic!("Unknown effect '{e}'");
+            }
+        }
+        self.effects = effects.iter().map(|e| e.to_string()).collect();
+        self
+    }
+    /// What the program reads on stdin; `content_type` is a MIME type or a comma-separated list.
+    pub fn stdin(&mut self, description: &str, content_type: &str) -> &mut Self {
+        self.stdin = Some((description.into(), content_type.into()));
+        self
+    }
+    /// What the program writes on stdout; undeclared means text.
+    pub fn stdout(&mut self, description: &str, content_type: &str) -> &mut Self {
+        self.stdout = Some((description.into(), content_type.into()));
+        self
+    }
+    /// At most one of these options may be given.
+    pub fn exclusive(&mut self, longs: &[&str]) -> &mut Self {
+        self.add_constraint("exclusive", longs.iter().copied())
+    }
+    /// When `long` is given, the others must be too.
+    pub fn requires(&mut self, long: &str, longs: &[&str]) -> &mut Self {
+        self.add_constraint("requires", std::iter::once(long).chain(longs.iter().copied()))
+    }
+    /// At least one of these options must be given.
+    pub fn one_of(&mut self, longs: &[&str]) -> &mut Self {
+        self.add_constraint("oneOf", longs.iter().copied())
+    }
+
+    fn add_constraint<'a>(&mut self, kind: &'static str, longs: impl Iterator<Item = &'a str>) -> &mut Self {
+        let longs: Vec<String> = longs.map(String::from).collect();
+        for long in &longs {
+            if !self.options.iter().any(|o| &o.long == long) && !self.inherited.contains(long) {
+                panic!("Unknown option --{long} in constraint");
+            }
+        }
+        self.constraints.push((kind, longs));
+        self
+    }
+
+    /// Register a command (spec section 1.7) and return it, to register its options and arguments on.
+    pub fn command(&mut self, name: &str, description: &str) -> &mut Cli {
+        if !self.args.is_empty() {
+            panic!("Cannot mix commands and positional arguments");
+        }
+        if self.children.iter().any(|c| c.word == name) {
+            panic!("Duplicate command {name}");
+        }
+        let mut child = Cli::new();
+        child.name = format!("{} {name}", self.name);
+        child.root = self.root.clone();
+        child.cwd = self.cwd.clone();
+        child.description = description.into();
+        child.word = name.into();
+        child.inherited = self.inherited.iter().cloned().chain(self.options.iter().map(|o| o.long.clone())).collect();
+        self.children.push(child);
+        self.children.last_mut().expect("just pushed")
+    }
+
+    /// The command words selected by the last parse, e.g. `["db", "migrate"]`.
+    pub fn command_path(&self) -> Vec<String> {
+        let mut node = self;
+        let mut out = Vec::new();
+        for &i in &self.selected {
+            node = &node.children[i];
+            out.push(node.word.clone());
+        }
+        out
+    }
+
+    /// The selected command, its parent, ... up to this one.
+    fn chain(&self) -> Vec<&Cli> {
+        let mut node = self;
+        let mut out = vec![self];
+        for &i in &self.selected {
+            node = &node.children[i];
+            out.push(node);
+        }
+        out.reverse();
+        out
+    }
+
+    fn node(&self) -> &Cli {
+        self.chain()[0]
+    }
+
+    fn chain_options(&self) -> Vec<Opt> {
+        self.chain().iter().flat_map(|n| n.options.iter().cloned()).collect()
+    }
+
+    fn chain_find(&self, long: &str) -> Option<Opt> {
+        self.chain_options().into_iter().find(|o| o.long == long)
     }
 
     /// `option` holds the config file path; `prefixes` is comma-separated.
@@ -918,12 +1042,16 @@ impl Cli {
             group: "Options".into(),
             rule: String::new(),
             search_dirs: Vec::new(),
+            secret: false,
         });
         let index = self.options.len() - 1;
         OptRef { cli: self, index }
     }
 
     fn add_arg(&mut self, name: &str, description: &str, default: &str, variadic: bool) -> ArgRef<'_> {
+        if !self.children.is_empty() {
+            panic!("Cannot mix commands and positional arguments");
+        }
         if self.args.iter().any(|a| a.variadic) {
             panic!("Argument {name} registered after a variadic argument");
         }
@@ -945,10 +1073,6 @@ impl Cli {
         }
     }
 
-    fn find(&self, long: &str) -> Option<usize> {
-        self.options.iter().position(|o| o.long == long)
-    }
-
     // -- parsing --------------------------------------------------------------
 
     /// Parse without exiting. Values are available via [`Cli::values`] when the result is `Parsed::Ok`.
@@ -959,6 +1083,7 @@ impl Cli {
         self.sources.clear();
         self.config.clear();
         self.values = Values::default();
+        self.selected.clear();
         self.ensure_help();
 
         let mut result = self.scan(&argv);
@@ -973,8 +1098,9 @@ impl Cli {
         }
 
         let path_var = self.env.get("PATH").cloned().unwrap_or_default();
-        let missing: Vec<&(String, String, String)> =
-            self.commands.iter().filter(|c| !command_available(&c.0, &path_var)).collect();
+        let required: Vec<(String, String, String)> =
+            self.chain().iter().rev().flat_map(|n| n.commands.iter().cloned()).collect();
+        let missing: Vec<&(String, String, String)> = required.iter().filter(|c| !command_available(&c.0, &path_var)).collect();
         if !missing.is_empty() {
             let mut detail = Vec::new();
             for (cmd, desc, hint) in &missing {
@@ -992,7 +1118,7 @@ impl Cli {
         }
 
         let missing: Vec<String> = self
-            .options
+            .chain_options()
             .iter()
             .filter(|o| o.required && !matches!(self.raw.get(&o.long), Some(Raw::One(v)) if !v.is_empty()))
             .map(|o| format!("--{}", o.long))
@@ -1000,11 +1126,41 @@ impl Cli {
         if !missing.is_empty() {
             return Parsed::err(format!("Missing required argument(s): {}", missing.join(" ")));
         }
-        Parsed::Ok
+        match self.check_constraints() {
+            Some(e) => Parsed::err(e),
+            None => Parsed::Ok,
+        }
     }
 
-    fn set_cli(&mut self, i: usize, value: String) {
-        let opt = &self.options[i];
+    /// Spec section 1.6: the first relationship that fails, from the program down.
+    fn check_constraints(&self) -> Option<String> {
+        let given = |long: &str| {
+            let var = self.chain_find(long).map(|o| o.var).unwrap_or_default();
+            matches!(self.source(long), "cli" | "config" | "env")
+                && !matches!(self.values.get(&var), Value::Bool(false))
+                && !matches!(self.values.get(&var), Value::List(l) if l.is_empty())
+        };
+        for node in self.chain().iter().rev() {
+            for (kind, longs) in &node.constraints {
+                let on: Vec<&String> = longs.iter().filter(|l| given(l)).collect();
+                match *kind {
+                    "exclusive" if on.len() > 1 => {
+                        return Some(format!("Options --{} and --{} cannot be used together", on[0], on[1]))
+                    }
+                    "requires" if given(&longs[0]) => {
+                        if let Some(absent) = longs[1..].iter().find(|l| !given(l)) {
+                            return Some(format!("Option --{} requires --{absent}", longs[0]));
+                        }
+                    }
+                    "oneOf" if on.is_empty() => return Some(format!("One of --{} is required", longs.join(", --"))),
+                    _ => {}
+                }
+            }
+        }
+        None
+    }
+
+    fn set_cli(&mut self, opt: &Opt, value: String) {
         let long = opt.long.clone();
         if opt.kind == Kind::Array {
             let mut list = match (self.sources.get(&long), self.raw.remove(&long)) {
@@ -1030,12 +1186,18 @@ impl Cli {
                 let token = argv[i].clone();
                 i += 1;
                 if end_of_options || token == "-" || !token.starts_with('-') {
+                    let node = self.node();
                     if let Some(r) = rest.as_mut() {
                         r.push(token);
-                    } else if pos >= self.args.len() {
+                    } else if !node.children.is_empty() {
+                        match node.children.iter().position(|c| c.word == token) {
+                            Some(i) => self.selected.push(i),
+                            None => return Err(format!("Unknown command: {token}")),
+                        }
+                    } else if pos >= node.args.len() {
                         return Err(format!("Unexpected argument: {token}"));
                     } else {
-                        let arg = &self.args[pos];
+                        let arg = node.args[pos].clone();
                         pos += 1;
                         if arg.variadic {
                             variadic_name = arg.name.clone();
@@ -1051,52 +1213,52 @@ impl Cli {
                         Some((n, v)) => (n.to_string(), Some(v.to_string())),
                         None => (body.to_string(), None),
                     };
-                    if let Some(idx) = self.find(&name) {
-                        let kind = self.options[idx].kind;
+                    if let Some(opt) = self.chain_find(&name) {
+                        let kind = opt.kind;
                         match value {
                             Some(v) if kind == Kind::Flag => match bool_word(&v) {
-                                Some(b) => self.set_cli(idx, b.to_string()),
+                                Some(b) => self.set_cli(&opt, b.to_string()),
                                 None => return Err(format!("Option --{name} expects a boolean value, got '{v}'")),
                             },
-                            Some(v) => self.set_cli(idx, v),
-                            None if kind == Kind::Flag => self.set_cli(idx, "true".into()),
+                            Some(v) => self.set_cli(&opt, v),
+                            None if kind == Kind::Flag => self.set_cli(&opt, "true".into()),
                             None => match argv.get(i) {
                                 Some(next) if !next.starts_with("--") => {
                                     let next = next.clone();
-                                    self.set_cli(idx, next);
+                                    self.set_cli(&opt, next);
                                     i += 1;
                                 }
                                 _ => return Err(format!("Option --{name} requires an argument")),
                             },
                         }
-                    } else if let (Some(target), None) = (name.strip_prefix("no-").and_then(|n| self.find(n)), &value) {
-                        if !self.options[target].bool_like() {
+                    } else if let (Some(target), None) = (name.strip_prefix("no-").and_then(|n| self.chain_find(n)), &value) {
+                        if !target.bool_like() {
                             return Err(format!("Option --{name} can only be used with flag/boolean options"));
                         }
-                        self.set_cli(target, "false".into());
+                        self.set_cli(&target, "false".into());
                     } else {
                         return Err(format!("Unknown option: --{name}"));
                     }
                 } else {
                     let cluster: Vec<char> = token[1..].chars().collect();
                     for (j, ch) in cluster.iter().enumerate() {
-                        let idx = self
-                            .options
-                            .iter()
-                            .position(|o| o.short == ch.to_string())
+                        let opt = self
+                            .chain_options()
+                            .into_iter()
+                            .find(|o| o.short == ch.to_string())
                             .ok_or(format!("Unknown option: -{ch}"))?;
-                        if self.options[idx].kind == Kind::Flag {
-                            self.set_cli(idx, "true".into());
+                        if opt.kind == Kind::Flag {
+                            self.set_cli(&opt, "true".into());
                             continue;
                         }
                         if j + 1 < cluster.len() {
-                            self.set_cli(idx, cluster[j + 1..].iter().collect());
+                            self.set_cli(&opt, cluster[j + 1..].iter().collect());
                             break;
                         }
                         match argv.get(i) {
                             Some(next) if !next.starts_with('-') => {
                                 let next = next.clone();
-                                self.set_cli(idx, next);
+                                self.set_cli(&opt, next);
                                 i += 1;
                             }
                             _ => return Err(format!("Option -{ch} requires an argument")),
@@ -1113,8 +1275,7 @@ impl Cli {
     }
 
     fn load_config(&mut self) -> Result<(), String> {
-        let Some(idx) = self.find(&self.config_option.clone()) else { return Ok(()) };
-        let opt = self.options[idx].clone();
+        let Some(opt) = self.chain_find(&self.config_option.clone()) else { return Ok(()) };
         let (path, source) = match self.raw.get(&opt.long) {
             Some(Raw::One(v)) => (v.clone(), "cli"),
             _ => match self.env.get(&opt.var).filter(|v| !v.is_empty()) {
@@ -1132,11 +1293,11 @@ impl Cli {
 
         let entries: Vec<(String, String)> = self.config.iter().map(|(k, (v, _))| (k.clone(), v.clone())).collect();
         for (key, value) in entries {
-            let Some(t) = self.find(&key) else { continue };
-            if t == idx || self.sources.get(&key) == Some(&"cli") {
+            let Some(t) = self.chain_find(&key) else { continue };
+            if t.long == opt.long || self.sources.get(&key) == Some(&"cli") {
                 continue;
             }
-            let raw = match self.options[t].kind {
+            let raw = match t.kind {
                 Kind::Flag => match bool_word(&value) {
                     Some(b) => Raw::One(b.to_string()),
                     None => return Err(format!("Config value for --{key} must be a boolean, got '{value}'")),
@@ -1199,7 +1360,12 @@ impl Cli {
     }
 
     fn resolve(&mut self) -> Result<(), String> {
-        for arg in &self.args {
+        if !self.node().children.is_empty() {
+            return Err("Missing command".into());
+        }
+        let options = self.chain_options();
+        let args = self.node().args.clone();
+        for arg in &args {
             if self.arg_raw.contains_key(&arg.name) {
                 continue;
             }
@@ -1212,7 +1378,7 @@ impl Cli {
             }
         }
 
-        for opt in &self.options {
+        for opt in &options {
             if self.sources.contains_key(&opt.long) {
                 continue;
             }
@@ -1235,7 +1401,7 @@ impl Cli {
         }
 
         // Path resolution: the base depends on where the value came from.
-        for opt in &self.options {
+        for opt in &options {
             if !is_path_rule(&opt.rule) || opt.long == self.config_option {
                 continue;
             }
@@ -1250,7 +1416,7 @@ impl Cli {
                 Raw::Many(l) => l.iter_mut().for_each(|v| *v = resolve_path(v, &base, &opt.search_dirs)),
             }
         }
-        for arg in &self.args {
+        for arg in &args {
             if !is_path_rule(&arg.rule) {
                 continue;
             }
@@ -1275,7 +1441,7 @@ impl Cli {
             }
         };
         let mut values = Values::default();
-        for opt in &self.options {
+        for opt in &options {
             let value = match (self.raw.get(&opt.long), opt.kind) {
                 (None, Kind::Array) => Value::List(Vec::new()),
                 (None, _) => Value::Null,
@@ -1284,8 +1450,11 @@ impl Cli {
             };
             values.set(&opt.var, value);
         }
-        for arg in &self.args {
+        for arg in &args {
             values.set(&arg.name, convert_raw(&self.arg_raw[&arg.name], &arg.rule, &arg.name)?);
+        }
+        if !self.children.is_empty() {
+            values.set("command", Value::List(self.command_path().into_iter().map(Value::Str).collect()));
         }
         self.values = values;
         Ok(())
@@ -1301,13 +1470,14 @@ impl Cli {
     /// [`Cli::run`] with explicit arguments (excluding the program name).
     pub fn run_with<S: AsRef<str>>(&mut self, argv: &[S]) -> Values {
         let head = argv.iter().map(AsRef::as_ref).take_while(|a| *a != "--");
+        let words: Vec<&str> = argv.iter().map(AsRef::as_ref).skip_while(|a| *a != "--").skip(1).collect();
         for a in head {
             if a == "--help-json-schema" {
                 println!("{}", self.json_schema());
                 std::process::exit(0);
             }
             if a == "--bash-completion" {
-                print!("{}", self.completion_data());
+                print!("{}", self.completion_data_for(&words));
                 std::process::exit(0);
             }
             if a == "--completion" {
@@ -1361,16 +1531,31 @@ impl Cli {
 
     /// Resolved values as JSON (spec section 10).
     pub fn values_json(&self) -> String {
-        Json::Map(self.values.iter().map(|(k, v)| (k.to_string(), Json::from_value(v))).collect()).pretty()
+        let secrets: Vec<String> = self.chain_options().into_iter().filter(|o| o.secret).map(|o| o.var).collect();
+        let mask = |k: &str, v: &Value| match v {
+            _ if !secrets.iter().any(|s| s == k) => Json::from_value(v),
+            Value::Null => Json::Null,
+            Value::List(l) => Json::Arr(l.iter().map(|_| Json::Str("***".into())).collect()),
+            _ => Json::Str("***".into()),
+        };
+        Json::Map(self.values.iter().map(|(k, v)| (k.to_string(), mask(k, v))).collect()).pretty()
     }
 
     // -- output ---------------------------------------------------------------
 
-    /// Help text (spec section 7).
+    /// Help text (spec section 7), for the selected command.
     pub fn usage(&mut self) -> String {
         self.ensure_help();
+        let chain = self.chain();
+        let node = chain[0];
+        let options = self.chain_options();
         let max_width = self.env.get("CLYOPS_MAX_WIDTH").and_then(|w| w.parse::<usize>().ok()).filter(|w| *w > 0).unwrap_or(100);
-        let longest = self.options.iter().map(|o| o.label().chars().count()).max().unwrap_or(0);
+        let longest = options
+            .iter()
+            .map(|o| o.label().chars().count())
+            .chain(node.children.iter().map(|c| c.word.chars().count()))
+            .max()
+            .unwrap_or(0);
         let indent = (longest + 4).clamp(32, 50);
         let text_width = max_width.saturating_sub(indent).max(20);
 
@@ -1396,8 +1581,11 @@ impl Cli {
         };
 
         let mut sections: Vec<Vec<String>> = Vec::new();
-        let mut usage = format!("Usage: {}", self.name);
-        for a in &self.args {
+        let mut usage = format!("Usage: {}", node.name);
+        if !node.children.is_empty() {
+            usage += " <command>";
+        }
+        for a in &node.args {
             usage += &if a.variadic {
                 format!(" [<{}...>]", a.name)
             } else if a.default.is_empty() {
@@ -1408,13 +1596,39 @@ impl Cli {
         }
         sections.push(vec![usage + " [OPTIONS]"]);
 
-        if !self.description.is_empty() {
-            sections.push(wrap_text(&self.description, max_width));
+        if !node.description.is_empty() {
+            sections.push(wrap_text(&node.description, max_width));
         }
 
-        if !self.args.is_empty() {
+        let io: Vec<String> = [("Input:", &node.stdin), ("Output:", &node.stdout)]
+            .iter()
+            .filter_map(|(label, decl)| {
+                let (d, t) = decl.as_ref()?;
+                let mut line = label.to_string();
+                if !d.is_empty() {
+                    line += &format!(" {d}");
+                }
+                if !t.is_empty() {
+                    line += &format!(" ({t})");
+                }
+                Some(line)
+            })
+            .collect();
+        if !io.is_empty() {
+            sections.push(io);
+        }
+
+        if !node.children.is_empty() {
+            let mut lines = vec!["Commands:".to_string()];
+            for c in &node.children {
+                lines.extend(row(&c.word, &c.description));
+            }
+            sections.push(lines);
+        }
+
+        if !node.args.is_empty() {
             let mut lines = vec!["Positional Arguments:".to_string()];
-            for a in &self.args {
+            for a in &node.args {
                 let mut notes = Vec::new();
                 if a.variadic {
                     notes.push("variadic".to_string())
@@ -1430,10 +1644,11 @@ impl Cli {
             sections.push(lines);
         }
 
-        if !self.commands.is_empty() {
+        let required: Vec<&(String, String, String)> = chain.iter().rev().flat_map(|n| n.commands.iter()).collect();
+        if !required.is_empty() {
             let path_var = self.env.get("PATH").cloned().unwrap_or_default();
             let mut lines = vec!["Required Commands:".to_string()];
-            for (cmd, desc, hint) in &self.commands {
+            for (cmd, desc, hint) in required {
                 let status = if command_available(cmd, &path_var) { "installed" } else { "not found" };
                 let text = if hint.is_empty() { desc.clone() } else { format!("{desc} ({hint})") };
                 lines.extend(row(&format!("{cmd} [{status}]"), &text));
@@ -1441,15 +1656,17 @@ impl Cli {
             sections.push(lines);
         }
 
+        let constraints: Vec<&(&str, Vec<String>)> = chain.iter().rev().flat_map(|n| n.constraints.iter()).collect();
+        let list = |longs: &[&String]| longs.iter().map(|l| format!("--{l}")).collect::<Vec<_>>().join(", ");
         let mut groups: Vec<&str> = Vec::new();
-        for o in &self.options {
+        for o in &options {
             if !groups.contains(&o.group.as_str()) {
                 groups.push(&o.group);
             }
         }
         for group in groups {
             let mut lines = vec![format!("{group}:")];
-            for o in self.options.iter().filter(|o| o.group == group) {
+            for o in options.iter().filter(|o| o.group == group) {
                 let mut notes = Vec::new();
                 if o.required {
                     notes.push("required".to_string())
@@ -1457,8 +1674,11 @@ impl Cli {
                 if o.kind == Kind::Array {
                     notes.push("multiple".to_string())
                 }
+                if o.secret {
+                    notes.push("secret".to_string())
+                }
                 if let Some((v, _)) = self.config.get(&o.long) {
-                    notes.push(format!("config: {v}"))
+                    notes.push(format!("config: {}", if o.secret { "***" } else { v }))
                 }
                 if !o.default.is_empty() {
                     notes.push(format!("default: {}", o.default))
@@ -1466,13 +1686,29 @@ impl Cli {
                 if !o.rule.is_empty() {
                     notes.push(format!("accepts: {}", describe_rule(&o.rule)))
                 }
+                for (kind, longs) in constraints.iter().map(|c| (c.0, &c.1)) {
+                    if !longs.contains(&o.long) {
+                        continue;
+                    }
+                    match kind {
+                        "exclusive" => notes.push(format!(
+                            "conflicts with: {}",
+                            list(&longs.iter().filter(|l| **l != o.long).collect::<Vec<_>>())
+                        )),
+                        "requires" if longs[0] == o.long => {
+                            notes.push(format!("requires: {}", list(&longs[1..].iter().collect::<Vec<_>>())))
+                        }
+                        "oneOf" => notes.push(format!("one of: {}", list(&longs.iter().collect::<Vec<_>>()))),
+                        _ => {}
+                    }
+                }
                 lines.extend(row(&o.label(), &annotate(&o.description, &notes)));
             }
             sections.push(lines);
         }
 
-        if !self.epilog.is_empty() {
-            sections.push(self.epilog.trim_end_matches('\n').split('\n').map(String::from).collect());
+        if !node.epilog.is_empty() {
+            sections.push(node.epilog.trim_end_matches('\n').split('\n').map(String::from).collect());
         }
 
         let text = sections.iter().map(|s| s.join("\n")).collect::<Vec<_>>().join("\n\n");
@@ -1482,6 +1718,12 @@ impl Cli {
     /// JSON description of the CLI (spec section 8).
     pub fn json_schema(&mut self) -> String {
         self.ensure_help();
+        let mut fields = vec![("clyops", Json::Num("1".into())), ("script", Json::Str(self.name.clone()))];
+        fields.extend(self.schema_node());
+        Json::Obj(fields).pretty()
+    }
+
+    fn schema_node(&self) -> Vec<(&'static str, Json)> {
         let type_of = |o: &Opt| {
             let r = o.rule.as_str();
             if o.kind == Kind::Flag || r == "bool" {
@@ -1499,9 +1741,12 @@ impl Cli {
             }
         };
         let s = |v: &str| Json::Str(v.to_string());
-        Json::Obj(vec![
-            ("clyops", Json::Num("1".into())),
-            ("script", s(&self.name)),
+        let stream = |d: &Option<(String, String)>| match d {
+            Some((d, t)) => Json::Obj(vec![("description", s(d)), ("contentType", s(t))]),
+            None => Json::Null,
+        };
+        let mut fields = if self.word.is_empty() { Vec::new() } else { vec![("name", s(&self.word))] };
+        fields.extend(vec![
             ("description", s(&self.description)),
             ("epilog", s(&self.epilog)),
             (
@@ -1546,6 +1791,7 @@ impl Cli {
                                         o.rule.strip_prefix("choice:").map(|c| c.split(',').map(s).collect()).unwrap_or_default(),
                                     ),
                                 ),
+                                ("secret", Json::Bool(o.secret)),
                             ])
                         })
                         .collect(),
@@ -1560,8 +1806,21 @@ impl Cli {
                         .collect(),
                 ),
             ),
-        ])
-        .pretty()
+            ("effects", Json::Arr(self.effects.iter().map(|e| s(e)).collect())),
+            (
+                "constraints",
+                Json::Arr(
+                    self.constraints
+                        .iter()
+                        .map(|(k, l)| Json::Obj(vec![("type", s(k)), ("options", Json::Arr(l.iter().map(|o| s(o)).collect()))]))
+                        .collect(),
+                ),
+            ),
+            ("stdin", stream(&self.stdin)),
+            ("stdout", stream(&self.stdout)),
+            ("commands", Json::Arr(self.children.iter().map(|c| Json::Obj(c.schema_node())).collect())),
+        ]);
+        fields
     }
 
     /// Shell script that enables completion for this program (spec section 9):
@@ -1579,10 +1838,34 @@ impl Cli {
 
     /// Tab-separated completion records (spec section 9).
     pub fn completion_data(&mut self) -> String {
+        self.completion_data_for(&[])
+    }
+
+    /// Completion records for the words typed after the program name: a
+    /// program with commands follows them (spec section 9).
+    pub fn completion_data_for(&mut self, words: &[&str]) -> String {
         self.ensure_help();
         let clean = |s: &str| s.replace(['\t', '\n'], " ");
         let mut out = String::from("#clyops-completion 1\n");
-        for o in &self.options {
+        let mut chain = vec![&*self];
+        if !self.children.is_empty() {
+            let mut skip = 0;
+            for w in words {
+                match chain[0].children.iter().find(|c| c.word == *w) {
+                    Some(c) => chain.insert(0, c),
+                    None => break,
+                }
+                skip += 1;
+            }
+            if !chain[0].children.is_empty() && skip < words.len() && !words[skip].starts_with('-') {
+                return out;
+            }
+            let _ = writeln!(out, "skip\t{skip}");
+            for c in &chain[0].children {
+                let _ = writeln!(out, "cmd\t{}\t{}", c.word, clean(&c.description));
+            }
+        }
+        for o in chain.iter().flat_map(|n| n.options.iter()) {
             let short = if o.short.is_empty() { "-".to_string() } else { format!("-{}", o.short) };
             if o.kind == Kind::Flag {
                 let _ = writeln!(out, "opt\t--{}\t{short}\tflag\tnone\t-\t{}", o.long, clean(&o.description));
@@ -1595,7 +1878,7 @@ impl Cli {
                 let _ = writeln!(out, "opt\t--no-{}\t-\tflag\tnone\t-\t{}", o.long, clean(&o.description));
             }
         }
-        for a in &self.args {
+        for a in &chain[0].args {
             let (kind, values) = completion_kind(&a.rule, &[]);
             let values = if values.is_empty() { "-".to_string() } else { values };
             let arity = if a.variadic { "variadic" } else { "single" };

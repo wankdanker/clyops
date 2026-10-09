@@ -9,6 +9,9 @@ fn main() {
     cli.description("Demo program for the clyops conformance suite. It registers one of every kind of option and argument so that each implementation can be checked against the same help text, schema and resolved values.");
     cli.epilog("Examples:\n  demo in.txt slow a b --tag x --tag y\n  demo in.txt -vc demo.conf");
     cli.require_command("sh", "POSIX shell", "install dash");
+    cli.effects(&["idempotent", "network"]);
+    cli.stdin("Lines to process", "text/plain");
+    cli.stdout("The resolved values", "application/json");
 
     cli.arg("input", "Input file", "", "path");
     cli.arg("mode", "Processing mode", "fast", "choice:fast,slow");
@@ -25,7 +28,7 @@ fn main() {
     cli.opt("ENABLED",  "enabled",  "",  "true",      "Enable processing").rule("bool");
     cli.opt_array("TAG", "tag",     "t",              "Tag to attach").rule("string:1-8");
     cli.opt("NO_CACHE", "no-cache", "",  "flag",      "Disable the cache");
-    cli.opt("KEY",      "key",      "k", "",          "API key").group("Auth");
+    cli.opt("KEY",      "key",      "k", "",          "API key").group("Auth").rule("secret");
     cli.opt("HOST",     "host",     "H", "localhost", "Server host").group("Network").rule("hostname");
     cli.opt("PORT",     "port",     "p", "8080",      "Server port").group("Network").rule("port");
     cli.opt("ENDPOINT", "endpoint", "",  "optional",  "Endpoint URL").group("Network").rule("url");
@@ -43,6 +46,8 @@ fn main() {
 
     cli.config("config", "demo:,shared:");
     cli.path_search("config", "conf");
+    cli.exclusive(&["endpoint", "addr"]);
+    cli.requires("dest", &["src"]);
 
     cli.run();
 
