@@ -3,10 +3,11 @@ name: Publish
 # Publishes a released version to the package registries. Run it by hand after
 # the GitHub release exists (Actions → Publish → Run workflow).
 #
-# Needs: secret NPM_TOKEN (npm), secret CARGO_REGISTRY_TOKEN (crates.io), secret
-# RUBYGEMS_API_KEY (rubygems.org), and PyPI trusted publishing configured for
-# this workflow with environment "pypi". The Go module needs no publishing (the
-# release tags it), and the Java jar is attached to the GitHub release.
+# Needs: npm trusted publishing configured for every npm workspace package,
+# secret CARGO_REGISTRY_TOKEN (crates.io), secret RUBYGEMS_API_KEY (rubygems.org),
+# and PyPI trusted publishing configured for this workflow with environment
+# "pypi". The Go module needs no publishing (the release tags it), and the Java
+# jar is attached to the GitHub release.
 
 on:
   workflow_dispatch:
@@ -43,12 +44,16 @@ jobs:
       - uses: actions/checkout@v4
         with: { ref: "${{ inputs.tag }}" }
       - uses: actions/setup-node@v4
-        with: { node-version: 22, registry-url: "https://registry.npmjs.org" }
+        with: { node-version: 24, registry-url: "https://registry.npmjs.org" }
+      # Trusted publishing requires npm >=11.5.1; don't rely on bundled npm.
+      - run: npm install --global npm@11
+      - name: Show publishing tool versions
+        run: |
+          node --version
+          npm --version
       - run: npm ci && npm run build --workspaces && npm test --workspaces
       # Every workspace, in dependency order (npm follows the workspaces list).
       - run: npm publish --workspaces --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   pypi:
     if: inputs.pypi

@@ -401,8 +401,11 @@ matches every manifest, and attaches to one GitHub release:
 
 Running the workflow by hand builds everything as a dry run without releasing. Publishing to
 npm, PyPI, crates.io and RubyGems is a separate manual workflow ([publish.yml](.github/workflows/publish.yml)).
-It needs the `NPM_TOKEN`, `CARGO_REGISTRY_TOKEN` and `RUBYGEMS_API_KEY` secrets, plus PyPI trusted publishing for
-`publish.yml` with environment `pypi`.
+It needs the `CARGO_REGISTRY_TOKEN` and `RUBYGEMS_API_KEY` secrets, plus PyPI trusted publishing for
+`publish.yml` with environment `pypi`. npm uses trusted publishing without an `NPM_TOKEN` secret:
+configure `wankdanker/clyops`, workflow `publish.yml`, no environment, and allow direct publishing
+on each npm package (`clyops`, `clyops-tools`, `clyops-jobs`, `clyops-mcp`, and `clyops-api`).
+The npm job installs npm 11 on Node 24 so it supports OIDC authentication.
 
 ## License
 
