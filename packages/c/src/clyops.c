@@ -192,7 +192,7 @@ enum { K_FLAG, K_VALUE, K_ARRAY };
 typedef struct {
     char *var, *long_name, *dflt, *desc, *group, *rule, *search_raw;
     char short_name;
-    int kind, required;
+    int kind, required, secret;
     svec search; /* absolute search dirs, computed per parse */
     /* per parse */
     int has;
@@ -225,16 +225,53 @@ struct clyops {
     char* error;
     svec detail;
     int show_usage;
+    svec effects;
+    char *stdin_desc, *stdin_type, *stdout_desc, *stdout_type; /* NULL desc: undeclared */
+    svec con_type, con_opts; /* relationships: type and space-separated long names */
+    clyops_t** kids;
+    size_t nkids, capkids;
+    clyops_t* parent;
+    char* word;
+    /* On the program: the selected command, its words, and the chain's options, deepest first. */
+    clyops_t* selected;
+    svec words;
+    opt_t** chain;
+    size_t nchain;
 };
 
 clyops_t* clyops_new(const char* name) {
     clyops_t* cli = xalloc(sizeof *cli);
     cli->name = xstrdup(name);
     cli->root = xstrdup(".");
+    cli->selected = cli;
     return cli;
 }
 
+/* The commands from the program down to the selected one (at most 64 deep). */
+static size_t nodes_down(const clyops_t* root, const clyops_t** out) {
+    size_t n = 0;
+    for (const clyops_t* c = root->selected; c && n < 64; c = c == root ? NULL : c->parent) out[n++] = c;
+    for (size_t i = 0; i < n / 2; i++) {
+        const clyops_t* t = out[i];
+        out[i] = out[n - 1 - i];
+        out[n - 1 - i] = t;
+    }
+    return n;
+}
+
+/* Collect the chain's options, deepest command first. */
+static void rebuild_chain(clyops_t* root) {
+    root->nchain = 0;
+    for (const clyops_t* c = root->selected; c; c = c == root ? NULL : c->parent) {
+        root->chain = realloc(root->chain, (root->nchain + c->nopts + 1) * sizeof *root->chain);
+        if (!root->chain) { fputs("clyops: out of memory\n", stderr); exit(70); }
+        for (size_t i = 0; i < c->nopts; i++) root->chain[root->nchain++] = &c->opts[i];
+    }
+}
+
 static void reset_parse(clyops_t* cli) {
+    for (size_t i = 0; i < cli->nkids; i++) reset_parse(cli->kids[i]);
+    sv_clear(&cli->words);
     for (size_t i = 0; i < cli->nopts; i++) {
         opt_t* o = &cli->opts[i];
         o->has = 0;
@@ -277,8 +314,12 @@ void clyops_free(clyops_t* cli) {
         free(a->name); free(a->desc); free(a->dflt); free(a->rule);
         sv_free(&a->list);
     }
+    for (size_t i = 0; i < cli->nkids; i++) clyops_free(cli->kids[i]);
+    free(cli->kids); free(cli->chain); sv_free(&cli->words);
     free(cli->opts); free(cli->args); free(cli->cfg);
     sv_free(&cli->cmds); sv_free(&cli->cmd_desc); sv_free(&cli->cmd_hint); sv_free(&cli->prefixes); sv_free(&cli->detail);
+    sv_free(&cli->effects); sv_free(&cli->con_type); sv_free(&cli->con_opts);
+    free(cli->stdin_desc); free(cli->stdin_type); free(cli->stdout_desc); free(cli->stdout_type); free(cli->word);
     free(cli->name); free(cli->root); free(cli->cwd); free(cli->root_abs);
     free(cli->description); free(cli->epilog); free(cli->config_option);
     free(cli);
@@ -328,6 +369,68 @@ static opt_t* find_short(const clyops_t* cli, char c) {
     return NULL;
 }
 
+/* An option of the selected chain, by long (or, when long_name is NULL, short) name. */
+static opt_t* chain_find(const clyops_t* root, const char* long_name, char c) {
+    for (size_t i = 0; i < root->nchain; i++)
+        if (long_name ? streq(root->chain[i]->long_name, long_name) : root->chain[i]->short_name == c) return root->chain[i];
+    return NULL;
+}
+
+void clyops_set_effects(clyops_t* cli, const char* const* effects) {
+    sv_clear(&cli->effects);
+    for (; *effects; effects++) {
+        if (!streq(*effects, "read-only") && !streq(*effects, "idempotent") && !streq(*effects, "destructive") && !streq(*effects, "network"))
+            clyops_die(2, "Unknown effect '%s'", *effects);
+        sv_push(&cli->effects, xstrdup(*effects));
+    }
+}
+
+void clyops_stdin(clyops_t* cli, const char* description, const char* content_type) {
+    set_str(&cli->stdin_desc, description);
+    set_str(&cli->stdin_type, content_type);
+}
+
+void clyops_stdout(clyops_t* cli, const char* description, const char* content_type) {
+    set_str(&cli->stdout_desc, description);
+    set_str(&cli->stdout_type, content_type);
+}
+
+void clyops_add_constraint(clyops_t* cli, const char* type, const char* const* long_names) {
+    sbuf b = {0};
+    for (; *long_names; long_names++) {
+        const clyops_t* c = cli;
+        while (c && !find_opt(c, *long_names)) c = c->parent;
+        if (!c) clyops_die(2, "Unknown option --%s in constraint", *long_names);
+        if (b.len) sb_putc(&b, ' ');
+        sb_put(&b, *long_names);
+    }
+    sv_push(&cli->con_type, xstrdup(type));
+    sv_push(&cli->con_opts, sb_take(&b));
+}
+
+clyops_t* clyops_command(clyops_t* cli, const char* name, const char* description) {
+    if (cli->nargs) clyops_die(2, "Cannot mix commands and positional arguments");
+    for (size_t i = 0; i < cli->nkids; i++)
+        if (streq(cli->kids[i]->word, name)) clyops_die(2, "Duplicate command %s", name);
+    if (cli->nkids == cli->capkids) {
+        cli->capkids = cli->capkids ? cli->capkids * 2 : 4;
+        clyops_t** p = realloc(cli->kids, cli->capkids * sizeof *p);
+        if (!p) { fputs("clyops: out of memory\n", stderr); exit(70); }
+        cli->kids = p;
+    }
+    clyops_t* kid = clyops_new(NULL);
+    kid->word = xstrdup(name);
+    kid->description = xstrdup(description ? description : "");
+    kid->parent = cli;
+    cli->kids[cli->nkids++] = kid;
+    return kid;
+}
+
+static clyops_t* find_kid(const clyops_t* cli, const char* word) {
+    for (size_t i = 0; i < cli->nkids; i++) if (streq(cli->kids[i]->word, word)) return cli->kids[i];
+    return NULL;
+}
+
 void clyops_path_search(clyops_t* cli, const char* long_name, const char* dirs) {
     opt_t* o = find_opt(cli, long_name);
     if (!o) clyops_die(2, "clyops_path_search: unknown option --%s", long_name);
@@ -356,6 +459,8 @@ static int known_rule(const char* r) {
 static void add_opt(clyops_t* cli, const char* var, const char* long_name, int kind, const char* dflt, int required, clyops_meta_t m) {
     if (find_opt(cli, long_name)) clyops_die(2, "Duplicate option --%s", long_name);
     if (m.short_name && find_short(cli, m.short_name)) clyops_die(2, "Invalid or duplicate short option -%c", m.short_name);
+    int secret = m.rule && (streq(m.rule, "secret") || starts(m.rule, "secret:"));
+    if (secret) m.rule = m.rule[6] ? m.rule + 7 : "";
     if (!known_rule(m.rule)) clyops_die(2, "Unknown validation rule '%s' for --%s", m.rule, long_name);
     if (cli->nopts == cli->capopts) {
         cli->capopts = cli->capopts ? cli->capopts * 2 : 16;
@@ -375,6 +480,7 @@ static void add_opt(clyops_t* cli, const char* var, const char* long_name, int k
     o->group = xstrdup(empty(m.group) ? "Options" : m.group);
     o->rule = xstrdup(m.rule ? m.rule : "");
     o->search_raw = xstrdup("");
+    o->secret = secret;
 }
 
 void clyops_add_opt(clyops_t* cli, const char* var, const char* long_name, const char* default_value, clyops_meta_t meta) {
@@ -388,6 +494,7 @@ void clyops_add_opt_array(clyops_t* cli, const char* var, const char* long_name,
 }
 
 static void add_arg(clyops_t* cli, const char* name, clyops_meta_t m, int variadic) {
+    if (cli->nkids) clyops_die(2, "Cannot mix commands and positional arguments");
     for (size_t i = 0; i < cli->nargs; i++)
         if (cli->args[i].variadic) clyops_die(2, "Argument %s registered after a variadic argument", name);
     if (!known_rule(m.rule)) clyops_die(2, "Unknown validation rule '%s' for %s", m.rule, name);
@@ -660,9 +767,18 @@ static int scan(clyops_t* cli, int argc, char** argv) {
     for (int i = 0; i < argc; i++) {
         const char* tok = argv[i];
         if (end_of_options || streq(tok, "-") || tok[0] != '-') {
+            clyops_t* node = cli->selected;
             if (rest) { sv_push(&rest->list, xstrdup(tok)); continue; }
-            if (pos >= cli->nargs) { set_error(cli, fmt("Unexpected argument: %s", tok)); return 0; }
-            arg_t* a = &cli->args[pos++];
+            if (node->nkids) {
+                clyops_t* kid = find_kid(node, tok);
+                if (!kid) { set_error(cli, fmt("Unknown command: %s", tok)); return 0; }
+                cli->selected = kid;
+                sv_push(&cli->words, xstrdup(tok));
+                rebuild_chain(cli);
+                continue;
+            }
+            if (pos >= node->nargs) { set_error(cli, fmt("Unexpected argument: %s", tok)); return 0; }
+            arg_t* a = &node->args[pos++];
             a->has = 1;
             if (a->variadic) { rest = a; sv_push(&a->list, xstrdup(tok)); }
             else a->raw = xstrdup(tok);
@@ -671,8 +787,8 @@ static int scan(clyops_t* cli, int argc, char** argv) {
         } else if (starts(tok, "--")) {
             const char* eq = strchr(tok, '=');
             char* name = eq ? xstrndup(tok + 2, (size_t)(eq - tok - 2)) : xstrdup(tok + 2);
-            opt_t* o = find_opt(cli, name);
-            opt_t* neg = (!o && !eq && starts(name, "no-")) ? find_opt(cli, name + 3) : NULL;
+            opt_t* o = chain_find(cli, name, 0);
+            opt_t* neg = (!o && !eq && starts(name, "no-")) ? chain_find(cli, name + 3, 0) : NULL;
             int ok = 1;
             if (o && eq) {
                 if (o->kind == K_FLAG) {
@@ -695,7 +811,7 @@ static int scan(clyops_t* cli, int argc, char** argv) {
             if (!ok) return 0;
         } else {
             for (const char* c = tok + 1; *c; c++) {
-                opt_t* o = find_short(cli, *c);
+                opt_t* o = chain_find(cli, NULL, *c);
                 if (!o) { set_error(cli, fmt("Unknown option: -%c", *c)); return 0; }
                 if (o->kind == K_FLAG) { set_cli(o, "true"); continue; }
                 if (c[1]) { set_cli(o, c + 1); break; }
@@ -787,7 +903,7 @@ static int read_config(clyops_t* cli, const char* path, int depth, svec* stack) 
 }
 
 static int load_config(clyops_t* cli) {
-    opt_t* co = find_opt(cli, cli->config_option);
+    opt_t* co = chain_find(cli, cli->config_option, 0);
     if (!co) return 1;
     const char* path = NULL;
     const char* src = "cli";
@@ -809,7 +925,7 @@ static int load_config(clyops_t* cli) {
 
     for (size_t i = 0; i < cli->ncfg; i++) {
         cfg_t* c = &cli->cfg[i];
-        opt_t* o = find_opt(cli, c->key);
+        opt_t* o = chain_find(cli, c->key, 0);
         if (!o || o == co || streq(o->src, "cli")) continue;
         if (o->kind == K_FLAG) {
             int b;
@@ -831,16 +947,18 @@ static int load_config(clyops_t* cli) {
 }
 
 static int resolve_values(clyops_t* cli) {
-    for (size_t i = 0; i < cli->nargs; i++) {
-        arg_t* a = &cli->args[i];
+    clyops_t* node = cli->selected;
+    if (node->nkids) { set_error(cli, xstrdup("Missing command")); return 0; }
+    for (size_t i = 0; i < node->nargs; i++) {
+        arg_t* a = &node->args[i];
         if (a->has || a->variadic) continue;
         if (empty(a->dflt)) { set_error(cli, fmt("Missing required positional argument: %s", a->name)); return 0; }
         a->raw = xstrdup(a->dflt);
         a->has = 1;
     }
 
-    for (size_t i = 0; i < cli->nopts; i++) {
-        opt_t* o = &cli->opts[i];
+    for (size_t i = 0; i < cli->nchain; i++) {
+        opt_t* o = cli->chain[i];
         if (o->src) continue;
         const char* env = o->kind == K_ARRAY ? NULL : getenv(o->var);
         if (!empty(env)) {
@@ -864,8 +982,8 @@ static int resolve_values(clyops_t* cli) {
     }
 
     /* Path resolution: the base depends on where the value came from. */
-    for (size_t i = 0; i < cli->nopts; i++) {
-        opt_t* o = &cli->opts[i];
+    for (size_t i = 0; i < cli->nchain; i++) {
+        opt_t* o = cli->chain[i];
         if (!is_path_rule(o->rule) || !o->has || streq(o->long_name, cli->config_option)) continue;
         const char* base = streq(o->src, "cli") ? cli->cwd : streq(o->src, "config") ? o->cfg_dir : cli->root_abs;
         if (o->kind == K_ARRAY) {
@@ -880,8 +998,8 @@ static int resolve_values(clyops_t* cli) {
             o->raw = r;
         }
     }
-    for (size_t i = 0; i < cli->nargs; i++) {
-        arg_t* a = &cli->args[i];
+    for (size_t i = 0; i < node->nargs; i++) {
+        arg_t* a = &node->args[i];
         if (!is_path_rule(a->rule)) continue;
         if (a->variadic) {
             for (size_t k = 0; k < a->list.len; k++) {
@@ -898,8 +1016,8 @@ static int resolve_values(clyops_t* cli) {
 
     /* Validation; empty values are not validated. bool rules normalize to true/false. */
     const char* norm;
-    for (size_t i = 0; i < cli->nopts; i++) {
-        opt_t* o = &cli->opts[i];
+    for (size_t i = 0; i < cli->nchain; i++) {
+        opt_t* o = cli->chain[i];
         if (empty(o->rule) || !o->has) continue;
         char* name = fmt("--%s", o->long_name);
         char* err = NULL;
@@ -916,8 +1034,8 @@ static int resolve_values(clyops_t* cli) {
         free(name);
         if (err) { set_error(cli, err); return 0; }
     }
-    for (size_t i = 0; i < cli->nargs; i++) {
-        arg_t* a = &cli->args[i];
+    for (size_t i = 0; i < node->nargs; i++) {
+        arg_t* a = &node->args[i];
         if (empty(a->rule)) continue;
         char* err = NULL;
         if (a->variadic) {
@@ -935,23 +1053,72 @@ static int resolve_values(clyops_t* cli) {
     return 1;
 }
 
+/* Absolute search dirs for the options of `cli` and its commands. */
+static void prepare_search(clyops_t* cli, const char* root_abs) {
+    for (size_t i = 0; i < cli->nopts; i++) {
+        opt_t* o = &cli->opts[i];
+        sv_clear(&o->search);
+        char* copy = xstrdup(o->search_raw);
+        char* save = NULL;
+        for (char* d = strtok_r(copy, ":", &save); d; d = strtok_r(NULL, ":", &save)) sv_push(&o->search, join_norm(root_abs, d));
+        free(copy);
+    }
+    for (size_t i = 0; i < cli->nkids; i++) prepare_search(cli->kids[i], root_abs);
+}
+
+/* An option is given when set by cli, config or env, and not false or an empty list (spec section 1.6). */
+static int given(const clyops_t* cli, const char* long_name) {
+    const opt_t* o = chain_find(cli, long_name, 0);
+    if (!o || !(streq(o->src, "cli") || streq(o->src, "config") || streq(o->src, "env"))) return 0;
+    if (o->kind == K_ARRAY) return o->list.len > 0;
+    return !((o->kind == K_FLAG || streq(o->rule, "bool")) && streq(o->raw, "false"));
+}
+
+/* Spec section 1.6: the first relationship that fails, from the program down. */
+static char* check_constraints(const clyops_t* cli) {
+    const clyops_t* nodes[64];
+    size_t n = nodes_down(cli, nodes);
+    for (size_t k = 0; k < n; k++) {
+        for (size_t c = 0; c < nodes[k]->con_type.len; c++) {
+            const char* type = nodes[k]->con_type.v[c];
+            char* copy = xstrdup(nodes[k]->con_opts.v[c]);
+            char *save = NULL, *longs[64];
+            size_t nl = 0, on[64], non = 0;
+            for (char* t = strtok_r(copy, " ", &save); t && nl < 64; t = strtok_r(NULL, " ", &save)) {
+                if (given(cli, t)) on[non++] = nl;
+                longs[nl++] = t;
+            }
+            char* err = NULL;
+            if (streq(type, "exclusive") && non > 1) {
+                err = fmt("Options --%s and --%s cannot be used together", longs[on[0]], longs[on[1]]);
+            } else if (streq(type, "requires") && given(cli, longs[0])) {
+                for (size_t i = 1; i < nl && !err; i++)
+                    if (!given(cli, longs[i])) err = fmt("Option --%s requires --%s", longs[0], longs[i]);
+            } else if (streq(type, "oneOf") && non == 0) {
+                sbuf b = {0};
+                for (size_t i = 0; i < nl; i++) sb_printf(&b, "%s--%s", i ? ", " : "", longs[i]);
+                err = fmt("One of %s is required", b.s);
+                free(b.s);
+            }
+            free(copy);
+            if (err) return err;
+        }
+    }
+    return NULL;
+}
+
 clyops_status_t clyops_parse(clyops_t* cli, int argc, char** argv) {
     reset_parse(cli);
     ensure_help(cli);
+    cli->selected = cli;
+    rebuild_chain(cli);
 
     char buf[PATH_MAX];
     free(cli->cwd);
     cli->cwd = xstrdup(getcwd(buf, sizeof buf) ? buf : "/");
     free(cli->root_abs);
     cli->root_abs = join_norm(cli->cwd, cli->root);
-    for (size_t i = 0; i < cli->nopts; i++) {
-        opt_t* o = &cli->opts[i];
-        sv_clear(&o->search);
-        char* copy = xstrdup(o->search_raw);
-        char* save = NULL;
-        for (char* d = strtok_r(copy, ":", &save); d; d = strtok_r(NULL, ":", &save)) sv_push(&o->search, join_norm(cli->root_abs, d));
-        free(copy);
-    }
+    prepare_search(cli, cli->root_abs);
 
     int ok = scan(cli, argc, argv);
     if (ok && !empty(cli->config_option)) ok = load_config(cli);
@@ -960,11 +1127,16 @@ clyops_status_t clyops_parse(clyops_t* cli, int argc, char** argv) {
     if (!ok || !resolve_values(cli)) return CLYOPS_ERROR;
 
     sbuf missing = {0};
-    for (size_t i = 0; i < cli->cmds.len; i++) {
-        if (command_available(cli->cmds.v[i])) continue;
-        sb_printf(&missing, "%s%s", missing.len ? ", " : "", cli->cmds.v[i]);
-        sv_push(&cli->detail, fmt("  %s - %s", cli->cmds.v[i], cli->cmd_desc.v[i]));
-        if (*cli->cmd_hint.v[i]) sv_push(&cli->detail, fmt("    Install: %s", cli->cmd_hint.v[i]));
+    const clyops_t* nodes[64];
+    size_t nn = nodes_down(cli, nodes);
+    for (size_t k = 0; k < nn; k++) {
+        const clyops_t* c = nodes[k];
+        for (size_t i = 0; i < c->cmds.len; i++) {
+            if (command_available(c->cmds.v[i])) continue;
+            sb_printf(&missing, "%s%s", missing.len ? ", " : "", c->cmds.v[i]);
+            sv_push(&cli->detail, fmt("  %s - %s", c->cmds.v[i], c->cmd_desc.v[i]));
+            if (*c->cmd_hint.v[i]) sv_push(&cli->detail, fmt("    Install: %s", c->cmd_hint.v[i]));
+        }
     }
     if (missing.len) {
         set_error(cli, fmt("Missing required command(s): %s", missing.s));
@@ -973,13 +1145,18 @@ clyops_status_t clyops_parse(clyops_t* cli, int argc, char** argv) {
         return CLYOPS_ERROR;
     }
 
-    for (size_t i = 0; i < cli->nopts; i++) {
-        opt_t* o = &cli->opts[i];
+    for (size_t i = 0; i < cli->nchain; i++) {
+        opt_t* o = cli->chain[i];
         if (o->required && empty(o->raw)) sb_printf(&missing, "%s--%s", missing.len ? " " : "", o->long_name);
     }
     if (missing.len) {
         set_error(cli, fmt("Missing required argument(s): %s", missing.s));
         free(missing.s);
+        return CLYOPS_ERROR;
+    }
+    char* conflict = check_constraints(cli);
+    if (conflict) {
+        set_error(cli, conflict);
         return CLYOPS_ERROR;
     }
     return CLYOPS_OK;
@@ -995,7 +1172,11 @@ void clyops_run(clyops_t* cli, int argc, char** argv) {
     char* out = NULL;
     for (int i = 1; i < argc && !streq(argv[i], "--"); i++) {
         if (streq(argv[i], "--help-json-schema")) out = clyops_json_schema(cli);
-        else if (streq(argv[i], "--bash-completion")) out = clyops_completion_data(cli);
+        else if (streq(argv[i], "--bash-completion")) {
+            int end = i;
+            while (end < argc && !streq(argv[end], "--")) end++;
+            out = end < argc ? clyops_completion_data_for(cli, argc - end - 1, argv + end + 1) : clyops_completion_data(cli);
+        }
         else if (streq(argv[i], "--completion")) {
             const char* shell = i + 1 < argc ? argv[i + 1] : "";
             out = clyops_completion_script(cli, shell);
@@ -1031,13 +1212,19 @@ void clyops_run(clyops_t* cli, int argc, char** argv) {
 /* ------------------------------------------------------------------------- */
 
 static const opt_t* opt_by_var(const clyops_t* cli, const char* var) {
-    for (size_t i = 0; i < cli->nopts; i++) if (streq(cli->opts[i].var, var)) return &cli->opts[i];
+    for (size_t i = 0; i < cli->nchain; i++) if (streq(cli->chain[i]->var, var)) return cli->chain[i];
     return NULL;
 }
 
 static const arg_t* arg_by_name(const clyops_t* cli, const char* name) {
-    for (size_t i = 0; i < cli->nargs; i++) if (streq(cli->args[i].name, name)) return &cli->args[i];
+    const clyops_t* node = cli->selected;
+    for (size_t i = 0; i < node->nargs; i++) if (streq(node->args[i].name, name)) return &node->args[i];
     return NULL;
+}
+
+/* The selected command words, as the value "command" of a program with commands. */
+static const svec* command_words(const clyops_t* cli, const char* name) {
+    return cli->nkids && streq(name, "command") ? &cli->words : NULL;
 }
 
 const char* clyops_get(const clyops_t* cli, const char* name) {
@@ -1045,7 +1232,8 @@ const char* clyops_get(const clyops_t* cli, const char* name) {
     if (o) return o->kind == K_ARRAY ? (o->list.len ? o->list.v[0] : NULL) : o->has ? o->raw : NULL;
     const arg_t* a = arg_by_name(cli, name);
     if (a) return a->variadic ? (a->list.len ? a->list.v[0] : NULL) : a->raw;
-    return NULL;
+    const svec* w = command_words(cli, name);
+    return w && w->len ? w->v[0] : NULL;
 }
 
 long long clyops_get_int(const clyops_t* cli, const char* name) {
@@ -1065,7 +1253,8 @@ size_t clyops_get_count(const clyops_t* cli, const char* name) {
     if (o) return o->kind == K_ARRAY ? o->list.len : (size_t)o->has;
     const arg_t* a = arg_by_name(cli, name);
     if (a) return a->variadic ? a->list.len : (size_t)a->has;
-    return 0;
+    const svec* w = command_words(cli, name);
+    return w ? w->len : 0;
 }
 
 const char* clyops_get_at(const clyops_t* cli, const char* name, size_t index) {
@@ -1073,11 +1262,13 @@ const char* clyops_get_at(const clyops_t* cli, const char* name, size_t index) {
     if (o && o->kind == K_ARRAY) return index < o->list.len ? o->list.v[index] : NULL;
     const arg_t* a = arg_by_name(cli, name);
     if (a && a->variadic) return index < a->list.len ? a->list.v[index] : NULL;
+    const svec* w = command_words(cli, name);
+    if (w) return index < w->len ? w->v[index] : NULL;
     return index == 0 ? clyops_get(cli, name) : NULL;
 }
 
 const char* clyops_source(const clyops_t* cli, const char* long_name) {
-    const opt_t* o = find_opt(cli, starts(long_name, "--") ? long_name + 2 : long_name);
+    const opt_t* o = chain_find(cli, starts(long_name, "--") ? long_name + 2 : long_name, 0);
     return o && o->src ? o->src : "unset";
 }
 
@@ -1117,10 +1308,11 @@ static void json_typed(sbuf* b, const char* v, int flag, const char* rule) {
 
 char* clyops_values_json(const clyops_t* cli) {
     sbuf b = {0};
-    size_t total = cli->nopts + cli->nargs, n = 0;
+    const clyops_t* node = cli->selected;
+    size_t total = cli->nchain + node->nargs + (cli->nkids ? 1 : 0), n = 0;
     sb_put(&b, "{\n");
-    for (size_t i = 0; i < cli->nopts; i++) {
-        const opt_t* o = &cli->opts[i];
+    for (size_t i = 0; i < cli->nchain; i++) {
+        const opt_t* o = cli->chain[i];
         sb_put(&b, "  ");
         json_str(&b, o->var);
         sb_put(&b, ": ");
@@ -1128,18 +1320,20 @@ char* clyops_values_json(const clyops_t* cli) {
             sb_putc(&b, '[');
             for (size_t k = 0; k < o->list.len; k++) {
                 if (k) sb_put(&b, ", ");
-                json_typed(&b, o->list.v[k], 0, o->rule);
+                if (o->secret) sb_put(&b, "\"***\"");
+                else json_typed(&b, o->list.v[k], 0, o->rule);
             }
             sb_putc(&b, ']');
         } else if (o->has) {
-            json_typed(&b, o->raw, o->kind == K_FLAG, o->rule);
+            if (o->secret) sb_put(&b, "\"***\"");
+            else json_typed(&b, o->raw, o->kind == K_FLAG, o->rule);
         } else {
             sb_put(&b, "null");
         }
         sb_put(&b, ++n < total ? ",\n" : "\n");
     }
-    for (size_t i = 0; i < cli->nargs; i++) {
-        const arg_t* a = &cli->args[i];
+    for (size_t i = 0; i < node->nargs; i++) {
+        const arg_t* a = &node->args[i];
         sb_put(&b, "  ");
         json_str(&b, a->name);
         sb_put(&b, ": ");
@@ -1156,6 +1350,14 @@ char* clyops_values_json(const clyops_t* cli) {
             sb_put(&b, "null");
         }
         sb_put(&b, ++n < total ? ",\n" : "\n");
+    }
+    if (cli->nkids) {
+        sb_put(&b, "  \"command\": [");
+        for (size_t k = 0; k < cli->words.len; k++) {
+            if (k) sb_put(&b, ", ");
+            json_str(&b, cli->words.v[k]);
+        }
+        sb_put(&b, "]\n");
     }
     sb_put(&b, "}");
     return sb_take(&b);
@@ -1245,43 +1447,96 @@ static char* annotate(const char* text, svec* notes) {
     return sb_take(&b);
 }
 
+/* Relationship annotations for option `o` (spec section 7). */
+static void relation_notes(const clyops_t* cli, const opt_t* o, svec* notes) {
+    const clyops_t* nodes[64];
+    size_t n = nodes_down(cli, nodes);
+    for (size_t k = 0; k < n; k++) {
+        for (size_t c = 0; c < nodes[k]->con_type.len; c++) {
+            const char* type = nodes[k]->con_type.v[c];
+            char* copy = xstrdup(nodes[k]->con_opts.v[c]);
+            char *save = NULL, *longs[64];
+            size_t nl = 0;
+            int has = 0;
+            for (char* t = strtok_r(copy, " ", &save); t && nl < 64; t = strtok_r(NULL, " ", &save)) {
+                has |= streq(t, o->long_name);
+                longs[nl++] = t;
+            }
+            if (has && !(streq(type, "requires") && !streq(longs[0], o->long_name))) {
+                sbuf b = {0};
+                sb_put(&b, streq(type, "exclusive") ? "conflicts with: " : streq(type, "requires") ? "requires: " : "one of: ");
+                size_t first = 1;
+                for (size_t i = streq(type, "requires") ? 1 : 0; i < nl; i++) {
+                    if (streq(type, "exclusive") && streq(longs[i], o->long_name)) continue;
+                    sb_printf(&b, "%s--%s", first ? "" : ", ", longs[i]);
+                    first = 0;
+                }
+                sv_push(notes, sb_take(&b));
+            }
+            free(copy);
+        }
+    }
+}
+
 char* clyops_usage(clyops_t* cli) {
     ensure_help(cli);
+    if (!cli->nchain) rebuild_chain(cli);
+    const clyops_t* node = cli->selected;
     const char* w = getenv("CLYOPS_MAX_WIDTH");
     long maxw = (w && re_match("^[0-9]+$", w)) ? atol(w) : 0;
     if (maxw <= 0) maxw = 100;
     size_t longest = 0;
-    for (size_t i = 0; i < cli->nopts; i++) {
-        char* l = opt_label(&cli->opts[i]);
+    for (size_t i = 0; i < cli->nchain; i++) {
+        char* l = opt_label(cli->chain[i]);
         if (utf8_len(l) > longest) longest = utf8_len(l);
         free(l);
     }
+    for (size_t i = 0; i < node->nkids; i++)
+        if (utf8_len(node->kids[i]->word) > longest) longest = utf8_len(node->kids[i]->word);
     size_t indent = longest + 4 < 32 ? 32 : longest + 4 > 50 ? 50 : longest + 4;
     size_t width = (size_t)maxw > indent + 20 ? (size_t)maxw - indent : 20;
 
     sbuf b = {0};
     svec notes = {0};
     sb_printf(&b, "Usage: %s", cli->name ? cli->name : "cli");
-    for (size_t i = 0; i < cli->nargs; i++) {
-        const arg_t* a = &cli->args[i];
+    for (size_t i = 0; i < cli->words.len; i++) sb_printf(&b, " %s", cli->words.v[i]);
+    if (node->nkids) sb_put(&b, " <command>");
+    for (size_t i = 0; i < node->nargs; i++) {
+        const arg_t* a = &node->args[i];
         if (a->variadic) sb_printf(&b, " [<%s...>]", a->name);
         else if (*a->dflt) sb_printf(&b, " [<%s>]", a->name);
         else sb_printf(&b, " <%s>", a->name);
     }
     sb_put(&b, " [OPTIONS]\n");
 
-    if (!empty(cli->description)) {
+    if (!empty(node->description)) {
         svec lines = {0};
-        wrap_text(cli->description, (size_t)maxw, &lines);
+        wrap_text(node->description, (size_t)maxw, &lines);
         sb_putc(&b, '\n');
         for (size_t i = 0; i < lines.len; i++) rtrim_line(&b, lines.v[i]);
         sv_free(&lines);
     }
 
-    if (cli->nargs) {
+    if (node->stdin_desc || node->stdout_desc) sb_putc(&b, '\n');
+    for (int k = 0; k < 2; k++) {
+        const char* d = k ? node->stdout_desc : node->stdin_desc;
+        const char* t = k ? node->stdout_type : node->stdin_type;
+        if (!d) continue;
+        sb_put(&b, k ? "Output:" : "Input:");
+        if (*d) sb_printf(&b, " %s", d);
+        if (*t) sb_printf(&b, " (%s)", t);
+        sb_putc(&b, '\n');
+    }
+
+    if (node->nkids) {
+        sb_put(&b, "\nCommands:\n");
+        for (size_t i = 0; i < node->nkids; i++) row(&b, node->kids[i]->word, node->kids[i]->description, indent, width);
+    }
+
+    if (node->nargs) {
         sb_put(&b, "\nPositional Arguments:\n");
-        for (size_t i = 0; i < cli->nargs; i++) {
-            const arg_t* a = &cli->args[i];
+        for (size_t i = 0; i < node->nargs; i++) {
+            const arg_t* a = &node->args[i];
             if (a->variadic) sv_push(&notes, xstrdup("variadic"));
             if (*a->dflt) sv_push(&notes, fmt("default: %s", a->dflt));
             if (*a->rule) {
@@ -1295,36 +1550,44 @@ char* clyops_usage(clyops_t* cli) {
         }
     }
 
-    if (cli->cmds.len) {
+    const clyops_t* nodes[64];
+    size_t nn = nodes_down(cli, nodes), ncmds = 0;
+    for (size_t k = 0; k < nn; k++) ncmds += nodes[k]->cmds.len;
+    if (ncmds) {
         sb_put(&b, "\nRequired Commands:\n");
-        for (size_t i = 0; i < cli->cmds.len; i++) {
-            char* label = fmt("%s [%s]", cli->cmds.v[i], command_available(cli->cmds.v[i]) ? "installed" : "not found");
-            char* text = *cli->cmd_hint.v[i] ? fmt("%s (%s)", cli->cmd_desc.v[i], cli->cmd_hint.v[i]) : xstrdup(cli->cmd_desc.v[i]);
-            row(&b, label, text, indent, width);
-            free(label);
-            free(text);
+        for (size_t k = 0; k < nn; k++) {
+            const clyops_t* c = nodes[k];
+            for (size_t i = 0; i < c->cmds.len; i++) {
+                char* label = fmt("%s [%s]", c->cmds.v[i], command_available(c->cmds.v[i]) ? "installed" : "not found");
+                char* text = *c->cmd_hint.v[i] ? fmt("%s (%s)", c->cmd_desc.v[i], c->cmd_hint.v[i]) : xstrdup(c->cmd_desc.v[i]);
+                row(&b, label, text, indent, width);
+                free(label);
+                free(text);
+            }
         }
     }
 
-    for (size_t g = 0; g < cli->nopts; g++) {
-        const char* group = cli->opts[g].group;
+    for (size_t g = 0; g < cli->nchain; g++) {
+        const char* group = cli->chain[g]->group;
         int seen = 0;
-        for (size_t k = 0; k < g && !seen; k++) seen = streq(cli->opts[k].group, group);
+        for (size_t k = 0; k < g && !seen; k++) seen = streq(cli->chain[k]->group, group);
         if (seen) continue;
         sb_printf(&b, "\n%s:\n", group);
-        for (size_t i = g; i < cli->nopts; i++) {
-            const opt_t* o = &cli->opts[i];
+        for (size_t i = g; i < cli->nchain; i++) {
+            const opt_t* o = cli->chain[i];
             if (!streq(o->group, group)) continue;
             if (o->required) sv_push(&notes, xstrdup("required"));
             if (o->kind == K_ARRAY) sv_push(&notes, xstrdup("multiple"));
+            if (o->secret) sv_push(&notes, xstrdup("secret"));
             cfg_t* c = find_cfg(cli, o->long_name);
-            if (c) sv_push(&notes, fmt("config: %s", c->value));
+            if (c) sv_push(&notes, fmt("config: %s", o->secret ? "***" : c->value));
             if (*o->dflt) sv_push(&notes, fmt("default: %s", o->dflt));
             if (*o->rule) {
                 char* d = describe_rule(o->rule);
                 sv_push(&notes, fmt("accepts: %s", d));
                 free(d);
             }
+            relation_notes(cli, o, &notes);
             char* text = annotate(o->desc, &notes);
             char* label = opt_label(o);
             row(&b, label, text, indent, width);
@@ -1333,8 +1596,8 @@ char* clyops_usage(clyops_t* cli) {
         }
     }
 
-    if (!empty(cli->epilog)) {
-        char* e = xstrdup(cli->epilog);
+    if (!empty(node->epilog)) {
+        char* e = xstrdup(node->epilog);
         size_t n = strlen(e);
         while (n && e[n - 1] == '\n') e[--n] = 0;
         sb_putc(&b, '\n');
@@ -1352,30 +1615,45 @@ char* clyops_usage(clyops_t* cli) {
     return sb_take(&b);
 }
 
-char* clyops_json_schema(clyops_t* cli) {
-    ensure_help(cli);
-    sbuf b = {0};
-    sb_put(&b, "{\n  \"clyops\": 1,\n  \"script\": ");
-    json_str(&b, cli->name ? cli->name : "cli");
-    sb_put(&b, ",\n  \"description\": ");
-    json_str(&b, cli->description ? cli->description : "");
-    sb_put(&b, ",\n  \"epilog\": ");
-    json_str(&b, cli->epilog ? cli->epilog : "");
-    sb_put(&b, ",\n  \"arguments\": [");
+static void json_list(sbuf* b, const char* const* items, size_t n) {
+    sb_putc(b, '[');
+    for (size_t i = 0; i < n; i++) {
+        if (i) sb_put(b, ", ");
+        json_str(b, items[i]);
+    }
+    sb_putc(b, ']');
+}
+
+static void json_stream(sbuf* b, const char* desc, const char* type) {
+    if (!desc) { sb_put(b, "null"); return; }
+    sb_put(b, "{\"description\": ");
+    json_str(b, desc);
+    sb_put(b, ", \"contentType\": ");
+    json_str(b, type);
+    sb_putc(b, '}');
+}
+
+/* The schema fields of `cli` from "description" on (spec section 8), without the braces. */
+static void schema_node(sbuf* b, const clyops_t* cli) {
+    sb_put(b, "  \"description\": ");
+    json_str(b, cli->description ? cli->description : "");
+    sb_put(b, ",\n  \"epilog\": ");
+    json_str(b, cli->epilog ? cli->epilog : "");
+    sb_put(b, ",\n  \"arguments\": [");
     for (size_t i = 0; i < cli->nargs; i++) {
         const arg_t* a = &cli->args[i];
-        sb_put(&b, i ? ",\n    {\n      \"name\": " : "\n    {\n      \"name\": ");
-        json_str(&b, a->name);
-        sb_put(&b, ",\n      \"description\": ");
-        json_str(&b, a->desc);
-        sb_printf(&b, ",\n      \"required\": %s,\n      \"isVariadic\": %s,\n      \"default\": ",
+        sb_put(b, i ? ",\n    {\n      \"name\": " : "\n    {\n      \"name\": ");
+        json_str(b, a->name);
+        sb_put(b, ",\n      \"description\": ");
+        json_str(b, a->desc);
+        sb_printf(b, ",\n      \"required\": %s,\n      \"isVariadic\": %s,\n      \"default\": ",
                   !a->variadic && !*a->dflt ? "true" : "false", a->variadic ? "true" : "false");
-        json_str(&b, a->dflt);
-        sb_put(&b, ",\n      \"validation\": ");
-        json_str(&b, a->rule);
-        sb_put(&b, "\n    }");
+        json_str(b, a->dflt);
+        sb_put(b, ",\n      \"validation\": ");
+        json_str(b, a->rule);
+        sb_put(b, "\n    }");
     }
-    sb_put(&b, cli->nargs ? "\n  ],\n  \"options\": [" : "],\n  \"options\": [");
+    sb_put(b, cli->nargs ? "\n  ],\n  \"options\": [" : "],\n  \"options\": [");
     for (size_t i = 0; i < cli->nopts; i++) {
         const opt_t* o = &cli->opts[i];
         const char* r = o->rule;
@@ -1385,50 +1663,90 @@ char* clyops_json_schema(clyops_t* cli) {
                          : starts(r, "choice:") ? "choice"
                          : is_path_rule(r) ? "path" : "string";
         char sh[2] = {o->short_name, 0};
-        sb_put(&b, i ? ",\n    {\n      \"name\": " : "\n    {\n      \"name\": ");
-        json_str(&b, o->long_name);
-        sb_put(&b, ",\n      \"shortName\": ");
-        json_str(&b, sh);
-        sb_put(&b, ",\n      \"variableName\": ");
-        json_str(&b, o->var);
-        sb_put(&b, ",\n      \"description\": ");
-        json_str(&b, o->desc);
-        sb_put(&b, ",\n      \"default\": ");
-        json_str(&b, o->kind == K_FLAG ? "false" : o->dflt);
-        sb_put(&b, ",\n      \"group\": ");
-        json_str(&b, o->group);
-        sb_printf(&b, ",\n      \"type\": \"%s\",\n      \"isFlag\": %s,\n      \"isArray\": %s,\n      \"required\": %s,\n      \"validation\": ",
+        sb_put(b, i ? ",\n    {\n      \"name\": " : "\n    {\n      \"name\": ");
+        json_str(b, o->long_name);
+        sb_put(b, ",\n      \"shortName\": ");
+        json_str(b, sh);
+        sb_put(b, ",\n      \"variableName\": ");
+        json_str(b, o->var);
+        sb_put(b, ",\n      \"description\": ");
+        json_str(b, o->desc);
+        sb_put(b, ",\n      \"default\": ");
+        json_str(b, o->kind == K_FLAG ? "false" : o->dflt);
+        sb_put(b, ",\n      \"group\": ");
+        json_str(b, o->group);
+        sb_printf(b, ",\n      \"type\": \"%s\",\n      \"isFlag\": %s,\n      \"isArray\": %s,\n      \"required\": %s,\n      \"validation\": ",
                   type, o->kind == K_FLAG ? "true" : "false", o->kind == K_ARRAY ? "true" : "false", o->required ? "true" : "false");
-        json_str(&b, r);
-        sb_put(&b, ",\n      \"choices\": [");
+        json_str(b, r);
+        sb_put(b, ",\n      \"choices\": [");
         if (starts(r, "choice:")) {
             const char* p = r + 7;
             int first = 1;
             while (1) {
                 const char* comma = strchr(p, ',');
                 char* c = comma ? xstrndup(p, (size_t)(comma - p)) : xstrdup(p);
-                sb_put(&b, first ? "\n        " : ",\n        ");
-                json_str(&b, c);
+                sb_put(b, first ? "\n        " : ",\n        ");
+                json_str(b, c);
                 free(c);
                 first = 0;
                 if (!comma) break;
                 p = comma + 1;
             }
-            sb_put(&b, "\n      ");
+            sb_put(b, "\n      ");
         }
-        sb_put(&b, "]\n    }");
+        sb_printf(b, "],\n      \"secret\": %s\n    }", o->secret ? "true" : "false");
     }
-    sb_put(&b, "\n  ],\n  \"requiredCommands\": [");
+    sb_put(b, "\n  ],\n  \"requiredCommands\": [");
     for (size_t i = 0; i < cli->cmds.len; i++) {
-        sb_put(&b, i ? ",\n    {\n      \"command\": " : "\n    {\n      \"command\": ");
-        json_str(&b, cli->cmds.v[i]);
-        sb_put(&b, ",\n      \"description\": ");
-        json_str(&b, cli->cmd_desc.v[i]);
-        sb_put(&b, ",\n      \"installHint\": ");
-        json_str(&b, cli->cmd_hint.v[i]);
-        sb_put(&b, "\n    }");
+        sb_put(b, i ? ",\n    {\n      \"command\": " : "\n    {\n      \"command\": ");
+        json_str(b, cli->cmds.v[i]);
+        sb_put(b, ",\n      \"description\": ");
+        json_str(b, cli->cmd_desc.v[i]);
+        sb_put(b, ",\n      \"installHint\": ");
+        json_str(b, cli->cmd_hint.v[i]);
+        sb_put(b, "\n    }");
     }
-    sb_put(&b, cli->cmds.len ? "\n  ]\n}" : "]\n}");
+    sb_put(b, cli->cmds.len ? "\n  ],\n  \"effects\": " : "],\n  \"effects\": ");
+    json_list(b, (const char* const*)cli->effects.v, cli->effects.len);
+    sb_put(b, ",\n  \"constraints\": [");
+    for (size_t i = 0; i < cli->con_type.len; i++) {
+        sb_put(b, i ? ", {\"type\": " : "{\"type\": ");
+        json_str(b, cli->con_type.v[i]);
+        sb_put(b, ", \"options\": [");
+        const char* p = cli->con_opts.v[i];
+        for (int first = 1; *p; first = 0) {
+            const char* sp = strchr(p, ' ');
+            char* name = sp ? xstrndup(p, (size_t)(sp - p)) : xstrdup(p);
+            if (!first) sb_put(b, ", ");
+            json_str(b, name);
+            free(name);
+            p = sp ? sp + 1 : p + strlen(p);
+        }
+        sb_put(b, "]}");
+    }
+    sb_put(b, "],\n  \"stdin\": ");
+    json_stream(b, cli->stdin_desc, cli->stdin_type);
+    sb_put(b, ",\n  \"stdout\": ");
+    json_stream(b, cli->stdout_desc, cli->stdout_type);
+    sb_put(b, ",\n  \"commands\": [");
+    for (size_t i = 0; i < cli->nkids; i++) {
+        sb_put(b, i ? ", {\n  \"name\": " : "{\n  \"name\": ");
+        json_str(b, cli->kids[i]->word);
+        sb_put(b, ",\n");
+        schema_node(b, cli->kids[i]);
+        sb_put(b, "\n}");
+    }
+    sb_putc(b, ']');
+}
+
+char* clyops_json_schema(clyops_t* cli) {
+    ensure_help(cli);
+    sbuf b = {0};
+    sb_put(&b, "{\n  \"clyops\": 1,\n  \"script\": ");
+    json_str(&b, cli->name ? cli->name : "cli");
+    sb_put(&b, ",\n");
+    schema_node(&b, cli);
+    sb_put(&b, "\n}");
     return sb_take(&b);
 }
 
@@ -1462,24 +1780,37 @@ static char* clean(const char* s) {
     return d;
 }
 
-char* clyops_completion_data(clyops_t* cli) {
+char* clyops_completion_data(clyops_t* cli) { return clyops_completion_data_for(cli, 0, NULL); }
+
+char* clyops_completion_data_for(clyops_t* cli, int nwords, char** words) {
     ensure_help(cli);
     if (!cli->root_abs) {
         /* Not parsed yet: compute search dirs the same way clyops_parse does. */
         char buf[PATH_MAX];
         cli->root_abs = join_norm(getcwd(buf, sizeof buf) ? buf : "/", cli->root);
-        for (size_t i = 0; i < cli->nopts; i++) {
-            opt_t* o = &cli->opts[i];
-            char* copy = xstrdup(o->search_raw);
-            char* save = NULL;
-            for (char* d = strtok_r(copy, ":", &save); d; d = strtok_r(NULL, ":", &save)) sv_push(&o->search, join_norm(cli->root_abs, d));
-            free(copy);
-        }
+        prepare_search(cli, cli->root_abs);
     }
     sbuf b = {0};
     sb_put(&b, "#clyops-completion 1\n");
-    for (size_t i = 0; i < cli->nopts; i++) {
-        const opt_t* o = &cli->opts[i];
+    cli->selected = cli;
+    if (cli->nkids) {
+        int skip = 0;
+        for (clyops_t* kid; skip < nwords && (kid = find_kid(cli->selected, words[skip])); skip++) cli->selected = kid;
+        if (cli->selected->nkids && skip < nwords && words[skip][0] != '-') {
+            cli->selected = cli;
+            return sb_take(&b);
+        }
+        sb_printf(&b, "skip\t%d\n", skip);
+        for (size_t i = 0; i < cli->selected->nkids; i++) {
+            char* desc = clean(cli->selected->kids[i]->description);
+            sb_printf(&b, "cmd\t%s\t%s\n", cli->selected->kids[i]->word, desc);
+            free(desc);
+        }
+    }
+    rebuild_chain(cli);
+    const clyops_t* node = cli->selected;
+    for (size_t i = 0; i < cli->nchain; i++) {
+        const opt_t* o = cli->chain[i];
         char* desc = clean(o->desc);
         char sh[3] = {'-', o->short_name, 0};
         const char* shs = o->short_name ? sh : "-";
@@ -1493,8 +1824,8 @@ char* clyops_completion_data(clyops_t* cli) {
         if (bool_like(o)) sb_printf(&b, "opt\t--no-%s\t-\tflag\tnone\t-\t%s\n", o->long_name, desc);
         free(desc);
     }
-    for (size_t i = 0; i < cli->nargs; i++) {
-        const arg_t* a = &cli->args[i];
+    for (size_t i = 0; i < node->nargs; i++) {
+        const arg_t* a = &node->args[i];
         char* desc = clean(a->desc);
         sb_printf(&b, "arg\t%s\t%s\t", a->name, a->variadic ? "variadic" : "single");
         completion_kind(&b, a->rule, NULL);

@@ -53,6 +53,31 @@ void clyops_require_command(clyops_t* cli, const char* command, const char* desc
 /** Fallback dirs (colon-separated, relative to root) for bare relative values of a path option. */
 void clyops_path_search(clyops_t* cli, const char* long_name, const char* dirs);
 
+/** What running the program does: a NULL-terminated list of read-only, idempotent, destructive, network. */
+void clyops_set_effects(clyops_t* cli, const char* const* effects);
+#define clyops_effects(cli, ...) clyops_set_effects((cli), (const char* const[]){ __VA_ARGS__, NULL })
+/** What the program reads on stdin; `content_type` is a MIME type or a comma-separated list. */
+void clyops_stdin(clyops_t* cli, const char* description, const char* content_type);
+/** What the program writes on stdout; undeclared means text. */
+void clyops_stdout(clyops_t* cli, const char* description, const char* content_type);
+
+/**
+ * Option relationships (spec section 1.6) over a NULL-terminated list of long
+ * names: "exclusive" (at most one given), "requires" (the first needs the
+ * others) or "oneOf" (at least one given).
+ */
+void clyops_add_constraint(clyops_t* cli, const char* type, const char* const* long_names);
+#define clyops_exclusive(cli, ...) clyops_add_constraint((cli), "exclusive", (const char* const[]){ __VA_ARGS__, NULL })
+#define clyops_requires(cli, ...) clyops_add_constraint((cli), "requires", (const char* const[]){ __VA_ARGS__, NULL })
+#define clyops_one_of(cli, ...) clyops_add_constraint((cli), "oneOf", (const char* const[]){ __VA_ARGS__, NULL })
+
+/**
+ * Register a command (spec section 1.7) and return it, to register its options
+ * and arguments on. It belongs to `cli` and is freed with it. After parsing,
+ * the selected words are the value "command" (clyops_get_count/clyops_get_at).
+ */
+clyops_t* clyops_command(clyops_t* cli, const char* name, const char* description);
+
 /**
  * Register an option. `default_value` is a default, "flag" for a boolean flag,
  * "optional" for no default, or "" to make the option required.
@@ -103,6 +128,8 @@ int clyops_is_explicitly_set(const clyops_t* cli, const char* long_name);
 char* clyops_usage(clyops_t* cli);
 char* clyops_json_schema(clyops_t* cli);
 char* clyops_completion_data(clyops_t* cli);
+/** Completion records for the words typed after the program name; a program with commands follows them. */
+char* clyops_completion_data_for(clyops_t* cli, int nwords, char** words);
 char* clyops_values_json(const clyops_t* cli);
 /** Script enabling completion in "bash", "zsh" or "fish" (spec section 9); NULL for an unknown shell. */
 char* clyops_completion_script(const clyops_t* cli, const char* shell);

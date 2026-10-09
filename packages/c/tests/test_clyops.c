@@ -76,11 +76,67 @@ static void test_output(void) {
     clyops_free(cli);
 }
 
+static void test_secret_and_relationships(void) {
+    unsetenv("A");
+    clyops_t* cli = clyops_new("t");
+    clyops_opt(cli, "TOKEN", "token", "optional", .rule = "secret:string:3-");
+    clyops_opt(cli, "A", "a", "flag", .short_name = 'a');
+    clyops_opt(cli, "B", "b", "flag", .short_name = 'b');
+    clyops_opt(cli, "C", "c", "optional", .short_name = 'c');
+    clyops_exclusive(cli, "a", "b");
+    clyops_requires(cli, "c", "a");
+    clyops_one_of(cli, "a", "b", "c");
+    char* ok[] = {"--token", "abcd", "-a", "--no-b"};
+    CHECK(clyops_parse(cli, 4, ok) == CLYOPS_OK);
+    CHECK(strcmp(clyops_get(cli, "TOKEN"), "abcd") == 0);
+    char* values = clyops_values_json(cli);
+    CHECK(strstr(values, "\"TOKEN\": \"***\"") != NULL);
+    free(values);
+    char* schema = clyops_json_schema(cli);
+    CHECK(strstr(schema, "\"secret\": true") != NULL && strstr(schema, "\"validation\": \"string:3-\"") != NULL);
+    free(schema);
+    char* both[] = {"-ab"};
+    CHECK(clyops_parse(cli, 1, both) == CLYOPS_ERROR);
+    CHECK(strcmp(clyops_error(cli), "Options --a and --b cannot be used together") == 0);
+    char* needs[] = {"-c", "x"};
+    CHECK(clyops_parse(cli, 2, needs) == CLYOPS_ERROR);
+    CHECK(strcmp(clyops_error(cli), "Option --c requires --a") == 0);
+    CHECK(clyops_parse(cli, 0, NULL) == CLYOPS_ERROR);
+    CHECK(strcmp(clyops_error(cli), "One of --a, --b, --c is required") == 0);
+    clyops_free(cli);
+}
+
+static void test_commands(void) {
+    clyops_t* cli = clyops_new("m");
+    clyops_opt(cli, "CONFIG", "config", "optional", .short_name = 'c', .group = "Global");
+    clyops_t* migrate = clyops_command(clyops_command(cli, "db", "Database"), "migrate", "Migrate");
+    clyops_opt(migrate, "TO", "to", "optional", .rule = "int");
+    clyops_arg(migrate, "name", .default_value = "all");
+    char* argv[] = {"db", "-c", "x", "migrate", "--to", "3"};
+    CHECK(clyops_parse(cli, 6, argv) == CLYOPS_OK);
+    CHECK(clyops_get_count(cli, "command") == 2 && strcmp(clyops_get_at(cli, "command", 1), "migrate") == 0);
+    CHECK(clyops_get_int(cli, "TO") == 3 && strcmp(clyops_get(cli, "CONFIG"), "x") == 0);
+    char* early[] = {"--to", "3", "db", "migrate"};
+    CHECK(clyops_parse(cli, 4, early) == CLYOPS_ERROR && strcmp(clyops_error(cli), "Unknown option: --to") == 0);
+    char* group[] = {"db"};
+    CHECK(clyops_parse(cli, 1, group) == CLYOPS_ERROR && strcmp(clyops_error(cli), "Missing command") == 0);
+    char* unknown[] = {"db", "seed"};
+    CHECK(clyops_parse(cli, 2, unknown) == CLYOPS_ERROR && strcmp(clyops_error(cli), "Unknown command: seed") == 0);
+    char* help[] = {"db", "migrate", "-h"};
+    CHECK(clyops_parse(cli, 3, help) == CLYOPS_HELP);
+    char* usage = clyops_usage(cli);
+    CHECK(strncmp(usage, "Usage: m db migrate [<name>] [OPTIONS]", 38) == 0);
+    free(usage);
+    clyops_free(cli);
+}
+
 int main(void) {
     test_typed_values();
     test_errors_and_help();
     test_environment();
     test_output();
+    test_secret_and_relationships();
+    test_commands();
     if (failures) {
         fprintf(stderr, "%d failed\n", failures);
         return 1;

@@ -10,6 +10,9 @@ int main(int argc, char** argv) {
     clyops_description(cli, "Demo program for the clyops conformance suite. It registers one of every kind of option and argument so that each implementation can be checked against the same help text, schema and resolved values.");
     clyops_epilog(cli, "Examples:\n  demo in.txt slow a b --tag x --tag y\n  demo in.txt -vc demo.conf");
     clyops_require_command(cli, "sh", "POSIX shell", "install dash");
+    clyops_effects(cli, "idempotent", "network");
+    clyops_stdin(cli, "Lines to process", "text/plain");
+    clyops_stdout(cli, "The resolved values", "application/json");
 
     clyops_arg(cli, "input", .description = "Input file", .rule = "path");
     clyops_arg(cli, "mode", .description = "Processing mode", .default_value = "fast", .rule = "choice:fast,slow");
@@ -26,7 +29,7 @@ int main(int argc, char** argv) {
     clyops_opt(cli, "ENABLED",  "enabled",  "true",                         .description = "Enable processing",                            .rule = "bool");
     clyops_opt_array(cli, "TAG", "tag",                  .short_name = 't', .description = "Tag to attach",                                .rule = "string:1-8");
     clyops_opt(cli, "NO_CACHE", "no-cache", "flag",                         .description = "Disable the cache");
-    clyops_opt(cli, "KEY",      "key",      "",          .short_name = 'k', .description = "API key",               .group = "Auth");
+    clyops_opt(cli, "KEY",      "key",      "",          .short_name = 'k', .description = "API key",               .group = "Auth",       .rule = "secret");
     clyops_opt(cli, "HOST",     "host",     "localhost", .short_name = 'H', .description = "Server host",           .group = "Network",    .rule = "hostname");
     clyops_opt(cli, "PORT",     "port",     "8080",      .short_name = 'p', .description = "Server port",           .group = "Network",    .rule = "port");
     clyops_opt(cli, "ENDPOINT", "endpoint", "optional",                     .description = "Endpoint URL",          .group = "Network",    .rule = "url");
@@ -44,6 +47,8 @@ int main(int argc, char** argv) {
 
     clyops_config(cli, "config", "demo:,shared:");
     clyops_path_search(cli, "config", "conf");
+    clyops_exclusive(cli, "endpoint", "addr");
+    clyops_requires(cli, "dest", "src");
 
     clyops_run(cli, argc, argv);
 
