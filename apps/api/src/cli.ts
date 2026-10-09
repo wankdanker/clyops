@@ -14,6 +14,7 @@ cli.opt('CLYOPS_API_NAME',         'name',        'n', 'optional',  'API title (
 cli.opt('CLYOPS_API_CWD',          'cwd',         '',  'optional',  'Working directory for the tools (default: the current one)', 'Tools', 'dir:exists');
 cli.opt('CLYOPS_API_TIMEOUT',      'timeout',     't', '0',         'Kill a tool after this many seconds (0: never)', 'Tools', 'int:0-');
 cli.opt('CLYOPS_API_CONCURRENCY',  'concurrency', 'j', 'optional',  'Async jobs run at the same time (default: CPUs)', 'Tools', 'int:1-');
+cli.opt('CLYOPS_API_MCP',          'mcp',         '',  'true',      'Also serve the tools over MCP (streamable HTTP) at /mcp', 'Server', 'bool');
 cli.opt('CLYOPS_API_HOST',         'host',        'H', '127.0.0.1', 'Address to listen on', 'Server');
 cli.opt('CLYOPS_API_PORT',         'port',        'p', '8080',      'Port to listen on',                             'Server', 'port');
 cli.opt('CLYOPS_API_API_KEY',      'api-key',     'k', 'optional',  'Require this key (Authorization: Bearer KEY or X-API-Key)', 'Server');
@@ -26,9 +27,10 @@ const { app, tools } = await createApi({
   timeoutMs: (args.CLYOPS_API_TIMEOUT as number) * 1000,
   concurrency: (args.CLYOPS_API_CONCURRENCY as number | null) ?? undefined,
   apiKey: (args.CLYOPS_API_API_KEY as string | null) ?? undefined,
+  mcp: args.CLYOPS_API_MCP as boolean,
   version,
 });
 const server = app.listen(args.CLYOPS_API_PORT as number, args.CLYOPS_API_HOST as string, () => {
-  info('serving %d tool(s) on http://%s:%d (OpenAPI: /openapi.json)', tools.length, args.CLYOPS_API_HOST, args.CLYOPS_API_PORT);
+  info('serving %d tool(s) on http://%s:%d (OpenAPI: /openapi.json%s)', tools.length, args.CLYOPS_API_HOST, args.CLYOPS_API_PORT, args.CLYOPS_API_MCP ? ', MCP: /mcp' : '');
 });
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => server.close(() => process.exit(0)));

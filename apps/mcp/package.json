@@ -1,18 +1,18 @@
 {
-  "name": "clyops-api",
+  "name": "clyops-mcp",
   "version": "0.1.0",
-  "description": "Serve a directory of clyops tools as an HTTP API: an endpoint per tool, validated and documented in OpenAPI from its schema, with sync and async (job) runs.",
+  "description": "Give an AI agent a directory of clyops tools over MCP (stdio or streamable HTTP), with each tool's input schema from its --help-json-schema.",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/wankdanker/clyops.git",
-    "directory": "apps/api"
+    "directory": "apps/mcp"
   },
   "keywords": [
     "clyops",
-    "api",
-    "openapi",
-    "express",
+    "mcp",
+    "model-context-protocol",
+    "agent",
     "cli",
     "tools"
   ],
@@ -21,7 +21,7 @@
   },
   "type": "module",
   "bin": {
-    "clyops-api": "./dist/cli.js"
+    "clyops-mcp": "./dist/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -42,17 +42,13 @@
     "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "clyops": "0.1.0",
-    "clyops-jobs": "0.1.0",
-    "clyops-mcp": "0.1.0",
-    "clyops-tools": "0.1.0",
-    "express": "^5.2.1",
-    "plus-express": "^2.1.1"
+    "clyops-tools": "0.1.0"
   },
   "devDependencies": {
-    "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
     "typescript": "^5.6.0",
-    "@modelcontextprotocol/sdk": "^1.32.1"
+    "express": "^5.2.1"
   }
 }

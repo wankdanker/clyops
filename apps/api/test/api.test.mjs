@@ -4,6 +4,8 @@ import { chmodSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from '
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createApi } from '../dist/index.js';
 
 const repo = fileURLToPath(new URL('../../..', import.meta.url));
@@ -40,8 +42,10 @@ before(async () => {
 });
 
 after(() => {
-  server.close();
-  keyed.close();
+  for (const s of [server, keyed]) {
+    s.closeAllConnections();
+    s.close();
+  }
 });
 
 test('lists and describes the tools', async () => {
@@ -141,4 +145,23 @@ test('API key', async () => {
   const doc = await (await fetch(`${kbase}/openapi.json`, { headers: { 'x-api-key': 'sekret' } })).json();
   assert.deepEqual(doc.security, [{ apiKey: [] }]);
   assert.equal(doc.components.securitySchemes.apiKey.scheme, 'bearer');
+});
+
+test('MCP at /mcp, behind the API key', async () => {
+  const client = new Client({ name: 'test', version: '1' });
+  await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`)));
+  try {
+    assert.deepEqual((await client.listTools()).tools.map((t) => t.name), ['slow', 'media_demo']);
+    const result = await client.callTool({ name: 'media_demo', arguments: { input: 'in.txt', count: 2 } });
+    assert.equal(result.structuredContent.values.COUNT, 2);
+  } finally {
+    await client.close();
+  }
+
+  const kurl = new URL(`http://127.0.0.1:${keyed.address().port}/mcp`);
+  await assert.rejects(new Client({ name: 'test', version: '1' }).connect(new StreamableHTTPClientTransport(kurl)), /missing or wrong API key/);
+  const keyedClient = new Client({ name: 'test', version: '1' });
+  await keyedClient.connect(new StreamableHTTPClientTransport(kurl, { requestInit: { headers: { authorization: 'Bearer sekret' } } }));
+  assert.equal((await keyedClient.listTools()).tools.length, 2);
+  await keyedClient.close();
 });

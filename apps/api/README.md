@@ -65,12 +65,13 @@ cancelled). Jobs are kept in memory (the latest 1000) and run `--concurrency` at
 | `GET /tools/<words>` | A tool's clyops schema and the JSON Schema of its input |
 | `POST /tools/<words>[?async=true]` | Run it |
 | `GET /jobs`, `GET /jobs/<id>`, `DELETE /jobs/<id>` | Async jobs |
+| `POST /mcp` | The same tools over MCP (streamable HTTP, stateless) for agents; see [clyops-mcp](../mcp). `--no-mcp` turns it off. |
 
 ## Options
 
 ```
 clyops-api --root DIR [--name NAME] [--cwd DIR] [--timeout SECONDS] [--concurrency N]
-           [--host 127.0.0.1] [--port 8080] [--api-key KEY]
+           [--host 127.0.0.1] [--port 8080] [--api-key KEY] [--no-mcp]
 ```
 
 It listens on localhost unless told otherwise. Every option can also come from the environment as `CLYOPS_API_<OPTION>`. With `--api-key` (or

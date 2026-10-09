@@ -5,3 +5,4 @@ export * from './discover.js';
 export * from './argv.js';
 export * from './run.js';
 export * from './json-schema.js';
+export * from './tools.js';

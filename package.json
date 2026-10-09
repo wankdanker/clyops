@@ -2,5 +2,5 @@
   "name": "clyops-monorepo",
   "private": true,
   "description": "npm workspace for the JavaScript/TypeScript packages and apps.",
-  "workspaces": ["packages/js", "packages/tools", "packages/jobs", "apps/api"]
+  "workspaces": ["packages/js", "packages/tools", "packages/jobs", "apps/mcp", "apps/api"]
 }

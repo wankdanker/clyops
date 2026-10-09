@@ -27,6 +27,8 @@ const result = await run('./scripts/media/to-pcm.sh', argv, { timeoutMs: 60_000 
 | Function | |
 | --- | --- |
 | `discover(root, {name?})` | The tree of groups and commands under a directory or a dispatcher definition file ([spec §12](../../spec/SPEC.md#12-dispatchers-clyops-dispatch)): `.clyops` descriptions and ignore lists, hidden files skipped, groups shadowing commands. Nested dispatchers are expanded into groups. Each command has a `kind`: `tool` (uses a clyops library), `dispatcher` or `other`. |
+| `loadTools(root, {name?, onError?})` | `{tree, tools}`: the tree, plus every `tool` with its schema loaded. |
+| `runTool(tool, input, runOptions?)` | `toArgv` + `run`, with `ok` and `json` (stdout parsed, when it is JSON). |
 | `commands(group)` | Every command in a tree. |
 | `classify(file)` | `tool`, `dispatcher` or `other`. Only `tool`s should be run for their schema. |
 | `loadSchema(file, {cwd?, timeoutMs?})` | The tool's `--help-json-schema` output, cached by file modification time and size. |

@@ -11,7 +11,9 @@ section here.
 - **clyops-jobs** (npm): a job engine for clyops tools: config-bound functions with templated
   options, artifacts, job records and an in-memory queue.
 - **clyops-api** (npm): serve a directory of tools as an HTTP API, with an endpoint per tool,
-  request validation and an OpenAPI document from each tool's schema, and async jobs.
+  request validation and an OpenAPI document from each tool's schema, async jobs and MCP at `/mcp`.
+- **clyops-mcp** (npm): a directory of tools as MCP tools for AI agents, over stdio
+  (`clyops-mcp --root DIR`) or streamable HTTP; clyops-api serves it at `/mcp`.
 - The JavaScript packages form one npm workspace at the repository root.
 
 ## [0.1.0] - 2026-10-08

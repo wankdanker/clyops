@@ -134,7 +134,15 @@ functions bound to tools in a JSON config, templated options, artifacts, job rec
 [apps/api](apps/api) serves a directory of tools over HTTP: `clyops-api --root ~/mytool/scripts`
 makes `POST /tools/media/to-pcm` run `media/to-pcm.sh` with a JSON body validated against the
 tool's schema, waiting for it or (`?async=true`) returning a job to poll, and publishes the whole
-thing as an OpenAPI document at `/openapi.json`.
+thing as an OpenAPI document at `/openapi.json`. It serves the same tools to AI agents over MCP at
+`/mcp`.
+
+## clyops-mcp
+
+[apps/mcp](apps/mcp) hands a directory of tools to an AI agent over MCP:
+`claude mcp add mytool -- clyops-mcp --root ~/mytool/scripts` gives the agent one tool per program,
+each described and typed by the program's own schema, with arguments validated before anything
+runs.
 
 ## clyops runner
 
@@ -164,6 +172,7 @@ packages/
   c/                      C11 + POSIX, Makefile and CMake
 apps/
   api/                    clyops-api: a directory of tools as an HTTP API with OpenAPI (npm: clyops-api)
+  mcp/                    clyops-mcp: a directory of tools as MCP tools for AI agents (npm: clyops-mcp)
   dispatch/               clyops-dispatch: a directory of tools as one command with subcommands
   runner/                 desktop UI for clyops tools (Tauri + React)
 tools/

@@ -1,7 +1,8 @@
 // An HTTP API over a directory of clyops tools: one POST endpoint per tool,
 // validated and documented from its --help-json-schema.
-import { commands, discover, loadSchema, run, toArgv, toJsonSchema, type Command, type Group, type RunResult, type Schema } from 'clyops-tools';
+import { loadTools, runTool, toJsonSchema, type Tool, type ToolResult } from 'clyops-tools';
 import { JobQueue, type JobRecord } from 'clyops-jobs';
+import { mcpHttpHandler } from 'clyops-mcp';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { plus, z } from 'plus-express';
 import { toZod } from './zod.js';
@@ -19,54 +20,13 @@ export interface ApiOptions {
   timeoutMs?: number;
   /** Async jobs run at the same time (default: the number of CPUs). */
   concurrency?: number;
+  /** Also serve the tools over MCP (streamable HTTP) at /mcp (default: true). */
+  mcp?: boolean;
   version?: string;
 }
 
-/** A tool the API serves. */
-export interface Tool extends Command {
-  schema: Schema;
-  /** URL path of its endpoint, `/tools/<group>/.../<name>`. */
-  path: string;
-  description: string;
-}
-
-export interface RunResponse extends RunResult {
-  ok: boolean;
-  /** stdout parsed as JSON, when it is JSON. */
-  json?: unknown;
-}
-
-/** The tools under `root` with their schemas. Tools whose schema can't be read are skipped. */
-export async function loadTools(root: string, opts: { name?: string; onError?: (cmd: Command, err: Error) => void } = {}): Promise<{ tree: Group; tools: Tool[] }> {
-  const tree = discover(root, { name: opts.name });
-  const loaded = await Promise.all(
-    commands(tree)
-      .filter((cmd) => cmd.kind === 'tool')
-      .map(async (cmd) => {
-        try {
-          const schema = await loadSchema(cmd.file);
-          return { ...cmd, schema, path: `/tools/${cmd.words.join('/')}`, description: schema.description.split('\n')[0] };
-        } catch (err) {
-          opts.onError?.(cmd, err as Error);
-          return undefined;
-        }
-      }),
-  );
-  return { tree, tools: loaded.filter((t): t is Tool => Boolean(t)) };
-}
-
-/** Run a tool with JSON input. */
-export async function runTool(tool: Tool, input: Record<string, unknown>, opts: { cwd?: string; timeoutMs?: number; signal?: AbortSignal } = {}): Promise<RunResponse> {
-  const { argv } = toArgv(tool.schema, input);
-  const result = await run(tool.file, argv, opts);
-  const out: RunResponse = { ...result, ok: result.exitCode === 0 };
-  try {
-    if (result.stdout.trim()) out.json = JSON.parse(result.stdout);
-  } catch {
-    // not JSON: stdout is still there as text
-  }
-  return out;
-}
+/** A tool the API serves, with the URL path of its endpoint, `/tools/<group>/.../<name>`. */
+export type ApiTool = Tool & { path: string };
 
 const RunResponseSchema = z.object({
   ok: z.boolean(),
@@ -100,11 +60,13 @@ const json = (schema: z.ZodType, description: string) => ({ description, content
  * a new app) to pick up added or changed tools.
  */
 export async function createApi(opts: ApiOptions) {
-  const { tree, tools } = await loadTools(opts.root, {
+  const loaded = await loadTools(opts.root, {
     name: opts.name,
     onError: (cmd, err) => process.emitWarning(`skipping ${cmd.words.join(' ')}: ${err.message}`),
   });
-  const queue = new JobQueue<RunResponse>({ concurrency: opts.concurrency });
+  const tree = loaded.tree;
+  const tools: ApiTool[] = loaded.tools.map((t) => ({ ...t, path: `/tools/${t.words.join('/')}` }));
+  const queue = new JobQueue<ToolResult>({ concurrency: opts.concurrency });
   const { app, registry } = plus(express(), {
     openApiConfig: {
       openapi: '3.0.0',
@@ -122,7 +84,7 @@ export async function createApi(opts: ApiOptions) {
     });
   }
 
-  const jobView = (record: JobRecord, result?: RunResponse) => ({ ...record, ...(result ? { result } : {}) });
+  const jobView = (record: JobRecord, result?: ToolResult) => ({ ...record, ...(result ? { result } : {}) });
 
   app.get('/openapi.json', (_req: Request, res: Response) => {
     res.json(registry.generateOpenAPIDocument(opts.apiKey ? { security: [{ apiKey: [] }] } : {}));
@@ -212,6 +174,10 @@ export async function createApi(opts: ApiOptions) {
       res.status(202).json(jobView(job.record));
     },
   );
+
+  if (opts.mcp !== false) {
+    app.post('/mcp', mcpHttpHandler({ name: tree.name, version: opts.version, instructions: tree.description || undefined, tools, cwd: opts.cwd, timeoutMs: opts.timeoutMs }));
+  }
 
   app.use(errorHandler);
   return { app, registry, tree, tools, queue };
