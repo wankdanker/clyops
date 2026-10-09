@@ -10,6 +10,7 @@
 | **JavaScript / TypeScript** | `clyops-<version>.tgz` (`npm install ./clyops-<version>.tgz`) |
 | **Python** | `clyops-<version>-py3-none-any.whl` or the sdist |
 | **Rust** | `clyops-<version>.crate` |
+| **Go** | `go get github.com/wankdanker/clyops/packages/go@v<version>` |
 
 `SHA256SUMS` lists a checksum for every file.
 

@@ -38,6 +38,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-go@v5
+        with: { go-version: stable, cache-dependency-path: packages/go/go.mod }
       - id: version
         name: Version matches the tag
         run: |
@@ -259,3 +261,9 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" dist/* \
             --title "clyops $VERSION" --notes-file notes.md --verify-tag
+      # Go versions a module in a subdirectory by a tag with its path, so
+      # `go get github.com/wankdanker/clyops/packages/go@vX.Y.Z` needs packages/go/vX.Y.Z.
+      - name: Tag the Go module
+        run: |
+          git tag "packages/go/$GITHUB_REF_NAME" "$GITHUB_SHA"
+          git push origin "packages/go/$GITHUB_REF_NAME"

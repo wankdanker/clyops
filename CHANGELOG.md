@@ -5,6 +5,9 @@ section here.
 
 ## [Unreleased]
 
+- **Go** (`packages/go`): the seventh implementation, standard library only, passing the full
+  conformance suite and the real-shell completion tests. Released as the Go module
+  `github.com/wankdanker/clyops/packages/go`, tagged `packages/go/vX.Y.Z` with each release.
 - **clyops-tools** (npm): discover a directory of tools, load their schemas, map JSON input onto
   a command line ([spec §13](spec/SPEC.md#13-json-input-toargv)), JSON Schema of that input, and
   run them.

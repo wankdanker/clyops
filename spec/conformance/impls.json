@@ -4,5 +4,6 @@
   "bash": ["bash", "packages/bash/examples/demo.sh"],
   "python": ["python3", "packages/python/examples/demo.py"],
   "rust": ["packages/rust/target/debug/examples/demo"],
-  "c": ["packages/c/build/demo"]
+  "c": ["packages/c/build/demo"],
+  "go": ["packages/go/build/demo"]
 }

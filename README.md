@@ -5,8 +5,8 @@ once at the top of a program, and clyops handles the rest: parsing, validation,
 help text, config files, environment variables, a JSON schema of the interface,
 logging helpers and shell completion for bash, zsh and fish.
 
-The same behavior ships for **Bash, JavaScript, TypeScript, Python, Rust and
-C**. Every implementation is checked against one shared [specification](spec/SPEC.md)
+The same behavior ships for **Bash, JavaScript, TypeScript, Python, Rust, C
+and Go**. Every implementation is checked against one shared [specification](spec/SPEC.md)
 and [conformance suite](spec/conformance/), so a tool keeps the same help
 output, error messages and completion when you port it from Bash to Rust.
 
@@ -24,6 +24,9 @@ cli.opt("PORT", "port", "p", "8080", "Server port").group("Network").rule("port"
 ```
 ```c
 clyops_opt(cli, "PORT", "port", "8080", .short_name = 'p', .description = "Server port", .group = "Network", .rule = "port"); // C
+```
+```go
+cli.Opt("PORT", "port", "p", "8080", "Server port", "Network", "port")       // Go
 ```
 
 ## A complete program
@@ -71,7 +74,7 @@ info(f"sending {args.SRC} to {args.HOST}:{args.PORT}")
 </table>
 
 Each package's README shows the same program in its own language:
-[JavaScript/TypeScript](packages/js) · [Bash](packages/bash) · [Python](packages/python) · [Rust](packages/rust) · [C](packages/c).
+[JavaScript/TypeScript](packages/js) · [Bash](packages/bash) · [Python](packages/python) · [Rust](packages/rust) · [C](packages/c) · [Go](packages/go).
 
 ## What you get
 
@@ -170,6 +173,7 @@ packages/
   python/                 pure standard library (PyPI: clyops)
   rust/                   crate clyops (only dependency: regex)
   c/                      C11 + POSIX, Makefile and CMake
+  go/                     Go module, standard library only (go get .../clyops/packages/go)
 apps/
   api/                    clyops-api: a directory of tools as an HTTP API with OpenAPI (npm: clyops-api)
   mcp/                    clyops-mcp: a directory of tools as MCP tools for AI agents (npm: clyops-mcp)
@@ -196,7 +200,7 @@ make rust           # build + test + conformance for one package (js, bash, pyth
 make dispatch       # build + test clyops-dispatch
 ```
 
-Requirements: Node 20+, Python 3.9+, Rust 1.70+, a C11 compiler, Bash 4.3+.
+Requirements: Node 20+, Python 3.9+, Rust 1.70+, a C11 compiler, Go 1.21+, Bash 4.3+.
 
 ### Adding or changing behavior
 
@@ -233,6 +237,7 @@ matches every manifest, and attaches to one GitHub release:
 - **clyops-dispatch** binaries for Linux x64/arm64, macOS universal and Windows x64.
 - **libclyops** prebuilt for Linux x64/arm64 and macOS universal, plus a source tarball.
 - The npm tarballs, Python wheel and sdist, Rust `.crate` and `clyops.sh`.
+- The Go module is tagged `packages/go/vX.Y.Z` at the same commit, so `go get` resolves it.
 - `SHA256SUMS`.
 
 Running the workflow by hand builds everything as a dry run without releasing. Publishing to

@@ -25,6 +25,7 @@ FILES = [
     ("packages/rust/Cargo.toml", r'(?m)^version = "([^"]+)"'),
     ("packages/bash/clyops.sh", r'(?m)^CLYOPS_VERSION="([^"]+)"'),
     ("packages/c/include/clyops.h", r'(?m)^#define CLYOPS_VERSION "([^"]+)"'),
+    ("packages/go/clyops.go", r'(?m)^const Version = "([^"]+)"'),
     ("apps/runner/package.json", TOP),
     ("apps/runner/package-lock.json", TOP),
     ("apps/runner/package-lock.json", LOCK_ROOT),
