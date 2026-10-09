@@ -82,6 +82,137 @@ info(f"sending {args.SRC} to {args.HOST}:{args.PORT}")
 Each package's README shows the same program in its own language:
 [JavaScript/TypeScript](packages/js) · [Bash](packages/bash) · [Python](packages/python) · [Rust](packages/rust) · [C](packages/c) · [Go](packages/go) · [Ruby](packages/ruby) · [Java](packages/java).
 
+Either version (and the same program in every other language) prints exactly this for
+`send --help`:
+
+```
+Usage: send <SRC> [<EXTRA...>] [OPTIONS]
+
+Copy files to a server.
+
+Positional Arguments:
+  SRC                           File to send (accepts: existing file)
+  EXTRA                         More files (variadic, accepts: existing file)
+
+Network:
+  -H, --host=<value>            Server (default: localhost, accepts: hostname)
+  -p, --port=<value>            Port (default: 22, accepts: port: 1-65535)
+
+Options:
+  -v, --verbose                 Chatty
+
+Config:
+  -c, --config=<value>          Config file (accepts: path)
+
+Global:
+  -h, --help                    Show this help message and exit
+```
+
+<details>
+<summary><code>send --help-json-schema</code>: the machine-readable interface that UIs, the API and the MCP server are built from</summary>
+
+```json
+{
+  "clyops": 1,
+  "script": "send",
+  "description": "Copy files to a server.",
+  "epilog": "",
+  "arguments": [
+    {
+      "name": "SRC",
+      "description": "File to send",
+      "required": true,
+      "isVariadic": false,
+      "default": "",
+      "validation": "file:exists"
+    },
+    {
+      "name": "EXTRA",
+      "description": "More files",
+      "required": false,
+      "isVariadic": true,
+      "default": "",
+      "validation": "file:exists"
+    }
+  ],
+  "options": [
+    {
+      "name": "host",
+      "shortName": "H",
+      "variableName": "HOST",
+      "description": "Server",
+      "default": "localhost",
+      "group": "Network",
+      "type": "string",
+      "isFlag": false,
+      "isArray": false,
+      "required": false,
+      "validation": "hostname",
+      "choices": []
+    },
+    {
+      "name": "port",
+      "shortName": "p",
+      "variableName": "PORT",
+      "description": "Port",
+      "default": "22",
+      "group": "Network",
+      "type": "integer",
+      "isFlag": false,
+      "isArray": false,
+      "required": false,
+      "validation": "port",
+      "choices": []
+    },
+    {
+      "name": "verbose",
+      "shortName": "v",
+      "variableName": "VERBOSE",
+      "description": "Chatty",
+      "default": "false",
+      "group": "Options",
+      "type": "boolean",
+      "isFlag": true,
+      "isArray": false,
+      "required": false,
+      "validation": "",
+      "choices": []
+    },
+    {
+      "name": "config",
+      "shortName": "c",
+      "variableName": "CONFIG",
+      "description": "Config file",
+      "default": "",
+      "group": "Config",
+      "type": "path",
+      "isFlag": false,
+      "isArray": false,
+      "required": false,
+      "validation": "path",
+      "choices": []
+    },
+    {
+      "name": "help",
+      "shortName": "h",
+      "variableName": "HELP",
+      "description": "Show this help message and exit",
+      "default": "false",
+      "group": "Global",
+      "type": "boolean",
+      "isFlag": true,
+      "isArray": false,
+      "required": false,
+      "validation": "",
+      "choices": []
+    }
+  ],
+  "requiredCommands": []
+}
+```
+
+</details>
+
 ## What you get
 
 | | |
