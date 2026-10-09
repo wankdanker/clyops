@@ -41,8 +41,12 @@ fails comes back as an error with its exit status and stderr, so the agent can r
 message and correct itself.
 
 ```
-clyops-mcp --root DIR [--name NAME] [--cwd DIR] [--timeout SECONDS]
+clyops-mcp --root DIR [--name NAME] [--cwd DIR] [--timeout SECONDS] [--no-watch]
 ```
+
+The server watches the tools directory: when a tool is added, changed or removed it tells the
+agent (`notifications/tools/list_changed`), and clients that support it refresh their tool list
+without restarting the server. `--no-watch` reads the tools once at startup.
 
 Tools run in `--cwd` (default: where the server was started, which for most clients is the
 project the agent is working in), so relative paths resolve there. Options can also be set as

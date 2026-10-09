@@ -73,14 +73,19 @@ cancelled). Jobs are kept in memory (the latest 1000) and run `--concurrency` at
 
 ```
 clyops-api --root DIR [--name NAME] [--cwd DIR] [--timeout SECONDS] [--concurrency N]
-           [--host 127.0.0.1] [--port 8080] [--api-key KEY] [--no-mcp]
+           [--host 127.0.0.1] [--port 8080] [--api-key KEY] [--no-mcp] [--no-watch]
 ```
 
 It listens on localhost unless told otherwise. Every option can also come from the environment as `CLYOPS_API_<OPTION>`. With `--api-key` (or
 `CLYOPS_API_API_KEY`), every request needs `Authorization: Bearer KEY` or `X-API-Key: KEY`. Anyone who can call
 the API can run every tool in the directory with any arguments their schemas accept, so only point it
 at tools you'd let its callers run. Tools run in `--cwd` (default: where the server was started), so
-relative paths in the input resolve there. The tools are read at startup: restart to pick up changes.
+relative paths in the input resolve there.
+
+**Hot reload.** The server watches the tools directory: add, change or remove a tool (or a
+`.clyops` file) and its endpoint, the OpenAPI document and the MCP tool list follow within a
+moment, without a restart. Jobs already running keep running. `--no-watch` reads the tools once
+at startup instead.
 
 ## As a library
 
@@ -88,8 +93,13 @@ relative paths in the input resolve there. The tools are read at startup: restar
 import express from 'express';
 import { createApi } from 'clyops-api';
 
-const { app, tools, queue } = await createApi({ root: './scripts', apiKey: process.env.KEY });
+const { app, current, close } = await createApi({ root: './scripts', apiKey: process.env.KEY, watch: true });
 app.listen(8080);
+current().tools;   // what is being served now
+close();           // stop watching
 ```
+
+Watching is off by default in the library (`watch: true` turns it on, `onReload` reports each
+new set) and on by default in the `clyops-api` command.
 
 `loadTools(root)` and `runTool(tool, input)` are exported for other servers.

@@ -1,12 +1,13 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import express from 'express';
 import { loadTools } from 'clyops-tools';
 import { mcpHttpHandler } from '../dist/index.js';
@@ -61,6 +62,34 @@ test('stdio server', { timeout: 60_000 }, async () => {
   try {
     assert.equal(client.getInstructions(), 'Test tools');
     await exercise(client);
+  } finally {
+    await client.close();
+  }
+});
+
+test('stdio server picks up new and removed tools', { timeout: 60_000 }, async () => {
+  const root = tree();
+  const client = new Client({ name: 'test', version: '1' });
+  let changed = () => {};
+  client.setNotificationHandler(ToolListChangedNotificationSchema, () => changed());
+  const next = () => new Promise((resolve) => { changed = resolve; });
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [cli, '--root', root], env, stderr: 'pipe' }));
+  try {
+    const names = async () => (await client.listTools()).tools.map((t) => t.name);
+    assert.deepEqual(await names(), ['media_demo']);
+
+    let notified = next();
+    writeFileSync(join(root, 'media/again'), readFileSync(join(root, 'media/demo')));
+    chmodSync(join(root, 'media/again'), 0o755);
+    await notified;
+    assert.deepEqual(await names(), ['media_again', 'media_demo']);
+    const run = await client.callTool({ name: 'media_again', arguments: { input: 'in.txt' } });
+    assert.equal(run.isError, false);
+
+    notified = next();
+    rmSync(join(root, 'media/demo'));
+    await notified;
+    assert.deepEqual(await names(), ['media_again']);
   } finally {
     await client.close();
   }

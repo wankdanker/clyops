@@ -1,6 +1,6 @@
 // An HTTP API over a directory of clyops tools: one POST endpoint per tool,
 // validated and documented from its --help-json-schema.
-import { loadTools, runTool, toJsonSchema, type Tool, type ToolResult } from 'clyops-tools';
+import { loadTools, runTool, toJsonSchema, watchTools, type Command, type Group, type Tool, type ToolResult } from 'clyops-tools';
 import { JobQueue, type JobRecord } from 'clyops-jobs';
 import { mcpHttpHandler } from 'clyops-mcp';
 import express, { type NextFunction, type Request, type Response } from 'express';
@@ -22,6 +22,10 @@ export interface ApiOptions {
   concurrency?: number;
   /** Also serve the tools over MCP (streamable HTTP) at /mcp (default: true). */
   mcp?: boolean;
+  /** Pick up added, changed and removed tools without a restart (default: false; call close() to stop). */
+  watch?: boolean;
+  /** Called after each reload when watching. */
+  onReload?: (loaded: { tree: Group; tools: ApiTool[] }) => void;
   version?: string;
 }
 
@@ -56,41 +60,71 @@ const ErrorSchema = z.object({ error: z.string(), issues: z.unknown().optional()
 const json = (schema: z.ZodType, description: string) => ({ description, content: { 'application/json': { schema } } });
 
 /**
- * Build the Express app. Routes are fixed when it is built: restart (or build
- * a new app) to pick up added or changed tools.
+ * Build the Express app. With `watch`, the tool endpoints, the OpenAPI
+ * document and /mcp follow the tools directory as it changes; otherwise they
+ * are fixed when the app is built.
  */
 export async function createApi(opts: ApiOptions) {
-  const loaded = await loadTools(opts.root, {
-    name: opts.name,
-    onError: (cmd, err) => process.emitWarning(`skipping ${cmd.words.join(' ')}: ${err.message}`),
-  });
-  const tree = loaded.tree;
-  const tools: ApiTool[] = loaded.tools.map((t) => ({ ...t, path: `/tools/${t.words.join('/')}` }));
   const queue = new JobQueue<ToolResult>({ concurrency: opts.concurrency });
-  const { app, registry } = plus(express(), {
-    openApiConfig: {
-      openapi: '3.0.0',
-      info: { title: tree.name, version: opts.version ?? '0.0.0', description: tree.description || `clyops tools in ${tree.dir}` },
-    },
-  });
-  app.use(express.json({ limit: '10mb' }));
+  const onError = (cmd: Command | null, err: Error) => process.emitWarning(cmd ? `skipping ${cmd.words.join(' ')}: ${err.message}` : err.message);
+  const withPaths = (tools: Tool[]): ApiTool[] => tools.map((t) => ({ ...t, path: `/tools/${t.words.join('/')}` }));
 
+  // Everything documented in OpenAPI lives on a router rebuilt for each set of tools.
+  let api: ReturnType<typeof buildRoutes>;
+  const swap = (loaded: { tree: Group; tools: Tool[] }) => (api = buildRoutes(opts, queue, loaded.tree, withPaths(loaded.tools)));
+  const watcher = opts.watch
+    ? await watchTools(opts.root, { name: opts.name, onError, onChange: (loaded) => opts.onReload?.(swap(loaded)) })
+    : undefined;
+  swap(watcher ? watcher.current() : await loadTools(opts.root, { name: opts.name, onError }));
+
+  const app = express();
+  app.use(express.json({ limit: '10mb' }));
   if (opts.apiKey) {
-    registry.registerSecurityScheme('apiKey', { type: 'http', scheme: 'bearer' });
     app.use((req: Request, res: Response, next: NextFunction) => {
       const given = req.get('x-api-key') ?? req.get('authorization')?.replace(/^Bearer\s+/i, '');
       if (given === opts.apiKey) return next();
       res.status(401).json({ error: 'missing or wrong API key' });
     });
   }
+  app.get('/openapi.json', (_req: Request, res: Response) => {
+    res.json(api.registry.generateOpenAPIDocument(opts.apiKey ? { security: [{ apiKey: [] }] } : {}));
+  });
+  // RouterPlus's type drops Router's call signature; it is still a Router.
+  app.use((req: Request, res: Response, next: NextFunction) => (api.router as unknown as express.Router)(req, res, next));
+  if (opts.mcp !== false) {
+    app.post('/mcp', mcpHttpHandler(() => ({
+      name: api.tree.name,
+      version: opts.version,
+      instructions: api.tree.description || undefined,
+      tools: api.tools,
+      cwd: opts.cwd,
+      timeoutMs: opts.timeoutMs,
+    })));
+  }
+  app.use(errorHandler);
 
+  return {
+    app,
+    queue,
+    /** The tree and tools being served now. */
+    current: () => ({ tree: api.tree, tools: api.tools }),
+    /** Stop watching (the app keeps serving the last set). */
+    close: () => watcher?.close(),
+  };
+}
+
+/** The documented routes for one set of tools, on their own router and registry. */
+function buildRoutes(opts: ApiOptions, queue: JobQueue<ToolResult>, tree: Group, tools: ApiTool[]) {
+  const { router, registry } = plus(express.Router(), {
+    openApiConfig: {
+      openapi: '3.0.0',
+      info: { title: tree.name, version: opts.version ?? '0.0.0', description: tree.description || `clyops tools in ${tree.dir}` },
+    },
+  });
+  if (opts.apiKey) registry.registerSecurityScheme('apiKey', { type: 'http', scheme: 'bearer' });
   const jobView = (record: JobRecord, result?: ToolResult) => ({ ...record, ...(result ? { result } : {}) });
 
-  app.get('/openapi.json', (_req: Request, res: Response) => {
-    res.json(registry.generateOpenAPIDocument(opts.apiKey ? { security: [{ apiKey: [] }] } : {}));
-  });
-
-  app.get(
+  router.get(
     {
       path: '/tools',
       summary: 'List the tools',
@@ -105,7 +139,7 @@ export async function createApi(opts: ApiOptions) {
   for (const tool of tools) {
     const inputSchema = toJsonSchema(tool.schema);
     const tag = tool.words.length > 1 ? tool.words.slice(0, -1).join(' ') : 'tools';
-    app.get(
+    router.get(
       {
         path: tool.path,
         summary: `Describe ${tool.words.join(' ')}`,
@@ -116,7 +150,7 @@ export async function createApi(opts: ApiOptions) {
         res.json({ schema: tool.schema, input: inputSchema });
       },
     );
-    app.post(
+    router.post(
       {
         path: tool.path,
         operationId: tool.words.join('_').replace(/[^A-Za-z0-9_]/g, '_'),
@@ -151,13 +185,13 @@ export async function createApi(opts: ApiOptions) {
   }
 
   const JobParams = z.object({ id: z.string() });
-  app.get(
+  router.get(
     { path: '/jobs', summary: 'List jobs', tags: ['jobs'], responses: { 200: json(z.array(JobSchema), 'Recent jobs, without results') } },
     (_req: Request, res: Response) => {
       res.json(queue.list());
     },
   );
-  app.get(
+  router.get(
     { path: '/jobs/:id', summary: 'A job, with its result once done', tags: ['jobs'], params: JobParams, responses: { 200: json(JobSchema, 'The job'), 404: json(ErrorSchema, 'No such job') } },
     (req: Request, res: Response) => {
       const job = queue.get(String(req.params.id));
@@ -165,7 +199,7 @@ export async function createApi(opts: ApiOptions) {
       res.json(jobView(job.record, job.result));
     },
   );
-  app.delete(
+  router.delete(
     { path: '/jobs/:id', summary: 'Cancel a job', tags: ['jobs'], params: JobParams, responses: { 202: json(JobSchema, 'Cancelling'), 404: json(ErrorSchema, 'No such job') } },
     (req: Request, res: Response) => {
       const job = queue.get(String(req.params.id));
@@ -175,12 +209,7 @@ export async function createApi(opts: ApiOptions) {
     },
   );
 
-  if (opts.mcp !== false) {
-    app.post('/mcp', mcpHttpHandler({ name: tree.name, version: opts.version, instructions: tree.description || undefined, tools, cwd: opts.cwd, timeoutMs: opts.timeoutMs }));
-  }
-
-  app.use(errorHandler);
-  return { app, registry, tree, tools, queue };
+  return { router, registry, tree, tools };
 }
 
 /** Errors as JSON: validation failures (400) with zod's issues, anything else 500. */

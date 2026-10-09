@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -164,4 +164,43 @@ test('MCP at /mcp, behind the API key', { timeout: 60_000 }, async () => {
   await keyedClient.connect(new StreamableHTTPClientTransport(kurl, { requestInit: { headers: { authorization: 'Bearer sekret' } } }));
   assert.equal((await keyedClient.listTools()).tools.length, 2);
   await keyedClient.close();
+});
+
+test('watch: tools added and removed show up without a restart', { timeout: 60_000 }, async () => {
+  const root = tree();
+  let reloaded = () => {};
+  const next = () => new Promise((resolve) => { reloaded = resolve; });
+  const api = await createApi({ root, cwd: root, watch: true, onReload: () => reloaded() });
+  const srv = api.app.listen(0);
+  const at = `http://127.0.0.1:${srv.address().port}`;
+  const paths = async () => (await (await fetch(`${at}/tools`)).json()).map((t) => t.path);
+  try {
+    assert.deepEqual(await paths(), ['/tools/slow', '/tools/media/demo']);
+
+    let done = next();
+    mkdirSync(join(root, 'video'));
+    writeFileSync(join(root, 'video/cut'), readFileSync(join(root, 'media/demo')));
+    chmodSync(join(root, 'video/cut'), 0o755);
+    await done;
+    assert.deepEqual(await paths(), ['/tools/slow', '/tools/media/demo', '/tools/video/cut']);
+    const run = await (await fetch(`${at}/tools/video/cut`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"input":"a"}' })).json();
+    assert.equal(run.ok, true, run.stderr);
+    const doc = await (await fetch(`${at}/openapi.json`)).json();
+    assert.ok(doc.paths['/tools/video/cut'].post);
+    const client = new Client({ name: 'test', version: '1' });
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${at}/mcp`)));
+    assert.ok((await client.listTools()).tools.some((t) => t.name === 'video_cut'));
+    await client.close();
+
+    done = next();
+    rmSync(join(root, 'slow'));
+    await done;
+    assert.deepEqual(await paths(), ['/tools/media/demo', '/tools/video/cut']);
+    assert.equal((await fetch(`${at}/tools/slow`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"input":"a"}' })).status, 404);
+    assert.equal((await (await fetch(`${at}/openapi.json`)).json()).paths['/tools/slow'], undefined);
+  } finally {
+    api.close();
+    srv.closeAllConnections();
+    srv.close();
+  }
 });

@@ -14,6 +14,8 @@ section here.
   request validation and an OpenAPI document from each tool's schema, async jobs and MCP at `/mcp`.
 - **clyops-mcp** (npm): a directory of tools as MCP tools for AI agents, over stdio
   (`clyops-mcp --root DIR`) or streamable HTTP; clyops-api serves it at `/mcp`.
+- Hot reload: clyops-api and clyops-mcp follow the tools directory as tools are added, changed
+  or removed (`watchTools` in clyops-tools); `--no-watch` turns it off.
 - The JavaScript packages form one npm workspace at the repository root.
 
 ## [0.1.0] - 2026-10-08

@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { classify, commands, discover, inputKeys, loadSchema, run, tail, toArgv, toJsonSchema } from '../dist/index.js';
+import { classify, commands, discover, inputKeys, loadSchema, run, tail, toArgv, toJsonSchema, watchTools } from '../dist/index.js';
 
 const repo = fileURLToPath(new URL('../../..', import.meta.url));
 const golden = JSON.parse(readFileSync(join(repo, 'spec/conformance/golden/schema.json'), 'utf8'));
@@ -178,4 +178,42 @@ test('toJsonSchema', () => {
   assert.match('10.0.0.1', new RegExp(p.addr.pattern));
   assert.doesNotMatch('mail@x', new RegExp(p.email.pattern));
   assert.ok(p.no_cache && p.data_dir && p.key);
+});
+
+// Recursive fs.watch needs Node 20 on Linux.
+const old = Number(process.versions.node.split('.')[0]) < 20 && 'needs Node 20+';
+test('watchTools reloads when tools change', { timeout: 30_000, skip: old }, async () => {
+  const root = tree();
+  const sets = [];
+  let wake = () => {};
+  const watcher = await watchTools(root, { debounceMs: 50, onChange: (loaded) => { sets.push(loaded); wake(); } });
+  // Resolve once a reload satisfies `check`.
+  const until = (check) => new Promise((resolve) => {
+    wake = () => sets.length && check(sets.at(-1)) && resolve(sets.at(-1));
+    wake();
+  });
+  const names = (loaded) => loaded.tools.map((t) => t.words.join(' '));
+  try {
+    assert.ok(names(watcher.current()).includes('media to-pcm'));
+    assert.ok(!names(watcher.current()).includes('media new'));
+    // Not a tool: rescanned, but not reported.
+    writeFileSync(join(root, 'notes.log'), 'x');
+
+    file(join(root, 'media/new.sh'), readFileSync(join(root, 'demo.sh'), 'utf8'));
+    await until((l) => names(l).includes('media new'));
+
+    mkdirSync(join(root, 'extra'));
+    file(join(root, 'extra/deep'), readFileSync(join(root, 'demo.sh'), 'utf8'));
+    await until((l) => names(l).includes('extra deep'));
+
+    writeFileSync(join(root, '.clyops'), 'description: Renamed\n');
+    await until((l) => l.tree.description === 'Renamed');
+
+    rmSync(join(root, 'media/new.sh'));
+    const last = await until((l) => !names(l).includes('media new'));
+    assert.equal(watcher.current(), last);
+    assert.equal(sets.length, 4, 'one report per real change');
+  } finally {
+    watcher.close();
+  }
 });

@@ -1,4 +1,5 @@
 // A directory of tools, loaded with their schemas, and running one with JSON input.
+import { watch } from 'node:fs';
 import { commands, discover, type Command, type Group } from './discover.js';
 import { toArgv, type Input } from './argv.js';
 import { run, type RunOptions, type RunResult } from './run.js';
@@ -33,6 +34,56 @@ export async function loadTools(root: string, opts: { name?: string; onError?: (
       }),
   );
   return { tree, tools: loaded.filter((t): t is Tool => Boolean(t)) };
+}
+
+export interface ToolsWatcher {
+  /** The latest tree and tools. */
+  current(): { tree: Group; tools: Tool[] };
+  close(): void;
+}
+
+/**
+ * loadTools, then reload whenever something under the tools directory
+ * changes, calling `onChange` when the set of tools (or their schemas or
+ * descriptions) differs. Changes are debounced, so a
+ * burst of writes (an editor saving, a checkout) reloads once. A reload that
+ * fails keeps the previous set and is reported to `onError`. Needs Node 20+
+ * (recursive fs.watch) on Linux.
+ */
+export async function watchTools(
+  root: string,
+  opts: { name?: string; debounceMs?: number; onChange?: (loaded: { tree: Group; tools: Tool[] }) => void; onError?: (cmd: Command | null, err: Error) => void } = {},
+): Promise<ToolsWatcher> {
+  const load = () => loadTools(root, { name: opts.name, onError: opts.onError });
+  let loaded = await load();
+  let timer: NodeJS.Timeout | undefined;
+  // Reloads run one at a time; a change during one schedules another.
+  let running: Promise<void> = Promise.resolve();
+  const reload = () => {
+    running = running.then(async () => {
+      try {
+        const next = await load();
+        // Files that aren't tools change too (a tool's output, a log): only
+        // report a set that differs.
+        if (JSON.stringify(next) === JSON.stringify(loaded)) return;
+        loaded = next;
+        opts.onChange?.(loaded);
+      } catch (err) {
+        opts.onError?.(null, err as Error);
+      }
+    });
+  };
+  const watcher = watch(loaded.tree.dir, { recursive: true }, () => {
+    clearTimeout(timer);
+    timer = setTimeout(reload, opts.debounceMs ?? 250);
+  });
+  return {
+    current: () => loaded,
+    close: () => {
+      clearTimeout(timer);
+      watcher.close();
+    },
+  };
 }
 
 /** Run a tool with JSON input (spec section 13). */
