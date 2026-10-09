@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -397,6 +398,7 @@ type option struct {
 	required                         bool
 	description, group, rule         string
 	searchDirs                       []string
+	secret                           bool
 }
 
 func (o *option) label() string {
@@ -422,6 +424,18 @@ type argument struct {
 type command struct{ name, description, hint string }
 
 type configValue struct{ value, dir string }
+
+// stream is a declared stdin or stdout (spec section 1.3).
+type stream struct {
+	Description string `json:"description"`
+	ContentType string `json:"contentType"`
+}
+
+// constraint is an option relationship (spec section 1.6).
+type constraint struct {
+	Type    string   `json:"type"`
+	Options []string `json:"options"`
+}
 
 // ParseResult is the outcome of Parse: Status is "ok", "help" or "error".
 type ParseResult struct {
@@ -488,6 +502,13 @@ type Cli struct {
 	argSet              map[string]bool
 	sources             map[string]string
 	config              map[string]configValue
+	effects             []string
+	stdin, stdout       *stream
+	constraints         []constraint
+	children            []*Cli
+	parent              *Cli
+	word                string
+	selected            *Cli // the command selected by the last parse (nil: this one)
 }
 
 // New returns an empty Cli for the running program.
@@ -516,6 +537,117 @@ func (c *Cli) SetDescription(text string) *Cli { c.description = text; return c 
 
 // SetEpilog sets the text shown at the end of the help.
 func (c *Cli) SetEpilog(text string) *Cli { c.epilog = text; return c }
+
+// SetEffects declares what running the program does: read-only, idempotent, destructive, network.
+func (c *Cli) SetEffects(effects ...string) *Cli {
+	for _, e := range effects {
+		if e != "read-only" && e != "idempotent" && e != "destructive" && e != "network" {
+			panic("clyops: unknown effect '" + e + "'")
+		}
+	}
+	c.effects = effects
+	return c
+}
+
+// SetStdin declares what the program reads on stdin; contentType is a MIME type or a comma-separated list.
+func (c *Cli) SetStdin(description, contentType string) *Cli {
+	c.stdin = &stream{description, contentType}
+	return c
+}
+
+// SetStdout declares what the program writes on stdout; undeclared means text.
+func (c *Cli) SetStdout(description, contentType string) *Cli {
+	c.stdout = &stream{description, contentType}
+	return c
+}
+
+// Exclusive says at most one of these options may be given.
+func (c *Cli) Exclusive(longs ...string) *Cli { return c.addConstraint("exclusive", longs) }
+
+// Requires says that when long is given, the others must be too.
+func (c *Cli) Requires(long string, longs ...string) *Cli {
+	return c.addConstraint("requires", append([]string{long}, longs...))
+}
+
+// OneOf says at least one of these options must be given.
+func (c *Cli) OneOf(longs ...string) *Cli { return c.addConstraint("oneOf", longs) }
+
+func (c *Cli) addConstraint(kind string, longs []string) *Cli {
+	for _, long := range longs {
+		if c.findOption(long, false) == nil {
+			panic("clyops: unknown option --" + long + " in constraint")
+		}
+	}
+	c.constraints = append(c.constraints, constraint{kind, longs})
+	return c
+}
+
+// Command registers a command (spec section 1.7) and returns it, to register
+// its options and arguments on.
+func (c *Cli) Command(name, description string) *Cli {
+	if len(c.args) > 0 {
+		panic("clyops: cannot mix commands and positional arguments")
+	}
+	for _, k := range c.children {
+		if k.word == name {
+			panic("clyops: duplicate command " + name)
+		}
+	}
+	child := &Cli{Name: c.Name + " " + name, Root: c.root(), Cwd: c.Cwd, Env: c.Env, Values: Values{},
+		byLong: map[string]*option{}, byShort: map[string]*option{}, description: description, parent: c, word: name}
+	c.children = append(c.children, child)
+	return child
+}
+
+// CommandPath is the command words selected by the last parse, e.g. ["db", "migrate"].
+func (c *Cli) CommandPath() []string {
+	words := []string{}
+	for node := c.sel(); node != nil && node != c; node = node.parent {
+		words = append([]string{node.word}, words...)
+	}
+	return words
+}
+
+func (c *Cli) sel() *Cli {
+	if c.selected == nil {
+		return c
+	}
+	return c.selected
+}
+
+// chain is the selected command, its parent, ... up to c.
+func (c *Cli) chain() []*Cli {
+	var out []*Cli
+	for node := c.sel(); node != nil; node = node.parent {
+		out = append(out, node)
+		if node == c {
+			break
+		}
+	}
+	return out
+}
+
+func (c *Cli) chainOptions() []*option {
+	var out []*option
+	for _, n := range c.chain() {
+		out = append(out, n.options...)
+	}
+	return out
+}
+
+// findOption is an option by long (or short) name, in c and its ancestors.
+func (c *Cli) findOption(name string, short bool) *option {
+	for node := c; node != nil; node = node.parent {
+		m := node.byLong
+		if short {
+			m = node.byShort
+		}
+		if opt := m[name]; opt != nil {
+			return opt
+		}
+	}
+	return nil
+}
 
 // SetConfig names the option holding a config file path; prefixes is comma-separated.
 func (c *Cli) SetConfig(option, prefixes string) *Cli {
@@ -565,13 +697,13 @@ func (c *Cli) Opt(variable, long, short, def, description string, groupAndRule .
 	if def == "flag" || def == "optional" {
 		value = ""
 	}
-	return c.add(&option{variable, long, short, kind, value, def == "", description, group, rule, nil})
+	return c.add(&option{variable, long, short, kind, value, def == "", description, group, rule, nil, false})
 }
 
 // OptArray registers a repeatable option whose values accumulate into a list.
 func (c *Cli) OptArray(variable, long, short, description string, groupAndRule ...string) *Cli {
 	group, rule := groupRule(groupAndRule)
-	return c.add(&option{variable, long, short, "array", "", false, description, group, rule, nil})
+	return c.add(&option{variable, long, short, "array", "", false, description, group, rule, nil, false})
 }
 
 // Arg registers a positional argument. An empty def makes it required.
@@ -609,6 +741,9 @@ func (c *Cli) add(opt *option) *Cli {
 	if opt.short != "" && (utf8.RuneCountInString(opt.short) != 1 || c.byShort[opt.short] != nil) {
 		panic("clyops: invalid or duplicate short option -" + opt.short)
 	}
+	if opt.rule == "secret" || strings.HasPrefix(opt.rule, "secret:") {
+		opt.secret, opt.rule = true, strings.TrimPrefix(strings.TrimPrefix(opt.rule, "secret"), ":")
+	}
 	if !knownRule(opt.rule) {
 		panic(fmt.Sprintf("clyops: unknown validation rule '%s' for --%s", opt.rule, opt.long))
 	}
@@ -621,6 +756,9 @@ func (c *Cli) add(opt *option) *Cli {
 }
 
 func (c *Cli) addArg(arg *argument) *Cli {
+	if len(c.children) > 0 {
+		panic("clyops: cannot mix commands and positional arguments")
+	}
 	for _, a := range c.args {
 		if a.variadic {
 			panic("clyops: argument " + arg.name + " registered after a variadic argument")
@@ -639,7 +777,7 @@ func (c *Cli) ensureHelp() {
 		if c.byShort["h"] != nil {
 			short = ""
 		}
-		c.add(&option{"HELP", "help", short, "flag", "", false, "Show this help message and exit", "Global", "", nil})
+		c.add(&option{"HELP", "help", short, "flag", "", false, "Show this help message and exit", "Global", "", nil, false})
 	}
 }
 
@@ -652,6 +790,7 @@ func (c *Cli) Parse(argv []string) ParseResult {
 	c.raw, c.argRaw, c.argSet = map[string][]string{}, map[string][]string{}, map[string]bool{}
 	c.sources, c.config = map[string]string{}, map[string]configValue{}
 	c.Values = Values{}
+	c.selected = nil
 	c.ensureHelp()
 
 	scanErr := c.catch(func() { c.scan(argv) })
@@ -669,7 +808,7 @@ func (c *Cli) Parse(argv []string) ParseResult {
 	}
 
 	var missingCmds []command
-	for _, cmd := range c.commands {
+	for _, cmd := range c.requiredCommands() {
 		if !c.which(cmd.name) {
 			missingCmds = append(missingCmds, cmd)
 		}
@@ -687,7 +826,7 @@ func (c *Cli) Parse(argv []string) ParseResult {
 	}
 
 	var missing []string
-	for _, o := range c.options {
+	for _, o := range c.chainOptions() {
 		if o.required && (len(c.raw[o.long]) == 0 || c.raw[o.long][0] == "") {
 			missing = append(missing, "--"+o.long)
 		}
@@ -695,8 +834,63 @@ func (c *Cli) Parse(argv []string) ParseResult {
 	if len(missing) > 0 {
 		return ParseResult{Status: "error", Error: "Missing required argument(s): " + strings.Join(missing, " "), ShowUsage: true}
 	}
+	if err := c.checkConstraints(); err != "" {
+		return ParseResult{Status: "error", Error: err, ShowUsage: true}
+	}
 	return ParseResult{Status: "ok"}
 }
+
+// requiredCommands is the chain's required commands, from the program down.
+func (c *Cli) requiredCommands() []command {
+	var out []command
+	chain := c.chain()
+	for i := len(chain) - 1; i >= 0; i-- {
+		out = append(out, chain[i].commands...)
+	}
+	return out
+}
+
+// chainConstraints is the chain's relationships, from the program down.
+func (c *Cli) chainConstraints() []constraint {
+	var out []constraint
+	chain := c.chain()
+	for i := len(chain) - 1; i >= 0; i-- {
+		out = append(out, chain[i].constraints...)
+	}
+	return out
+}
+
+// checkConstraints is spec section 1.6: the first relationship that fails.
+func (c *Cli) checkConstraints() string {
+	given := func(long string) bool {
+		s, v := c.Source(long), c.raw[long]
+		return (s == "cli" || s == "config" || s == "env") && len(v) > 0 && !(len(v) == 1 && v[0] == "false" && c.findSel(long).kind == "flag")
+	}
+	for _, k := range c.chainConstraints() {
+		var on []string
+		for _, long := range k.Options {
+			if given(long) {
+				on = append(on, long)
+			}
+		}
+		switch {
+		case k.Type == "exclusive" && len(on) > 1:
+			return "Options --" + on[0] + " and --" + on[1] + " cannot be used together"
+		case k.Type == "requires" && given(k.Options[0]):
+			for _, long := range k.Options[1:] {
+				if !given(long) {
+					return "Option --" + k.Options[0] + " requires --" + long
+				}
+			}
+		case k.Type == "oneOf" && len(on) == 0:
+			return "One of --" + strings.Join(k.Options, ", --") + " is required"
+		}
+	}
+	return ""
+}
+
+// findSel is an option of the selected chain.
+func (c *Cli) findSel(name string) *option { return c.sel().findOption(name, false) }
 
 // catch runs fn and returns the message of a parse or validation error it raises.
 func (c *Cli) catch(fn func()) (msg string) {
@@ -749,12 +943,24 @@ func (c *Cli) scan(argv []string) {
 		i++
 		switch {
 		case endOfOptions || token == "-" || !strings.HasPrefix(token, "-"):
+			node := c.sel()
 			if rest != nil {
 				c.argRaw[rest.name] = append(c.argRaw[rest.name], token)
-			} else if pos >= len(c.args) {
+			} else if len(node.children) > 0 {
+				var child *Cli
+				for _, k := range node.children {
+					if k.word == token {
+						child = k
+					}
+				}
+				if child == nil {
+					panic(parseError("Unknown command: " + token))
+				}
+				c.selected = child
+			} else if pos >= len(node.args) {
 				panic(parseError("Unexpected argument: " + token))
 			} else {
-				arg := c.args[pos]
+				arg := node.args[pos]
 				pos++
 				c.argRaw[arg.name] = []string{token}
 				c.argSet[arg.name] = true
@@ -766,7 +972,7 @@ func (c *Cli) scan(argv []string) {
 			endOfOptions = true
 		case strings.HasPrefix(token, "--"):
 			name, value, eq := strings.Cut(token[2:], "=")
-			opt := c.byLong[name]
+			opt := c.findSel(name)
 			switch {
 			case opt != nil && eq:
 				if opt.kind == "flag" {
@@ -787,8 +993,8 @@ func (c *Cli) scan(argv []string) {
 					c.setCLI(opt, argv[i])
 					i++
 				}
-			case strings.HasPrefix(name, "no-") && !eq && c.byLong[name[3:]] != nil:
-				target := c.byLong[name[3:]]
+			case strings.HasPrefix(name, "no-") && !eq && c.findSel(name[3:]) != nil:
+				target := c.findSel(name[3:])
 				if !target.boolLike() {
 					panic(parseError("Option --" + name + " can only be used with flag/boolean options"))
 				}
@@ -799,7 +1005,7 @@ func (c *Cli) scan(argv []string) {
 		default:
 			cluster := []rune(token[1:])
 			for j, ch := range cluster {
-				opt := c.byShort[string(ch)]
+				opt := c.sel().findOption(string(ch), true)
 				if opt == nil {
 					panic(parseError("Unknown option: -" + string(ch)))
 				}
@@ -823,7 +1029,7 @@ func (c *Cli) scan(argv []string) {
 }
 
 func (c *Cli) loadConfig() {
-	opt := c.byLong[c.configOption]
+	opt := c.findSel(c.configOption)
 	if opt == nil {
 		return
 	}
@@ -846,7 +1052,7 @@ func (c *Cli) loadConfig() {
 	c.readConfig(resolved, 0, map[string]bool{})
 
 	for key, cv := range c.config {
-		target := c.byLong[key]
+		target := c.findSel(key)
 		if target == nil || target == opt || c.sources[key] == "cli" {
 			continue
 		}
@@ -917,7 +1123,11 @@ func (c *Cli) readConfig(path string, depth int, stack map[string]bool) {
 }
 
 func (c *Cli) resolve() {
-	for _, arg := range c.args {
+	if len(c.sel().children) > 0 {
+		panic(parseError("Missing command"))
+	}
+	options, args := c.chainOptions(), c.sel().args
+	for _, arg := range args {
 		if c.argSet[arg.name] {
 			continue
 		}
@@ -931,7 +1141,7 @@ func (c *Cli) resolve() {
 		}
 	}
 
-	for _, opt := range c.options {
+	for _, opt := range options {
 		if _, ok := c.sources[opt.long]; ok {
 			continue
 		}
@@ -960,7 +1170,7 @@ func (c *Cli) resolve() {
 	}
 
 	// Path resolution: the base depends on where the value came from.
-	for _, opt := range c.options {
+	for _, opt := range options {
 		values, ok := c.raw[opt.long]
 		if !isPathRule(opt.rule) || !ok || opt.long == c.configOption {
 			continue
@@ -976,7 +1186,7 @@ func (c *Cli) resolve() {
 			values[i] = ResolvePath(v, base, opt.searchDirs)
 		}
 	}
-	for _, arg := range c.args {
+	for _, arg := range args {
 		if isPathRule(arg.rule) {
 			for i, v := range c.argRaw[arg.name] {
 				c.argRaw[arg.name][i] = ResolvePath(v, c.Cwd, nil)
@@ -1001,7 +1211,7 @@ func (c *Cli) resolve() {
 		}
 		return out
 	}
-	for _, opt := range c.options {
+	for _, opt := range options {
 		values, ok := c.raw[opt.long]
 		switch {
 		case !ok && opt.kind == "array":
@@ -1016,12 +1226,15 @@ func (c *Cli) resolve() {
 			c.Values[opt.variable] = convert(values[0], opt.rule, "--"+opt.long)
 		}
 	}
-	for _, arg := range c.args {
+	for _, arg := range args {
 		if arg.variadic {
 			c.Values[arg.name] = list(c.argRaw[arg.name], arg.rule, arg.name)
 		} else {
 			c.Values[arg.name] = convert(c.argRaw[arg.name][0], arg.rule, arg.name)
 		}
+	}
+	if len(c.children) > 0 {
+		c.Values["command"] = c.CommandPath()
 	}
 }
 
@@ -1039,13 +1252,17 @@ func (c *Cli) RunArgs(argv []string) Values {
 			break
 		}
 	}
+	words := []string{}
+	if len(head) < len(argv) {
+		words = argv[len(head)+1:]
+	}
 	for i, a := range head {
 		switch a {
 		case "--help-json-schema":
 			fmt.Println(c.JSONSchema())
 			os.Exit(0)
 		case "--bash-completion":
-			fmt.Print(c.CompletionData())
+			fmt.Print(c.CompletionData(words...))
 			os.Exit(0)
 		case "--completion":
 			shell := ""
@@ -1115,11 +1332,26 @@ func (c *Cli) ValuesJSON() string {
 		n++
 		b.WriteString("\n  " + jsonText(key) + ": " + strings.ReplaceAll(jsonIndent(value), "\n", "\n  "))
 	}
-	for _, o := range c.options {
-		write(o.variable, c.Values[o.variable])
+	for _, o := range c.chainOptions() {
+		v := c.Values[o.variable]
+		if o.secret && v != nil {
+			if list, ok := v.([]any); ok {
+				masked := []any{}
+				for range list {
+					masked = append(masked, "***")
+				}
+				v = masked
+			} else {
+				v = "***"
+			}
+		}
+		write(o.variable, v)
 	}
-	for _, a := range c.args {
+	for _, a := range c.sel().args {
 		write(a.name, c.Values[a.name])
+	}
+	if len(c.children) > 0 {
+		write("command", c.CommandPath())
 	}
 	if n > 0 {
 		b.WriteString("\n")
@@ -1146,16 +1378,20 @@ func jsonText(s string) string { return jsonIndent(s) }
 // Output
 // ---------------------------------------------------------------------------
 
-// Usage is the help text (spec section 7).
+// Usage is the help text (spec section 7), for the selected command.
 func (c *Cli) Usage() string {
 	c.ensureHelp()
+	node, options := c.sel(), c.chainOptions()
 	maxWidth := 100
 	if w, err := strconv.Atoi(c.Env["CLYOPS_MAX_WIDTH"]); err == nil && w > 0 && rePort.MatchString(c.Env["CLYOPS_MAX_WIDTH"]) {
 		maxWidth = w
 	}
 	longest := 0
-	for _, o := range c.options {
+	for _, o := range options {
 		longest = max(longest, utf8.RuneCountInString(o.label()))
+	}
+	for _, k := range node.children {
+		longest = max(longest, utf8.RuneCountInString(k.word))
 	}
 	indent := min(50, max(32, longest+4))
 	textWidth := max(20, maxWidth-indent)
@@ -1182,8 +1418,11 @@ func (c *Cli) Usage() string {
 	}
 
 	var sections [][]string
-	usage := "Usage: " + c.Name
-	for _, a := range c.args {
+	usage := "Usage: " + node.Name
+	if len(node.children) > 0 {
+		usage += " <command>"
+	}
+	for _, a := range node.args {
 		switch {
 		case a.variadic:
 			usage += " [<" + a.name + "...>]"
@@ -1194,12 +1433,39 @@ func (c *Cli) Usage() string {
 		}
 	}
 	sections = append(sections, []string{usage + " [OPTIONS]"})
-	if c.description != "" {
-		sections = append(sections, WrapText(c.description, maxWidth))
+	if node.description != "" {
+		sections = append(sections, WrapText(node.description, maxWidth))
 	}
-	if len(c.args) > 0 {
+	var io []string
+	for _, d := range []struct {
+		label string
+		s     *stream
+	}{{"Input:", node.stdin}, {"Output:", node.stdout}} {
+		if d.s == nil {
+			continue
+		}
+		line := d.label
+		if d.s.Description != "" {
+			line += " " + d.s.Description
+		}
+		if d.s.ContentType != "" {
+			line += " (" + d.s.ContentType + ")"
+		}
+		io = append(io, line)
+	}
+	if len(io) > 0 {
+		sections = append(sections, io)
+	}
+	if len(node.children) > 0 {
+		lines := []string{"Commands:"}
+		for _, k := range node.children {
+			lines = append(lines, row(k.word, k.description)...)
+		}
+		sections = append(sections, lines)
+	}
+	if len(node.args) > 0 {
 		lines := []string{"Positional Arguments:"}
-		for _, a := range c.args {
+		for _, a := range node.args {
 			var notes []string
 			if a.variadic {
 				notes = append(notes, "variadic")
@@ -1214,9 +1480,9 @@ func (c *Cli) Usage() string {
 		}
 		sections = append(sections, lines)
 	}
-	if len(c.commands) > 0 {
+	if commands := c.requiredCommands(); len(commands) > 0 {
 		lines := []string{"Required Commands:"}
-		for _, cmd := range c.commands {
+		for _, cmd := range commands {
 			status := "not found"
 			if c.which(cmd.name) {
 				status = "installed"
@@ -1229,9 +1495,11 @@ func (c *Cli) Usage() string {
 		}
 		sections = append(sections, lines)
 	}
+	constraints := c.chainConstraints()
+	list := func(longs []string) string { return "--" + strings.Join(longs, ", --") }
 	var groups []string
 	seen := map[string]bool{}
-	for _, o := range c.options {
+	for _, o := range options {
 		if !seen[o.group] {
 			seen[o.group] = true
 			groups = append(groups, o.group)
@@ -1239,7 +1507,7 @@ func (c *Cli) Usage() string {
 	}
 	for _, group := range groups {
 		lines := []string{group + ":"}
-		for _, o := range c.options {
+		for _, o := range options {
 			if o.group != group {
 				continue
 			}
@@ -1250,8 +1518,15 @@ func (c *Cli) Usage() string {
 			if o.kind == "array" {
 				notes = append(notes, "multiple")
 			}
+			if o.secret {
+				notes = append(notes, "secret")
+			}
 			if cv, ok := c.config[o.long]; ok {
-				notes = append(notes, "config: "+cv.value)
+				if o.secret {
+					notes = append(notes, "config: ***")
+				} else {
+					notes = append(notes, "config: "+cv.value)
+				}
 			}
 			if o.def != "" {
 				notes = append(notes, "default: "+o.def)
@@ -1259,12 +1534,26 @@ func (c *Cli) Usage() string {
 			if o.rule != "" {
 				notes = append(notes, "accepts: "+DescribeRule(o.rule))
 			}
+			for _, k := range constraints {
+				if !slices.Contains(k.Options, o.long) {
+					continue
+				}
+				switch {
+				case k.Type == "exclusive":
+					others := slices.DeleteFunc(slices.Clone(k.Options), func(l string) bool { return l == o.long })
+					notes = append(notes, "conflicts with: "+list(others))
+				case k.Type == "requires" && k.Options[0] == o.long:
+					notes = append(notes, "requires: "+list(k.Options[1:]))
+				case k.Type == "oneOf":
+					notes = append(notes, "one of: "+list(k.Options))
+				}
+			}
 			lines = append(lines, row(o.label(), annotate(o.description, notes))...)
 		}
 		sections = append(sections, lines)
 	}
-	if c.epilog != "" {
-		sections = append(sections, strings.Split(strings.TrimRight(c.epilog, "\n"), "\n"))
+	if node.epilog != "" {
+		sections = append(sections, strings.Split(strings.TrimRight(node.epilog, "\n"), "\n"))
 	}
 
 	var parts []string
@@ -1301,6 +1590,7 @@ type schemaOption struct {
 	Required     bool     `json:"required"`
 	Validation   string   `json:"validation"`
 	Choices      []string `json:"choices"`
+	Secret       bool     `json:"secret"`
 }
 
 type schemaCommand struct {
@@ -1309,21 +1599,40 @@ type schemaCommand struct {
 	InstallHint string `json:"installHint"`
 }
 
-type schema struct {
-	Clyops           int              `json:"clyops"`
-	Script           string           `json:"script"`
+type schemaBody struct {
 	Description      string           `json:"description"`
 	Epilog           string           `json:"epilog"`
 	Arguments        []schemaArgument `json:"arguments"`
 	Options          []schemaOption   `json:"options"`
 	RequiredCommands []schemaCommand  `json:"requiredCommands"`
+	Effects          []string         `json:"effects"`
+	Constraints      []constraint     `json:"constraints"`
+	Stdin            *stream          `json:"stdin"`
+	Stdout           *stream          `json:"stdout"`
+	Commands         []schemaNode     `json:"commands"`
+}
+
+type schemaNode struct {
+	Name string `json:"name"`
+	schemaBody
+}
+
+type schema struct {
+	Clyops int    `json:"clyops"`
+	Script string `json:"script"`
+	schemaBody
 }
 
 // JSONSchema is the JSON description of the CLI (spec section 8).
 func (c *Cli) JSONSchema() string {
 	c.ensureHelp()
-	s := schema{Clyops: 1, Script: c.Name, Description: c.description, Epilog: c.epilog,
-		Arguments: []schemaArgument{}, Options: []schemaOption{}, RequiredCommands: []schemaCommand{}}
+	return jsonIndent(schema{1, c.Name, c.schemaBody()})
+}
+
+func (c *Cli) schemaBody() schemaBody {
+	s := schemaBody{Description: c.description, Epilog: c.epilog, Arguments: []schemaArgument{}, Options: []schemaOption{},
+		RequiredCommands: []schemaCommand{}, Effects: append([]string{}, c.effects...),
+		Constraints: append([]constraint{}, c.constraints...), Stdin: c.stdin, Stdout: c.stdout, Commands: []schemaNode{}}
 	for _, a := range c.args {
 		s.Arguments = append(s.Arguments, schemaArgument{a.name, a.description, !a.variadic && a.def == "", a.variadic, a.def, a.rule})
 	}
@@ -1349,12 +1658,15 @@ func (c *Cli) JSONSchema() string {
 			choices = strings.Split(r[7:], ",")
 		}
 		s.Options = append(s.Options, schemaOption{o.long, o.short, o.variable, o.description, def, o.group, typ,
-			o.kind == "flag", o.kind == "array", o.required, r, choices})
+			o.kind == "flag", o.kind == "array", o.required, r, choices, o.secret})
 	}
 	for _, cmd := range c.commands {
 		s.RequiredCommands = append(s.RequiredCommands, schemaCommand{cmd.name, cmd.description, cmd.hint})
 	}
-	return jsonIndent(s)
+	for _, k := range c.children {
+		s.Commands = append(s.Commands, schemaNode{k.word, k.schemaBody()})
+	}
+	return s
 }
 
 // CompletionScript is the shell script that enables completion for this
@@ -1370,7 +1682,9 @@ func (c *Cli) CompletionScript(shell string) (script string, ok bool) {
 }
 
 // CompletionData is the tab-separated completion records (spec section 9).
-func (c *Cli) CompletionData() string {
+// words are the words typed after the program name; a program with commands
+// follows them.
+func (c *Cli) CompletionData(words ...string) string {
 	c.ensureHelp()
 	clean := func(s string) string { return strings.NewReplacer("\t", " ", "\n", " ").Replace(s) }
 	orDash := func(s string) string {
@@ -1380,7 +1694,32 @@ func (c *Cli) CompletionData() string {
 		return s
 	}
 	lines := []string{"#clyops-completion 1"}
-	for _, o := range c.options {
+	node := c
+	if len(c.children) > 0 {
+		skip := 0
+	walk:
+		for _, w := range words {
+			for _, k := range node.children {
+				if k.word == w {
+					node, skip = k, skip+1
+					continue walk
+				}
+			}
+			break
+		}
+		if len(node.children) > 0 && skip < len(words) && !strings.HasPrefix(words[skip], "-") {
+			return lines[0] + "\n"
+		}
+		lines = append(lines, "skip\t"+strconv.Itoa(skip))
+		for _, k := range node.children {
+			lines = append(lines, "cmd\t"+k.word+"\t"+clean(k.description))
+		}
+	}
+	var options []*option
+	for n := node; n != nil; n = n.parent {
+		options = append(options, n.options...)
+	}
+	for _, o := range options {
 		short := "-"
 		if o.short != "" {
 			short = "-" + o.short
@@ -1395,7 +1734,7 @@ func (c *Cli) CompletionData() string {
 			lines = append(lines, "opt\t--no-"+o.long+"\t-\tflag\tnone\t-\t"+clean(o.description))
 		}
 	}
-	for _, a := range c.args {
+	for _, a := range node.args {
 		kind, values := completionKind(a.rule, nil)
 		arity := "single"
 		if a.variadic {

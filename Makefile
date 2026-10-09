@@ -33,7 +33,7 @@ build-c:
 	$(MAKE) -C packages/c
 
 build-go:
-	cd packages/go && go build -o build/demo ./examples/demo
+	cd packages/go && go build -o build/demo ./examples/demo && go build -o build/tasks ./examples/tasks
 
 build-java:
 	cd packages/java && mvn -q -B package -DskipTests \

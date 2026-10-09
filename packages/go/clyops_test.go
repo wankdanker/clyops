@@ -150,3 +150,91 @@ func TestJSONOutputs(t *testing.T) {
 		t.Fatal(s)
 	}
 }
+
+func mustPanic(t *testing.T, want string, fn func()) {
+	t.Helper()
+	defer func() {
+		if r := recover(); r == nil || !strings.Contains(r.(string), want) {
+			t.Fatalf("panic %v, want %q", r, want)
+		}
+	}()
+	fn()
+}
+
+func TestNewRegistrationErrors(t *testing.T) {
+	mustPanic(t, "unknown effect 'sideways'", func() { New().SetEffects("sideways") })
+	mustPanic(t, "unknown option --b in constraint", func() { New().Opt("A", "a", "", "flag", "A").Exclusive("a", "b") })
+	mustPanic(t, "cannot mix commands and positional arguments", func() { New().Arg("x", "X", "").Command("c", "C") })
+}
+
+func TestSecretValuesAreMasked(t *testing.T) {
+	cli := New()
+	cli.Name, cli.Env = "t", map[string]string{}
+	cli.Opt("TOKEN", "token", "", "", "Token", "Auth", "secret:string:3-")
+	if r := cli.Parse([]string{"--token", "abcd"}); r.Status != "ok" {
+		t.Fatal(r.Error)
+	}
+	var values map[string]any
+	_ = json.Unmarshal([]byte(cli.ValuesJSON()), &values)
+	if cli.Values.String("TOKEN") != "abcd" || values["TOKEN"] != "***" {
+		t.Fatalf("values %v / %v", cli.Values, values)
+	}
+	var schema struct {
+		Options []struct {
+			Secret     bool
+			Validation string
+		}
+	}
+	_ = json.Unmarshal([]byte(cli.JSONSchema()), &schema)
+	if !schema.Options[0].Secret || schema.Options[0].Validation != "string:3-" {
+		t.Fatalf("schema %+v", schema)
+	}
+}
+
+func TestRelationships(t *testing.T) {
+	make2 := func(env map[string]string) *Cli {
+		cli := New()
+		cli.Name, cli.Env = "t", env
+		cli.Opt("A", "a", "a", "flag", "A").Opt("B", "b", "b", "flag", "B").Opt("C", "c", "c", "optional", "C")
+		return cli.Exclusive("a", "b").Requires("c", "a").OneOf("a", "b", "c")
+	}
+	none := map[string]string{}
+	for _, tc := range []struct {
+		env  map[string]string
+		argv []string
+		want string
+	}{
+		{none, []string{"-a", "-b"}, "Options --a and --b cannot be used together"},
+		{none, []string{"-a", "--no-b"}, ""},
+		{none, []string{"-c", "x"}, "Option --c requires --a"},
+		{map[string]string{"A": "true"}, []string{"-c", "x"}, ""},
+		{none, nil, "One of --a, --b, --c is required"},
+	} {
+		if r := make2(tc.env).Parse(tc.argv); r.Error != tc.want {
+			t.Errorf("%v: %q, want %q", tc.argv, r.Error, tc.want)
+		}
+	}
+}
+
+func TestCommands(t *testing.T) {
+	cli := New()
+	cli.Name, cli.Env = "m", map[string]string{}
+	cli.Opt("CONFIG", "config", "c", "optional", "Config", "Global")
+	migrate := cli.Command("db", "Database").Command("migrate", "Migrate")
+	migrate.Opt("TO", "to", "", "optional", "Target", "Options", "int")
+	migrate.Arg("name", "Name", "all")
+	if r := cli.Parse([]string{"db", "-c", "x", "migrate", "--to", "3"}); r.Status != "ok" {
+		t.Fatal(r.Error)
+	}
+	if !reflect.DeepEqual(cli.CommandPath(), []string{"db", "migrate"}) || cli.Values.Int("TO") != 3 || cli.Values.String("CONFIG") != "x" {
+		t.Fatalf("values %v", cli.Values)
+	}
+	for argv, want := range map[string]string{"--to 3 db migrate": "Unknown option: --to", "db": "Missing command", "db seed": "Unknown command: seed"} {
+		if r := cli.Parse(strings.Fields(argv)); r.Error != want {
+			t.Errorf("%s: %q, want %q", argv, r.Error, want)
+		}
+	}
+	if r := cli.Parse([]string{"db", "migrate", "-h"}); r.Status != "help" || !strings.HasPrefix(cli.Usage(), "Usage: m db migrate [<name>] [OPTIONS]") {
+		t.Fatal(cli.Usage())
+	}
+}

@@ -31,7 +31,7 @@ jobs:
       - run: sudo apt-get update -q && sudo apt-get install -y -q zsh fish shellcheck
       - run: python3 tools/sync-completions.py --check
       - run: pip install jsonschema && python3 tools/check-schema.py
-      - run: shellcheck -S warning packages/bash/clyops.sh packages/bash/examples/demo.sh packages/bash/test/test.sh tools/*.sh
+      - run: shellcheck -S warning packages/bash/clyops.sh packages/bash/examples/demo.sh packages/bash/examples/tasks.sh packages/bash/test/test.sh tools/*.sh
       - run: make build
       - run: make conformance
       - run: make completions
@@ -136,7 +136,7 @@ jobs:
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
       - run: go vet ./...
       - run: go test ./...
-      - run: go build -o build/demo ./examples/demo
+      - run: go build -o build/demo ./examples/demo && go build -o build/tasks ./examples/tasks
       - run: python3 ../../tools/conformance.py go
 
   ruby:

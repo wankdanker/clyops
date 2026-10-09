@@ -16,6 +16,9 @@ func main() {
 	cli.SetDescription("Demo program for the clyops conformance suite. It registers one of every kind of option and argument so that each implementation can be checked against the same help text, schema and resolved values.")
 	cli.SetEpilog("Examples:\n  demo in.txt slow a b --tag x --tag y\n  demo in.txt -vc demo.conf")
 	cli.RequireCommand("sh", "POSIX shell", "install dash")
+	cli.SetEffects("idempotent", "network")
+	cli.SetStdin("Lines to process", "text/plain")
+	cli.SetStdout("The resolved values", "application/json")
 
 	cli.Arg("input", "Input file", "", "path")
 	cli.Arg("mode", "Processing mode", "fast", "choice:fast,slow")
@@ -32,7 +35,7 @@ func main() {
 	cli.Opt("ENABLED", "enabled", "", "true", "Enable processing", "Options", "bool")
 	cli.OptArray("TAG", "tag", "t", "Tag to attach", "Options", "string:1-8")
 	cli.Opt("NO_CACHE", "no-cache", "", "flag", "Disable the cache", "Options")
-	cli.Opt("KEY", "key", "k", "", "API key", "Auth")
+	cli.Opt("KEY", "key", "k", "", "API key", "Auth", "secret")
 	cli.Opt("HOST", "host", "H", "localhost", "Server host", "Network", "hostname")
 	cli.Opt("PORT", "port", "p", "8080", "Server port", "Network", "port")
 	cli.Opt("ENDPOINT", "endpoint", "", "optional", "Endpoint URL", "Network", "url")
@@ -50,6 +53,8 @@ func main() {
 
 	cli.SetConfig("config", "demo:,shared:")
 	cli.SetPathSearch("config", "conf")
+	cli.Exclusive("endpoint", "addr")
+	cli.Requires("dest", "src")
 
 	cli.Run()
 
