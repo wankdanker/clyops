@@ -60,6 +60,7 @@ module Clyops
     "file:exists" => "existing file", "file:readable" => "readable file", "file:writable" => "writable file",
     "dir:exists" => "existing directory", "dir:writable" => "writable directory"
   }.freeze
+  EFFECTS = %w[read-only idempotent destructive network].freeze
   HOSTNAME = /\A[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\z/
 
   # A ValueError-like error carrying the spec's message for a value that fails its rule.
@@ -272,7 +273,8 @@ module Clyops
   # Cli
   # -------------------------------------------------------------------------
 
-  Option = Struct.new(:var, :long, :short, :kind, :default, :required, :description, :group, :rule, :search_dirs) do
+  Option = Struct.new(:var, :long, :short, :kind, :default, :required, :description, :group, :rule, :search_dirs,
+                      :secret) do
     def label
       head = short.empty? ? "    --#{long}" : "-#{short}, --#{long}"
       kind == "flag" ? head : "#{head}=<value>"
@@ -329,12 +331,62 @@ module Clyops
       @arg_raw = {}
       @sources = {}
       @config = {} # key -> [value, dir]
+      @effects = []
+      @stdin = nil
+      @stdout = nil
+      @constraints = []
+      @children = []
+      @parent = nil
+      @word = ""
+      # The command selected by the last parse (this one when it has no commands).
+      @selected = self
     end
 
     # -- registration -------------------------------------------------------
 
     def set_description(text) = tap { @description = text }
     def set_epilog(text) = tap { @epilog = text }
+
+    # What running the program does: read-only, idempotent, destructive, network.
+    def set_effects(*effects)
+      effects.each { |e| raise DefinitionError, "Unknown effect '#{e}'" unless EFFECTS.include?(e) }
+      @effects = effects
+      self
+    end
+
+    # What the program reads on stdin; `content_type` is a MIME type or a comma-separated list.
+    def set_stdin(description, content_type = "") = tap { @stdin = { "description" => description, "contentType" => content_type } }
+    # What the program writes on stdout; undeclared means text.
+    def set_stdout(description, content_type = "") = tap { @stdout = { "description" => description, "contentType" => content_type } }
+
+    # At most one of these options may be given.
+    def exclusive(*longs) = add_constraint("exclusive", longs)
+    # When the first option is given, the others must be too.
+    def requires(long, *longs) = add_constraint("requires", [long, *longs])
+    # At least one of these options must be given.
+    def one_of(*longs) = add_constraint("oneOf", longs)
+
+    # Register a command (spec section 1.7) and return it, to register its options and arguments on.
+    def command(name, description = "")
+      raise DefinitionError, "Cannot mix commands and positional arguments" unless @args.empty?
+      raise DefinitionError, "Duplicate command #{name}" if @children.any? { |c| c.word == name }
+
+      child = Cli.new(name: "#{@name} #{name}", root: @root, cwd: @cwd, env: @env)
+      child.adopt(self, name, description)
+      @children << child
+      child
+    end
+
+    # The command words selected by the last parse, e.g. ["db", "migrate"].
+    def command_path
+      words = []
+      node = @selected
+      while node && !node.equal?(self)
+        words.unshift(node.word)
+        node = node.parent
+      end
+      words
+    end
 
     # `option` holds the config file path; `prefixes` is comma-separated.
     def set_config(option, prefixes)
@@ -361,12 +413,12 @@ module Clyops
     def opt(var, long, short = "", default = "", description = "", group = "Options", rule = "")
       kind = default == "flag" ? "flag" : "value"
       value = %w[flag optional].include?(default) ? "" : default
-      add(Option.new(var, long, short, kind, value, default == "", description, group, rule, []))
+      add(Option.new(var, long, short, kind, value, default == "", description, group, rule, [], false))
     end
 
     # Register a repeatable option whose values accumulate into a list.
     def opt_array(var, long, short = "", description = "", group = "Options", rule = "")
-      add(Option.new(var, long, short, "array", "", false, description, group, rule, []))
+      add(Option.new(var, long, short, "array", "", false, description, group, rule, [], false))
     end
 
     # Register a positional argument. An empty default makes it required.
@@ -388,6 +440,7 @@ module Clyops
       @sources = {}
       @config = {}
       @values = Values.new
+      @selected = self
       ensure_help
 
       scan_error = nil
@@ -406,7 +459,7 @@ module Clyops
         return ParseResult.new("error", e.message)
       end
 
-      missing_cmds = @commands.reject { |c| which(c[0]) }
+      missing_cmds = chain.reverse.flat_map { |n| n.commands }.reject { |c| which(c[0]) }
       unless missing_cmds.empty?
         detail = missing_cmds.flat_map do |cmd, desc, hint|
           ["  #{cmd} - #{desc}"] + (hint.empty? ? [] : ["    Install: #{hint}"])
@@ -414,8 +467,11 @@ module Clyops
         return ParseResult.new("error", "Missing required command(s): #{missing_cmds.map(&:first).join(', ')}", false, detail)
       end
 
-      missing = @options.select { |o| o.required && @raw[o.long].to_s.empty? }.map { |o| "--#{o.long}" }
+      missing = chain_options.select { |o| o.required && @raw[o.long].to_s.empty? }.map { |o| "--#{o.long}" }
       return ParseResult.new("error", "Missing required argument(s): #{missing.join(' ')}") unless missing.empty?
+
+      conflict = check_constraints
+      return ParseResult.new("error", conflict) if conflict
 
       ParseResult.new("ok")
     end
@@ -430,7 +486,7 @@ module Clyops
         exit(0)
       end
       if head.include?("--bash-completion")
-        $stdout.write(completion_data)
+        $stdout.write(completion_data(argv.include?("--") ? argv[(argv.index("--") + 1)..] : []))
         exit(0)
       end
       if (i = head.index("--completion"))
@@ -467,19 +523,25 @@ module Clyops
     # Resolved values as JSON (spec section 10).
     def values_json
       out = {}
-      @options.each { |o| out[o.var] = @values[o.var] }
-      @args.each { |a| out[a.name] = @values[a.name] }
+      chain_options.each do |o|
+        v = @values[o.var]
+        out[o.var] = o.secret && !v.nil? ? (v.is_a?(Array) ? v.map { "***" } : "***") : v
+      end
+      @selected.args.each { |a| out[a.name] = @values[a.name] }
+      out["command"] = command_path unless @children.empty?
       Clyops.pretty_json(out)
     end
 
     # -- output -------------------------------------------------------------
 
-    # Help text (spec section 7).
+    # Help text (spec section 7), for the selected command.
     def usage
       ensure_help
+      node = @selected
+      options = chain_options
       width = @env.fetch("CLYOPS_MAX_WIDTH", "")
       max_width = width.match?(/\A[0-9]+\z/) && width.to_i.positive? ? width.to_i : 100
-      longest = @options.map { |o| o.label.length }.max || 0
+      longest = (options.map { |o| o.label.length } + node.children.map { |c| c.word.length }).max || 0
       indent = [50, [32, longest + 4].max].min
       text_width = [20, max_width - indent].max
 
@@ -492,19 +554,30 @@ module Clyops
       annotate = ->(text, notes) { notes.empty? ? text : "#{text} (#{notes.join(', ')})" }
 
       sections = []
-      line = "Usage: #{@name}"
-      @args.each do |a|
+      line = "Usage: #{node.name}"
+      line += " <command>" unless node.children.empty?
+      node.args.each do |a|
         line += if a.variadic then " [<#{a.name}...>]"
                 elsif !a.default.empty? then " [<#{a.name}>]"
                 else " <#{a.name}>"
                 end
       end
       sections << ["#{line} [OPTIONS]"]
-      sections << Clyops.wrap_text(@description, max_width) unless @description.empty?
+      sections << Clyops.wrap_text(node.description, max_width) unless node.description.empty?
 
-      unless @args.empty?
+      io = [["Input:", node.stdin], ["Output:", node.stdout]].filter_map do |label, decl|
+        next unless decl
+
+        ctype = decl["contentType"]
+        [label, decl["description"], ctype.empty? ? "" : "(#{ctype})"].reject(&:empty?).join(" ")
+      end
+      sections << io unless io.empty?
+
+      sections << (["Commands:"] + node.children.flat_map { |c| row.(c.word, c.description) }) unless node.children.empty?
+
+      unless node.args.empty?
         lines = ["Positional Arguments:"]
-        @args.each do |a|
+        node.args.each do |a|
           notes = (a.variadic ? ["variadic"] : []) + (a.default.empty? ? [] : ["default: #{a.default}"])
           notes << "accepts: #{Clyops.describe_rule(a.rule)}" unless a.rule.empty?
           lines += row.(a.name, annotate.(a.description, notes))
@@ -512,30 +585,44 @@ module Clyops
         sections << lines
       end
 
-      unless @commands.empty?
+      commands = chain.reverse.flat_map { |n| n.commands }
+      unless commands.empty?
         lines = ["Required Commands:"]
-        @commands.each do |cmd, desc, hint|
+        commands.each do |cmd, desc, hint|
           status = which(cmd) ? "installed" : "not found"
           lines += row.("#{cmd} [#{status}]", hint.empty? ? desc : "#{desc} (#{hint})")
         end
         sections << lines
       end
 
-      @options.map(&:group).uniq.each do |group|
+      constraints = chain.reverse.flat_map { |n| n.constraints }
+      list = ->(longs) { longs.map { |l| "--#{l}" }.join(", ") }
+      options.map(&:group).uniq.each do |group|
         lines = ["#{group}:"]
-        @options.select { |o| o.group == group }.each do |o|
+        options.select { |o| o.group == group }.each do |o|
           notes = []
           notes << "required" if o.required
           notes << "multiple" if o.kind == "array"
-          notes << "config: #{@config[o.long][0]}" if @config.key?(o.long)
+          notes << "secret" if o.secret
+          notes << "config: #{o.secret ? '***' : @config[o.long][0]}" if @config.key?(o.long)
           notes << "default: #{o.default}" unless o.default.empty?
           notes << "accepts: #{Clyops.describe_rule(o.rule)}" unless o.rule.empty?
+          constraints.each do |c|
+            longs = c["options"]
+            next unless longs.include?(o.long)
+
+            case c["type"]
+            when "exclusive" then notes << "conflicts with: #{list.(longs - [o.long])}"
+            when "requires" then notes << "requires: #{list.(longs[1..])}" if longs[0] == o.long
+            when "oneOf" then notes << "one of: #{list.(longs)}"
+            end
+          end
           lines += row.(o.label, annotate.(o.description, notes))
         end
         sections << lines
       end
 
-      sections << @epilog.sub(/\n+\z/, "").split("\n", -1) unless @epilog.empty?
+      sections << node.epilog.sub(/\n+\z/, "").split("\n", -1) unless node.epilog.empty?
 
       text = sections.map { |s| s.join("\n") }.join("\n\n")
       "#{text.split("\n", -1).map(&:rstrip).join("\n")}\n"
@@ -544,33 +631,7 @@ module Clyops
     # JSON description of the CLI (spec section 8).
     def json_schema
       ensure_help
-      type_of = lambda do |o|
-        r = o.rule
-        next "boolean" if o.kind == "flag" || r == "bool"
-        next "integer" if r.start_with?("int") || r == "port"
-        next "number" if r.start_with?("float")
-        next "choice" if r.start_with?("choice:")
-
-        Clyops.path_rule?(r) ? "path" : "string"
-      end
-
-      Clyops.pretty_json({
-        "clyops" => 1,
-        "script" => @name,
-        "description" => @description,
-        "epilog" => @epilog,
-        "arguments" => @args.map do |a|
-          { "name" => a.name, "description" => a.description, "required" => !a.variadic && a.default.empty?,
-            "isVariadic" => a.variadic, "default" => a.default, "validation" => a.rule }
-        end,
-        "options" => @options.map do |o|
-          { "name" => o.long, "shortName" => o.short, "variableName" => o.var, "description" => o.description,
-            "default" => o.kind == "flag" ? "false" : o.default, "group" => o.group, "type" => type_of.(o),
-            "isFlag" => o.kind == "flag", "isArray" => o.kind == "array", "required" => o.required,
-            "validation" => o.rule, "choices" => o.rule.start_with?("choice:") ? o.rule[7..].split(",", -1) : [] }
-        end,
-        "requiredCommands" => @commands.map { |c, d, h| { "command" => c, "description" => d, "installHint" => h } }
-      })
+      Clyops.pretty_json({ "clyops" => 1, "script" => @name }.merge(schema_node))
     end
 
     # Shell script that enables completion for this program (spec section 9):
@@ -582,12 +643,34 @@ module Clyops
       template.gsub("__CLYOPS_FUNC__", @name.gsub(/[^A-Za-z0-9_]/, "_")).gsub("__CLYOPS_PROG__", @name)
     end
 
-    # Tab-separated completion records (spec section 9).
-    def completion_data
+    # Tab-separated completion records (spec section 9). `words` are the words
+    # typed after the program name; a program with commands follows them.
+    def completion_data(words = [])
       ensure_help
       clean = ->(s) { s.tr("\t\n", "  ") }
       lines = ["#clyops-completion 1"]
-      @options.each do |o|
+      node = self
+      unless @children.empty?
+        skip = 0
+        words.each do |w|
+          child = node.children.find { |c| c.word == w }
+          break unless child
+
+          node = child
+          skip += 1
+        end
+        return "#{lines[0]}\n" if !node.children.empty? && skip < words.length && !words[skip].start_with?("-")
+
+        lines << "skip\t#{skip}"
+        node.children.each { |c| lines << "cmd\t#{c.word}\t#{clean.(c.description)}" }
+      end
+      options = []
+      n = node
+      while n
+        options.concat(n.options)
+        n = n.parent
+      end
+      options.each do |o|
         short = o.short.empty? ? "-" : "-#{o.short}"
         if o.kind == "flag"
           lines << "opt\t--#{o.long}\t#{short}\tflag\tnone\t-\t#{clean.(o.description)}"
@@ -597,20 +680,120 @@ module Clyops
         end
         lines << "opt\t--no-#{o.long}\t-\tflag\tnone\t-\t#{clean.(o.description)}" if o.bool_like?
       end
-      @args.each do |a|
+      node.args.each do |a|
         kind, values = Clyops.completion_kind(a.rule, [])
         lines << "arg\t#{a.name}\t#{a.variadic ? 'variadic' : 'single'}\t#{kind}\t#{values.empty? ? '-' : values}\t#{clean.(a.description)}"
       end
       "#{lines.join("\n")}\n"
     end
 
+    protected
+
+    attr_reader :word, :parent, :children, :options, :args, :commands, :constraints, :description, :epilog, :stdin, :stdout
+
+    def adopt(parent, word, description)
+      @parent = parent
+      @word = word
+      @description = description
+    end
+
+    # An option by long (or short) name, in this level and its ancestors.
+    def find_option(name, short)
+      node = self
+      while node
+        opt = short ? node.by_short[name] : node.by_long[name]
+        return opt if opt
+
+        node = node.parent
+      end
+      nil
+    end
+
+    def by_long = @by_long
+    def by_short = @by_short
+
+    def schema_node
+      type_of = lambda do |o|
+        r = o.rule
+        next "boolean" if o.kind == "flag" || r == "bool"
+        next "integer" if r.start_with?("int") || r == "port"
+        next "number" if r.start_with?("float")
+        next "choice" if r.start_with?("choice:")
+
+        Clyops.path_rule?(r) ? "path" : "string"
+      end
+      (@parent ? { "name" => @word } : {}).merge(
+        "description" => @description,
+        "epilog" => @epilog,
+        "arguments" => @args.map do |a|
+          { "name" => a.name, "description" => a.description, "required" => !a.variadic && a.default.empty?,
+            "isVariadic" => a.variadic, "default" => a.default, "validation" => a.rule }
+        end,
+        "options" => @options.map do |o|
+          { "name" => o.long, "shortName" => o.short, "variableName" => o.var, "description" => o.description,
+            "default" => o.kind == "flag" ? "false" : o.default, "group" => o.group, "type" => type_of.(o),
+            "isFlag" => o.kind == "flag", "isArray" => o.kind == "array", "required" => o.required,
+            "validation" => o.rule, "choices" => o.rule.start_with?("choice:") ? o.rule[7..].split(",", -1) : [],
+            "secret" => o.secret }
+        end,
+        "requiredCommands" => @commands.map { |c, d, h| { "command" => c, "description" => d, "installHint" => h } },
+        "effects" => @effects,
+        "constraints" => @constraints,
+        "stdin" => @stdin,
+        "stdout" => @stdout,
+        "commands" => @children.map { |c| c.schema_node }
+      )
+    end
+
     private
+
+    # The selected command, its parent, ... up to this one.
+    def chain
+      out = []
+      node = @selected
+      while node
+        out << node
+        node = node.equal?(self) ? nil : node.parent
+      end
+      out
+    end
+
+    def chain_options = chain.flat_map { |n| n.options }
+
+    def add_constraint(type, longs)
+      longs.each { |l| raise DefinitionError, "Unknown option --#{l} in constraint" unless find_option(l, false) }
+      @constraints << { "type" => type, "options" => longs }
+      self
+    end
+
+    # Spec section 1.6: the first relationship that fails, from the program down.
+    def check_constraints
+      given = lambda do |long|
+        v = @raw[long]
+        %w[cli config env].include?(source(long)) && v != "false" && v != []
+      end
+      chain.reverse.each do |node|
+        node.constraints.each do |c|
+          longs = c["options"]
+          on = longs.select(&given)
+          return "Options --#{on[0]} and --#{on[1]} cannot be used together" if c["type"] == "exclusive" && on.length > 1
+          if c["type"] == "requires" && given.(longs[0])
+            absent = longs[1..].find { |l| !given.(l) }
+            return "Option --#{longs[0]} requires --#{absent}" if absent
+          end
+          return "One of #{longs.map { |l| "--#{l}" }.join(', ')} is required" if c["type"] == "oneOf" && on.empty?
+        end
+      end
+      nil
+    end
 
     def add(opt)
       raise DefinitionError, "Duplicate option --#{opt.long}" if @by_long.key?(opt.long)
       if !opt.short.empty? && (opt.short.length != 1 || @by_short.key?(opt.short))
         raise DefinitionError, "Invalid or duplicate short option -#{opt.short}"
       end
+      opt.secret = opt.rule == "secret" || opt.rule.start_with?("secret:")
+      opt.rule = opt.rule.delete_prefix("secret").delete_prefix(":") if opt.secret
       raise DefinitionError, "Unknown validation rule '#{opt.rule}' for --#{opt.long}" unless Clyops.known_rule?(opt.rule)
 
       @options << opt
@@ -620,6 +803,7 @@ module Clyops
     end
 
     def add_arg(arg)
+      raise DefinitionError, "Cannot mix commands and positional arguments" unless @children.empty?
       raise DefinitionError, "Argument #{arg.name} registered after a variadic argument" if @args.any?(&:variadic)
       raise DefinitionError, "Unknown validation rule '#{arg.rule}' for #{arg.name}" unless Clyops.known_rule?(arg.rule)
 
@@ -631,7 +815,7 @@ module Clyops
       return if @by_long.key?("help")
 
       add(Option.new("HELP", "help", @by_short.key?("h") ? "" : "h", "flag", "", false,
-                     "Show this help message and exit", "Global", "", []))
+                     "Show this help message and exit", "Global", "", [], false))
     end
 
     def which(cmd)
@@ -660,12 +844,18 @@ module Clyops
         token = argv[i]
         i += 1
         if end_of_options || token == "-" || !token.start_with?("-")
+          node = @selected
           if rest
             rest << token
-          elsif pos >= @args.length
+          elsif !node.children.empty?
+            child = node.children.find { |c| c.word == token }
+            raise ParseError, "Unknown command: #{token}" unless child
+
+            @selected = child
+          elsif pos >= node.args.length
             raise ParseError, "Unexpected argument: #{token}"
           else
-            arg = @args[pos]
+            arg = node.args[pos]
             pos += 1
             if arg.variadic
               rest = [token]
@@ -678,7 +868,7 @@ module Clyops
           end_of_options = true
         elsif token.start_with?("--")
           name, eq, value = token[2..].partition("=")
-          opt = @by_long[name]
+          opt = @selected.find_option(name, false)
           if opt && !eq.empty?
             if opt.kind == "flag"
               b = Clyops.bool_word(value)
@@ -696,8 +886,8 @@ module Clyops
               set_cli(opt, argv[i])
               i += 1
             end
-          elsif name.start_with?("no-") && eq.empty? && @by_long.key?(name[3..])
-            target = @by_long[name[3..]]
+          elsif name.start_with?("no-") && eq.empty? && @selected.find_option(name[3..], false)
+            target = @selected.find_option(name[3..], false)
             raise ParseError, "Option --#{name} can only be used with flag/boolean options" unless target.bool_like?
 
             set_cli(target, "false")
@@ -707,7 +897,7 @@ module Clyops
         else
           cluster = token[1..]
           cluster.each_char.with_index do |ch, j|
-            opt = @by_short[ch]
+            opt = @selected.find_option(ch, true)
             raise ParseError, "Unknown option: -#{ch}" unless opt
 
             if opt.kind == "flag"
@@ -729,7 +919,7 @@ module Clyops
     end
 
     def load_config
-      opt = @by_long[@config_option]
+      opt = @selected.find_option(@config_option, false)
       return unless opt
 
       path = @raw[opt.long]
@@ -750,7 +940,7 @@ module Clyops
       read_config(resolved, 0, {})
 
       @config.each do |key, (value, _)|
-        target = @by_long[key]
+        target = @selected.find_option(key, false)
         next if target.nil? || target.equal?(opt) || @sources[key] == "cli"
 
         if target.kind == "flag"
@@ -801,7 +991,11 @@ module Clyops
     end
 
     def resolve
-      @args.each do |arg|
+      raise ParseError, "Missing command" unless @selected.children.empty?
+
+      options = chain_options
+      args = @selected.args
+      args.each do |arg|
         next if @arg_raw.key?(arg.name)
 
         if arg.variadic
@@ -813,7 +1007,7 @@ module Clyops
         end
       end
 
-      @options.each do |opt|
+      options.each do |opt|
         next if @sources.key?(opt.long)
 
         env_value = opt.kind == "array" ? nil : @env[opt.var]
@@ -836,7 +1030,7 @@ module Clyops
       end
 
       # Path resolution: the base depends on where the value came from.
-      @options.each do |opt|
+      options.each do |opt|
         next if !Clyops.path_rule?(opt.rule) || !@raw.key?(opt.long) || opt.long == @config_option
 
         base = case @sources[opt.long]
@@ -847,7 +1041,7 @@ module Clyops
         value = @raw[opt.long]
         @raw[opt.long] = value.is_a?(Array) ? value.map { |v| Clyops.resolve_path(v, base, opt.search_dirs) } : Clyops.resolve_path(value, base, opt.search_dirs)
       end
-      @args.each do |arg|
+      args.each do |arg|
         next unless Clyops.path_rule?(arg.rule)
 
         value = @arg_raw[arg.name]
@@ -855,7 +1049,7 @@ module Clyops
       end
 
       convert = ->(v, rule, name) { !v.empty? && !rule.empty? ? Clyops.validate(v, rule, name) : v }
-      @options.each do |opt|
+      options.each do |opt|
         raw = @raw[opt.long]
         @values[opt.var] = if raw.nil? then opt.kind == "array" ? [] : nil
                            elsif opt.kind == "flag" then raw == "true"
@@ -863,10 +1057,11 @@ module Clyops
                            else convert.(raw, opt.rule, "--#{opt.long}")
                            end
       end
-      @args.each do |arg|
+      args.each do |arg|
         value = @arg_raw[arg.name]
         @values[arg.name] = value.is_a?(Array) ? value.map { |v| convert.(v, arg.rule, arg.name) } : convert.(value, arg.rule, arg.name)
       end
+      @values["command"] = command_path unless @children.empty?
     end
   end
 end
