@@ -36,3 +36,20 @@ and variadics. `clyops_parse` is the non-exiting variant of `clyops_run`.
 
 Build with `make` (produces `build/libclyops.a`) or add the directory to a CMake project with
 `add_subdirectory(clyops)` and link `clyops`.
+
+## Commands, relationships, secrets, effects and I/O
+
+```c
+clyops_t* db = clyops_command(cli, "db", "Database tasks");            /* a command: mytool db ... */
+clyops_t* migrate = clyops_command(db, "migrate", "Apply migrations");  /* freed with cli */
+clyops_opt(migrate, "TO", "to", "optional", .description = "Target version", .rule = "int");
+clyops_effects(migrate, "destructive");      /* read-only, idempotent, destructive, network */
+clyops_opt(cli, "TOKEN", "token", "", .description = "API token", .rule = "secret"); /* masked in help and values JSON */
+clyops_exclusive(cli, "json", "quiet");      /* also clyops_requires(cli, "a", "b"), clyops_one_of(...) */
+clyops_stdin(cli, "Audio to transcribe", "audio/wav");  /* and clyops_stdout(cli, description, type) */
+clyops_run(cli, argc, argv);                 /* clyops_get_at(cli, "command", 0) == "db" */
+```
+
+The selected command words are the value `"command"` (`clyops_get_count` / `clyops_get_at`). Commands share the program's options (accepted before or after the command words) and config file;
+each has its own help (`mytool db migrate --help`), schema and completion. See the
+[spec](../../spec/SPEC.md) sections 1.3 to 1.7.

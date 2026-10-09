@@ -39,6 +39,7 @@ The tools are found next to the real file, so the symlink can live anywhere.
 | `description` | Shown at the top of the help. |
 | `dir` | Tools directory, relative to the definition (default: the definition's own directory). |
 | `ignore` | Comma-separated file or command names to leave out. |
+| `allow`, `deny` | Which tools [clyops-api](../api) and [clyops-mcp](../mcp) serve from this directory (globs over command words). The dispatcher accepts and ignores them. |
 
 A group directory can hold a `.clyops` file with its own `description` and `ignore`.
 

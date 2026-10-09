@@ -30,3 +30,20 @@ Values are typed: `PORT` is a number, flags are booleans, array options and vari
 Other API: `source(long)`, `isSet(long)`, `isExplicitlySet(long)`, `usage()`, `jsonSchema()`,
 `completionScript(shell)`, `valuesJson()`, `setPathSearch(long, dirs)`, `requireCommand(cmd, desc, hint)`,
 and the logging helpers `info`, `warn`, `error`, `success`, `die`.
+
+## Commands, relationships, secrets, effects and I/O
+
+```js
+const db = cli.command('db', 'Database tasks');              // a command: mytool db ...
+const migrate = db.command('migrate', 'Apply migrations');   // mytool db migrate
+migrate.opt('TO', 'to', '', 'optional', 'Target version', 'Options', 'int');
+migrate.setEffects('destructive');                           // read-only, idempotent, destructive, network
+cli.opt('TOKEN', 'token', 't', '', 'API token', 'Auth', 'secret');  // masked in help and valuesJson()
+cli.exclusive('json', 'quiet');                              // also requires(a, b...) and oneOf(a, b...)
+cli.setStdin('Audio to transcribe', 'audio/wav');            // and setStdout(description, contentType)
+const args = cli.run();                                      // args.command: ['db', 'migrate']
+```
+
+`cli.commandPath` is the selected command words. Commands share the program's options (accepted before or after the command words) and config file;
+each has its own help (`mytool db migrate --help`), schema and completion. See the
+[spec](../../spec/SPEC.md) sections 1.3 to 1.7.

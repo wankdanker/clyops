@@ -33,6 +33,9 @@ npm install clyops-jobs
   (`job`, `paths`, whatever the trigger knows).
 - `artifacts`: glob patterns (`*`, `?`, `**`) relative to `paths.work_dir`, copied into
   `paths.artifacts_dir`, with an optional `required: true` or `min: N`.
+- `stdin`: a template naming a file fed to the tool's stdin (`"${media.path}"`; relative to the
+  config root). `stdout`: a template naming the file its stdout is written to
+  (`"${paths.work_dir}/out.mp3"`; relative to `paths.work_dir`), which also counts as an artifact.
 - `result`: a template map added to the result record.
 
 ```js
@@ -55,8 +58,8 @@ record = transitionJobRecord(record, { status: 'done', completedAt: timestampIso
 `runScriptFunction` options: `configRoot` (relative path options resolve against it),
 `context`, `controlled` (options the trigger sets itself, default `['help']`), `defaultPositional`
 (a template for the first argument when the config gives none, e.g. `'${media.path}'`),
-`timeoutMs`, `env`, `cwd`, `signal`, `onStderr`. `configureLogging({module, warn, verbose})`
-routes warnings about config keys that match no option.
+`timeoutMs`, `env`, `cwd`, `signal`, `onStderr`. Its `command` shows secret options as `***`.
+`configureLogging({module, warn, verbose})` routes warnings about config keys that match no option.
 
 ## Job records
 
@@ -73,7 +76,7 @@ routes warnings about config keys that match no option.
 ```js
 import { JobQueue } from 'clyops-jobs';
 
-const queue = new JobQueue({ concurrency: 4, keep: 1000, onChange: (record) => save(record) });
+const queue = new JobQueue({ concurrency: 4, keep: 1000, onChange: (record) => save(record), onDrop: (record) => cleanUp(record) });
 const job = queue.add('transcribe', async ({ signal, stage }) => { stage('decode'); return doWork(signal); });
 job.record;        // the live record
 await job.done;    // the task's result (rejects if it failed)

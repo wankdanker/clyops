@@ -38,8 +38,21 @@ stdout back; when stdout is a JSON object it is also returned as structured cont
 fails comes back as an error with its exit status and stderr, so the agent can read the tool's own
 message and correct itself.
 
+- **Commands.** A program with commands (`tasks db migrate`) gives one MCP tool per command:
+  `tasks_db_migrate`.
+- **Effects.** A tool's declared effects become MCP annotations: `read-only` → `readOnlyHint`,
+  `destructive` → `destructiveHint`, `idempotent` → `idempotentHint`, `network` →
+  `openWorldHint`. Clients use them to decide when to ask before running a tool.
+- **stdin and stdout.** A tool that declares stdin takes it as one more argument, `stdin` (base64
+  for binary types). Declared binary stdout comes back as an `image` or `audio` content block, or
+  an embedded resource (a blob) for other types.
+- **Secrets.** Secret options are passed to the tool in its environment rather than on the command
+  line, and shown as `***` in logs.
+
 ```
 clyops-mcp --root DIR [--name NAME] [--cwd DIR] [--timeout SECONDS] [--no-watch]
+           [--allow GLOB]... [--deny GLOB]... [--read-only] [--paths-within DIR]...
+           [--max-output BYTES] [--audit FILE]
 ```
 
 The server watches the tools directory: when a tool is added, changed or removed it tells the
@@ -48,8 +61,22 @@ without restarting the server. `--no-watch` reads the tools once at startup.
 
 Tools run in `--cwd` (default: where the server was started, which for most clients is the
 project the agent is working in), so relative paths resolve there. Options can also be set as
-`CLYOPS_MCP_<OPTION>` in the environment. The agent can run any tool in the directory with any
-arguments its schema accepts: point it at tools you'd let the agent run.
+`CLYOPS_MCP_<OPTION>` in the environment.
+
+## Security
+
+The agent can run any tool the server offers with any arguments its schema accepts. Offer only
+what it should be able to run:
+
+- `--allow media/*` / `--deny admin/**` (repeatable): globs over a tool's words, `*` within a word
+  and `**` across words. A tool must match an `--allow` pattern when there are any, and no
+  `--deny` pattern. `allow:` and `deny:` lines in the root `.clyops` file apply as well.
+- `--read-only`: offer only tools that declare the `read-only` effect.
+- `--paths-within DIR` (repeatable): path arguments (`path`, `file:*`, `dir:*`) must resolve inside
+  one of these directories, symlinks followed, before anything runs.
+- `--max-output BYTES` (default 16 MiB): keep at most this much of a tool's stdout and stderr.
+- `--audit FILE` (`-` for stderr): one JSON line per run with the tool, its command line (secrets
+  as `***`), exit status and duration.
 
 ## Over HTTP
 

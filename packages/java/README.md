@@ -66,3 +66,20 @@ exec java -cp /opt/send/send.jar:/opt/send/clyops.jar Send "$@"
 
 Shell completion: `eval "$(send --completion bash)"` (or `zsh`, `fish`). Completion starts a JVM
 on each Tab press; for snappier completion on large tools, consider a native image (GraalVM).
+
+## Commands, relationships, secrets, effects and I/O
+
+```java
+Cli db = cli.command("db", "Database tasks");              // a command: mytool db ...
+Cli migrate = db.command("migrate", "Apply migrations");   // mytool db migrate
+migrate.opt("TO", "to", "", "optional", "Target version", "Options", "int");
+migrate.setEffects("destructive");                         // read-only, idempotent, destructive, network
+cli.opt("TOKEN", "token", "t", "", "API token", "Auth", "secret"); // masked in help and valuesJson()
+cli.exclusive("json", "quiet");                            // also requires("a", "b"...) and oneOf("a", "b"...)
+cli.setStdin("Audio to transcribe", "audio/wav");          // and setStdout(description, contentType)
+cli.run(argv);                                             // cli.commandPath() == [db, migrate]
+```
+
+Commands share the program's options (accepted before or after the command words) and config file;
+each has its own help (`mytool db migrate --help`), schema and completion. See the
+[spec](../../spec/SPEC.md) sections 1.3 to 1.7.

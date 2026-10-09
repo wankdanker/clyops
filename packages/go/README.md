@@ -50,3 +50,20 @@ recognized as clyops tools by [clyops-dispatch](../../apps/dispatch), the API an
 with no extra steps.
 
 Versions are tagged `packages/go/vX.Y.Z` alongside each clyops release.
+
+## Commands, relationships, secrets, effects and I/O
+
+```go
+db := cli.Command("db", "Database tasks")                // a command: mytool db ...
+migrate := db.Command("migrate", "Apply migrations")     // mytool db migrate
+migrate.Opt("TO", "to", "", "optional", "Target version", "Options", "int")
+migrate.SetEffects("destructive")                        // read-only, idempotent, destructive, network
+cli.Opt("TOKEN", "token", "t", "", "API token", "Auth", "secret") // masked in help and ValuesJSON()
+cli.Exclusive("json", "quiet")                           // also Requires("a", "b"...) and OneOf("a", "b"...)
+cli.SetStdin("Audio to transcribe", "audio/wav")         // and SetStdout(description, contentType)
+v := cli.Run()                                           // cli.CommandPath() == []string{"db", "migrate"}
+```
+
+Commands share the program's options (accepted before or after the command words) and config file;
+each has its own help (`mytool db migrate --help`), schema and completion. See the
+[spec](../../spec/SPEC.md) sections 1.3 to 1.7.

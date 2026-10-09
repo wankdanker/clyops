@@ -43,6 +43,33 @@ A tool that runs but fails answers `200` with `"ok": false` and its exit code an
 that doesn't match the schema answers `400` with the validation issues and doesn't run anything.
 If the client disconnects, the tool is stopped.
 
+A program with commands (`tasks db migrate`) has an endpoint per command: `POST /tools/tasks/db/migrate`.
+
+**Streaming stdin.** Any body that isn't JSON is streamed to the tool's stdin as it arrives, and
+the input comes from the query string instead (typed by the schema: `?count=3&verbose=true`,
+repeated keys for arrays: `?tag=a&tag=b`). The query is validated before the tool starts.
+
+```sh
+curl -s 'localhost:8080/tools/transcribe?model=base' -H content-type:audio/wav --data-binary @in.wav
+```
+
+**Multipart.** `multipart/form-data` takes the input as JSON in an `args` part, stdin in a `stdin`
+part, and files for path inputs in parts named after them (saved to a temporary directory for the
+run, then removed):
+
+```sh
+curl -s localhost:8080/tools/media/to-pcm -F args='{"rate":16000}' -F input=@in.wav
+```
+
+**Streaming stdout.** When a tool declares binary output (`stdout` with a type such as
+`audio/mpeg`), the response *is* that output, sent as the tool writes it with the declared
+`Content-Type`: `curl ... > out.mp3` works, and a player can start before the tool is done. The
+exit status isn't known when the headers go out, so it follows as HTTP trailers,
+`X-Clyops-Exit-Code` and `X-Clyops-Stderr` (the end of stderr); a tool that fails before writing
+anything answers `500` with the usual JSON. `Accept: application/json` asks for the JSON envelope
+instead (`stdout` base64-encoded, `"stdoutEncoding": "base64"`), and `Accept:
+application/octet-stream` streams any tool's output.
+
 **Async.** `POST /tools/...?async=true` answers `202` with a job record and a `Location` header:
 
 ```sh
@@ -54,7 +81,10 @@ curl -s -XDELETE localhost:8080/jobs/job-1f2e3d4c5b6a    # cancel
 ```
 
 Job status moves `pending` → `processing` → `done` | `error` (`error: "cancelled"` when
-cancelled). Jobs are kept in memory (the latest 1000) and run `--concurrency` at a time.
+cancelled). Jobs are kept in memory (the latest 1000) and run `--concurrency` at a time. A job
+with a streamed body keeps it in a file until it runs; a job with binary output writes it to a
+file served at `GET /jobs/<id>/stdout` (its result has `stdoutUrl`). A job's files are removed when
+it is dropped.
 
 ## Endpoints
 
@@ -65,20 +95,50 @@ cancelled). Jobs are kept in memory (the latest 1000) and run `--concurrency` at
 | `GET /tools/<words>` | A tool's clyops schema and the JSON Schema of its input |
 | `POST /tools/<words>[?async=true]` | Run it |
 | `GET /jobs`, `GET /jobs/<id>`, `DELETE /jobs/<id>` | Async jobs |
+| `GET /jobs/<id>/stdout` | A finished job's binary output |
 | `POST /mcp` | The same tools over MCP (streamable HTTP, stateless) for agents; see [clyops-mcp](../mcp). `--no-mcp` turns it off. |
 
 ## Options
 
 ```
 clyops-api --root DIR [--name NAME] [--cwd DIR] [--timeout SECONDS] [--concurrency N]
-           [--host 127.0.0.1] [--port 8080] [--api-key KEY] [--no-mcp] [--no-watch]
+           [--host 127.0.0.1] [--port 8080] [--api-key KEY] [--keys FILE] [--no-mcp] [--no-watch]
+           [--allow GLOB]... [--deny GLOB]... [--read-only] [--paths-within DIR]...
+           [--max-body BYTES] [--max-output BYTES] [--audit FILE]
 ```
 
-It listens on localhost unless told otherwise. Every option can also come from the environment as `CLYOPS_API_<OPTION>`. With `--api-key` (or
-`CLYOPS_API_API_KEY`), every request needs `Authorization: Bearer KEY` or `X-API-Key: KEY`. Anyone who can call
-the API can run every tool in the directory with any arguments their schemas accept, so only point it
-at tools you'd let its callers run. Tools run in `--cwd` (default: where the server was started), so
-relative paths in the input resolve there.
+It listens on localhost unless told otherwise. Every option can also come from the environment as
+`CLYOPS_API_<OPTION>`. Tools run in `--cwd` (default: where the server was started), so relative
+paths in the input resolve there. Each operation in the OpenAPI document carries the tool's
+declared effects as `x-clyops-effects`.
+
+## Security
+
+Anyone who can call the API can run every tool it serves with any arguments their schemas accept.
+Serve only what callers should be able to run:
+
+- **Keys.** With `--api-key` (or `CLYOPS_API_API_KEY`), every request needs `Authorization: Bearer
+  KEY` or `X-API-Key: KEY`; that key may run everything. `--keys FILE` adds named keys, each with
+  its own scope:
+  ```json
+  { "ci": { "key": "…", "allow": ["media/*"] }, "ops": { "key": "…", "deny": ["admin/**"] } }
+  ```
+  A key sees and runs only its tools (`403` otherwise), in the REST endpoints and at `/mcp`, and
+  sees only its own jobs.
+- **Which tools.** `--allow media/*` and `--deny admin/**` (repeatable) are globs over a tool's
+  words: `*` within a word, `**` across words. A tool must match an `--allow` pattern when there
+  are any, and no `--deny` pattern; `allow:` and `deny:` lines in the root `.clyops` file apply as
+  well. `--read-only` serves only tools declaring the `read-only` effect. Hot reload applies the
+  same rules to new tools.
+- **Paths.** `--paths-within DIR` (repeatable): path inputs (`path`, `file:*`, `dir:*`) must
+  resolve inside one of these directories, symlinks followed, or the request is a `400`.
+- **Limits.** `--timeout`, `--concurrency`, `--max-body` (JSON, multipart and spooled bodies;
+  default 10 MiB) and `--max-output` (stdout and stderr kept per run; default 16 MiB).
+- **Secrets.** Options a tool marks secret are passed to it in its environment rather than on
+  its command line (where `ps` shows them), and `command` in responses, job records and the audit
+  log shows them as `***`.
+- **Audit.** `--audit FILE` (`-` for stderr) appends one JSON line per run: time, key, tool,
+  command line, exit status and duration.
 
 **Hot reload.** The server watches the tools directory: add, change or remove a tool (or a
 `.clyops` file) and its endpoint, the OpenAPI document and the MCP tool list follow within a

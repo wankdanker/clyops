@@ -148,7 +148,8 @@ Global:
       "isArray": false,
       "required": false,
       "validation": "hostname",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "port",
@@ -162,7 +163,8 @@ Global:
       "isArray": false,
       "required": false,
       "validation": "port",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "verbose",
@@ -176,7 +178,8 @@ Global:
       "isArray": false,
       "required": false,
       "validation": "",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "config",
@@ -190,7 +193,8 @@ Global:
       "isArray": false,
       "required": false,
       "validation": "path",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "help",
@@ -204,10 +208,16 @@ Global:
       "isArray": false,
       "required": false,
       "validation": "",
-      "choices": []
+      "choices": [],
+      "secret": false
     }
   ],
-  "requiredCommands": []
+  "requiredCommands": [],
+  "effects": [],
+  "constraints": [],
+  "stdin": null,
+  "stdout": null,
+  "commands": []
 }
 ```
 
@@ -227,6 +237,10 @@ Global:
 | **Completion** | `--completion bash\|zsh\|fish` prints a script that completes options, choices, files, directories and hosts |
 | **Logging** | `info`, `warn`, `error`, `success`, `die` with timestamps and colors (TTY only, `NO_COLOR` aware, `CLYOPS_SILENT`) |
 | **Required commands** | declare external tools a script needs; help shows whether each is installed |
+| **Commands** | nested subcommands in one program (`mytool db migrate --to 3`), each with its own options, arguments, help, schema and completion, sharing the program's options and config |
+| **Relationships** | `exclusive`, `requires` and `oneOf` between options, checked after config and environment, shown in help and the schema |
+| **Secrets** | a `secret` (or `secret:RULE`) option is masked in help and in the values JSON, and marked so the API, MCP server and runner keep it out of command lines, logs and templates |
+| **Effects and I/O** | declare what running the program does (`read-only`, `idempotent`, `destructive`, `network`) and what it reads on stdin and writes on stdout (with MIME types), for agents and servers to act on |
 
 The [spec](spec/SPEC.md) is the precise reference for all of it.
 
@@ -275,19 +289,25 @@ functions bound to tools in a JSON config, templated options, artifacts, job rec
 makes `POST /tools/media/to-pcm` run `media/to-pcm.sh` with a JSON body validated against the
 tool's schema, waiting for it or (`?async=true`) returning a job to poll, and publishes the whole
 thing as an OpenAPI document at `/openapi.json`. It serves the same tools to AI agents over MCP at
-`/mcp`.
+`/mcp`. A non-JSON body is streamed to the tool's stdin, declared binary output (`audio/mpeg`,
+`image/png`) streams back as the response, and named API keys, allow/deny lists, a read-only mode,
+path confinement, size limits and an audit log control who can run what.
 
 ## clyops-mcp
 
 [apps/mcp](apps/mcp) hands a directory of tools to an AI agent over MCP:
 `claude mcp add mytool -- clyops-mcp --root ~/mytool/scripts` gives the agent one tool per program,
 each described and typed by the program's own schema, with arguments validated before anything
-runs.
+runs. Declared effects become the MCP annotations clients use to decide when to ask before running a
+tool.
 
 ## clyops runner
 
 [apps/runner](apps/runner) is a desktop app (Tauri + React) that lists the clyops tools in a
-directory, builds a form for each from `--help-json-schema`, runs them and streams their output.
+directory, builds a form for each from `--help-json-schema` (one per command of a program with
+commands), runs them and streams their output. Secrets get password fields and stay out of saved
+templates, destructive tools ask before running, and tools that read stdin or write binary output
+get an input box and a "save output to" field.
 It works the same for tools in any of the languages, and its tests load a real clyops tool, so
 schema changes that would break it fail CI.
 
@@ -354,9 +374,9 @@ Requirements: Node 20+, Python 3.9+, Rust 1.70+, a C11 compiler, Go 1.21+, Ruby 
 
 ### Adding a language
 
-Write the library, write `examples/demo.*` registering the CLI described in
-[spec/conformance/README.md](spec/conformance/README.md), add its command to
-[impls.json](spec/conformance/impls.json), and add a CI job.
+Write the library, write `examples/demo.*` and `examples/tasks.*` registering the two CLIs
+described in [spec/conformance/README.md](spec/conformance/README.md), add the demo's command to
+[impls.json](spec/conformance/impls.json) (the tasks demo is found next to it), and add a CI job.
 
 ## Releases
 

@@ -5,6 +5,51 @@ section here.
 
 ## [0.2.0] - 2026-10-09
 
+### Commands, relationships, secrets, effects and I/O
+
+New in the spec and all nine implementations, each checked by the conformance suite (now 136
+cases, with a second demo program, `tasks`, for commands):
+
+- **Commands** ([spec §1.7](spec/SPEC.md#17-commands)): nested subcommands in one program
+  (`mytool db migrate --to 3`), each with its own options, arguments, help, schema and completion,
+  sharing the program's options and config file. Shell completion follows the command words,
+  directly and through clyops-dispatch. (#5)
+- **Option relationships** ([§1.6](spec/SPEC.md#16-option-relationships)): `exclusive`,
+  `requires` and `oneOf`, checked after config and environment, annotated in help and listed in
+  the schema's `constraints`. (#4)
+- **Secret options** ([§1.5](spec/SPEC.md#15-secret-options)): the `secret` / `secret:RULE` rule
+  masks a value in help (`config: ***`) and in `valuesJson()`, and marks it `"secret": true` in
+  the schema. (#3)
+- **Effects** ([§1.3](spec/SPEC.md#13-metadata)): `read-only`, `idempotent`, `destructive` and
+  `network`, in the schema's `effects`. (#1)
+- **stdin and stdout**: declared with a description and a MIME type, shown in help as
+  `Input:`/`Output:` and in the schema. (#6)
+
+The schema stays `clyops: 1`; the new fields (`effects`, `constraints`, `stdin`, `stdout`,
+`commands`, and `secret` on options) are additive.
+
+### Serving tools safely and with streams
+
+- **clyops-tools**: a program's commands become tools of their own; tool filters (allow/deny
+  globs, read-only) also read from the root `.clyops` file; secrets are passed in the environment
+  and shown as `***`; path inputs can be confined to directories; `run`/`start` take stdin, keep
+  binary stdout or stream it, and cap output; an audit log writer.
+- **clyops-api**: a non-JSON body streams to the tool's stdin with the input in the query string;
+  multipart takes args, stdin and file uploads for path inputs; declared binary stdout streams back
+  as the response with the exit status in HTTP trailers; async jobs spool input and serve binary
+  output at `/jobs/<id>/stdout`; named keys with per-key scopes (`--keys`), `--allow`/`--deny`,
+  `--read-only`, `--paths-within`, `--max-body`, `--max-output` and `--audit`; effects in OpenAPI
+  as `x-clyops-effects`. (#2, #6)
+- **clyops-mcp**: effects become MCP tool annotations; a `stdin` argument for tools that read
+  stdin; image, audio and blob results for binary stdout; the same security options as the API.
+  (#1, #2, #6)
+- **clyops-jobs**: functions take `stdin` and `stdout` file templates (stdout counts as an
+  artifact); commands in logs show secrets as `***`; `JobQueue` `onDrop`.
+- **clyops runner**: a form per command, password fields for secrets (never saved in templates),
+  effect badges and a confirmation for destructive tools, relationship warnings, and stdin and
+  "save output to" fields.
+- **clyops-dispatch** accepts the `allow`/`deny` keys in `.clyops` files.
+
 ### New languages
 
 Three more implementations with the same one-line registration, each passing the full
