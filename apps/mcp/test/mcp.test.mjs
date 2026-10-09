@@ -123,3 +123,72 @@ test('streamable HTTP handler', { timeout: 60_000 }, async () => {
     await client.close();
   }
 });
+
+test('commands, effects, stdin, binary stdout, path confinement and audit', { timeout: 60_000 }, async () => {
+  const root = tree();
+  writeFileSync(join(root, 'tasks'), `#!/bin/sh\n# clyops-tool\nexec node ${join(repo, 'packages/js/examples/tasks.cjs')} "$@"\n`);
+  chmodSync(join(root, 'tasks'), 0o755);
+  // Echoes stdin back as its declared image/png output.
+  writeFileSync(join(root, 'media/png'), `#!/usr/bin/env node
+// clyops-tool
+const { Cli } = require(${JSON.stringify(join(repo, 'packages/js/dist/cjs/index.js'))});
+const cli = new Cli({ name: 'png' });
+cli.setDescription('Make a picture');
+cli.setStdin('Text', 'text/plain');
+cli.setStdout('Picture', 'image/png');
+cli.run();
+process.stdin.pipe(process.stdout);
+`);
+  chmodSync(join(root, 'media/png'), 0o755);
+  const audit = join(root, 'audit.log');
+  const client = new Client({ name: 'test', version: '1' });
+  await client.connect(new StdioClientTransport({
+    command: process.execPath, args: [cli, '--root', root, '--cwd', root, '--paths-within', root, '--audit', audit], env, stderr: 'pipe',
+  }));
+  try {
+    const { tools } = await client.listTools();
+    const by = Object.fromEntries(tools.map((t) => [t.name, t]));
+    assert.deepEqual(Object.keys(by).sort(), ['media_demo', 'media_png', 'tasks_db_migrate', 'tasks_db_status', 'tasks_send']);
+    assert.deepEqual(by.tasks_db_migrate.annotations, { destructiveHint: true });
+    assert.deepEqual(by.tasks_db_status.annotations, { readOnlyHint: true });
+    assert.deepEqual(by.tasks_send.annotations, { openWorldHint: true });
+    assert.deepEqual(by.media_demo.annotations, { idempotentHint: true, openWorldHint: true });
+    assert.equal(by.media_png.annotations, undefined);
+    assert.equal(by.tasks_send.inputSchema.properties.stdin.contentEncoding, 'base64');
+    assert.equal(by.media_png.inputSchema.properties.stdin.contentEncoding, undefined);
+
+    const migrate = await client.callTool({ name: 'tasks_db_migrate', arguments: { target: '9', dry_run: true } });
+    assert.equal(migrate.isError, false, JSON.stringify(migrate.content));
+    assert.deepEqual(migrate.structuredContent.values.command, ['db', 'migrate']);
+
+    const png = await client.callTool({ name: 'media_png', arguments: { stdin: 'hi' } });
+    assert.equal(png.isError, false, JSON.stringify(png.content));
+    assert.deepEqual(png.content, [{ type: 'image', data: Buffer.from('hi').toString('base64'), mimeType: 'image/png' }]);
+
+    const outside = await client.callTool({ name: 'media_demo', arguments: { input: 'in.txt', src: '/etc/passwd' } });
+    assert.equal(outside.isError, true);
+    assert.match(outside.content[0].text, /--src: \/etc\/passwd is outside the allowed directories/);
+  } finally {
+    await client.close();
+  }
+  const lines = readFileSync(audit, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.deepEqual(lines.map((l) => [l.tool, l.exitCode, l.via]), [['tasks db migrate', 0, 'mcp'], ['media png', 0, 'mcp']]);
+  assert.ok(lines[0].command.includes('--dry-run') && lines[0].time);
+});
+
+test('read-only and allow/deny limit the tools served', { timeout: 60_000 }, async () => {
+  const root = tree();
+  writeFileSync(join(root, 'tasks'), `#!/bin/sh\n# clyops-tool\nexec node ${join(repo, 'packages/js/examples/tasks.cjs')} "$@"\n`);
+  chmodSync(join(root, 'tasks'), 0o755);
+  const names = async (...args) => {
+    const client = new Client({ name: 'test', version: '1' });
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [cli, '--root', root, '--no-watch', ...args], env, stderr: 'pipe' }));
+    try {
+      return (await client.listTools()).tools.map((t) => t.name).sort();
+    } finally {
+      await client.close();
+    }
+  };
+  assert.deepEqual(await names('--read-only'), ['tasks_db_status']);
+  assert.deepEqual(await names('--allow', 'tasks/**', '--deny', 'tasks/db/migrate'), ['tasks_db_status', 'tasks_send']);
+});

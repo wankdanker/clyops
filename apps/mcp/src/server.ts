@@ -5,7 +5,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
 import type { JsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/types.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { runTool, tail, toJsonSchema, type JsonSchema, type Tool } from 'clyops-tools';
+import { InputError, isTextType, runTool, tail, toJsonSchema, type AuditEntry, type JsonSchema, type Tool, type ToolResult } from 'clyops-tools';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 export interface McpOptions {
@@ -19,6 +19,12 @@ export interface McpOptions {
   cwd?: string;
   /** Kill a tool after this long (0: never). */
   timeoutMs?: number;
+  /** Path-valued arguments must resolve inside these directories. */
+  within?: string[];
+  /** Keep at most this many bytes of a tool's stdout and stderr (0: all). */
+  maxOutput?: number;
+  /** Called after every run, for an audit log. */
+  audit?: (entry: Omit<AuditEntry, 'time'>) => void;
 }
 
 /** The MCP tool name for a clyops tool: its words joined by `_` (`media_to-pcm`). */
@@ -26,9 +32,25 @@ export function toolName(tool: Tool): string {
   return tool.words.join('_').replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64);
 }
 
-/** What the agent reads back from a run: stdout, and on failure the exit status and stderr. */
-function toResult(tool: Tool, result: Awaited<ReturnType<typeof runTool>>): CallToolResult {
+/** A tool's declared binary stdout type, if any (spec section 1.3). */
+function binaryStdout(tool: Tool): string | undefined {
+  const type = tool.schema.stdout?.contentType;
+  return type && !isTextType(type) ? type.split(';')[0].trim() : undefined;
+}
+
+/**
+ * What the agent reads back from a run: stdout (an image, audio or a blob for
+ * declared binary output), and on failure the exit status and stderr.
+ */
+function toResult(tool: Tool, result: ToolResult): CallToolResult {
   const content: CallToolResult['content'] = [];
+  const binary = binaryStdout(tool);
+  if (binary && result.stdoutBuffer?.length) {
+    const data = result.stdoutBuffer.toString('base64');
+    if (binary.startsWith('image/')) content.push({ type: 'image', data, mimeType: binary });
+    else if (binary.startsWith('audio/')) content.push({ type: 'audio', data, mimeType: binary });
+    else content.push({ type: 'resource', resource: { uri: `clyops://${toolName(tool)}/stdout`, mimeType: binary, blob: data } });
+  }
   if (result.stdout) content.push({ type: 'text', text: result.stdout });
   if (!result.ok) {
     const why = result.timedOut ? 'timed out' : result.signal ? `was killed (${result.signal})` : `exited with status ${result.exitCode}`;
@@ -45,16 +67,35 @@ function toResult(tool: Tool, result: Awaited<ReturnType<typeof runTool>>): Call
 }
 
 // Each tool's input schema and compiled validator, built once per tool object.
+// A tool that declares stdin takes it as one more argument, `stdin`.
 const validator = new AjvJsonSchemaValidator();
 const prepared = new WeakMap<Tool, { inputSchema: JsonSchema; validate: JsonSchemaValidator<Record<string, unknown>> }>();
 function prepare(tool: Tool) {
   let entry = prepared.get(tool);
   if (!entry) {
     const inputSchema = toJsonSchema(tool.schema);
+    const stdin = tool.schema.stdin;
+    const properties = inputSchema.properties as Record<string, JsonSchema>;
+    if (stdin && !('stdin' in properties)) {
+      const text = isTextType(stdin.contentType);
+      const what = [stdin.description, stdin.contentType && `(${stdin.contentType})`].filter(Boolean).join(' ');
+      properties.stdin = { type: 'string', description: `Standard input${what ? `: ${what}` : ''}${text ? '' : ', base64-encoded'}`, ...(text ? {} : { contentEncoding: 'base64' }) };
+    }
     entry = { inputSchema, validate: validator.getValidator<Record<string, unknown>>(inputSchema as never) };
     prepared.set(tool, entry);
   }
   return entry;
+}
+
+/** MCP tool annotations from the tool's declared effects (spec section 1.3). */
+function annotations(tool: Tool) {
+  const effects = tool.schema.effects ?? [];
+  const out: Record<string, boolean> = {};
+  if (effects.includes('read-only')) out.readOnlyHint = true;
+  if (effects.includes('destructive')) out.destructiveHint = true;
+  if (effects.includes('idempotent')) out.idempotentHint = true;
+  if (effects.includes('network')) out.openWorldHint = true;
+  return Object.keys(out).length ? { annotations: out } : {};
 }
 
 /**
@@ -71,6 +112,7 @@ export function createMcpServer(opts: McpOptions): Server {
       title: tool.words.join(' '),
       description: [tool.schema.description, tool.schema.epilog].filter(Boolean).join('\n\n'),
       inputSchema: prepare(tool).inputSchema as { type: 'object'; [key: string]: unknown },
+      ...annotations(tool),
     })),
   }));
 
@@ -79,7 +121,23 @@ export function createMcpServer(opts: McpOptions): Server {
     if (!tool) return { content: [{ type: 'text', text: `Unknown tool: ${request.params.name}` }], isError: true };
     const checked = prepare(tool).validate(request.params.arguments ?? {});
     if (!checked.valid) return { content: [{ type: 'text', text: `Invalid arguments: ${checked.errorMessage}` }], isError: true };
-    const result = await runTool(tool, checked.data, { cwd: opts.cwd, timeoutMs: opts.timeoutMs, signal: extra.signal });
+    const { stdin, ...input } = checked.data;
+    const declared = tool.schema.stdin;
+    const stdinData = declared && typeof stdin === 'string' ? (isTextType(declared.contentType) ? stdin : Buffer.from(stdin, 'base64')) : undefined;
+    let result: ToolResult;
+    try {
+      result = await runTool(tool, declared ? input : checked.data, {
+        cwd: opts.cwd, timeoutMs: opts.timeoutMs, signal: extra.signal, within: opts.within, maxOutput: opts.maxOutput,
+        stdin: stdinData, stdout: binaryStdout(tool) ? 'buffer' : 'text',
+      });
+    } catch (err) {
+      if (err instanceof InputError) return { content: [{ type: 'text', text: `Invalid arguments: ${err.message}` }], isError: true };
+      throw err;
+    }
+    opts.audit?.({
+      tool: tool.words.join(' '), command: result.command, exitCode: result.exitCode, signal: result.signal,
+      timedOut: result.timedOut, durationMs: result.durationMs, via: 'mcp',
+    });
     return toResult(tool, result);
   });
 
@@ -90,11 +148,11 @@ export function createMcpServer(opts: McpOptions): Server {
  * A request handler serving MCP over streamable HTTP, statelessly: each
  * request gets its own server and transport. Mount it on POST (and GET/DELETE,
  * which it answers with 405) at a path such as `/mcp`, after a JSON body parser.
- * Pass a function to serve whatever it returns at the time of each request.
+ * Pass a function to serve whatever it returns for each request (given the request, e.g. to serve per-caller tools).
  */
-export function mcpHttpHandler(opts: McpOptions | (() => McpOptions)) {
-  return async (req: IncomingMessage & { body?: unknown }, res: ServerResponse): Promise<void> => {
-    const server = createMcpServer(typeof opts === 'function' ? opts() : opts);
+export function mcpHttpHandler<R extends IncomingMessage & { body?: unknown }>(opts: McpOptions | ((req: R) => McpOptions)) {
+  return async (req: R, res: ServerResponse): Promise<void> => {
+    const server = createMcpServer(typeof opts === 'function' ? opts(req) : opts);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on('close', () => {
       void transport.close();
