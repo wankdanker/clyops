@@ -11,7 +11,13 @@ it, and streams the output, so any program built with any clyops package gets a 
   variadic arguments, required fields marked.
 - **Running:** run several instances at once and watch stdout/stderr live. Copy the equivalent
   command line, or paste a command line to fill the form.
-- **Templates:** save and reload form values per tool.
+- **Templates:** save and reload form values per tool. Secret options are never saved.
+- **Commands:** a program with commands (`mytool db migrate`) gets a command picker, and a form
+  for the chosen command with the options it inherits.
+- **Effects and relationships:** the tool's declared effects show as badges, and a `destructive`
+  tool asks before it runs. Options that conflict, or that need another option, are flagged.
+- **stdin and stdout:** a tool that reads stdin gets a text box (or a file to read it from); one
+  that writes binary output (an image, audio) gets a "save output to" field.
 
 ## Install
 

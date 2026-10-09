@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import type { ScriptSchema, ScriptSchemaBody } from '../types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -274,4 +275,73 @@ export function buildCommandArgs(
   });
 
   return args;
+}
+
+/** Whether output of `contentType` is text (undeclared output is). */
+export function isTextType(contentType?: string): boolean {
+  const type = (contentType ?? '').split(';')[0].trim().toLowerCase();
+  return !type || type.startsWith('text/') || type === 'application/json' || type.endsWith('+json') || type === 'application/xml';
+}
+
+/**
+ * A program's commands (spec section 1.7), one entry per command without
+ * commands: its words, and a schema with the command's arguments, its options
+ * and those it inherits (nearest first), and the nearest effects, stdin and
+ * stdout. Empty for a program without commands.
+ */
+export function expandCommands(schema: ScriptSchema): { words: string[]; schema: ScriptSchema }[] {
+  const out: { words: string[]; schema: ScriptSchema }[] = [];
+  const visit = (chain: ScriptSchemaBody[], words: string[]) => {
+    const node = chain[chain.length - 1];
+    if (node.commands?.length) {
+      node.commands.forEach((child) => visit([...chain, child], [...words, child.name]));
+      return;
+    }
+    const nearest = <T,>(pick: (s: ScriptSchemaBody) => T | null | undefined) => {
+      for (let i = chain.length - 1; i >= 0; i--) {
+        const v = pick(chain[i]);
+        if (v !== undefined && v !== null && !(Array.isArray(v) && v.length === 0)) return v;
+      }
+      return undefined;
+    };
+    out.push({
+      words,
+      schema: {
+        ...schema,
+        script: [schema.script, ...words].join(' '),
+        description: node.description,
+        epilog: node.epilog,
+        arguments: node.arguments,
+        options: [...chain].reverse().flatMap((s) => s.options),
+        requiredCommands: chain.flatMap((s) => s.requiredCommands),
+        effects: nearest((s) => s.effects) ?? [],
+        constraints: chain.flatMap((s) => s.constraints ?? []),
+        stdin: nearest((s) => s.stdin) ?? null,
+        stdout: nearest((s) => s.stdout) ?? null,
+        commands: [],
+      },
+    });
+  };
+  if (schema.commands?.length) visit([schema], []);
+  return out;
+}
+
+/** The option relationships (spec section 1.6) the form values break, as messages. */
+export function constraintIssues(schema: ScriptSchema, values: Record<string, unknown>): string[] {
+  const given = (name: string) => {
+    const v = values[name];
+    return Array.isArray(v) ? v.some((x) => x !== '') : v !== undefined && v !== '' && v !== false;
+  };
+  const list = (names: string[]) => names.map((n) => `--${n}`).join(', ');
+  const issues: string[] = [];
+  for (const c of schema.constraints ?? []) {
+    const on = c.options.filter(given);
+    if (c.type === 'exclusive' && on.length > 1) issues.push(`${list(on)} cannot be used together`);
+    if (c.type === 'requires' && given(c.options[0])) {
+      const absent = c.options.slice(1).filter((n) => !given(n));
+      if (absent.length) issues.push(`--${c.options[0]} requires ${list(absent)}`);
+    }
+    if (c.type === 'oneOf' && on.length === 0) issues.push(`One of ${list(c.options)} is required (unless set in a config file or the environment)`);
+  }
+  return issues;
 }

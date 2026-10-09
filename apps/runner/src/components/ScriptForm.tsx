@@ -1,24 +1,42 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
-import { Play, Save, Loader2, X, RotateCcw, Search, Plus, Trash2, ChevronDown, ChevronUp, ChevronsDownUp, ChevronsUpDown, Copy, FileJson, Check, Terminal } from 'lucide-react';
+import { Play, Save, Loader2, X, RotateCcw, Search, Plus, Trash2, ChevronDown, ChevronUp, ChevronsDownUp, ChevronsUpDown, Copy, FileJson, Check, Terminal, AlertTriangle } from 'lucide-react';
 import { ScriptSchema, FormValues } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './Card';
 import { Button } from './Button';
 import { Input } from './Input';
 import { Label } from './Label';
-import { buildCommandArgs, formatCommandLine, parseCommandLine } from '../lib/utils';
+import { buildCommandArgs, constraintIssues, expandCommands, formatCommandLine, isTextType, parseCommandLine } from '../lib/utils';
 import { TemplateJsonEditor } from './TemplateJsonEditor';
+
+/** Where a run's stdin comes from and its binary stdout goes (spec section 1.3). */
+export interface RunIo {
+  stdin?: string;
+  stdinFile?: string;
+  stdoutFile?: string;
+}
 
 interface ScriptFormProps {
   schema: ScriptSchema;
-  onRun: (args: string[]) => void;
+  onRun: (args: string[], io: RunIo) => void;
   onSaveTemplate: (name: string, values: FormValues) => void;
   isRunning?: boolean;
   initialValues?: FormValues;
   initialTemplateName?: string;
 }
 
-export function ScriptForm({ schema, onRun, onSaveTemplate, isRunning, initialValues, initialTemplateName }: ScriptFormProps) {
+export function ScriptForm({ schema: program, onRun, onSaveTemplate, isRunning, initialValues, initialTemplateName }: ScriptFormProps) {
+  // A program with commands gets a form per command (spec section 1.7).
+  const commands = useMemo(() => expandCommands(program), [program]);
+  const [commandKey, setCommandKey] = useState('');
+  const command = commands.find((c) => c.words.join(' ') === commandKey) ?? commands[0];
+  const schema = command ? command.schema : program;
+  const words = command ? command.words : [];
+  const [stdinText, setStdinText] = useState('');
+  const [stdinFile, setStdinFile] = useState('');
+  const [stdoutFile, setStdoutFile] = useState('');
+  const binaryOut = schema.stdout && !isTextType(schema.stdout.contentType);
+  const effects = schema.effects ?? [];
   const [values, setValues] = useState<FormValues>({});
   const [templateName, setTemplateName] = useState('');
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
@@ -32,7 +50,7 @@ export function ScriptForm({ schema, onRun, onSaveTemplate, isRunning, initialVa
 
   // Copy command to clipboard
   const handleCopyCommand = async () => {
-    const args = buildCommandArgs(schema, values);
+    const args = [...words, ...buildCommandArgs(schema, values)];
     const commandLine = formatCommandLine(schema.path, args);
     try {
       await writeText(commandLine);
@@ -139,13 +157,20 @@ export function ScriptForm({ schema, onRun, onSaveTemplate, isRunning, initialVa
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const args = buildCommandArgs(schema, values);
-    onRun(args);
+    if (effects.includes('destructive') && !window.confirm(`${schema.script} is marked destructive: it deletes or overwrites things. Run it?`)) return;
+    const args = [...words, ...buildCommandArgs(schema, values)];
+    onRun(args, {
+      stdin: schema.stdin && stdinText && !stdinFile ? stdinText : undefined,
+      stdinFile: schema.stdin && stdinFile ? stdinFile : undefined,
+      stdoutFile: binaryOut && stdoutFile ? stdoutFile : undefined,
+    });
   };
 
   const handleSaveTemplate = () => {
     if (templateName.trim()) {
-      onSaveTemplate(templateName, values);
+      // Secrets are never written to a template file.
+      const secrets = new Set(schema.options.filter((o) => o.secret).map((o) => o.name));
+      onSaveTemplate(templateName, Object.fromEntries(Object.entries(values).filter(([name]) => !secrets.has(name))));
       setTemplateName('');
       setShowSaveTemplate(false);
     }
@@ -328,7 +353,8 @@ export function ScriptForm({ schema, onRun, onSaveTemplate, isRunning, initialVa
         </Label>
         <Input
           id={opt.name}
-          type={opt.type === 'integer' || opt.type === 'number' ? 'number' : 'text'}
+          type={opt.secret ? 'password' : opt.type === 'integer' || opt.type === 'number' ? 'number' : 'text'}
+          autoComplete={opt.secret ? 'off' : undefined}
           value={value as string}
           onChange={(e) => handleChange(opt.name, e.target.value)}
           placeholder={opt.default || ''}
@@ -345,6 +371,35 @@ export function ScriptForm({ schema, onRun, onSaveTemplate, isRunning, initialVa
       <CardHeader>
         <CardTitle>{schema.script}</CardTitle>
         <CardDescription>{schema.description}</CardDescription>
+        {effects.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {effects.map((effect) => (
+              <span
+                key={effect}
+                className={`rounded px-2 py-0.5 text-xs font-medium ${effect === 'destructive' ? 'bg-destructive/15 text-destructive' : 'bg-muted text-muted-foreground'}`}
+              >
+                {effect}
+              </span>
+            ))}
+          </div>
+        )}
+        {commands.length > 0 && (
+          <div className="pt-2">
+            <Label htmlFor="command">Command</Label>
+            <select
+              id="command"
+              value={words.join(' ')}
+              onChange={(e) => setCommandKey(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
+            >
+              {commands.map((c) => (
+                <option key={c.words.join(' ')} value={c.words.join(' ')}>
+                  {c.words.join(' ')}{c.schema.description ? ` — ${c.schema.description.split('\n')[0]}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -525,6 +580,56 @@ export function ScriptForm({ schema, onRun, onSaveTemplate, isRunning, initialVa
 
             {/* JSON Editor - moved outside sticky area for better height */}
           </div>
+
+          {/* Relationships the values break (spec section 1.6): flagged, not enforced. */}
+          {constraintIssues(schema, values).map((issue) => (
+            <p key={issue} className="flex items-center gap-2 text-sm text-amber-600">
+              <AlertTriangle className="h-4 w-4" />
+              {issue}
+            </p>
+          ))}
+
+          {/* Standard input and binary output (spec section 1.3). */}
+          {(schema.stdin || binaryOut) && (
+            <div className="space-y-4">
+              {schema.stdin && (
+                <div>
+                  <Label htmlFor="stdin">
+                    Input{schema.stdin.description ? `: ${schema.stdin.description}` : ''}
+                    {schema.stdin.contentType && <span className="text-muted-foreground ml-1">({schema.stdin.contentType})</span>}
+                  </Label>
+                  <textarea
+                    id="stdin"
+                    value={stdinText}
+                    onChange={(e) => setStdinText(e.target.value)}
+                    disabled={Boolean(stdinFile)}
+                    rows={4}
+                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono mt-1"
+                  />
+                  <Input
+                    value={stdinFile}
+                    onChange={(e) => setStdinFile(e.target.value)}
+                    placeholder="…or read it from this file"
+                    className="mt-2"
+                  />
+                </div>
+              )}
+              {binaryOut && (
+                <div>
+                  <Label htmlFor="stdout">
+                    Save output{schema.stdout?.description ? ` (${schema.stdout.description}, ${schema.stdout.contentType})` : ` (${schema.stdout?.contentType})`} to
+                  </Label>
+                  <Input
+                    id="stdout"
+                    value={stdoutFile}
+                    onChange={(e) => setStdoutFile(e.target.value)}
+                    placeholder="/path/to/output file"
+                    className="mt-1"
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* JSON Editor - full height section */}
           {showJsonEditor && (

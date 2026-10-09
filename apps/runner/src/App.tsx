@@ -4,7 +4,7 @@ import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { Terminal, FileCode, Loader2, Settings, Pencil, Trash2, Check, X } from 'lucide-react';
 import { ScriptInfo, ScriptSchema, RunningScript, ScriptOutputLine, FormValues, Template, AppConfig } from './types';
 import { ScriptList } from './components/ScriptList';
-import { ScriptForm } from './components/ScriptForm';
+import { ScriptForm, type RunIo } from './components/ScriptForm';
 import { ScriptOutput } from './components/ScriptOutput';
 import { SettingsModal } from './components/SettingsModal';
 import { Card, CardContent } from './components/Card';
@@ -93,13 +93,16 @@ function App() {
     }
   };
 
-  const handleRunScript = async (args: string[]) => {
+  const handleRunScript = async (args: string[], io: RunIo = {}) => {
     if (!selectedScript) return;
 
     try {
       const id = await invoke<string>('run_script', {
         scriptPath: selectedScript.path,
         args: args,
+        stdin: io.stdin ?? null,
+        stdinFile: io.stdinFile ?? null,
+        stdoutFile: io.stdoutFile ?? null,
       });
 
       const newRunningScript: RunningScript = {

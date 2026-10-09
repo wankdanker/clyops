@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -34,6 +34,17 @@ struct ScriptSchema {
     options: Vec<ScriptOption>,
     #[serde(rename = "requiredCommands")]
     required_commands: Vec<RequiredCommand>,
+    // Added in clyops 0.2 (spec sections 1.3-1.7); passed through to the form.
+    #[serde(default)]
+    effects: Vec<String>,
+    #[serde(default)]
+    constraints: Vec<serde_json::Value>,
+    #[serde(default)]
+    stdin: Option<serde_json::Value>,
+    #[serde(default)]
+    stdout: Option<serde_json::Value>,
+    #[serde(default)]
+    commands: Vec<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,6 +77,8 @@ struct ScriptOption {
     required: bool,
     validation: String,
     choices: Vec<String>,
+    #[serde(default)]
+    secret: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -395,10 +408,17 @@ fn parse_schema(json: &str, script_path: &str) -> Result<ScriptSchema, String> {
     Ok(schema)
 }
 
+/// Runs a tool. Its stdin is `stdin` (text) or the file `stdin_file`, else
+/// closed; with `stdout_file`, stdout is written there (binary output) instead
+/// of being streamed to the window line by line.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn run_script(
     script_path: String,
     args: Vec<String>,
+    stdin: Option<String>,
+    stdin_file: Option<String>,
+    stdout_file: Option<String>,
     process_manager: State<'_, ProcessManager>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
@@ -413,14 +433,28 @@ async fn run_script(
         .parent()
         .ok_or("Invalid script path")?;
 
+    let has_stdin = stdin.is_some() || stdin_file.is_some();
     let mut child = Command::new(&script_path)
         .args(&args)
         .current_dir(script_dir)
-        .stdin(Stdio::null())
+        .stdin(if has_stdin { Stdio::piped() } else { Stdio::null() })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Failed to spawn process: {}", e))?;
+
+    // Feed stdin from its own thread; dropping the pipe closes it.
+    if let Some(mut pipe) = child.stdin.take() {
+        thread::spawn(move || {
+            if let Some(path) = stdin_file {
+                if let Ok(mut file) = std::fs::File::open(path) {
+                    let _ = std::io::copy(&mut file, &mut pipe);
+                }
+            } else if let Some(text) = stdin {
+                let _ = pipe.write_all(text.as_bytes());
+            }
+        });
+    }
 
     // Take ownership of stdout and stderr
     let stdout = child.stdout.take();
@@ -437,32 +471,37 @@ async fn run_script(
 
     process_manager.add_process(id.clone(), process_info);
 
-    // Spawn thread to read stdout
-    if let Some(stdout) = stdout {
+    // Spawn thread to read stdout: lines to the window, or binary output to a
+    // file followed by a line saying where.
+    if let Some(mut stdout) = stdout {
         let id_clone = id.clone();
         let app_clone = app.clone();
         thread::spawn(move || {
+            let event_name = format!("output_{}", id_clone);
+            if let Some(path) = stdout_file {
+                let line = match std::fs::File::create(&path).and_then(|mut f| std::io::copy(&mut stdout, &mut f)) {
+                    Ok(n) => format!("Output saved to {path} ({n} bytes)"),
+                    Err(e) => format!("Could not save the output to {path}: {e}"),
+                };
+                let _ = app_clone.emit(&event_name, serde_json::json!({ "id": id_clone, "type": "info", "data": line }));
+                return;
+            }
             let reader = BufReader::new(stdout);
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    println!("Emitting stdout for {}: {}", id_clone, line);
-                    let event_name = format!("output_{}", id_clone);
-                    if let Err(e) = app_clone.emit(
-                        &event_name,
-                        serde_json::json!({
-                            "id": id_clone,
-                            "type": "stdout",
-                            "data": line,
-                        }),
-                    ) {
-                        eprintln!("Failed to emit stdout event: {}", e);
-                    }
+            for line in reader.lines().map_while(Result::ok) {
+                if let Err(e) = app_clone.emit(
+                    &event_name,
+                    serde_json::json!({
+                        "id": id_clone,
+                        "type": "stdout",
+                        "data": line,
+                    }),
+                ) {
+                    eprintln!("Failed to emit stdout event: {}", e);
                 }
             }
-            println!("Stdout reader thread finished for {}", id_clone);
         });
     }
-    
+
     // Spawn thread to read stderr
     if let Some(stderr) = stderr {
         let id_clone = id.clone();
