@@ -8,6 +8,9 @@ public class Demo {
         cli.setDescription("Demo program for the clyops conformance suite. It registers one of every kind of option and argument so that each implementation can be checked against the same help text, schema and resolved values.");
         cli.setEpilog("Examples:\n  demo in.txt slow a b --tag x --tag y\n  demo in.txt -vc demo.conf");
         cli.requireCommand("sh", "POSIX shell", "install dash");
+        cli.setEffects("idempotent", "network");
+        cli.setStdin("Lines to process", "text/plain");
+        cli.setStdout("The resolved values", "application/json");
 
         cli.arg("input", "Input file", "", "path");
         cli.arg("mode", "Processing mode", "fast", "choice:fast,slow");
@@ -24,7 +27,7 @@ public class Demo {
         cli.opt("ENABLED",  "enabled",  "",  "true",      "Enable processing",     "Options",    "bool");
         cli.optArray("TAG", "tag",      "t",              "Tag to attach",         "Options",    "string:1-8");
         cli.opt("NO_CACHE", "no-cache", "",  "flag",      "Disable the cache",     "Options");
-        cli.opt("KEY",      "key",      "k", "",          "API key",               "Auth");
+        cli.opt("KEY",      "key",      "k", "",          "API key",               "Auth",       "secret");
         cli.opt("HOST",     "host",     "H", "localhost", "Server host",           "Network",    "hostname");
         cli.opt("PORT",     "port",     "p", "8080",      "Server port",           "Network",    "port");
         cli.opt("ENDPOINT", "endpoint", "",  "optional",  "Endpoint URL",          "Network",    "url");
@@ -42,6 +45,8 @@ public class Demo {
 
         cli.setConfig("config", "demo:,shared:");
         cli.setPathSearch("config", "conf");
+        cli.exclusive("endpoint", "addr");
+        cli.requires("dest", "src");
 
         cli.run(argv);
 

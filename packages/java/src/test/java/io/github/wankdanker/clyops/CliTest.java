@@ -95,4 +95,58 @@ class CliTest {
         assertNull(cli.completionScript("powershell"));
         assertTrue(cli.completionScript("bash").contains("_clyops_t"));
     }
+
+    @Test
+    void newRegistrationErrors() {
+        assertEquals("Unknown effect 'sideways'",
+            assertThrows(IllegalArgumentException.class, () -> new Cli("t").setEffects("sideways")).getMessage());
+        assertEquals("Unknown option --b in constraint",
+            assertThrows(IllegalArgumentException.class, () -> new Cli("t").opt("A", "a", "", "flag", "A").exclusive("a", "b")).getMessage());
+        assertEquals("Cannot mix commands and positional arguments",
+            assertThrows(IllegalArgumentException.class, () -> new Cli("t").arg("x", "X", "").command("c", "C")).getMessage());
+    }
+
+    @Test
+    void secretValuesAreMasked() {
+        Cli cli = new Cli("t").setEnv(Map.of());
+        cli.opt("TOKEN", "token", "", "", "Token", "Auth", "secret:string:3-");
+        assertEquals("ok", cli.parse("--token", "abcd").status());
+        assertEquals("abcd", cli.values().getString("TOKEN"));
+        assertTrue(cli.valuesJson().contains("\"TOKEN\": \"***\""));
+        assertTrue(cli.jsonSchema().contains("\"validation\": \"string:3-\""));
+        assertTrue(cli.jsonSchema().contains("\"secret\": true"));
+    }
+
+    private static Cli related(Map<String, String> env) {
+        Cli cli = new Cli("t").setEnv(env);
+        cli.opt("A", "a", "a", "flag", "A").opt("B", "b", "b", "flag", "B").opt("C", "c", "c", "optional", "C");
+        return cli.exclusive("a", "b").requires("c", "a").oneOf("a", "b", "c");
+    }
+
+    @Test
+    void relationships() {
+        assertEquals("Options --a and --b cannot be used together", related(Map.of()).parse("-a", "-b").error());
+        assertEquals("ok", related(Map.of()).parse("-a", "--no-b").status());
+        assertEquals("Option --c requires --a", related(Map.of()).parse("-c", "x").error());
+        assertEquals("ok", related(Map.of("A", "true")).parse("-c", "x").status());
+        assertEquals("One of --a, --b, --c is required", related(Map.of()).parse().error());
+    }
+
+    @Test
+    void commands() {
+        Cli cli = new Cli("m").setEnv(Map.of());
+        cli.opt("CONFIG", "config", "c", "optional", "Config", "Global");
+        Cli migrate = cli.command("db", "Database").command("migrate", "Migrate");
+        migrate.opt("TO", "to", "", "optional", "Target", "Options", "int");
+        migrate.arg("name", "Name", "all");
+        assertEquals("ok", cli.parse("db", "-c", "x", "migrate", "--to", "3").status());
+        assertEquals(List.of("db", "migrate"), cli.commandPath());
+        assertEquals(3, cli.values().getInt("TO"));
+        assertEquals("x", cli.values().getString("CONFIG"));
+        assertEquals("Unknown option: --to", cli.parse("--to", "3", "db", "migrate").error());
+        assertEquals("Missing command", cli.parse("db").error());
+        assertEquals("Unknown command: seed", cli.parse("db", "seed").error());
+        assertEquals("help", cli.parse("db", "migrate", "-h").status());
+        assertTrue(cli.usage().startsWith("Usage: m db migrate [<name>] [OPTIONS]"));
+    }
 }

@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -308,6 +309,7 @@ public class Cli {
         final boolean required;
         String rule;
         List<String> searchDirs = List.of();
+        boolean secret;
 
         Option(String var, String lng, String shrt, String kind, String def, boolean required, String description, String group, String rule) {
             this.var = var; this.lng = lng; this.shrt = shrt; this.kind = kind; this.def = def;
@@ -352,6 +354,15 @@ public class Cli {
     private Map<String, List<String>> argRaw = new HashMap<>();
     private Map<String, String> sources = new HashMap<>();
     private Map<String, ConfigValue> config = new LinkedHashMap<>();
+    private List<String> effects = List.of();
+    private Map<String, Object> stdin;
+    private Map<String, Object> stdout;
+    private final List<Map<String, Object>> constraints = new ArrayList<>();
+    private final List<Cli> children = new ArrayList<>();
+    private Cli parent;
+    private String word = "";
+    // The command selected by the last parse (this one when it has no commands).
+    private Cli selected = this;
 
     /** A Cli for the program {@code name}, shown in help and used for completion. */
     public Cli(String name) {
@@ -386,6 +397,111 @@ public class Cli {
     public Cli setEpilog(String text) {
         this.epilog = text;
         return this;
+    }
+
+    /** What running the program does: read-only, idempotent, destructive, network. */
+    public Cli setEffects(String... effects) {
+        for (String e : effects) {
+            if (!List.of("read-only", "idempotent", "destructive", "network").contains(e)) {
+                throw new IllegalArgumentException("Unknown effect '" + e + "'");
+            }
+        }
+        this.effects = List.of(effects);
+        return this;
+    }
+
+    /** What the program reads on stdin; {@code contentType} is a MIME type or a comma-separated list. */
+    public Cli setStdin(String description, String contentType) {
+        this.stdin = stream(description, contentType);
+        return this;
+    }
+
+    /** What the program writes on stdout; undeclared means text. */
+    public Cli setStdout(String description, String contentType) {
+        this.stdout = stream(description, contentType);
+        return this;
+    }
+
+    private static Map<String, Object> stream(String description, String contentType) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("description", description);
+        m.put("contentType", contentType);
+        return m;
+    }
+
+    /** At most one of these options may be given. */
+    public Cli exclusive(String... lngs) { return addConstraint("exclusive", List.of(lngs)); }
+
+    /** When {@code lng} is given, the others must be too. */
+    public Cli requires(String lng, String... lngs) {
+        List<String> all = new ArrayList<>(List.of(lng));
+        all.addAll(List.of(lngs));
+        return addConstraint("requires", all);
+    }
+
+    /** At least one of these options must be given. */
+    public Cli oneOf(String... lngs) { return addConstraint("oneOf", List.of(lngs)); }
+
+    private Cli addConstraint(String type, List<String> lngs) {
+        for (String l : lngs) {
+            if (findOption(l, false) == null) throw new IllegalArgumentException("Unknown option --" + l + " in constraint");
+        }
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("type", type);
+        m.put("options", List.copyOf(lngs));
+        constraints.add(m);
+        return this;
+    }
+
+    /** Register a command (spec section 1.7) and return it, to register its options and arguments on. */
+    public Cli command(String word, String description) {
+        if (!args.isEmpty()) throw new IllegalArgumentException("Cannot mix commands and positional arguments");
+        for (Cli c : children) if (c.word.equals(word)) throw new IllegalArgumentException("Duplicate command " + word);
+        Cli child = new Cli(name + " " + word);
+        child.cwd = cwd;
+        child.root = root;
+        child.env = env;
+        child.description = description;
+        child.parent = this;
+        child.word = word;
+        children.add(child);
+        return child;
+    }
+
+    /** The command words selected by the last parse, e.g. [db, migrate]. */
+    public List<String> commandPath() {
+        List<String> words = new ArrayList<>();
+        for (Cli node = selected; node != null && node != this; node = node.parent) words.add(0, node.word);
+        return words;
+    }
+
+    /** The selected command, its parent, ... up to this one. */
+    private List<Cli> chain() {
+        List<Cli> out = new ArrayList<>();
+        for (Cli node = selected; node != null; node = node == this ? null : node.parent) out.add(node);
+        return out;
+    }
+
+    private List<Option> chainOptions() {
+        List<Option> out = new ArrayList<>();
+        for (Cli n : chain()) out.addAll(n.options);
+        return out;
+    }
+
+    /** From the program down. */
+    private List<Cli> chainDown() {
+        List<Cli> out = chain();
+        Collections.reverse(out);
+        return out;
+    }
+
+    /** An option by long (or short) name, in this level and its ancestors. */
+    private Option findOption(String nm, boolean isShort) {
+        for (Cli node = this; node != null; node = node.parent) {
+            Option opt = isShort ? node.byShort.get(nm) : node.byLong.get(nm);
+            if (opt != null) return opt;
+        }
+        return null;
     }
 
     /** {@code option} holds the config file path; {@code prefixes} is comma-separated. */
@@ -448,6 +564,10 @@ public class Cli {
         if (!opt.shrt.isEmpty() && (length(opt.shrt) != 1 || byShort.containsKey(opt.shrt))) {
             throw new IllegalArgumentException("Invalid or duplicate short option -" + opt.shrt);
         }
+        if (opt.rule.equals("secret") || opt.rule.startsWith("secret:")) {
+            opt.secret = true;
+            opt.rule = opt.rule.length() > 6 ? opt.rule.substring(7) : "";
+        }
         if (!knownRule(opt.rule)) throw new IllegalArgumentException("Unknown validation rule '" + opt.rule + "' for --" + opt.lng);
         options.add(opt);
         byLong.put(opt.lng, opt);
@@ -456,6 +576,7 @@ public class Cli {
     }
 
     private Cli addArg(Argument arg) {
+        if (!children.isEmpty()) throw new IllegalArgumentException("Cannot mix commands and positional arguments");
         if (args.stream().anyMatch(Argument::variadic)) {
             throw new IllegalArgumentException("Argument " + arg.name() + " registered after a variadic argument");
         }
@@ -481,6 +602,7 @@ public class Cli {
         sources = new HashMap<>();
         config = new LinkedHashMap<>();
         values = new Values();
+        selected = this;
         ensureHelp();
 
         String scanError = null;
@@ -499,7 +621,7 @@ public class Cli {
             return ParseResult.error(e.getMessage());
         }
 
-        List<Command> missingCmds = commands.stream().filter(c -> !which(c.name())).toList();
+        List<Command> missingCmds = chainDown().stream().flatMap(n -> n.commands.stream()).filter(c -> !which(c.name())).toList();
         if (!missingCmds.isEmpty()) {
             List<String> detail = new ArrayList<>();
             for (Command c : missingCmds) {
@@ -511,11 +633,46 @@ public class Cli {
         }
 
         List<String> missing = new ArrayList<>();
-        for (Option o : options) {
+        for (Option o : chainOptions()) {
             if (o.required && (!raw.containsKey(o.lng) || raw.get(o.lng).get(0).isEmpty())) missing.add("--" + o.lng);
         }
         if (!missing.isEmpty()) return ParseResult.error("Missing required argument(s): " + String.join(" ", missing));
+        String conflict = checkConstraints();
+        if (conflict != null) return ParseResult.error(conflict);
         return ParseResult.ok();
+    }
+
+    private boolean given(String lng) {
+        List<String> v = raw.get(lng);
+        return List.of("cli", "config", "env").contains(source(lng)) && v != null && !v.isEmpty()
+            && !(v.size() == 1 && v.get(0).equals("false") && selected.findOption(lng, false).kind.equals("flag"));
+    }
+
+    /** Spec section 1.6: the first relationship that fails, from the program down. */
+    @SuppressWarnings("unchecked")
+    private String checkConstraints() {
+        for (Cli node : chainDown()) {
+            for (Map<String, Object> c : node.constraints) {
+                List<String> lngs = (List<String>) c.get("options");
+                List<String> on = lngs.stream().filter(this::given).toList();
+                switch ((String) c.get("type")) {
+                    case "exclusive" -> {
+                        if (on.size() > 1) return "Options --" + on.get(0) + " and --" + on.get(1) + " cannot be used together";
+                    }
+                    case "requires" -> {
+                        if (given(lngs.get(0))) {
+                            for (String l : lngs.subList(1, lngs.size())) {
+                                if (!given(l)) return "Option --" + lngs.get(0) + " requires --" + l;
+                            }
+                        }
+                    }
+                    default -> {
+                        if (on.isEmpty()) return "One of --" + String.join(", --", lngs) + " is required";
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private boolean which(String cmd) {
@@ -546,12 +703,17 @@ public class Cli {
         while (i < argv.length) {
             String token = argv[i++];
             if (endOfOptions || token.equals("-") || !token.startsWith("-")) {
+                Cli node = selected;
                 if (rest != null) {
                     rest.add(token);
-                } else if (pos >= args.size()) {
+                } else if (!node.children.isEmpty()) {
+                    Cli child = node.children.stream().filter(c -> c.word.equals(token)).findFirst().orElse(null);
+                    if (child == null) throw new ParseError("Unknown command: " + token);
+                    selected = child;
+                } else if (pos >= node.args.size()) {
                     throw new ParseError("Unexpected argument: " + token);
                 } else {
-                    Argument arg = args.get(pos++);
+                    Argument arg = node.args.get(pos++);
                     List<String> value = new ArrayList<>(List.of(token));
                     argRaw.put(arg.name(), value);
                     if (arg.variadic()) rest = value;
@@ -564,7 +726,7 @@ public class Cli {
                 boolean eq = eqAt >= 0;
                 String nm = eq ? body.substring(0, eqAt) : body;
                 String value = eq ? body.substring(eqAt + 1) : "";
-                Option opt = byLong.get(nm);
+                Option opt = selected.findOption(nm, false);
                 if (opt != null && eq) {
                     if (opt.kind.equals("flag")) {
                         Boolean b = boolWord(value);
@@ -579,8 +741,8 @@ public class Cli {
                         if (i >= argv.length || argv[i].startsWith("--")) throw new ParseError("Option --" + nm + " requires an argument");
                         setCli(opt, argv[i++]);
                     }
-                } else if (nm.startsWith("no-") && !eq && byLong.containsKey(nm.substring(3))) {
-                    Option target = byLong.get(nm.substring(3));
+                } else if (nm.startsWith("no-") && !eq && selected.findOption(nm.substring(3), false) != null) {
+                    Option target = selected.findOption(nm.substring(3), false);
                     if (!target.boolLike()) throw new ParseError("Option --" + nm + " can only be used with flag/boolean options");
                     setCli(target, "false");
                 } else {
@@ -590,7 +752,7 @@ public class Cli {
                 int[] cluster = token.substring(1).codePoints().toArray();
                 for (int j = 0; j < cluster.length; j++) {
                     String ch = new String(Character.toChars(cluster[j]));
-                    Option opt = byShort.get(ch);
+                    Option opt = selected.findOption(ch, true);
                     if (opt == null) throw new ParseError("Unknown option: -" + ch);
                     if (opt.kind.equals("flag")) {
                         setCli(opt, "true");
@@ -609,7 +771,7 @@ public class Cli {
     }
 
     private void loadConfig() {
-        Option opt = byLong.get(configOption);
+        Option opt = selected.findOption(configOption, false);
         if (opt == null) return;
         String path = raw.containsKey(opt.lng) ? raw.get(opt.lng).get(0) : null;
         String source = "cli";
@@ -630,7 +792,7 @@ public class Cli {
         for (Map.Entry<String, ConfigValue> e : config.entrySet()) {
             String key = e.getKey();
             String value = e.getValue().value();
-            Option target = byLong.get(key);
+            Option target = selected.findOption(key, false);
             if (target == null || target == opt || "cli".equals(sources.get(key))) continue;
             if (target.kind.equals("flag")) {
                 Boolean b = boolWord(value);
@@ -691,6 +853,9 @@ public class Cli {
     }
 
     private void resolve() {
+        if (!selected.children.isEmpty()) throw new ParseError("Missing command");
+        List<Option> options = chainOptions();
+        List<Argument> args = selected.args;
         for (Argument arg : args) {
             if (argRaw.containsKey(arg.name())) continue;
             if (arg.variadic()) argRaw.put(arg.name(), new ArrayList<>());
@@ -740,6 +905,7 @@ public class Cli {
             List<String> r = argRaw.get(arg.name());
             values.put(arg.name(), arg.variadic() ? convertAll(r, arg.rule(), arg.name()) : convert(r.get(0), arg.rule(), arg.name()));
         }
+        if (!children.isEmpty()) values.put("command", commandPath());
     }
 
     private static Object convert(String v, String rule, String name) {
@@ -764,7 +930,7 @@ public class Cli {
             System.exit(0);
         }
         if (head.contains("--bash-completion")) {
-            System.out.print(completionData());
+            System.out.print(completionData(all.contains("--") ? all.subList(all.indexOf("--") + 1, all.size()) : List.of()));
             System.out.flush();
             System.exit(0);
         }
@@ -815,8 +981,14 @@ public class Cli {
     /** Resolved values as JSON (spec section 10), in registration order. */
     public String valuesJson() {
         Map<String, Object> out = new LinkedHashMap<>();
-        for (Option o : options) out.put(o.var, values.get(o.var));
-        for (Argument a : args) out.put(a.name(), values.get(a.name()));
+        for (Option o : chainOptions()) {
+            Object v = values.get(o.var);
+            if (o.secret && v instanceof List<?> list) v = list.stream().map(x -> "***").toList();
+            else if (o.secret && v != null) v = "***";
+            out.put(o.var, v);
+        }
+        for (Argument a : selected.args) out.put(a.name(), values.get(a.name()));
+        if (!children.isEmpty()) out.put("command", commandPath());
         return Json.write(out);
     }
 
@@ -824,26 +996,48 @@ public class Cli {
     // Output
     // -----------------------------------------------------------------------
 
-    /** Help text (spec section 7). */
+    /** Help text (spec section 7), for the selected command. */
+    @SuppressWarnings("unchecked")
     public String usage() {
         ensureHelp();
+        Cli node = selected;
+        List<Option> options = chainOptions();
         String w = env.getOrDefault("CLYOPS_MAX_WIDTH", "");
         int maxWidth = DIGITS.matcher(w).matches() && w.length() < 6 && Integer.parseInt(w) > 0 ? Integer.parseInt(w) : 100;
-        int longest = options.stream().mapToInt(o -> length(o.label())).max().orElse(0);
+        int longest = Math.max(options.stream().mapToInt(o -> length(o.label())).max().orElse(0),
+            node.children.stream().mapToInt(c -> length(c.word)).max().orElse(0));
         int indent = Math.min(50, Math.max(32, longest + 4));
         int textWidth = Math.max(20, maxWidth - indent);
 
         List<List<String>> sections = new ArrayList<>();
-        StringBuilder usage = new StringBuilder("Usage: " + name);
-        for (Argument a : args) {
+        StringBuilder usage = new StringBuilder("Usage: " + node.name);
+        if (!node.children.isEmpty()) usage.append(" <command>");
+        for (Argument a : node.args) {
             usage.append(a.variadic() ? " [<" + a.name() + "...>]" : !a.def().isEmpty() ? " [<" + a.name() + ">]" : " <" + a.name() + ">");
         }
         sections.add(List.of(usage + " [OPTIONS]"));
-        if (!description.isEmpty()) sections.add(wrapText(description, maxWidth));
+        if (!node.description.isEmpty()) sections.add(wrapText(node.description, maxWidth));
 
-        if (!args.isEmpty()) {
+        List<String> io = new ArrayList<>();
+        for (Object[] d : new Object[][] {{"Input:", node.stdin}, {"Output:", node.stdout}}) {
+            Map<String, Object> decl = (Map<String, Object>) d[1];
+            if (decl == null) continue;
+            String line = (String) d[0];
+            if (!((String) decl.get("description")).isEmpty()) line += " " + decl.get("description");
+            if (!((String) decl.get("contentType")).isEmpty()) line += " (" + decl.get("contentType") + ")";
+            io.add(line);
+        }
+        if (!io.isEmpty()) sections.add(io);
+
+        if (!node.children.isEmpty()) {
+            List<String> lines = new ArrayList<>(List.of("Commands:"));
+            for (Cli c : node.children) lines.addAll(row(c.word, c.description, indent, textWidth));
+            sections.add(lines);
+        }
+
+        if (!node.args.isEmpty()) {
             List<String> lines = new ArrayList<>(List.of("Positional Arguments:"));
-            for (Argument a : args) {
+            for (Argument a : node.args) {
                 List<String> notes = new ArrayList<>();
                 if (a.variadic()) notes.add("variadic");
                 if (!a.def().isEmpty()) notes.add("default: " + a.def());
@@ -852,9 +1046,10 @@ public class Cli {
             }
             sections.add(lines);
         }
-        if (!commands.isEmpty()) {
+        List<Command> required = chainDown().stream().flatMap(n -> n.commands.stream()).toList();
+        if (!required.isEmpty()) {
             List<String> lines = new ArrayList<>(List.of("Required Commands:"));
-            for (Command c : commands) {
+            for (Command c : required) {
                 String status = which(c.name()) ? "installed" : "not found";
                 lines.addAll(row(c.name() + " [" + status + "]", c.hint().isEmpty() ? c.description() : c.description() + " (" + c.hint() + ")", indent, textWidth));
             }
@@ -869,14 +1064,28 @@ public class Cli {
                 List<String> notes = new ArrayList<>();
                 if (o.required) notes.add("required");
                 if (o.kind.equals("array")) notes.add("multiple");
-                if (config.containsKey(o.lng)) notes.add("config: " + config.get(o.lng).value());
+                if (o.secret) notes.add("secret");
+                if (config.containsKey(o.lng)) notes.add("config: " + (o.secret ? "***" : config.get(o.lng).value()));
                 if (!o.def.isEmpty()) notes.add("default: " + o.def);
                 if (!o.rule.isEmpty()) notes.add("accepts: " + describeRule(o.rule));
+                for (Cli n : chainDown()) {
+                    for (Map<String, Object> c : n.constraints) {
+                        List<String> lngs = (List<String>) c.get("options");
+                        if (!lngs.contains(o.lng)) continue;
+                        switch ((String) c.get("type")) {
+                            case "exclusive" -> notes.add("conflicts with: --" + String.join(", --", lngs.stream().filter(l -> !l.equals(o.lng)).toList()));
+                            case "requires" -> {
+                                if (lngs.get(0).equals(o.lng)) notes.add("requires: --" + String.join(", --", lngs.subList(1, lngs.size())));
+                            }
+                            default -> notes.add("one of: --" + String.join(", --", lngs));
+                        }
+                    }
+                }
                 lines.addAll(row(o.label(), annotate(o.description, notes), indent, textWidth));
             }
             sections.add(lines);
         }
-        if (!epilog.isEmpty()) sections.add(splitAll(epilog.replaceAll("\n+$", ""), "\n"));
+        if (!node.epilog.isEmpty()) sections.add(splitAll(node.epilog.replaceAll("\n+$", ""), "\n"));
 
         List<String> parts = new ArrayList<>();
         for (List<String> s : sections) parts.add(String.join("\n", s));
@@ -904,6 +1113,13 @@ public class Cli {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("clyops", 1);
         out.put("script", name);
+        out.putAll(schemaNode());
+        return Json.write(out);
+    }
+
+    private Map<String, Object> schemaNode() {
+        Map<String, Object> out = new LinkedHashMap<>();
+        if (parent != null) out.put("name", word);
         out.put("description", description);
         out.put("epilog", epilog);
         List<Object> argList = new ArrayList<>();
@@ -939,6 +1155,7 @@ public class Cli {
             m.put("required", o.required);
             m.put("validation", r);
             m.put("choices", r.startsWith("choice:") ? splitAll(r.substring(7), ",") : List.of());
+            m.put("secret", o.secret);
             optList.add(m);
         }
         out.put("options", optList);
@@ -951,7 +1168,12 @@ public class Cli {
             cmdList.add(m);
         }
         out.put("requiredCommands", cmdList);
-        return Json.write(out);
+        out.put("effects", effects);
+        out.put("constraints", constraints);
+        out.put("stdin", stdin);
+        out.put("stdout", stdout);
+        out.put("commands", children.stream().map(Cli::schemaNode).toList());
+        return out;
     }
 
     /**
@@ -964,10 +1186,31 @@ public class Cli {
         return template.replace("__CLYOPS_FUNC__", name.replaceAll("[^A-Za-z0-9_]", "_")).replace("__CLYOPS_PROG__", name);
     }
 
-    /** Tab-separated completion records (spec section 9). */
-    public String completionData() {
+    /** Tab-separated completion records (spec section 9) for the program itself. */
+    public String completionData() { return completionData(List.of()); }
+
+    /**
+     * Tab-separated completion records (spec section 9). {@code words} are the words typed
+     * after the program name; a program with commands follows them.
+     */
+    public String completionData(List<String> words) {
         ensureHelp();
         List<String> lines = new ArrayList<>(List.of("#clyops-completion 1"));
+        Cli node = this;
+        if (!children.isEmpty()) {
+            int skip = 0;
+            for (String w : words) {
+                Cli child = node.children.stream().filter(c -> c.word.equals(w)).findFirst().orElse(null);
+                if (child == null) break;
+                node = child;
+                skip++;
+            }
+            if (!node.children.isEmpty() && skip < words.size() && !words.get(skip).startsWith("-")) return lines.get(0) + "\n";
+            lines.add("skip\t" + skip);
+            for (Cli c : node.children) lines.add("cmd\t" + c.word + "\t" + clean(c.description));
+        }
+        List<Option> options = new ArrayList<>();
+        for (Cli n = node; n != null; n = n.parent) options.addAll(n.options);
         for (Option o : options) {
             String shrt = o.shrt.isEmpty() ? "-" : "-" + o.shrt;
             String desc = clean(o.description);
@@ -979,7 +1222,7 @@ public class Cli {
             }
             if (o.boolLike()) lines.add("opt\t--no-" + o.lng + "\t-\tflag\tnone\t-\t" + desc);
         }
-        for (Argument a : args) {
+        for (Argument a : node.args) {
             String[] k = completionKind(a.rule(), List.of());
             lines.add("arg\t" + a.name() + "\t" + (a.variadic() ? "variadic" : "single") + "\t" + k[0] + "\t" + (k[1].isEmpty() ? "-" : k[1]) + "\t" + clean(a.description()));
         }

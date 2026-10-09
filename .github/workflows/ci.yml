@@ -172,7 +172,7 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "${{ matrix.java }}", cache: maven }
       - run: mvn -B -q package
-      - run: javac -Xlint:all,-serial -Werror -cp target/classes -d target/examples examples/Demo.java
+      - run: javac -Xlint:all,-serial -Werror -cp target/classes -d target/examples examples/Demo.java examples/Tasks.java
       - run: python3 ../../tools/conformance.py java
 
   dispatch:

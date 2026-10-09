@@ -37,7 +37,7 @@ build-go:
 
 build-java:
 	cd packages/java && mvn -q -B package -DskipTests \
-	  && javac -Xlint:all,-serial -Werror -cp target/classes -d target/examples examples/Demo.java
+	  && javac -Xlint:all,-serial -Werror -cp target/classes -d target/examples examples/Demo.java examples/Tasks.java
 
 build-dispatch:
 	cd apps/dispatch && cargo build
