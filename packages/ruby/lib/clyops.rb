@@ -769,8 +769,8 @@ module Clyops
     # Spec section 1.6: the first relationship that fails, from the program down.
     def check_constraints
       given = lambda do |long|
-        v = @raw[long]
-        %w[cli config env].include?(source(long)) && v != "false" && v != []
+        v = @values[@selected.find_option(long, false).var]
+        %w[cli config env].include?(source(long)) && v != false && v != []
       end
       chain.reverse.each do |node|
         node.constraints.each do |c|

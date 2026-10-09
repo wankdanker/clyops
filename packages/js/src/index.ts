@@ -606,8 +606,8 @@ export class Cli {
   /** Spec section 1.6: the first relationship that fails, from the program down. */
   private checkConstraints(): string | undefined {
     const given = (long: string): boolean => {
-      const v = this.raw.get(long);
-      return ['cli', 'config', 'env'].includes(this.source(long)) && v !== 'false' && !(Array.isArray(v) && v.length === 0);
+      const v = this.values[(this.selected.findOption(long, false) as OptionDef).varName];
+      return ['cli', 'config', 'env'].includes(this.source(long)) && v !== false && !(Array.isArray(v) && v.length === 0);
     };
     for (const node of this.chain().reverse()) {
       for (const c of node.constraints) {

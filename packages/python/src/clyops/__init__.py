@@ -613,8 +613,9 @@ class Cli:
     def _check_constraints(self) -> Optional[str]:
         """Spec section 1.6: the first relationship that fails, from the program down."""
         def given(long: str) -> bool:
-            v = self._raw.get(long)
-            return self.source(long) in ("cli", "config", "env") and v != "false" and v != []
+            opt = self._selected._find(long, False)
+            v = self.values.get(opt.var) if opt else None
+            return self.source(long) in ("cli", "config", "env") and v is not False and v != []
 
         for node in reversed(self._chain()):
             for c in node._constraints:

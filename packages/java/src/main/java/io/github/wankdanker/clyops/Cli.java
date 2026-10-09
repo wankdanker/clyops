@@ -643,9 +643,9 @@ public class Cli {
     }
 
     private boolean given(String lng) {
-        List<String> v = raw.get(lng);
-        return List.of("cli", "config", "env").contains(source(lng)) && v != null && !v.isEmpty()
-            && !(v.size() == 1 && v.get(0).equals("false") && selected.findOption(lng, false).kind.equals("flag"));
+        Object v = values.get(selected.findOption(lng, false).var);
+        return List.of("cli", "config", "env").contains(source(lng)) && !Boolean.FALSE.equals(v)
+            && !(v instanceof List<?> list && list.isEmpty());
     }
 
     /** Spec section 1.6: the first relationship that fails, from the program down. */

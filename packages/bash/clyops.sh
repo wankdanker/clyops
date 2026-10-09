@@ -797,7 +797,8 @@ clyops_parse() {
 # An option is given when set by cli, config or env, and not false or an empty list.
 _clyops_given() {
     case "${_CLYOPS_SRC[$1]:-}" in cli|config|env) ;; *) return 1 ;; esac
-    [[ "${_CLYOPS_KIND[$1]}" == flag ]] && { [[ "${_CLYOPS_RAW[$1]}" == true ]]; return; }
+    # Flags and bool options hold true/false once validated.
+    [[ "${_CLYOPS_KIND[$1]}" == flag || "${_CLYOPS_RULE[$1]}" == bool ]] && { [[ "${_CLYOPS_RAW[$1]}" != false ]]; return; }
     if [[ "${_CLYOPS_KIND[$1]}" == array ]]; then
         local -n _c_list="_CLYOPS_LIST_${_CLYOPS_INDEX[$1]}"
         (( ${#_c_list[@]} ))

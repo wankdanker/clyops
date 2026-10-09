@@ -863,8 +863,9 @@ func (c *Cli) chainConstraints() []constraint {
 // checkConstraints is spec section 1.6: the first relationship that fails.
 func (c *Cli) checkConstraints() string {
 	given := func(long string) bool {
-		s, v := c.Source(long), c.raw[long]
-		return (s == "cli" || s == "config" || s == "env") && len(v) > 0 && !(len(v) == 1 && v[0] == "false" && c.findSel(long).kind == "flag")
+		s, v := c.Source(long), c.Values[c.findSel(long).variable]
+		list, isList := v.([]any)
+		return (s == "cli" || s == "config" || s == "env") && v != false && !(isList && len(list) == 0)
 	}
 	for _, k := range c.chainConstraints() {
 		var on []string
