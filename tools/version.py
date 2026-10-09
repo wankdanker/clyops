@@ -15,10 +15,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # every file keeps its formatting.
 TOP = r'(?m)^  "version": "([^"]+)"'
 LOCK_ROOT = r'"packages": \{\n    "": \{\n      "name": "[^"]+",\n      "version": "([^"]+)"'
+# npm workspaces: their versions live in their package.json and the root lockfile.
+NPM_WORKSPACES = ["packages/js", "packages/tools"]
+LOCK_WS = r'"{}": \{{\n      "name": "[^"]+",\n      "version": "([^"]+)"'
 FILES = [
-    ("packages/js/package.json", TOP),
-    ("packages/js/package-lock.json", TOP),
-    ("packages/js/package-lock.json", LOCK_ROOT),
+    *[f for ws in NPM_WORKSPACES for f in ((f"{ws}/package.json", TOP), ("package-lock.json", LOCK_WS.format(ws)))],
     ("packages/python/pyproject.toml", r'(?m)^version = "([^"]+)"'),
     ("packages/python/src/clyops/__init__.py", r'(?m)^__version__ = "([^"]+)"'),
     ("packages/rust/Cargo.toml", r'(?m)^version = "([^"]+)"'),

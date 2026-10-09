@@ -494,3 +494,49 @@ running does:
   by the command's own records from `COMMAND --bash-completion -- REST...`; a
   nested dispatcher's `skip` is added to N;
 * at an unknown word: only the header.
+
+## 13. JSON input (`toArgv`)
+
+Programs that run clyops tools on someone else's behalf (an API, an MCP
+server, a job engine) take the input as a JSON object and turn it into a
+command line using the tool's `--help-json-schema` (section 8). The reference
+implementation is `toArgv` in [clyops-tools](../packages/tools).
+
+**Keys.** An option or argument is matched by the first key present among:
+its name with `-` replaced by `_` (`dry_run`), its literal name (`dry-run`),
+and, for options, its `variableName` in lower case (`dry_run`). Keys that
+match nothing are reported back to the caller, which decides whether that is
+an error. A `null` value is the same as leaving the key out.
+
+**Options** come first, in schema order:
+
+* a flag (`isFlag`, unless its choices are `true,false`) becomes `--name` when
+  the value is `true` or one of `true 1 yes on` (any case), and `--no-name`
+  otherwise, so `false` overrides a config file or environment variable;
+* any other option becomes `--name VALUE`, repeated for each element when the
+  value is an array (array options);
+* values are strings as given, numbers and booleans in their JSON spelling,
+  objects as JSON text.
+
+**Positionals** follow a `--` (only when there are any), so a value starting
+with `-` is never read as an option. Arguments are filled in schema order;
+an array fills a variadic. An argument left out before one that is given takes
+its `default`; without one, the input is an error
+(`ARG is given, so EARLIER must be too`).
+
+**Paths.** A caller may give a base directory: then relative values of path
+options and arguments (`path`, `file:*`, `dir:*`) are resolved against it,
+except `-`, URLs (`scheme://...`) and the `disabled`/`false` sentinels.
+Without one, the tool resolves them against its working directory as usual
+(section 6).
+
+**JSON Schema.** The input's JSON Schema has one property per argument and
+option (except `help`) under the key above. Types follow the validation rule:
+`int` → `integer` with `minimum`/`maximum` from the bounds, `float` →
+`number`, `port` → `integer` 1–65535, `bool` and flags → `boolean`, `choice` →
+string `enum`, `string:` bounds → `minLength`/`maxLength`, `regex:` →
+`pattern`, and `ip`, `hostname`, `url`, `email`, `uuid` and `date` → `pattern`
+with the section 5 regex; everything else is a string. Array options and
+variadics are arrays of that. Descriptions and typed defaults are carried
+over. Required arguments are required; options are not, since a tool may get
+a required option from its environment or a config file.

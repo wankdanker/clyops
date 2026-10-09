@@ -3,6 +3,13 @@
 All packages in this repository share one version. Each release's notes on GitHub come from its
 section here.
 
+## [Unreleased]
+
+- **clyops-tools** (npm): discover a directory of tools, load their schemas, map JSON input onto
+  a command line ([spec §13](spec/SPEC.md#13-json-input-toargv)), JSON Schema of that input, and
+  run them.
+- The JavaScript packages form one npm workspace at the repository root.
+
 ## [0.1.0] - 2026-10-08
 
 First release.

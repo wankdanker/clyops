@@ -121,6 +121,13 @@ completes group and command names, then the chosen command's own options. Withou
 file, an alias does the same: `alias mytool='clyops-dispatch --root ~/mytool/scripts --name mytool'`.
 It ships as a native binary for Linux, macOS and Windows in each release.
 
+## Node tooling
+
+[packages/tools](packages/tools) (`clyops-tools`) is the Node side of running clyops tools for
+someone else: it discovers a directory of tools the way clyops-dispatch does, reads their schemas,
+maps a JSON object onto a command line ([spec §13](spec/SPEC.md#13-json-input-toargv)) and gives the
+JSON Schema of that object.
+
 ## clyops runner
 
 [apps/runner](apps/runner) is a desktop app (Tauri + React) that lists the clyops tools in a
@@ -141,6 +148,7 @@ spec/
   conformance/            shared demo CLI definition, cases and golden outputs
 packages/
   js/                     TypeScript source -> ESM + CommonJS + .d.ts (npm: clyops)
+  tools/                  Node: discover, describe and run a directory of tools (npm: clyops-tools)
   bash/                   clyops.sh, a single sourceable file (Bash 4.3+)
   python/                 pure standard library (PyPI: clyops)
   rust/                   crate clyops (only dependency: regex)
@@ -205,7 +213,7 @@ matches every manifest, and attaches to one GitHub release:
   (`.dmg`), Windows x64 (`.msi`, setup `.exe`).
 - **clyops-dispatch** binaries for Linux x64/arm64, macOS universal and Windows x64.
 - **libclyops** prebuilt for Linux x64/arm64 and macOS universal, plus a source tarball.
-- The npm tarball, Python wheel and sdist, Rust `.crate` and `clyops.sh`.
+- The npm tarballs, Python wheel and sdist, Rust `.crate` and `clyops.sh`.
 - `SHA256SUMS`.
 
 Running the workflow by hand builds everything as a dry run without releasing. Publishing to

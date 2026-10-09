@@ -213,9 +213,8 @@ jobs:
         with: { python-version: "3.13" }
       - uses: dtolnay/rust-toolchain@stable
       - run: mkdir -p out
-      - name: npm package
-        working-directory: packages/js
-        run: npm ci && npm run build && npm pack --pack-destination ../../out
+      - name: npm packages
+        run: npm ci && npm run build --workspaces && npm pack --workspaces --pack-destination out
       - name: Python wheel and sdist
         run: pip install build && python -m build packages/python --outdir out
       - name: Rust crate

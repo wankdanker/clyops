@@ -8,6 +8,7 @@
 #   make check           all of the above
 #   make <lang>          build + unit tests + conformance for one package (js bash python rust c)
 #   make dispatch        build + test clyops-dispatch
+#   (js builds and tests every npm workspace: packages/js, packages/tools)
 
 IMPLS := js ts bash python rust c
 
@@ -18,8 +19,11 @@ all: build
 
 build: build-js build-rust build-c build-dispatch
 
-build-js:
-	cd packages/js && ( [ -d node_modules ] || npm ci ) && npm run build
+node_modules:
+	npm ci
+
+build-js: node_modules
+	npm run build --workspaces
 
 build-rust:
 	cd packages/rust && cargo build --examples
@@ -33,7 +37,7 @@ build-dispatch:
 test: test-js test-bash test-python test-rust test-c test-dispatch
 
 test-js: build-js
-	cd packages/js && npm test
+	npm test --workspaces
 
 test-bash:
 	bash packages/bash/test/test.sh
@@ -60,7 +64,7 @@ completions: build
 lint:
 	python3 tools/sync-completions.py --check
 	python3 tools/check-schema.py
-	cd packages/js && npm run typecheck
+	npm run typecheck --workspaces
 	cd packages/python && ruff check src tests examples && mypy src
 	cd packages/rust && cargo fmt --check && cargo clippy --all-targets -- -D warnings
 	cd apps/dispatch && cargo fmt --check && cargo clippy --all-targets -- -D warnings
@@ -86,7 +90,7 @@ c: test-c
 dispatch: build-dispatch test-dispatch
 
 clean:
-	cd packages/js && rm -rf dist
+	rm -rf packages/js/dist packages/tools/dist
 	cd packages/rust && cargo clean
 	cd apps/dispatch && cargo clean
 	$(MAKE) -C packages/c clean

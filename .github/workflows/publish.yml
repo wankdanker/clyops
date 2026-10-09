@@ -33,14 +33,14 @@ jobs:
     if: inputs.npm
     runs-on: ubuntu-latest
     permissions: { contents: read, id-token: write }
-    defaults: { run: { working-directory: packages/js } }
     steps:
       - uses: actions/checkout@v4
         with: { ref: "${{ inputs.tag }}" }
       - uses: actions/setup-node@v4
         with: { node-version: 22, registry-url: "https://registry.npmjs.org" }
-      - run: npm ci && npm run build && npm test
-      - run: npm publish --provenance --access public
+      - run: npm ci && npm run build --workspaces && npm test --workspaces
+      # Every workspace, in dependency order (npm follows the workspaces list).
+      - run: npm publish --workspaces --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
