@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/wankdanker/clyops.git", "directory": "packages/js" },
   "keywords": ["cli", "argv", "options", "parser", "argparse", "help", "completion"],
-  "engines": { "node": ">=18" },
+  "engines": { "node": ">=20" },
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",
   "types": "./dist/types/index.d.ts",

@@ -2,7 +2,7 @@
 
 One-line-per-option CLI parsing with validation, help text, config files, JSON schema, logging and
 shell completion. Written in TypeScript; ships CommonJS, ESM and type declarations. No runtime
-dependencies, Node 18+. See the [main README](https://github.com/wankdanker/clyops).
+dependencies, Node 20+. See the [main README](https://github.com/wankdanker/clyops).
 
 ```js
 #!/usr/bin/env node

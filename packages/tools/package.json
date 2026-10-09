@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/wankdanker/clyops.git", "directory": "packages/tools" },
   "keywords": ["clyops", "cli", "tools", "json-schema", "dispatcher"],
-  "engines": { "node": ">=18" },
+  "engines": { "node": ">=20" },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

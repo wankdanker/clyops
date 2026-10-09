@@ -47,8 +47,7 @@ export interface ToolsWatcher {
  * changes, calling `onChange` when the set of tools (or their schemas or
  * descriptions) differs. Changes are debounced, so a
  * burst of writes (an editor saving, a checkout) reloads once. A reload that
- * fails keeps the previous set and is reported to `onError`. Needs Node 20+
- * (recursive fs.watch) on Linux.
+ * fails keeps the previous set and is reported to `onError`.
  */
 export async function watchTools(
   root: string,

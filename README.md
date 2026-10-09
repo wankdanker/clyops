@@ -196,7 +196,7 @@ make rust           # build + test + conformance for one package (js, bash, pyth
 make dispatch       # build + test clyops-dispatch
 ```
 
-Requirements: Node 18+, Python 3.9+, Rust 1.70+, a C11 compiler, Bash 4.3+.
+Requirements: Node 20+, Python 3.9+, Rust 1.70+, a C11 compiler, Bash 4.3+.
 
 ### Adding or changing behavior
 

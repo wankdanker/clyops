@@ -28,7 +28,7 @@ const result = await run('./scripts/media/to-pcm.sh', argv, { timeoutMs: 60_000 
 | --- | --- |
 | `discover(root, {name?})` | The tree of groups and commands under a directory or a dispatcher definition file ([spec §12](../../spec/SPEC.md#12-dispatchers-clyops-dispatch)): `.clyops` descriptions and ignore lists, hidden files skipped, groups shadowing commands. Nested dispatchers are expanded into groups. Each command has a `kind`: `tool` (uses a clyops library), `dispatcher` or `other`. |
 | `loadTools(root, {name?, onError?})` | `{tree, tools}`: the tree, plus every `tool` with its schema loaded. |
-| `watchTools(root, {name?, debounceMs?, onChange?, onError?})` | `loadTools`, then reload on every change under the directory. `current()` is the latest set; `close()` stops watching. Node 20+ on Linux. |
+| `watchTools(root, {name?, debounceMs?, onChange?, onError?})` | `loadTools`, then reload on every change under the directory. `current()` is the latest set; `close()` stops watching. |
 | `runTool(tool, input, runOptions?)` | `toArgv` + `run`, with `ok` and `json` (stdout parsed, when it is JSON). |
 | `commands(group)` | Every command in a tree. |
 | `classify(file)` | `tool`, `dispatcher` or `other`. Only `tool`s should be run for their schema. |
@@ -38,4 +38,4 @@ const result = await run('./scripts/media/to-pcm.sh', argv, { timeoutMs: 60_000 
 | `run(file, argv, {cwd?, env?, timeoutMs?, signal?, onStdout?, onStderr?})` | Run a tool and collect its output. |
 | `tail(text, lines?)`, `shellQuote(argv)` | Helpers for error messages and logs. |
 
-ESM only, Node 18+.
+ESM only, Node 20+.

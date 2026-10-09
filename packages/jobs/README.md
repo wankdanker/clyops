@@ -80,4 +80,4 @@ await job.done;    // the task's result (rejects if it failed)
 queue.get(job.record.job_id)?.cancel();
 ```
 
-ESM only, Node 18+.
+ESM only, Node 20+.

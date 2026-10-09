@@ -23,7 +23,7 @@ first time, and on Windows choose **More info → Run anyway**.
 
 ## Development
 
-Requirements: Node 18+, Rust stable, and the [Tauri system dependencies](https://tauri.app/start/prerequisites/)
+Requirements: Node 20+, Rust stable, and the [Tauri system dependencies](https://tauri.app/start/prerequisites/)
 (on Debian/Ubuntu: `libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev`).
 
 ```sh

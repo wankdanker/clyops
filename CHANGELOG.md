@@ -16,7 +16,8 @@ section here.
   (`clyops-mcp --root DIR`) or streamable HTTP; clyops-api serves it at `/mcp`.
 - Hot reload: clyops-api and clyops-mcp follow the tools directory as tools are added, changed
   or removed (`watchTools` in clyops-tools); `--no-watch` turns it off.
-- The JavaScript packages form one npm workspace at the repository root.
+- The JavaScript packages form one npm workspace at the repository root, and all need Node 20+
+  (Node 18 is end-of-life).
 
 ## [0.1.0] - 2026-10-08
 

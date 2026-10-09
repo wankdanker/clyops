@@ -180,9 +180,7 @@ test('toJsonSchema', () => {
   assert.ok(p.no_cache && p.data_dir && p.key);
 });
 
-// Recursive fs.watch needs Node 20 on Linux.
-const old = Number(process.versions.node.split('.')[0]) < 20 && 'needs Node 20+';
-test('watchTools reloads when tools change', { timeout: 30_000, skip: old }, async () => {
+test('watchTools reloads when tools change', { timeout: 30_000 }, async () => {
   const root = tree();
   const sets = [];
   let wake = () => {};

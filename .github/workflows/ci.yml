@@ -35,7 +35,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        node: [18, 20, 22]
+        node: [20, 22]
         include:
           - { os: macos-latest, node: 22 }
     runs-on: ${{ matrix.os }}
@@ -49,11 +49,7 @@ jobs:
       - run: npm ci
       # Builds type-check too, in workspace order so each package sees the types it depends on.
       - run: npm run build --workspaces
-      # The servers (apps/api, apps/mcp) need Node 20+; on 18 only the libraries are tested.
       - run: npm test --workspaces
-        if: matrix.node != 18
-      - run: npm test -w packages/js -w packages/tools -w packages/jobs
-        if: matrix.node == 18
       - run: python3 tools/conformance.py js ts
 
   bash:

@@ -9,8 +9,6 @@ options, types, choices and ranges the tool validates, and nothing needs to be w
 npm install -g clyops-mcp
 ```
 
-Needs Node 20 or later.
-
 ## Local agent (stdio)
 
 ```sh
