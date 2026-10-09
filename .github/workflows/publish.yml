@@ -3,8 +3,10 @@ name: Publish
 # Publishes a released version to the package registries. Run it by hand after
 # the GitHub release exists (Actions → Publish → Run workflow).
 #
-# Needs: secret NPM_TOKEN (npm), secret CARGO_REGISTRY_TOKEN (crates.io), and
-# PyPI trusted publishing configured for this workflow with environment "pypi".
+# Needs: secret NPM_TOKEN (npm), secret CARGO_REGISTRY_TOKEN (crates.io), secret
+# RUBYGEMS_API_KEY (rubygems.org), and PyPI trusted publishing configured for
+# this workflow with environment "pypi". The Go module needs no publishing (the
+# release tags it), and the Java jar is attached to the GitHub release.
 
 on:
   workflow_dispatch:
@@ -22,6 +24,10 @@ on:
         default: true
       crates:
         description: Publish to crates.io
+        type: boolean
+        default: true
+      rubygems:
+        description: Publish to RubyGems
         type: boolean
         default: true
 
@@ -74,3 +80,17 @@ jobs:
       - name: clyops-dispatch
         working-directory: apps/dispatch
         run: cargo publish --locked
+
+  rubygems:
+    if: inputs.rubygems
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: packages/ruby } }
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ inputs.tag }}" }
+      - uses: ruby/setup-ruby@v1
+        with: { ruby-version: "3.3" }
+      - run: ruby -w test/test_clyops.rb && gem build clyops.gemspec
+      - run: gem push clyops-*.gem
+        env:
+          GEM_HOST_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}

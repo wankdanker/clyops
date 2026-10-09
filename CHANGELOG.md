@@ -5,6 +5,9 @@ section here.
 
 ## [Unreleased]
 
+- **Ruby** (`packages/ruby`, gem `clyops`) and **Java** (`packages/java`, Maven
+  `io.github.wankdanker:clyops`, Java 17+): the eighth and ninth implementations, standard
+  library only, passing the full conformance suite and the real-shell completion tests.
 - **Go** (`packages/go`): the seventh implementation, standard library only, passing the full
   conformance suite and the real-shell completion tests. Released as the Go module
   `github.com/wankdanker/clyops/packages/go`, tagged `packages/go/vX.Y.Z` with each release.

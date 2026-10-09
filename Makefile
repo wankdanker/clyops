@@ -6,18 +6,19 @@
 #   make completions     generated completion files are in sync + real-shell tests
 #   make lint            linters/formatters (where installed)
 #   make check           all of the above
-#   make <lang>          build + unit tests + conformance for one package (js bash python rust c go)
+#   make <lang>          build + unit tests + conformance for one package (js bash python rust c go ruby java)
 #   make dispatch        build + test clyops-dispatch
 #   (js builds and tests every npm workspace)
 
-IMPLS := js ts bash python rust c go
+IMPLS := js ts bash python rust c go ruby java
 
-.PHONY: all build test conformance completions lint check clean js bash python rust c go dispatch \
-        build-js build-rust build-c build-go build-dispatch test-js test-bash test-python test-rust test-c test-go test-dispatch
+.PHONY: all build test conformance completions lint check clean js bash python rust c go ruby java dispatch \
+        build-js build-rust build-c build-go build-java build-dispatch \
+        test-js test-bash test-python test-rust test-c test-go test-ruby test-java test-dispatch
 
 all: build
 
-build: build-js build-rust build-c build-go build-dispatch
+build: build-js build-rust build-c build-go build-java build-dispatch
 
 node_modules:
 	npm ci
@@ -34,10 +35,14 @@ build-c:
 build-go:
 	cd packages/go && go build -o build/demo ./examples/demo
 
+build-java:
+	cd packages/java && mvn -q -B package -DskipTests \
+	  && javac -Xlint:all,-serial -Werror -cp target/classes -d target/examples examples/Demo.java
+
 build-dispatch:
 	cd apps/dispatch && cargo build
 
-test: test-js test-bash test-python test-rust test-c test-go test-dispatch
+test: test-js test-bash test-python test-rust test-c test-go test-ruby test-java test-dispatch
 
 test-js: build-js
 	npm test --workspaces
@@ -56,6 +61,12 @@ test-c: build-c
 
 test-go:
 	cd packages/go && go test ./...
+
+test-ruby:
+	cd packages/ruby && ruby -w test/test_clyops.rb
+
+test-java:
+	cd packages/java && mvn -q -B test
 
 test-dispatch:
 	cd apps/dispatch && cargo test
@@ -97,6 +108,12 @@ c: test-c
 go: test-go build-go
 	python3 tools/conformance.py go
 
+ruby: test-ruby
+	python3 tools/conformance.py ruby
+
+java: test-java build-java
+	python3 tools/conformance.py java
+
 dispatch: build-dispatch test-dispatch
 
 clean:
@@ -104,4 +121,4 @@ clean:
 	cd packages/rust && cargo clean
 	cd apps/dispatch && cargo clean
 	$(MAKE) -C packages/c clean
-	rm -rf packages/go/build
+	rm -rf packages/go/build packages/java/target

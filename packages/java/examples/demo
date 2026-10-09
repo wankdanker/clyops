@@ -1,0 +1,4 @@
+#!/bin/sh
+# Run the Java conformance demo (build first: mvn -q package && javac, see the Makefile).
+here=$(cd "$(dirname "$0")/.." && pwd)
+exec java -cp "$here/target/classes:$here/target/examples" Demo "$@"

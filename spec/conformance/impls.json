@@ -5,5 +5,7 @@
   "python": ["python3", "packages/python/examples/demo.py"],
   "rust": ["packages/rust/target/debug/examples/demo"],
   "c": ["packages/c/build/demo"],
-  "go": ["packages/go/build/demo"]
+  "go": ["packages/go/build/demo"],
+  "ruby": ["ruby", "packages/ruby/examples/demo.rb"],
+  "java": ["packages/java/examples/demo"]
 }

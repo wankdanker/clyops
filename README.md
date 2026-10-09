@@ -5,8 +5,8 @@ once at the top of a program, and clyops handles the rest: parsing, validation,
 help text, config files, environment variables, a JSON schema of the interface,
 logging helpers and shell completion for bash, zsh and fish.
 
-The same behavior ships for **Bash, JavaScript, TypeScript, Python, Rust, C
-and Go**. Every implementation is checked against one shared [specification](spec/SPEC.md)
+The same behavior ships for **Bash, JavaScript, TypeScript, Python, Rust, C,
+Go, Ruby and Java**. Every implementation is checked against one shared [specification](spec/SPEC.md)
 and [conformance suite](spec/conformance/), so a tool keeps the same help
 output, error messages and completion when you port it from Bash to Rust.
 
@@ -27,6 +27,12 @@ clyops_opt(cli, "PORT", "port", "8080", .short_name = 'p', .description = "Serve
 ```
 ```go
 cli.Opt("PORT", "port", "p", "8080", "Server port", "Network", "port")       // Go
+```
+```ruby
+cli.opt "PORT", "port", "p", "8080", "Server port", "Network", "port"        # Ruby
+```
+```java
+cli.opt("PORT", "port", "p", "8080", "Server port", "Network", "port");     // Java
 ```
 
 ## A complete program
@@ -74,7 +80,7 @@ info(f"sending {args.SRC} to {args.HOST}:{args.PORT}")
 </table>
 
 Each package's README shows the same program in its own language:
-[JavaScript/TypeScript](packages/js) · [Bash](packages/bash) · [Python](packages/python) · [Rust](packages/rust) · [C](packages/c) · [Go](packages/go).
+[JavaScript/TypeScript](packages/js) · [Bash](packages/bash) · [Python](packages/python) · [Rust](packages/rust) · [C](packages/c) · [Go](packages/go) · [Ruby](packages/ruby) · [Java](packages/java).
 
 ## What you get
 
@@ -174,6 +180,8 @@ packages/
   rust/                   crate clyops (only dependency: regex)
   c/                      C11 + POSIX, Makefile and CMake
   go/                     Go module, standard library only (go get .../clyops/packages/go)
+  ruby/                   standard library only (RubyGems: clyops)
+  java/                   Java 17+, no dependencies (Maven: io.github.wankdanker:clyops)
 apps/
   api/                    clyops-api: a directory of tools as an HTTP API with OpenAPI (npm: clyops-api)
   mcp/                    clyops-mcp: a directory of tools as MCP tools for AI agents (npm: clyops-mcp)
@@ -196,11 +204,11 @@ make conformance    # shared suite against every implementation
 make completions    # completion files in sync + real-shell tests (needs zsh/fish for those shells)
 make lint           # tsc, ruff, mypy, rustfmt, clippy, shellcheck
 make check          # everything
-make rust           # build + test + conformance for one package (js, bash, python, rust, c)
+make rust           # build + test + conformance for one package (js, bash, python, rust, c, go, ruby, java)
 make dispatch       # build + test clyops-dispatch
 ```
 
-Requirements: Node 20+, Python 3.9+, Rust 1.70+, a C11 compiler, Go 1.21+, Bash 4.3+.
+Requirements: Node 20+, Python 3.9+, Rust 1.70+, a C11 compiler, Go 1.21+, Ruby 3.1+, Java 17+ with Maven, Bash 4.3+.
 
 ### Adding or changing behavior
 
@@ -236,13 +244,13 @@ matches every manifest, and attaches to one GitHub release:
   (`.dmg`), Windows x64 (`.msi`, setup `.exe`).
 - **clyops-dispatch** binaries for Linux x64/arm64, macOS universal and Windows x64.
 - **libclyops** prebuilt for Linux x64/arm64 and macOS universal, plus a source tarball.
-- The npm tarballs, Python wheel and sdist, Rust `.crate` and `clyops.sh`.
+- The npm tarballs, Python wheel and sdist, Rust `.crate`, Ruby `.gem`, Java `.jar` and `clyops.sh`.
 - The Go module is tagged `packages/go/vX.Y.Z` at the same commit, so `go get` resolves it.
 - `SHA256SUMS`.
 
 Running the workflow by hand builds everything as a dry run without releasing. Publishing to
-npm, PyPI and crates.io is a separate manual workflow ([publish.yml](.github/workflows/publish.yml)).
-It needs the `NPM_TOKEN` and `CARGO_REGISTRY_TOKEN` secrets, plus PyPI trusted publishing for
+npm, PyPI, crates.io and RubyGems is a separate manual workflow ([publish.yml](.github/workflows/publish.yml)).
+It needs the `NPM_TOKEN`, `CARGO_REGISTRY_TOKEN` and `RUBYGEMS_API_KEY` secrets, plus PyPI trusted publishing for
 `publish.yml` with environment `pypi`.
 
 ## License

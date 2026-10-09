@@ -40,6 +40,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-go@v5
         with: { go-version: stable, cache-dependency-path: packages/go/go.mod }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21, cache: maven }
+      - uses: ruby/setup-ruby@v1
+        with: { ruby-version: "3.3" }
       - id: version
         name: Version matches the tag
         run: |
@@ -222,6 +226,16 @@ jobs:
       - name: Rust crate
         working-directory: packages/rust
         run: cargo package && cp "target/package/clyops-$VERSION.crate" ../../out/
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21, cache: maven }
+      - uses: ruby/setup-ruby@v1
+        with: { ruby-version: "3.3" }
+      - name: Java jar
+        working-directory: packages/java
+        run: mvn -B -q package -DskipTests && cp "target/clyops-$VERSION.jar" ../../out/
+      - name: Ruby gem
+        working-directory: packages/ruby
+        run: gem build clyops.gemspec && mv "clyops-$VERSION.gem" ../../out/
       - name: Bash library and C sources
         run: |
           cp packages/bash/clyops.sh out/clyops.sh
