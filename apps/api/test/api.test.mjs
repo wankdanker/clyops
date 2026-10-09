@@ -204,3 +204,238 @@ test('watch: tools added and removed show up without a restart', { timeout: 60_0
     srv.close();
   }
 });
+
+// ---------------------------------------------------------------------------
+// Commands, stdin/stdout, multipart, keys and the other security options.
+
+import { request } from 'node:http';
+
+function jsTool(root, path, body) {
+  writeFileSync(join(root, path), `#!/usr/bin/env node\n// clyops-tool\nconst { Cli } = require(${JSON.stringify(join(repo, 'packages/js/dist/cjs/index.js'))});\n${body}`);
+  chmodSync(join(root, path), 0o755);
+}
+
+function streamsTree() {
+  const root = tree();
+  writeFileSync(join(root, 'tasks'), `#!/bin/sh\n# clyops-tool\nexec node ${join(repo, 'packages/js/examples/tasks.cjs')} "$@"\n`);
+  chmodSync(join(root, 'tasks'), 0o755);
+  // Echoes stdin back as its declared image/png output, or fails first.
+  jsTool(root, 'media/png', `const cli = new Cli({ name: 'png' });
+cli.setStdin('Text', 'text/plain'); cli.setStdout('Picture', 'image/png'); cli.setEffects('read-only');
+cli.opt('FAIL', 'fail', '', 'flag', 'Fail before writing');
+const v = cli.run();
+if (v.FAIL) { console.error('broken'); process.exit(3); }
+process.stdin.pipe(process.stdout);
+process.stdin.on('end', () => console.error('done'));
+`);
+  // Upper-cases stdin (or a file), with a prefix and a repeat count.
+  jsTool(root, 'upper', `const cli = new Cli({ name: 'upper' });
+cli.setStdin('Text', 'text/plain');
+cli.opt('PREFIX', 'prefix', '', '', 'Prefix');
+cli.opt('COUNT', 'count', '', '1', 'Repeats', 'Options', 'int:1-5');
+cli.opt('FILE', 'file', '', 'optional', 'Read this instead of stdin', 'Options', 'file:readable');
+cli.optArray('TAG', 'tag', '', 'Tags');
+const v = cli.run();
+const read = v.FILE ? require('fs').createReadStream(v.FILE) : process.stdin;
+let text = '';
+read.on('data', (d) => (text += d));
+read.on('end', () => process.stdout.write(JSON.stringify({ out: (v.PREFIX + text.toUpperCase()).repeat(v.COUNT), tags: v.TAG })));
+`);
+  return root;
+}
+
+async function serve(opts) {
+  const api = await createApi(opts);
+  const srv = api.app.listen(0);
+  return { at: `http://127.0.0.1:${srv.address().port}`, close: () => { srv.closeAllConnections(); srv.close(); }, api };
+}
+
+// A raw request, for the response trailers.
+function raw(url, { method = 'POST', headers = {}, body } = {}) {
+  return new Promise((resolve, reject) => {
+    const req = request(url, { method, headers }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, trailers: res.trailers, body: Buffer.concat(chunks) }));
+    });
+    req.on('error', reject);
+    req.end(body);
+  });
+}
+
+test('a program\'s commands are endpoints of their own', async () => {
+  const s = await serve({ root: streamsTree(), cwd: tmpdir() });
+  try {
+    const paths = (await (await fetch(`${s.at}/tools`)).json()).map((t) => t.path);
+    assert.deepEqual(paths.filter((p) => p.startsWith('/tools/tasks')), ['/tools/tasks/db/migrate', '/tools/tasks/db/status', '/tools/tasks/send']);
+    const res = await fetch(`${s.at}/tools/tasks/db/migrate`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"target":"4","dry_run":true}' });
+    const body = await res.json();
+    assert.equal(body.ok, true, body.stderr);
+    assert.deepEqual(body.json.values.command, ['db', 'migrate']);
+    assert.equal(body.json.values.target, '4');
+  } finally {
+    s.close();
+  }
+});
+
+test('declared binary stdout streams, with the exit status as a trailer', async () => {
+  const s = await serve({ root: streamsTree(), cwd: tmpdir() });
+  try {
+    const res = await raw(`${s.at}/tools/media/png`, { headers: { 'content-type': 'text/plain' }, body: 'hello' });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers['content-type'], 'image/png');
+    assert.equal(res.headers['transfer-encoding'], 'chunked');
+    assert.equal(res.body.toString(), 'hello');
+    assert.deepEqual(res.trailers, { 'x-clyops-exit-code': '0', 'x-clyops-stderr': 'done' });
+
+    const asJson = await (await fetch(`${s.at}/tools/media/png`, { method: 'POST', headers: { 'content-type': 'text/plain', accept: 'application/json' }, body: 'hi' })).json();
+    assert.deepEqual([asJson.ok, asJson.stdoutEncoding, Buffer.from(asJson.stdout, 'base64').toString()], [true, 'base64', 'hi']);
+
+    const failed = await fetch(`${s.at}/tools/media/png?fail=true`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'x' });
+    assert.equal(failed.status, 500);
+    const why = await failed.json();
+    assert.deepEqual([why.ok, why.exitCode], [false, 3]);
+    assert.match(why.stderr, /broken/);
+
+    const viaJson = await fetch(`${s.at}/tools/media/png`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    assert.equal(viaJson.headers.get('content-type'), 'image/png', 'a JSON body still streams declared binary output');
+  } finally {
+    s.close();
+  }
+});
+
+test('a non-JSON body is stdin and the query string the input', async () => {
+  const s = await serve({ root: streamsTree(), cwd: tmpdir() });
+  try {
+    const post = (query, body, type = 'text/plain') => fetch(`${s.at}/tools/upper?${query}`, { method: 'POST', headers: { 'content-type': type }, body });
+    const ok = await (await post('prefix=%3E&count=2&tag=a&tag=b', 'hi')).json();
+    assert.equal(ok.ok, true, ok.stderr);
+    assert.deepEqual(ok.json, { out: '>HI>HI', tags: ['a', 'b'] });
+    const bad = await post('prefix=x&count=abc&bogus=1', 'hi');
+    assert.equal(bad.status, 400);
+    const issues = (await bad.json()).issues.map((i) => i.path.join('.') || i.keys?.join(','));
+    assert.ok(issues.includes('count') && issues.includes('bogus'), issues.join());
+    const raw = await (await fetch(`${s.at}/tools/upper?prefix=-`, { method: 'POST', headers: { 'content-type': 'text/plain', accept: 'application/octet-stream' }, body: 'x' })).text();
+    assert.equal(raw, '{"out":"-X","tags":[]}', 'Accept: application/octet-stream streams undeclared output');
+  } finally {
+    s.close();
+  }
+});
+
+test('multipart: args, stdin and files for path inputs, within the body limit', async () => {
+  const s = await serve({ root: streamsTree(), cwd: tmpdir(), maxBody: 1000 });
+  try {
+    const form = new FormData();
+    form.set('args', JSON.stringify({ prefix: '#', count: 1 }));
+    form.set('file', new Blob(['from a file']), 'in.txt');
+    const res = await (await fetch(`${s.at}/tools/upper`, { method: 'POST', body: form })).json();
+    assert.equal(res.ok, true, res.stderr);
+    assert.equal(res.json.out, '#FROM A FILE');
+
+    const stdinForm = new FormData();
+    stdinForm.set('args', '{"prefix":"="}');
+    stdinForm.set('stdin', new Blob(['piped']), 'stdin.txt');
+    assert.equal((await (await fetch(`${s.at}/tools/upper`, { method: 'POST', body: stdinForm })).json()).json.out, '=PIPED');
+
+    const big = new FormData();
+    big.set('args', '{"prefix":"="}');
+    big.set('stdin', new Blob(['x'.repeat(5000)]), 'big');
+    assert.equal((await fetch(`${s.at}/tools/upper`, { method: 'POST', body: big })).status, 413);
+  } finally {
+    s.close();
+  }
+});
+
+test('async jobs spool stdin and serve binary output', { timeout: 30_000 }, async () => {
+  const s = await serve({ root: streamsTree(), cwd: tmpdir() });
+  try {
+    const res = await fetch(`${s.at}/tools/media/png?async=true`, { method: 'POST', headers: { 'content-type': 'image/png' }, body: 'later' });
+    assert.equal(res.status, 202);
+    const { job_id: id } = await res.json();
+    let job;
+    for (let i = 0; i < 100 && job?.status !== 'done'; i += 1) {
+      await new Promise((r) => setTimeout(r, 50));
+      job = await (await fetch(`${s.at}/jobs/${id}`)).json();
+    }
+    assert.equal(job.status, 'done');
+    assert.equal(job.result.stdoutUrl, `/jobs/${id}/stdout`);
+    const out = await fetch(`${s.at}${job.result.stdoutUrl}`);
+    assert.equal(out.headers.get('content-type'), 'image/png');
+    assert.equal(await out.text(), 'later');
+    assert.equal((await fetch(`${s.at}/jobs/nope/stdout`)).status, 404);
+  } finally {
+    s.close();
+  }
+});
+
+test('named keys: per-key tools, jobs and MCP; audit names the key', { timeout: 60_000 }, async () => {
+  const entries = [];
+  const s = await serve({
+    root: streamsTree(), cwd: tmpdir(), apiKey: 'admin',
+    keys: { ci: { key: 'c1', allow: ['media/**'] }, ops: { key: 'o1', deny: ['media/**'] } },
+    audit: (e) => entries.push(e),
+  });
+  const as = (key) => ({ authorization: `Bearer ${key}` });
+  try {
+    const list = async (key) => (await (await fetch(`${s.at}/tools`, { headers: as(key) })).json()).map((t) => t.path);
+    assert.deepEqual(await list('c1'), ['/tools/media/demo', '/tools/media/png']);
+    assert.ok((await list('o1')).includes('/tools/tasks/send') && !(await list('o1')).includes('/tools/media/demo'));
+    assert.equal((await list('admin')).length, 7);
+    assert.equal((await fetch(`${s.at}/tools`, { headers: as('nope') })).status, 401);
+    const forbidden = await fetch(`${s.at}/tools/tasks/db/status`, { method: 'POST', headers: { ...as('c1'), 'content-type': 'application/json' }, body: '{}' });
+    assert.equal(forbidden.status, 403);
+
+    const job = await (await fetch(`${s.at}/tools/media/demo?async=true`, { method: 'POST', headers: { ...as('c1'), 'content-type': 'application/json' }, body: '{"input":"x"}' })).json();
+    assert.equal(job.key, 'ci');
+    assert.equal((await fetch(`${s.at}/jobs/${job.job_id}`, { headers: as('o1') })).status, 404, 'another key does not see the job');
+    assert.ok((await (await fetch(`${s.at}/jobs`, { headers: as('c1') })).json()).some((j) => j.job_id === job.job_id));
+
+    const client = new Client({ name: 'test', version: '1' });
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${s.at}/mcp`), { requestInit: { headers: as('c1') } }));
+    assert.deepEqual((await client.listTools()).tools.map((t) => t.name).sort(), ['media_demo', 'media_png']);
+    await client.callTool({ name: 'media_png', arguments: { stdin: 'x' } });
+    await client.close();
+    for (let i = 0; i < 50 && entries.length < 2; i += 1) await new Promise((r) => setTimeout(r, 50));
+    assert.deepEqual(entries.map((e) => [e.key, e.tool, e.via]).sort(), [['ci', 'media demo', 'api'], ['ci', 'media png', 'mcp']]);
+  } finally {
+    s.close();
+  }
+});
+
+test('paths-within, exclusive options and secrets in the response', async () => {
+  const root = streamsTree();
+  const s = await serve({ root, cwd: root, within: [root] });
+  try {
+    const post = (body) => fetch(`${s.at}/tools/media/demo`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const outside = await post({ input: 'in.txt', src: '/etc/passwd' });
+    assert.equal(outside.status, 400);
+    assert.match((await outside.json()).error, /--src: \/etc\/passwd is outside the allowed directories/);
+    const both = await post({ input: 'in.txt', endpoint: 'https://x.example', addr: '10.0.0.1' });
+    assert.equal(both.status, 400);
+    assert.match(JSON.stringify(await both.json()), /--endpoint and --addr cannot be used together/);
+    const secret = await (await post({ input: 'in.txt', key: 'hunter2' })).json();
+    assert.equal(secret.ok, true, secret.stderr);
+    assert.equal(secret.json.values.KEY, '***');
+    assert.equal(secret.json.sources.key, 'env', 'secrets are passed in the environment');
+    assert.ok(!JSON.stringify(secret.command).includes('hunter2'));
+  } finally {
+    s.close();
+  }
+});
+
+test('OpenAPI documents stdin, multipart, binary output and effects', async () => {
+  const s = await serve({ root: streamsTree(), cwd: tmpdir(), filter: { deny: ['tasks/send'] } });
+  try {
+    const doc = await (await fetch(`${s.at}/openapi.json`)).json();
+    const png = doc.paths['/tools/media/png'].post;
+    assert.deepEqual(png['x-clyops-effects'], ['read-only']);
+    assert.deepEqual(Object.keys(png.requestBody.content).sort(), ['application/json', 'multipart/form-data', 'text/plain']);
+    assert.equal(png.responses['200'].content['image/png'].schema.format, 'binary');
+    assert.ok(png.parameters.some((p) => p.in === 'query' && p.name === 'fail'));
+    assert.deepEqual(doc.paths['/tools/tasks/db/migrate'].post['x-clyops-effects'], ['destructive']);
+    assert.equal(doc.paths['/tools/tasks/send'], undefined, 'the filter applies');
+    assert.ok(doc.paths['/jobs/{id}/stdout'].get);
+  } finally {
+    s.close();
+  }
+});
