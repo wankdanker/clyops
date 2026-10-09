@@ -1,0 +1,232 @@
+// An HTTP API over a directory of clyops tools: one POST endpoint per tool,
+// validated and documented from its --help-json-schema.
+import { commands, discover, loadSchema, run, toArgv, toJsonSchema, type Command, type Group, type RunResult, type Schema } from 'clyops-tools';
+import { JobQueue, type JobRecord } from 'clyops-jobs';
+import express, { type NextFunction, type Request, type Response } from 'express';
+import { plus, z } from 'plus-express';
+import { toZod } from './zod.js';
+
+export interface ApiOptions {
+  /** Tools directory or dispatcher definition file. */
+  root: string;
+  /** API title (default: the root's name). */
+  name?: string;
+  /** Working directory tools run in (default: the server's). */
+  cwd?: string;
+  /** Required as `Authorization: Bearer KEY` or `X-API-Key: KEY` when set. */
+  apiKey?: string;
+  /** Kill a tool after this long (0: never). */
+  timeoutMs?: number;
+  /** Async jobs run at the same time (default: the number of CPUs). */
+  concurrency?: number;
+  version?: string;
+}
+
+/** A tool the API serves. */
+export interface Tool extends Command {
+  schema: Schema;
+  /** URL path of its endpoint, `/tools/<group>/.../<name>`. */
+  path: string;
+  description: string;
+}
+
+export interface RunResponse extends RunResult {
+  ok: boolean;
+  /** stdout parsed as JSON, when it is JSON. */
+  json?: unknown;
+}
+
+/** The tools under `root` with their schemas. Tools whose schema can't be read are skipped. */
+export async function loadTools(root: string, opts: { name?: string; onError?: (cmd: Command, err: Error) => void } = {}): Promise<{ tree: Group; tools: Tool[] }> {
+  const tree = discover(root, { name: opts.name });
+  const loaded = await Promise.all(
+    commands(tree)
+      .filter((cmd) => cmd.kind === 'tool')
+      .map(async (cmd) => {
+        try {
+          const schema = await loadSchema(cmd.file);
+          return { ...cmd, schema, path: `/tools/${cmd.words.join('/')}`, description: schema.description.split('\n')[0] };
+        } catch (err) {
+          opts.onError?.(cmd, err as Error);
+          return undefined;
+        }
+      }),
+  );
+  return { tree, tools: loaded.filter((t): t is Tool => Boolean(t)) };
+}
+
+/** Run a tool with JSON input. */
+export async function runTool(tool: Tool, input: Record<string, unknown>, opts: { cwd?: string; timeoutMs?: number; signal?: AbortSignal } = {}): Promise<RunResponse> {
+  const { argv } = toArgv(tool.schema, input);
+  const result = await run(tool.file, argv, opts);
+  const out: RunResponse = { ...result, ok: result.exitCode === 0 };
+  try {
+    if (result.stdout.trim()) out.json = JSON.parse(result.stdout);
+  } catch {
+    // not JSON: stdout is still there as text
+  }
+  return out;
+}
+
+const RunResponseSchema = z.object({
+  ok: z.boolean(),
+  exitCode: z.number().int().nullable(),
+  signal: z.string().nullable(),
+  timedOut: z.boolean(),
+  stdout: z.string(),
+  stderr: z.string(),
+  durationMs: z.number(),
+  command: z.array(z.string()),
+  json: z.unknown().optional(),
+});
+
+const JobSchema = z.object({
+  job_id: z.string(),
+  function: z.string(),
+  status: z.enum(['pending', 'processing', 'done', 'error']),
+  stage: z.string().nullable(),
+  started_at: z.string(),
+  updated_at: z.string(),
+  completed_at: z.string().nullable(),
+  error: z.string().nullable(),
+  result: RunResponseSchema.optional(),
+}).passthrough();
+
+const ErrorSchema = z.object({ error: z.string(), issues: z.unknown().optional() });
+const json = (schema: z.ZodType, description: string) => ({ description, content: { 'application/json': { schema } } });
+
+/**
+ * Build the Express app. Routes are fixed when it is built: restart (or build
+ * a new app) to pick up added or changed tools.
+ */
+export async function createApi(opts: ApiOptions) {
+  const { tree, tools } = await loadTools(opts.root, {
+    name: opts.name,
+    onError: (cmd, err) => process.emitWarning(`skipping ${cmd.words.join(' ')}: ${err.message}`),
+  });
+  const queue = new JobQueue<RunResponse>({ concurrency: opts.concurrency });
+  const { app, registry } = plus(express(), {
+    openApiConfig: {
+      openapi: '3.0.0',
+      info: { title: tree.name, version: opts.version ?? '0.0.0', description: tree.description || `clyops tools in ${tree.dir}` },
+    },
+  });
+  app.use(express.json({ limit: '10mb' }));
+
+  if (opts.apiKey) {
+    registry.registerSecurityScheme('apiKey', { type: 'http', scheme: 'bearer' });
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      const given = req.get('x-api-key') ?? req.get('authorization')?.replace(/^Bearer\s+/i, '');
+      if (given === opts.apiKey) return next();
+      res.status(401).json({ error: 'missing or wrong API key' });
+    });
+  }
+
+  const jobView = (record: JobRecord, result?: RunResponse) => ({ ...record, ...(result ? { result } : {}) });
+
+  app.get('/openapi.json', (_req: Request, res: Response) => {
+    res.json(registry.generateOpenAPIDocument(opts.apiKey ? { security: [{ apiKey: [] }] } : {}));
+  });
+
+  app.get(
+    {
+      path: '/tools',
+      summary: 'List the tools',
+      tags: ['tools'],
+      responses: { 200: json(z.array(z.object({ name: z.string(), words: z.array(z.string()), path: z.string(), description: z.string() })), 'The tools') },
+    },
+    (_req: Request, res: Response) => {
+      res.json(tools.map((t) => ({ name: t.name, words: t.words, path: t.path, description: t.description })));
+    },
+  );
+
+  for (const tool of tools) {
+    const inputSchema = toJsonSchema(tool.schema);
+    const tag = tool.words.length > 1 ? tool.words.slice(0, -1).join(' ') : 'tools';
+    app.get(
+      {
+        path: tool.path,
+        summary: `Describe ${tool.words.join(' ')}`,
+        tags: [tag],
+        responses: { 200: json(z.object({ schema: z.unknown(), input: z.unknown() }), 'The tool\'s clyops schema and the JSON Schema of its input') },
+      },
+      (_req: Request, res: Response) => {
+        res.json({ schema: tool.schema, input: inputSchema });
+      },
+    );
+    app.post(
+      {
+        path: tool.path,
+        operationId: tool.words.join('_').replace(/[^A-Za-z0-9_]/g, '_'),
+        summary: tool.description || tool.words.join(' '),
+        description: [tool.schema.description, tool.schema.epilog].filter(Boolean).join('\n\n'),
+        tags: [tag],
+        body: toZod(inputSchema),
+        query: z.object({ async: z.enum(['true', 'false']).optional().openapi({ description: 'Return a job id at once instead of waiting' }) }),
+        responses: {
+          200: json(RunResponseSchema, 'The tool ran; `ok` is false when it exited non-zero'),
+          202: json(JobSchema, 'Queued (with `?async=true`); poll `GET /jobs/{id}`'),
+          400: json(ErrorSchema, 'Invalid input'),
+        },
+      },
+      async (req: Request, res: Response, next: NextFunction) => {
+        const input = (req.body ?? {}) as Record<string, unknown>;
+        try {
+          if (req.query.async === 'true') {
+            const job = queue.add(tool.words.join(' '), ({ signal }) => runTool(tool, input, { cwd: opts.cwd, timeoutMs: opts.timeoutMs, signal }));
+            res.status(202).location(`/jobs/${job.record.job_id}`).json(jobView(job.record));
+            return;
+          }
+          // A client that goes away stops the tool.
+          const abort = new AbortController();
+          res.on('close', () => !res.writableEnded && abort.abort());
+          res.json(await runTool(tool, input, { cwd: opts.cwd, timeoutMs: opts.timeoutMs, signal: abort.signal }));
+        } catch (err) {
+          next(err);
+        }
+      },
+    );
+  }
+
+  const JobParams = z.object({ id: z.string() });
+  app.get(
+    { path: '/jobs', summary: 'List jobs', tags: ['jobs'], responses: { 200: json(z.array(JobSchema), 'Recent jobs, without results') } },
+    (_req: Request, res: Response) => {
+      res.json(queue.list());
+    },
+  );
+  app.get(
+    { path: '/jobs/:id', summary: 'A job, with its result once done', tags: ['jobs'], params: JobParams, responses: { 200: json(JobSchema, 'The job'), 404: json(ErrorSchema, 'No such job') } },
+    (req: Request, res: Response) => {
+      const job = queue.get(String(req.params.id));
+      if (!job) return void res.status(404).json({ error: `no job ${req.params.id}` });
+      res.json(jobView(job.record, job.result));
+    },
+  );
+  app.delete(
+    { path: '/jobs/:id', summary: 'Cancel a job', tags: ['jobs'], params: JobParams, responses: { 202: json(JobSchema, 'Cancelling'), 404: json(ErrorSchema, 'No such job') } },
+    (req: Request, res: Response) => {
+      const job = queue.get(String(req.params.id));
+      if (!job) return void res.status(404).json({ error: `no job ${req.params.id}` });
+      job.cancel();
+      res.status(202).json(jobView(job.record));
+    },
+  );
+
+  app.use(errorHandler);
+  return { app, registry, tree, tools, queue };
+}
+
+/** Errors as JSON: validation failures (400) with zod's issues, anything else 500. */
+export function errorHandler(err: Error & { status?: number; errors?: unknown }, _req: Request, res: Response, _next: NextFunction): void {
+  const status = err.status ?? 500;
+  let issues = err.errors;
+  if (typeof issues === 'string') {
+    try {
+      issues = JSON.parse(issues);
+    } catch {
+      // plain message
+    }
+  }
+  res.status(status).json({ error: err.message, ...(issues !== undefined ? { issues } : {}) });
+}

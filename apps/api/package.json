@@ -1,0 +1,56 @@
+{
+  "name": "clyops-api",
+  "version": "0.1.0",
+  "description": "Serve a directory of clyops tools as an HTTP API: an endpoint per tool, validated and documented in OpenAPI from its schema, with sync and async (job) runs.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wankdanker/clyops.git",
+    "directory": "apps/api"
+  },
+  "keywords": [
+    "clyops",
+    "api",
+    "openapi",
+    "express",
+    "cli",
+    "tools"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "type": "module",
+  "bin": {
+    "clyops-api": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test test/*.test.mjs",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "dependencies": {
+    "clyops": "0.1.0",
+    "clyops-jobs": "0.1.0",
+    "clyops-tools": "0.1.0",
+    "express": "^5.2.1",
+    "plus-express": "^2.1.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}

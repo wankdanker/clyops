@@ -52,6 +52,8 @@ export class JobQueue<R = unknown> {
         update({ status: 'processing' });
         const result = await task({ signal: abort.signal, stage: (stage) => update({ status: 'processing', stage }) });
         job.result = result;
+        // A cancelled task that still returns (a killed tool) is cancelled all the same.
+        abort.signal.throwIfAborted();
         update({ status: 'done', completedAt: timestampIso() });
         return result;
       } catch (err) {

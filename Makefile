@@ -61,7 +61,7 @@ completions: build
 	python3 tools/sync-completions.py --check
 	@for impl in $(IMPLS); do tools/test-completions.sh $$impl || exit 1; done
 
-lint:
+lint: build-js
 	python3 tools/sync-completions.py --check
 	python3 tools/check-schema.py
 	npm run typecheck --workspaces

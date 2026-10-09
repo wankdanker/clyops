@@ -10,6 +10,8 @@ section here.
   run them.
 - **clyops-jobs** (npm): a job engine for clyops tools: config-bound functions with templated
   options, artifacts, job records and an in-memory queue.
+- **clyops-api** (npm): serve a directory of tools as an HTTP API, with an endpoint per tool,
+  request validation and an OpenAPI document from each tool's schema, and async jobs.
 - The JavaScript packages form one npm workspace at the repository root.
 
 ## [0.1.0] - 2026-10-08

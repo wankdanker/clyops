@@ -47,7 +47,7 @@ jobs:
           cache: npm
       # Every npm workspace: clyops (packages/js) and the Node tooling built on it.
       - run: npm ci
-      - run: npm run typecheck --workspaces
+      # Builds type-check too, in workspace order so each package sees the types it depends on.
       - run: npm run build --workspaces
       - run: npm test --workspaces
       - run: python3 tools/conformance.py js ts

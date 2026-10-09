@@ -16,7 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOP = r'(?m)^  "version": "([^"]+)"'
 LOCK_ROOT = r'"packages": \{\n    "": \{\n      "name": "[^"]+",\n      "version": "([^"]+)"'
 # npm workspaces: their versions live in their package.json and the root lockfile.
-NPM_WORKSPACES = ["packages/js", "packages/tools", "packages/jobs"]
+NPM_WORKSPACES = ["packages/js", "packages/tools", "packages/jobs", "apps/api"]
 LOCK_WS = r'"{}": \{{\n      "name": "[^"]+",\n      "version": "([^"]+)"'
 FILES = [
     *[f for ws in NPM_WORKSPACES for f in ((f"{ws}/package.json", TOP), ("package-lock.json", LOCK_WS.format(ws)))],

@@ -129,6 +129,13 @@ maps a JSON object onto a command line ([spec §13](spec/SPEC.md#13-json-input-t
 JSON Schema of that object. [packages/jobs](packages/jobs) (`clyops-jobs`) runs tools as jobs:
 functions bound to tools in a JSON config, templated options, artifacts, job records and a queue.
 
+## clyops-api
+
+[apps/api](apps/api) serves a directory of tools over HTTP: `clyops-api --root ~/mytool/scripts`
+makes `POST /tools/media/to-pcm` run `media/to-pcm.sh` with a JSON body validated against the
+tool's schema, waiting for it or (`?async=true`) returning a job to poll, and publishes the whole
+thing as an OpenAPI document at `/openapi.json`.
+
 ## clyops runner
 
 [apps/runner](apps/runner) is a desktop app (Tauri + React) that lists the clyops tools in a
@@ -156,6 +163,7 @@ packages/
   rust/                   crate clyops (only dependency: regex)
   c/                      C11 + POSIX, Makefile and CMake
 apps/
+  api/                    clyops-api: a directory of tools as an HTTP API with OpenAPI (npm: clyops-api)
   dispatch/               clyops-dispatch: a directory of tools as one command with subcommands
   runner/                 desktop UI for clyops tools (Tauri + React)
 tools/
