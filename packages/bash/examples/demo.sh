@@ -7,6 +7,9 @@ clyops_root "${DEMO_ROOT:-$PWD}"
 clyops_description "Demo program for the clyops conformance suite. It registers one of every kind of option and argument so that each implementation can be checked against the same help text, schema and resolved values."
 clyops_epilog $'Examples:\n  demo in.txt slow a b --tag x --tag y\n  demo in.txt -vc demo.conf'
 clyops_require_command sh "POSIX shell" "install dash"
+clyops_effects idempotent network
+clyops_stdin  "Lines to process" text/plain
+clyops_stdout "The resolved values" application/json
 
 clyops_arg          input "Input file" "" path
 clyops_arg          mode  "Processing mode" fast "choice:fast,slow"
@@ -23,7 +26,7 @@ clyops_opt       RATIO    ratio    "" 0.5      "Mix ratio"             Options  
 clyops_opt       ENABLED  enabled  "" true     "Enable processing"     Options    bool
 clyops_opt_array TAG      tag      t           "Tag to attach"         Options    "string:1-8"
 clyops_opt       NO_CACHE no-cache "" flag     "Disable the cache"     Options
-clyops_opt       KEY      key      k ""        "API key"               Auth
+clyops_opt       KEY      key      k ""        "API key"               Auth       secret
 clyops_opt       HOST     host     H localhost "Server host"           Network    hostname
 clyops_opt       PORT     port     p 8080      "Server port"           Network    port
 clyops_opt       ENDPOINT endpoint "" optional "Endpoint URL"          Network    url
@@ -41,6 +44,8 @@ clyops_opt_array INCLUDE  include  I           "Include directory"     Files    
 
 clyops_config      config "demo:,shared:"
 clyops_path_search config conf
+clyops_exclusive   endpoint addr
+clyops_requires    dest src
 
 clyops_run "$@"
 

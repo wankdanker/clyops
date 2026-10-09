@@ -582,7 +582,7 @@ export class Cli {
       return { status: 'error', error: (e as Error).message, showUsage: true };
     }
 
-    const missingCmds = this.chain().flatMap((n) => n.commands).filter((c) => !isCommandAvailable(c.command, this.env));
+    const missingCmds = this.chain().reverse().flatMap((n) => n.commands).filter((c) => !isCommandAvailable(c.command, this.env));
     if (missingCmds.length > 0) {
       const detail: string[] = [];
       for (const c of missingCmds) {
@@ -952,7 +952,7 @@ export class Cli {
       sections.push(lines);
     }
 
-    const commands = chain.flatMap((n) => n.commands);
+    const commands = [...chain].reverse().flatMap((n) => n.commands);
     if (commands.length > 0) {
       const lines = ['Required Commands:'];
       for (const c of commands) {

@@ -70,5 +70,36 @@ check "logging honors CLYOPS_SILENT except die" "[error] boom" "$(CLYOPS_SILENT=
     info hidden; warn hidden; error hidden
     die 3 boom' | sed 's/^[0-9: -]* //')"
 
+check "secret values are masked in values JSON but not in variables" "hunter2|***" "$(run '
+    clyops_opt TOKEN token "" "" "Token" Auth "secret:string:3-"
+    clyops_run "$@"
+    printf "%s|%s\n" "$TOKEN" "$(clyops_values_json | sed -n "s/.*\"TOKEN\": \"\(.*\)\".*/\1/p")"' --token hunter2)"
+
+check "relationships" "Options --a and --b cannot be used together" "$(run '
+    clyops_opt A a a flag "A"; clyops_opt B b b flag "B"
+    clyops_exclusive a b
+    clyops_parse -ab || echo "$_CLYOPS_ERROR"')"
+
+check "unknown effect is a registration error" "Unknown effect 'sideways'" "$(run '
+    clyops_effects sideways' | sed 's/.*\] //')"
+
+check "commands set CLYOPS_COMMAND and the chain's variables" "db migrate|3|x|latest" "$(run '
+    clyops_opt CONFIG config c optional "Config" Global
+    clyops_command db "Database"
+    clyops_command "db migrate" "Migrate"
+    clyops_opt TO to "" optional "Target" Options int
+    clyops_arg NAME "Name" latest
+    clyops_run "$@"
+    echo "${CLYOPS_COMMAND[*]}|$TO|$CONFIG|$NAME"' db -c x migrate --to 3)"
+
+check "sibling commands may reuse option names" "seed|5" "$(run '
+    clyops_command migrate "Migrate"; clyops_opt TO to "" optional "Target" Options int
+    clyops_command seed "Seed"; clyops_opt TO to "" 1 "Rows" Options int
+    clyops_run "$@"
+    echo "${CLYOPS_COMMAND[*]}|$TO"' seed --to 5)"
+
+check "commands and positional arguments do not mix" "Cannot mix commands and positional arguments" "$(run '
+    clyops_arg X "X"; clyops_command c "C"' | sed 's/.*\] //')"
+
 if (( failures )); then echo "$failures failed"; exit 1; fi
 echo "all passed"

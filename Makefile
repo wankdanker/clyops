@@ -86,7 +86,7 @@ lint: build-js
 	cd packages/rust && cargo fmt --check && cargo clippy --all-targets -- -D warnings
 	cd apps/dispatch && cargo fmt --check && cargo clippy --all-targets -- -D warnings
 	cd packages/go && test -z "$$(gofmt -l .)" && go vet ./...
-	@if command -v shellcheck >/dev/null; then shellcheck -S warning packages/bash/clyops.sh packages/bash/examples/demo.sh packages/bash/test/test.sh tools/*.sh; fi
+	@if command -v shellcheck >/dev/null; then shellcheck -S warning packages/bash/clyops.sh packages/bash/examples/demo.sh packages/bash/examples/tasks.sh packages/bash/test/test.sh tools/*.sh; fi
 
 check: lint test conformance completions
 

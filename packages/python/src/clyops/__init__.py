@@ -591,7 +591,8 @@ class Cli:
         except (_ParseError, ValidationError) as exc:
             return ParseResult("error", str(exc))
 
-        missing_cmds = [c for n in self._chain() for c in n._commands if not shutil.which(c[0], path=self.env.get("PATH", ""))]
+        missing_cmds = [c for n in reversed(self._chain()) for c in n._commands
+                        if not shutil.which(c[0], path=self.env.get("PATH", ""))]
         if missing_cmds:
             detail = []
             for cmd, desc, hint in missing_cmds:
@@ -967,7 +968,7 @@ class Cli:
                 lines += row(arg.name, annotate(arg.description, notes))
             sections.append(lines)
 
-        commands = [c for n in chain for c in n._commands]
+        commands = [c for n in reversed(chain) for c in n._commands]
         if commands:
             lines = ["Required Commands:"]
             for cmd, desc, hint in commands:

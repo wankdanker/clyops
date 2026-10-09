@@ -158,7 +158,7 @@ on. A level has either commands or positional arguments, not both.
 * The **chain** of a run is the selected command, its parent, and so on up to
   the program. The chain's options, in that order, are what is resolved,
   validated, shown in help and printed by `valuesJson()`; its required commands
-  and relationships are checked. Positional arguments are the selected
+  and relationships are checked, from the program down. Positional arguments are the selected
   command's. Config files (section 4) are the program's: `config()` is
   registered on the program, and its keys set the chain's options.
 * The selected command words are available as `command` (a list, e.g.
@@ -357,7 +357,8 @@ Help is that of the selected command (1.7): `mytool db --help` describes
    `Output: DESCRIPTION (TYPE)` lines, leaving out an empty description or type.
 4. **`Commands:`** (if any), one row per command: its name and description.
 5. **`Positional Arguments:`** (if any), one row per argument.
-6. **`Required Commands:`** (if any) of the chain, one row per command. Label
+6. **`Required Commands:`** (if any) of the chain, from the program down, one
+   row per command. Label
    is `CMD [installed]` or `CMD [not found]`; text is the description followed
    by ` (HINT)` when a hint exists.
 7. One section per option group of the chain's options, in order of first

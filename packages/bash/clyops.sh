@@ -41,7 +41,22 @@ declare -A _CLYOPS_INDEX=()     # long -> registration index (names the per-opti
 _CLYOPS_ARGS=() _CLYOPS_ARG_DESC=() _CLYOPS_ARG_DEFAULT=() _CLYOPS_ARG_RULE=()
 _CLYOPS_VARIADIC=""             # index of the variadic argument, if any
 
-_CLYOPS_CMDS=() _CLYOPS_CMD_DESC=() _CLYOPS_CMD_HINT=()
+_CLYOPS_CMDS=() _CLYOPS_CMD_DESC=() _CLYOPS_CMD_HINT=() _CLYOPS_CMD_OWNER=()
+declare -A _CLYOPS_SECRET=()    # long -> 1 for secret options
+declare -A _CLYOPS_OWNER=()     # long -> the command that registered it ("" for the program)
+_CLYOPS_EFFECTS=()
+_CLYOPS_STDIN=() _CLYOPS_STDOUT=()   # (description content-type) when declared
+_CLYOPS_CON_TYPE=() _CLYOPS_CON_OPTS=() _CLYOPS_CON_OWNER=()   # option relationships
+
+# Commands (spec section 1.7). Registrations made after clyops_command are
+# recorded, and replayed when the command is selected, so sibling commands
+# can reuse option names. Keys are ":" plus the command words.
+_CLYOPS_CUR=""                  # command being registered
+_CLYOPS_SEL=""                  # command selected so far
+_CLYOPS_REPLAYING=""
+declare -A _CLYOPS_CMD_REC=() _CLYOPS_CMD_ABOUT=() _CLYOPS_CMD_KIDS=() _CLYOPS_CMD_HASARGS=() _CLYOPS_ENTERED=()
+# shellcheck disable=SC2034  # public: the selected command words after parsing
+CLYOPS_COMMAND=()
 
 # Per-parse state
 declare -A _CLYOPS_RAW=() _CLYOPS_HAS=() _CLYOPS_SRC=() _CLYOPS_CFG_VAL=() _CLYOPS_CFG_DIR=()
@@ -81,11 +96,88 @@ _clyops_fatal() { _clyops_log error "$1" force; exit 2; }
 
 clyops_name()        { _CLYOPS_NAME="$1"; }
 clyops_root()        { _CLYOPS_ROOT="$1"; }
-clyops_description() { _CLYOPS_DESCRIPTION="$1"; }
-clyops_epilog()      { _CLYOPS_EPILOG="$1"; }
+clyops_description() { _clyops_record clyops_description "$@" || _CLYOPS_DESCRIPTION="$1"; }
+clyops_epilog()      { _clyops_record clyops_epilog "$@" || _CLYOPS_EPILOG="$1"; }
+
+# Inside a command, record a registration instead of making it (returns 0).
+_clyops_record() {
+    [[ -n "$_CLYOPS_CUR" && -z "$_CLYOPS_REPLAYING" ]] || return 1
+    printf -v _r ' %q' "$@"
+    _CLYOPS_CMD_REC[:$_CLYOPS_CUR]+="$_r"$'\n'
+}
+
+# Usage: clyops_command "<word> [<word>...]" <description>
+# Registers a command (spec section 1.7); later registrations belong to it.
+# "db migrate" is the migrate command of db, which must be registered first.
+clyops_command() {
+    local path="$1" parent="" word="${1##* }"
+    [[ "$path" == *" "* ]] && parent="${path% *}"
+    [[ -z "$parent" || -v "_CLYOPS_CMD_ABOUT[:$parent]" ]] || _clyops_fatal "clyops_command: unknown command $parent"
+    [[ -v "_CLYOPS_CMD_ABOUT[:$path]" ]] && _clyops_fatal "Duplicate command $path"
+    if [[ -n "${_CLYOPS_CMD_HASARGS[:$parent]:-}" ]] || [[ -z "$parent" && ${#_CLYOPS_ARGS[@]} -gt 0 ]]; then
+        _clyops_fatal "Cannot mix commands and positional arguments"
+    fi
+    _CLYOPS_CMD_ABOUT[:$path]="$2"
+    _CLYOPS_CMD_KIDS[:$parent]+="${_CLYOPS_CMD_KIDS[:$parent]:+ }$word"
+    _CLYOPS_CUR="$path"
+}
+
+# Usage: clyops_effects <effect>...   (read-only, idempotent, destructive, network)
+clyops_effects() {
+    _clyops_record clyops_effects "$@" && return 0
+    local e
+    for e in "$@"; do
+        case "$e" in read-only|idempotent|destructive|network) ;; *) _clyops_fatal "Unknown effect '$e'" ;; esac
+    done
+    _CLYOPS_EFFECTS=("$@")
+}
+
+# Usage: clyops_stdin <description> [content-type]   /   clyops_stdout <description> [content-type]
+clyops_stdin()  { _clyops_record clyops_stdin "$@" || _CLYOPS_STDIN=("$1" "${2:-}"); }
+clyops_stdout() { _clyops_record clyops_stdout "$@" || _CLYOPS_STDOUT=("$1" "${2:-}"); }
+
+# Usage: clyops_exclusive <long>...  /  clyops_requires <long> <long>...  /  clyops_one_of <long>...
+clyops_exclusive() { _clyops_record clyops_exclusive "$@" || _clyops_constraint exclusive "$@"; }
+clyops_requires()  { _clyops_record clyops_requires "$@" || _clyops_constraint requires "$@"; }
+clyops_one_of()    { _clyops_record clyops_one_of "$@" || _clyops_constraint oneOf "$@"; }
+
+_clyops_constraint() {
+    local type="$1" long; shift
+    for long in "$@"; do
+        [[ -v "_CLYOPS_KIND[$long]" ]] || _clyops_fatal "Unknown option --$long in constraint"
+    done
+    _CLYOPS_CON_TYPE+=("$type"); _CLYOPS_CON_OPTS+=("$*"); _CLYOPS_CON_OWNER+=("$_CLYOPS_SEL")
+}
+
+# Select command $1 (its parent already selected): replay its registrations.
+# Its options go first, so the chain's options read deepest command first.
+_clyops_enter() {
+    local path="$1" n0=${#_CLYOPS_OPTS[@]}
+    _CLYOPS_SEL="$path"
+    [[ -n "${_CLYOPS_ENTERED[:$path]:-}" ]] && return 0
+    _CLYOPS_ENTERED[:$path]=1
+    _CLYOPS_DESCRIPTION="${_CLYOPS_CMD_ABOUT[:$path]}" _CLYOPS_EPILOG="" _CLYOPS_EFFECTS=() _CLYOPS_STDIN=() _CLYOPS_STDOUT=()
+    _CLYOPS_REPLAYING=1
+    eval "${_CLYOPS_CMD_REC[:$path]:-}"
+    _CLYOPS_REPLAYING=""
+    _CLYOPS_OPTS=("${_CLYOPS_OPTS[@]:n0}" "${_CLYOPS_OPTS[@]:0:n0}")
+}
+
+# Select the command words $@ from the program down; stops at the first that is not a command.
+# Sets _r to the number of words followed.
+_clyops_walk() {
+    local n=0 w
+    for w in "$@"; do
+        [[ " ${_CLYOPS_CMD_KIDS[:$_CLYOPS_SEL]:-} " == *" $w "* ]] || break
+        _clyops_enter "${_CLYOPS_SEL:+$_CLYOPS_SEL }$w"
+        n=$((n + 1))
+    done
+    _r=$n
+}
 
 # Usage: clyops_config <option-long-name> <prefix[,prefix...]>
 clyops_config() {
+    _clyops_record clyops_config "$@" && return 0
     _CLYOPS_CONFIG_OPT="$1"
     local IFS=',' p
     _CLYOPS_CONFIG_PREFIXES=()
@@ -97,11 +189,13 @@ clyops_config() {
 
 # Usage: clyops_require_command <command> <description> [install-hint]
 clyops_require_command() {
-    _CLYOPS_CMDS+=("$1"); _CLYOPS_CMD_DESC+=("$2"); _CLYOPS_CMD_HINT+=("${3:-}")
+    _clyops_record clyops_require_command "$@" && return 0
+    _CLYOPS_CMDS+=("$1"); _CLYOPS_CMD_DESC+=("$2"); _CLYOPS_CMD_HINT+=("${3:-}"); _CLYOPS_CMD_OWNER+=("$_CLYOPS_SEL")
 }
 
 # Usage: clyops_path_search <long> <dir[:dir...]>   (dirs relative to the root)
 clyops_path_search() {
+    _clyops_record clyops_path_search "$@" && return 0
     [[ -v "_CLYOPS_KIND[$1]" ]] || _clyops_fatal "clyops_path_search: unknown option --$1"
     _CLYOPS_SEARCH[$1]="$2"
     [[ -n "${_CLYOPS_RULE[$1]}" ]] || _CLYOPS_RULE[$1]="path"
@@ -126,12 +220,15 @@ _clyops_add_opt() { # var long short kind default required desc group rule
         [[ ${#_c_short} -ne 1 || -v "_CLYOPS_BYSHORT[$_c_short]" ]] && _clyops_fatal "Invalid or duplicate short option -$_c_short"
         _CLYOPS_BYSHORT[$_c_short]="$_c_long"
     fi
-    _clyops_known_rule "$9" || _clyops_fatal "Unknown validation rule '$9' for --$_c_long"
-    _CLYOPS_INDEX[$_c_long]=${#_CLYOPS_OPTS[@]}
+    local _c_rule="$9"
+    if [[ "$_c_rule" == secret || "$_c_rule" == secret:* ]]; then _CLYOPS_SECRET[$_c_long]=1; _c_rule="${_c_rule:7}"; fi
+    _clyops_known_rule "$_c_rule" || _clyops_fatal "Unknown validation rule '$_c_rule' for --$_c_long"
+    _CLYOPS_OWNER[$_c_long]="$_CLYOPS_SEL"
+    _CLYOPS_INDEX[$_c_long]=$(( ${#_CLYOPS_INDEX[@]} ))
     _CLYOPS_OPTS+=("$_c_long")
     _CLYOPS_VAR[$_c_long]="$_c_var"; _CLYOPS_SHORT[$_c_long]="$_c_short"; _CLYOPS_KIND[$_c_long]="$4"
     _CLYOPS_DEFAULT[$_c_long]="$5"; _CLYOPS_REQUIRED[$_c_long]="$6"; _CLYOPS_DESC[$_c_long]="$7"
-    _CLYOPS_GROUP[$_c_long]="${8:-Options}"; _CLYOPS_RULE[$_c_long]="$9"; _CLYOPS_SEARCH[$_c_long]=""
+    _CLYOPS_GROUP[$_c_long]="${8:-Options}"; _CLYOPS_RULE[$_c_long]="$_c_rule"; _CLYOPS_SEARCH[$_c_long]=""
     # The environment is read when the option is registered: once parsed, the
     # variable holds the option's value instead.
     if [[ "$4" != array && -n "${!_c_var:-}" ]]; then _CLYOPS_ENV[$_c_long]="${!_c_var}"; fi
@@ -139,6 +236,7 @@ _clyops_add_opt() { # var long short kind default required desc group rule
 
 # Usage: clyops_opt <VAR> <long> <short> <default|flag|optional|""> <description> [group] [rule]
 clyops_opt() {
+    _clyops_record clyops_opt "$@" && return 0
     local _c_kind=value _c_dflt="$4" _c_req=""
     case "$4" in
         flag) _c_kind=flag; _c_dflt="" ;;
@@ -150,11 +248,18 @@ clyops_opt() {
 
 # Usage: clyops_opt_array <VAR> <long> <short> <description> [group] [rule]
 clyops_opt_array() {
+    _clyops_record clyops_opt_array "$@" && return 0
     _clyops_add_opt "$1" "$2" "$3" array "" "" "$4" "${5:-Options}" "${6:-}"
 }
 
 # Usage: clyops_arg <NAME> <description> [default] [rule]
 clyops_arg() {
+    [[ -n "${_CLYOPS_CMD_KIDS[:$_CLYOPS_CUR]:-}" ]] && _clyops_fatal "Cannot mix commands and positional arguments"
+    if [[ -n "$_CLYOPS_CUR" && -z "$_CLYOPS_REPLAYING" ]]; then
+        _CLYOPS_CMD_HASARGS[:$_CLYOPS_CUR]=1
+        _clyops_record clyops_arg "$@"
+        return 0
+    fi
     [[ -n "$_CLYOPS_VARIADIC" ]] && _clyops_fatal "Argument $1 registered after a variadic argument"
     _clyops_known_rule "${4:-}" || _clyops_fatal "Unknown validation rule '${4:-}' for $1"
     _CLYOPS_ARGS+=("$1"); _CLYOPS_ARG_DESC+=("$2"); _CLYOPS_ARG_DEFAULT+=("${3:-}"); _CLYOPS_ARG_RULE+=("${4:-}")
@@ -162,13 +267,18 @@ clyops_arg() {
 
 # Usage: clyops_arg_variadic <NAME> <description> [rule]
 clyops_arg_variadic() {
+    if [[ -n "$_CLYOPS_CUR" && -z "$_CLYOPS_REPLAYING" ]]; then
+        _CLYOPS_CMD_HASARGS[:$_CLYOPS_CUR]=1
+        _clyops_record clyops_arg_variadic "$@"
+        return 0
+    fi
     clyops_arg "$1" "$2" "" "${3:-}"
     _CLYOPS_VARIADIC=$(( ${#_CLYOPS_ARGS[@]} - 1 ))
 }
 
 _clyops_ensure_help() {
     [[ -v "_CLYOPS_KIND[help]" ]] && return 0
-    local _c_short=h
+    local _c_short=h _CLYOPS_SEL=""
     [[ -v "_CLYOPS_BYSHORT[h]" ]] && _c_short=""
     _clyops_add_opt HELP help "$_c_short" flag "" "" "Show this help message and exit" Global ""
 }
@@ -389,7 +499,11 @@ _clyops_scan() {
     while (( $# > 0 )); do
         token="$1"; shift
         if [[ -n "$end_of_options" || "$token" == - || "$token" != -* ]]; then
-            if [[ -n "$_CLYOPS_VARIADIC" ]] && (( pos > _CLYOPS_VARIADIC )); then
+            if [[ -n "${_CLYOPS_CMD_KIDS[:$_CLYOPS_SEL]:-}" ]]; then
+                _clyops_walk "$token"
+                (( _r )) || { _CLYOPS_ERROR="Unknown command: $token"; return 1; }
+                nargs=${#_CLYOPS_ARGS[@]}
+            elif [[ -n "$_CLYOPS_VARIADIC" ]] && (( pos > _CLYOPS_VARIADIC )); then
                 _CLYOPS_REST+=("$token")
             elif (( pos >= nargs )); then
                 _CLYOPS_ERROR="Unexpected argument: $token"; return 1
@@ -517,6 +631,7 @@ _clyops_load_config() {
 # Steps 6-9 of the pipeline (defaults, env, paths, validation).
 _clyops_resolve_values() {
     local i n=${#_CLYOPS_ARGS[@]} long rule base value name
+    [[ -n "${_CLYOPS_CMD_KIDS[:$_CLYOPS_SEL]:-}" ]] && { _CLYOPS_ERROR="Missing command"; return 1; }
     for (( i = 0; i < n; i++ )); do
         [[ "$i" == "$_CLYOPS_VARIADIC" || -v "_CLYOPS_ARGV[i]" ]] && continue
         if [[ -z "${_CLYOPS_ARG_DEFAULT[i]}" ]]; then
@@ -621,6 +736,8 @@ _clyops_assign() {
             printf -v "${_CLYOPS_VAR[$_c_long]}" '%s' "${_CLYOPS_RAW[$_c_long]:-}"
         fi
     done
+    # shellcheck disable=SC2034  # public: the selected command words
+    read -ra CLYOPS_COMMAND <<< "$_CLYOPS_SEL"
     for (( _c_i = 0; _c_i < ${#_CLYOPS_ARGS[@]}; _c_i++ )); do
         if [[ "$_c_i" == "$_CLYOPS_VARIADIC" ]]; then
             declare -ga "${_CLYOPS_ARGS[_c_i]}=(\"\${_CLYOPS_REST[@]}\")"
@@ -637,6 +754,7 @@ clyops_parse() {
     _clyops_ensure_help
     _CLYOPS_RAW=() _CLYOPS_HAS=() _CLYOPS_SRC=() _CLYOPS_CFG_VAL=() _CLYOPS_CFG_DIR=()
     _CLYOPS_ARGV=() _CLYOPS_REST=() _CLYOPS_ERROR="" _CLYOPS_DETAIL=() _CLYOPS_SHOW_USAGE=1 _CLYOPS_HELP=""
+    _CLYOPS_SEL=""
     for _c_long in "${_CLYOPS_OPTS[@]}"; do
         [[ "${_CLYOPS_KIND[$_c_long]}" == array ]] && _clyops_list_reset "$_c_long"
     done
@@ -670,8 +788,49 @@ clyops_parse() {
         [[ "${_CLYOPS_REQUIRED[$_c_long]}" && -z "${_CLYOPS_RAW[$_c_long]:-}" ]] && _c_missing+=("--$_c_long")
     done
     if (( ${#_c_missing[@]} )); then _CLYOPS_ERROR="Missing required argument(s): ${_c_missing[*]}"; return 1; fi
+    _clyops_check_constraints || return 1
 
     _clyops_assign
+    return 0
+}
+
+# An option is given when set by cli, config or env, and not false or an empty list.
+_clyops_given() {
+    case "${_CLYOPS_SRC[$1]:-}" in cli|config|env) ;; *) return 1 ;; esac
+    [[ "${_CLYOPS_KIND[$1]}" == flag ]] && { [[ "${_CLYOPS_RAW[$1]}" == true ]]; return; }
+    if [[ "${_CLYOPS_KIND[$1]}" == array ]]; then
+        local -n _c_list="_CLYOPS_LIST_${_CLYOPS_INDEX[$1]}"
+        (( ${#_c_list[@]} ))
+        return
+    fi
+    return 0
+}
+
+# Spec section 1.6: the first relationship that fails, from the program down.
+_clyops_check_constraints() {
+    local i long first on=() longs=()
+    for (( i = 0; i < ${#_CLYOPS_CON_TYPE[@]}; i++ )); do
+        read -ra longs <<< "${_CLYOPS_CON_OPTS[i]}"
+        on=()
+        for long in "${longs[@]}"; do _clyops_given "$long" && on+=("$long"); done
+        case "${_CLYOPS_CON_TYPE[i]}" in
+            exclusive)
+                (( ${#on[@]} > 1 )) && { _CLYOPS_ERROR="Options --${on[0]} and --${on[1]} cannot be used together"; return 1; } ;;
+            requires)
+                first="${longs[0]}"
+                _clyops_given "$first" || continue
+                for long in "${longs[@]:1}"; do
+                    _clyops_given "$long" || { _CLYOPS_ERROR="Option --$first requires --$long"; return 1; }
+                done ;;
+            oneOf)
+                if (( ${#on[@]} == 0 )); then
+                    first=""
+                    for long in "${longs[@]}"; do first+="${first:+, }--$long"; done
+                    _CLYOPS_ERROR="One of $first is required"
+                    return 1
+                fi ;;
+        esac
+    done
     return 0
 }
 
@@ -682,7 +841,12 @@ clyops_run() {
     for _c_arg in "$@"; do
         [[ "$_c_arg" == -- ]] && break
         if [[ "$_c_arg" == --help-json-schema ]]; then clyops_json_schema; exit 0; fi
-        if [[ "$_c_arg" == --bash-completion ]]; then clyops_completion_data; exit 0; fi
+        if [[ "$_c_arg" == --bash-completion ]]; then
+            local _c_words=("$@")
+            while (( ${#_c_words[@]} )) && [[ "${_c_words[0]}" != -- ]]; do _c_words=("${_c_words[@]:1}"); done
+            clyops_completion_data "${_c_words[@]:1}"
+            exit 0
+        fi
     done
     local _c_args=("$@") _c_i
     for (( _c_i = 0; _c_i < ${#_c_args[@]}; _c_i++ )); do
@@ -742,12 +906,16 @@ clyops_values_json() {
             local -n _c_list="_CLYOPS_LIST_${_CLYOPS_INDEX[$long]}"
             items=()
             if [[ "${_CLYOPS_HAS[$long]:-}" ]]; then
-                for i in "${_c_list[@]}"; do _clyops_json_typed "$i" "$kind" "$rule"; items+=("$_r"); done
+                for i in "${_c_list[@]}"; do
+                    if [[ -n "${_CLYOPS_SECRET[$long]:-}" ]]; then _r='"***"'; else _clyops_json_typed "$i" "$kind" "$rule"; fi
+                    items+=("$_r")
+                done
             fi
             unset -n _c_list
             local IFS=,; item+="[${items[*]}]"; unset IFS
         elif [[ "${_CLYOPS_HAS[$long]:-}" ]]; then
-            if [[ -z "${_CLYOPS_RAW[$long]}" ]]; then item+='""'
+            if [[ -n "${_CLYOPS_SECRET[$long]:-}" ]]; then item+='"***"'
+            elif [[ -z "${_CLYOPS_RAW[$long]}" ]]; then item+='""'
             else _clyops_json_typed "${_CLYOPS_RAW[$long]}" "$kind" "$rule"; item+="$_r"; fi
         else
             item+=null
@@ -772,6 +940,11 @@ clyops_values_json() {
         fi
         out+=("$item")
     done
+    if [[ -n "${_CLYOPS_CMD_KIDS[:]:-}" ]]; then
+        items=()
+        for i in $_CLYOPS_SEL; do _clyops_json_str "$i"; items+=("$_r"); done
+        local IFS=,; out+=("  \"command\": [${items[*]}]"); unset IFS
+    fi
     printf '{\n'
     local last=$(( ${#out[@]} - 1 ))
     for i in "${!out[@]}"; do
@@ -830,7 +1003,36 @@ _clyops_annotate() { # text notes... -> _r
     fi
 }
 
-# Help text (spec section 7).
+_clyops_stream_line() { # label description content-type
+    local line="$1"
+    [[ -n "$2" ]] && line+=" $2"
+    [[ -n "$3" ]] && line+=" ($3)"
+    echo "$line"
+}
+
+# Append option $1's relationship annotations (spec section 7) to the caller's notes.
+_clyops_relation_notes() {
+    local long="$1" i o list longs=()
+    for (( i = 0; i < ${#_CLYOPS_CON_TYPE[@]}; i++ )); do
+        [[ " ${_CLYOPS_CON_OPTS[i]} " == *" $long "* ]] || continue
+        read -ra longs <<< "${_CLYOPS_CON_OPTS[i]}"
+        list=""
+        case "${_CLYOPS_CON_TYPE[i]}" in
+            exclusive)
+                for o in "${longs[@]}"; do [[ "$o" != "$long" ]] && list+="${list:+, }--$o"; done
+                notes+=("conflicts with: $list") ;;
+            requires)
+                [[ "${longs[0]}" == "$long" ]] || continue
+                for o in "${longs[@]:1}"; do list+="${list:+, }--$o"; done
+                notes+=("requires: $list") ;;
+            oneOf)
+                for o in "${longs[@]}"; do list+="${list:+, }--$o"; done
+                notes+=("one of: $list") ;;
+        esac
+    done
+}
+
+# Help text (spec section 7), for the selected command.
 clyops_usage() {
     _clyops_ensure_help
     local maxw="${CLYOPS_MAX_WIDTH:-}" long longest=0 i notes=() usage group
@@ -838,13 +1040,16 @@ clyops_usage() {
     for long in "${_CLYOPS_OPTS[@]}"; do
         _clyops_label "$long"; (( ${#_r} > longest )) && longest=${#_r}
     done
+    local kids="${_CLYOPS_CMD_KIDS[:$_CLYOPS_SEL]:-}" kid
+    for kid in $kids; do (( ${#kid} > longest )) && longest=${#kid}; done
     _CLYOPS_INDENT=$(( longest + 4 ))
     (( _CLYOPS_INDENT < 32 )) && _CLYOPS_INDENT=32
     (( _CLYOPS_INDENT > 50 )) && _CLYOPS_INDENT=50
     _CLYOPS_TEXTW=$(( maxw - _CLYOPS_INDENT ))
     (( _CLYOPS_TEXTW < 20 )) && _CLYOPS_TEXTW=20
 
-    usage="Usage: ${_CLYOPS_NAME:-${0##*/}}"
+    usage="Usage: ${_CLYOPS_NAME:-${0##*/}}${_CLYOPS_SEL:+ $_CLYOPS_SEL}"
+    [[ -n "$kids" ]] && usage+=" <command>"
     for (( i = 0; i < ${#_CLYOPS_ARGS[@]}; i++ )); do
         if [[ "$i" == "$_CLYOPS_VARIADIC" ]]; then usage+=" [<${_CLYOPS_ARGS[i]}...>]"
         elif [[ -n "${_CLYOPS_ARG_DEFAULT[i]}" ]]; then usage+=" [<${_CLYOPS_ARGS[i]}>]"
@@ -856,6 +1061,17 @@ clyops_usage() {
         echo
         _clyops_wrap "$_CLYOPS_DESCRIPTION" "$maxw"
         for i in "${_CLYOPS_WRAPPED[@]}"; do _clyops_rtrim "$i"; done
+    fi
+
+    if (( ${#_CLYOPS_STDIN[@]} + ${#_CLYOPS_STDOUT[@]} )); then
+        echo
+        (( ${#_CLYOPS_STDIN[@]} )) && _clyops_stream_line Input: "${_CLYOPS_STDIN[@]}"
+        (( ${#_CLYOPS_STDOUT[@]} )) && _clyops_stream_line Output: "${_CLYOPS_STDOUT[@]}"
+    fi
+
+    if [[ -n "$kids" ]]; then
+        printf '\nCommands:\n'
+        for kid in $kids; do _clyops_row "$kid" "${_CLYOPS_CMD_ABOUT[:${_CLYOPS_SEL:+$_CLYOPS_SEL }$kid]}"; done
     fi
 
     if (( ${#_CLYOPS_ARGS[@]} )); then
@@ -893,9 +1109,13 @@ clyops_usage() {
             notes=()
             [[ "${_CLYOPS_REQUIRED[$long]}" ]] && notes+=(required)
             [[ "${_CLYOPS_KIND[$long]}" == array ]] && notes+=(multiple)
-            [[ -v "_CLYOPS_CFG_VAL[$long]" ]] && notes+=("config: ${_CLYOPS_CFG_VAL[$long]}")
+            [[ -n "${_CLYOPS_SECRET[$long]:-}" ]] && notes+=(secret)
+            if [[ -v "_CLYOPS_CFG_VAL[$long]" ]]; then
+                if [[ -n "${_CLYOPS_SECRET[$long]:-}" ]]; then notes+=("config: ***"); else notes+=("config: ${_CLYOPS_CFG_VAL[$long]}"); fi
+            fi
             [[ -n "${_CLYOPS_DEFAULT[$long]}" ]] && notes+=("default: ${_CLYOPS_DEFAULT[$long]}")
             if [[ -n "${_CLYOPS_RULE[$long]}" ]]; then _clyops_describe_rule "${_CLYOPS_RULE[$long]}"; notes+=("accepts: $_r"); fi
+            _clyops_relation_notes "$long"
             _clyops_annotate "${_CLYOPS_DESC[$long]}" "${notes[@]}"
             local text="$_r"
             _clyops_label "$long"
@@ -914,8 +1134,28 @@ clyops_usage() {
 # JSON description of the CLI (spec section 8).
 clyops_json_schema() {
     _clyops_ensure_help
-    local i long rule type sep c choices
     _clyops_json_str "${_CLYOPS_NAME:-${0##*/}}"; printf '{\n  "clyops": 1,\n  "script": %s,\n' "$_r"
+    _clyops_schema_node ""
+    printf '}\n'
+}
+
+_clyops_json_list() { # JSON array of the arguments into _r
+    local items=() i
+    for i in "$@"; do _clyops_json_str "$i"; items+=("$_r"); done
+    local IFS=,; _r="[${items[*]}]"
+}
+
+_clyops_json_stream() { # (description content-type) or nothing -> JSON into _r
+    if (( $# == 0 )); then _r=null; return; fi
+    local d
+    _clyops_json_str "$1"; d="$_r"; _clyops_json_str "$2"
+    _r="{\"description\": $d, \"contentType\": $_r}"
+}
+
+# The fields of command $1 ("" for the program), which is selected; its
+# commands are printed from subshells that select them in turn.
+_clyops_schema_node() {
+    local path="$1" i long rule type sep c choices kid
     _clyops_json_str "$_CLYOPS_DESCRIPTION"; printf '  "description": %s,\n' "$_r"
     _clyops_json_str "$_CLYOPS_EPILOG"; printf '  "epilog": %s,\n  "arguments": [' "$_r"
     sep=""
@@ -935,6 +1175,7 @@ clyops_json_schema() {
     printf '],\n  "options": ['
     sep=""
     for long in "${_CLYOPS_OPTS[@]}"; do
+        [[ "${_CLYOPS_OWNER[$long]}" == "$path" ]] || continue
         rule="${_CLYOPS_RULE[$long]}"
         case "$rule" in
             bool) type=boolean ;; int|int:*|port) type=integer ;; float|float:*) type=number ;;
@@ -957,22 +1198,17 @@ clyops_json_schema() {
         choices=()
         if [[ "$rule" == choice:* ]]; then
             local IFS=,
-            for c in ${rule#choice:}; do _clyops_json_str "$c"; choices+=("$_r"); done
+            for c in ${rule#choice:}; do choices+=("$c"); done
             unset IFS
         fi
-        if (( ${#choices[@]} )); then
-            printf '      "choices": [\n'
-            local last=$(( ${#choices[@]} - 1 ))
-            for i in "${!choices[@]}"; do printf '        %s%s\n' "${choices[i]}" "$( (( i < last )) && echo ,)"; done
-            printf '      ]\n    }'
-        else
-            printf '      "choices": []\n    }'
-        fi
+        _clyops_json_list "${choices[@]}"; printf '      "choices": %s,\n' "$_r"
+        printf '      "secret": %s\n    }' "$([[ -n "${_CLYOPS_SECRET[$long]:-}" ]] && echo true || echo false)"
         sep=","
     done
     printf '\n  ],\n  "requiredCommands": ['
     sep=""
     for (( i = 0; i < ${#_CLYOPS_CMDS[@]}; i++ )); do
+        [[ "${_CLYOPS_CMD_OWNER[i]}" == "$path" ]] || continue
         printf '%s\n    {\n' "$sep"
         _clyops_json_str "${_CLYOPS_CMDS[i]}"; printf '      "command": %s,\n' "$_r"
         _clyops_json_str "${_CLYOPS_CMD_DESC[i]}"; printf '      "description": %s,\n' "$_r"
@@ -980,7 +1216,27 @@ clyops_json_schema() {
         sep=","
     done
     [[ -n "$sep" ]] && printf '\n  '
-    printf ']\n}\n'
+    _clyops_json_list "${_CLYOPS_EFFECTS[@]}"; printf '],\n  "effects": %s,\n  "constraints": [' "$_r"
+    sep=""
+    for (( i = 0; i < ${#_CLYOPS_CON_TYPE[@]}; i++ )); do
+        [[ "${_CLYOPS_CON_OWNER[i]}" == "$path" ]] || continue
+        local -a longs
+        read -ra longs <<< "${_CLYOPS_CON_OPTS[i]}"
+        _clyops_json_list "${longs[@]}"
+        printf '%s{"type": "%s", "options": %s}' "$sep" "${_CLYOPS_CON_TYPE[i]}" "$_r"
+        sep=", "
+    done
+    _clyops_json_stream "${_CLYOPS_STDIN[@]}"; printf '],\n  "stdin": %s,\n' "$_r"
+    _clyops_json_stream "${_CLYOPS_STDOUT[@]}"; printf '  "stdout": %s,\n  "commands": [' "$_r"
+    sep=""
+    for kid in ${_CLYOPS_CMD_KIDS[:$path]:-}; do
+        _clyops_json_str "$kid"
+        printf '%s{\n  "name": %s,\n' "$sep" "$_r"
+        ( _clyops_enter "${path:+$path }$kid"; _clyops_schema_node "${path:+$path }$kid" )
+        printf '}'
+        sep=", "
+    done
+    printf ']\n'
 }
 
 _clyops_completion_kind() { # rule search-dirs -> _r "kind<TAB>values"
@@ -997,13 +1253,24 @@ _clyops_completion_kind() { # rule search-dirs -> _r "kind<TAB>values"
     _r="$kind"$'\t'"${values:--}"
 }
 
-# Tab-separated completion records (spec section 9).
+# Tab-separated completion records (spec section 9). The arguments are the
+# words typed after the program name; a program with commands follows them.
 clyops_completion_data() {
     _clyops_ensure_help
     _clyops_abspath "${_CLYOPS_ROOT:-.}" "$PWD"
     _CLYOPS_ROOT_ABS="$_r"
-    local long desc short i
+    local long desc short i kid
     echo "#clyops-completion 1"
+    if [[ -n "${_CLYOPS_CMD_KIDS[:]:-}" ]]; then
+        _clyops_walk "$@"
+        local skip="$_r" words=("$@")
+        [[ -n "${_CLYOPS_CMD_KIDS[:$_CLYOPS_SEL]:-}" ]] && (( skip < $# )) && [[ "${words[skip]}" != -* ]] && return 0
+        printf 'skip\t%s\n' "$skip"
+        for kid in ${_CLYOPS_CMD_KIDS[:$_CLYOPS_SEL]:-}; do
+            desc="${_CLYOPS_CMD_ABOUT[:${_CLYOPS_SEL:+$_CLYOPS_SEL }$kid]}"; desc="${desc//$'\t'/ }"; desc="${desc//$'\n'/ }"
+            printf 'cmd\t%s\t%s\n' "$kid" "$desc"
+        done
+    fi
     for long in "${_CLYOPS_OPTS[@]}"; do
         desc="${_CLYOPS_DESC[$long]//$'\t'/ }"; desc="${desc//$'\n'/ }"
         short="${_CLYOPS_SHORT[$long]:+-${_CLYOPS_SHORT[$long]}}"
