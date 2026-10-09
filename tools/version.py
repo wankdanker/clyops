@@ -16,7 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOP = r'(?m)^  "version": "([^"]+)"'
 LOCK_ROOT = r'"packages": \{\n    "": \{\n      "name": "[^"]+",\n      "version": "([^"]+)"'
 # npm workspaces: their versions live in their package.json and the root lockfile.
-NPM_WORKSPACES = ["packages/js", "packages/tools"]
+NPM_WORKSPACES = ["packages/js", "packages/tools", "packages/jobs"]
 LOCK_WS = r'"{}": \{{\n      "name": "[^"]+",\n      "version": "([^"]+)"'
 FILES = [
     *[f for ws in NPM_WORKSPACES for f in ((f"{ws}/package.json", TOP), ("package-lock.json", LOCK_WS.format(ws)))],
@@ -43,11 +43,18 @@ def read(rel):
         return fh.read()
 
 
+# Workspaces pin each other exactly; every such pin is checked and rewritten.
+NPM_PIN = r'"clyops(?:-[a-z]+)?": "(\d[^"]*)"'
+PINNED = ["package-lock.json"] + [f"{ws}/package.json" for ws in NPM_WORKSPACES]
+
+
 def current():
     found = []
     for rel, pattern in FILES:
         m = re.search(pattern, read(rel))
         found.append((rel, m.group(1) if m else None))
+    for rel in PINNED:
+        found += [(rel, m.group(1)) for m in re.finditer(NPM_PIN, read(rel))]
     return found
 
 
@@ -57,6 +64,10 @@ def set_version(version):
         m = re.search(pattern, text)
         with open(os.path.join(ROOT, rel), "w") as fh:
             fh.write(text[:m.start(1)] + version + text[m.end(1):])
+    for rel in PINNED:
+        text = re.sub(NPM_PIN, lambda m: m.group(0).replace(m.group(1), version), read(rel))
+        with open(os.path.join(ROOT, rel), "w") as fh:
+            fh.write(text)
 
 
 def main():

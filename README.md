@@ -126,7 +126,8 @@ It ships as a native binary for Linux, macOS and Windows in each release.
 [packages/tools](packages/tools) (`clyops-tools`) is the Node side of running clyops tools for
 someone else: it discovers a directory of tools the way clyops-dispatch does, reads their schemas,
 maps a JSON object onto a command line ([spec §13](spec/SPEC.md#13-json-input-toargv)) and gives the
-JSON Schema of that object.
+JSON Schema of that object. [packages/jobs](packages/jobs) (`clyops-jobs`) runs tools as jobs:
+functions bound to tools in a JSON config, templated options, artifacts, job records and a queue.
 
 ## clyops runner
 
@@ -149,6 +150,7 @@ spec/
 packages/
   js/                     TypeScript source -> ESM + CommonJS + .d.ts (npm: clyops)
   tools/                  Node: discover, describe and run a directory of tools (npm: clyops-tools)
+  jobs/                   Node: run tools as jobs: config, templates, artifacts, records (npm: clyops-jobs)
   bash/                   clyops.sh, a single sourceable file (Bash 4.3+)
   python/                 pure standard library (PyPI: clyops)
   rust/                   crate clyops (only dependency: regex)

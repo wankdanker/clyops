@@ -8,6 +8,8 @@ section here.
 - **clyops-tools** (npm): discover a directory of tools, load their schemas, map JSON input onto
   a command line ([spec §13](spec/SPEC.md#13-json-input-toargv)), JSON Schema of that input, and
   run them.
+- **clyops-jobs** (npm): a job engine for clyops tools: config-bound functions with templated
+  options, artifacts, job records and an in-memory queue.
 - The JavaScript packages form one npm workspace at the repository root.
 
 ## [0.1.0] - 2026-10-08

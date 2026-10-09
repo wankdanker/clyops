@@ -8,7 +8,7 @@
 #   make check           all of the above
 #   make <lang>          build + unit tests + conformance for one package (js bash python rust c)
 #   make dispatch        build + test clyops-dispatch
-#   (js builds and tests every npm workspace: packages/js, packages/tools)
+#   (js builds and tests every npm workspace)
 
 IMPLS := js ts bash python rust c
 
@@ -90,7 +90,7 @@ c: test-c
 dispatch: build-dispatch test-dispatch
 
 clean:
-	rm -rf packages/js/dist packages/tools/dist
+	rm -rf packages/*/dist apps/*/dist
 	cd packages/rust && cargo clean
 	cd apps/dispatch && cargo clean
 	$(MAKE) -C packages/c clean
