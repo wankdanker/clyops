@@ -9,6 +9,10 @@ limit, for servers that hand out job ids. Built on [clyops-tools](../tools).
 npm install clyops-jobs
 ```
 
+**Single file.** `clyops-jobs.cjs` (in this package, and on npm) is the whole library as one dependency-free
+CommonJS file: copy or link it into a project and `require()` it on Node 20+, with no build step
+and no `node_modules`. It includes clyops-tools. `require('clyops-jobs')` loads it; `import` loads the ESM build. It is generated from the sources and checked in CI.
+
 ## Function config
 
 ```json

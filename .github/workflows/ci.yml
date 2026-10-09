@@ -56,7 +56,9 @@ jobs:
       # Builds type-check too, in workspace order so each package sees the types it depends on.
       - run: npm run build --workspaces
       - run: npm test --workspaces
-      - run: python3 tools/conformance.py js ts
+      # The committed single-file CommonJS bundles match the sources.
+      - run: node tools/bundle-js.mjs --check
+      - run: python3 tools/conformance.py js ts cjs-bundle
 
   bash:
     strategy:

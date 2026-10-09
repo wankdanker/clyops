@@ -31,6 +31,10 @@ Other API: `source(long)`, `isSet(long)`, `isExplicitlySet(long)`, `usage()`, `j
 `completionScript(shell)`, `valuesJson()`, `setPathSearch(long, dirs)`, `requireCommand(cmd, desc, hint)`,
 and the logging helpers `info`, `warn`, `error`, `success`, `die`.
 
+**Single file.** `clyops.cjs` (in this package, and on npm) is the whole library as one dependency-free
+CommonJS file: copy or link it into a project and `require()` it on Node 20+, with no build step
+and no `node_modules`. It is generated from the sources and checked in CI.
+
 ## Commands, relationships, secrets, effects and I/O
 
 ```js

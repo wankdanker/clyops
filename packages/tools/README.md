@@ -8,6 +8,10 @@ the clyops API server, MCP server and job engine, and has no dependencies.
 npm install clyops-tools
 ```
 
+**Single file.** `clyops-tools.cjs` (in this package, and on npm) is the whole library as one dependency-free
+CommonJS file: copy or link it into a project and `require()` it on Node 20+, with no build step
+and no `node_modules`. `require('clyops-tools')` loads it; `import` loads the ESM build. It is generated from the sources and checked in CI.
+
 ```js
 import { discover, commands, loadSchema, toArgv, toJsonSchema, run } from 'clyops-tools';
 

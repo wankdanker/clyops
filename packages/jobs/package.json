@@ -24,12 +24,14 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./clyops-jobs.cjs"
     }
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "clyops-jobs.cjs"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

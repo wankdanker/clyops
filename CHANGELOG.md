@@ -3,6 +3,14 @@
 All packages in this repository share one version. Each release's notes on GitHub come from its
 section here.
 
+## [Unreleased]
+
+- **Single-file CommonJS bundles** of the Node packages, committed and published: `clyops.cjs`,
+  `clyops-tools.cjs` and `clyops-jobs.cjs` (which includes clyops-tools). Link or copy one file and
+  `require()` it on Node 20+, with no build step or `node_modules`, the way `clyops.sh` is used.
+  `require('clyops-tools')` and `require('clyops-jobs')` now load them (both were ESM-only). CI
+  checks they match the sources, and `clyops.cjs` runs the conformance suite (`cjs-bundle`).
+
 ## [0.2.0] - 2026-10-09
 
 ### Commands, relationships, secrets, effects and I/O

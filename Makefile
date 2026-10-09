@@ -10,9 +10,9 @@
 #   make dispatch        build + test clyops-dispatch
 #   (js builds and tests every npm workspace)
 
-IMPLS := js ts bash python rust c go ruby java
+IMPLS := js ts cjs-bundle bash python rust c go ruby java
 
-.PHONY: all build test conformance completions lint check clean js bash python rust c go ruby java dispatch \
+.PHONY: all build test conformance completions bundles lint check clean js bash python rust c go ruby java dispatch \
         build-js build-rust build-c build-go build-java build-dispatch \
         test-js test-bash test-python test-rust test-c test-go test-ruby test-java test-dispatch
 
@@ -78,8 +78,13 @@ completions: build
 	python3 tools/sync-completions.py --check
 	@for impl in $(IMPLS); do tools/test-completions.sh $$impl || exit 1; done
 
+# Rebuild the committed single-file CommonJS bundles (packages/*/clyops*.cjs).
+bundles: node_modules
+	node tools/bundle-js.mjs
+
 lint: build-js
 	python3 tools/sync-completions.py --check
+	node tools/bundle-js.mjs --check
 	python3 tools/check-schema.py
 	npm run typecheck --workspaces
 	cd packages/python && ruff check src tests examples && mypy src
@@ -91,7 +96,7 @@ lint: build-js
 check: lint test conformance completions
 
 js: test-js
-	python3 tools/conformance.py js ts
+	python3 tools/conformance.py js ts cjs-bundle
 
 bash: test-bash
 	python3 tools/conformance.py bash

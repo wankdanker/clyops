@@ -1,6 +1,7 @@
 {
   "js": ["node", "packages/js/examples/demo.cjs"],
   "ts": ["node", "packages/js/dist/examples/demo-ts.js"],
+  "cjs-bundle": ["node", "packages/js/examples/demo-bundle.cjs"],
   "bash": ["bash", "packages/bash/examples/demo.sh"],
   "python": ["python3", "packages/python/examples/demo.py"],
   "rust": ["packages/rust/target/debug/examples/demo"],

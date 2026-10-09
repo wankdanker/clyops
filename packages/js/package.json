@@ -16,7 +16,7 @@
       "require": "./dist/cjs/index.js"
     }
   },
-  "files": ["dist/cjs", "dist/esm", "dist/types", "src"],
+  "files": ["dist/cjs", "dist/esm", "dist/types", "src", "clyops.cjs"],
   "scripts": {
     "build": "tsc -p tsconfig.cjs.json && tsc -p tsconfig.esm.json && node scripts/mark-dist.mjs && tsc -p tsconfig.examples.json",
     "typecheck": "tsc -p tsconfig.cjs.json --noEmit",
