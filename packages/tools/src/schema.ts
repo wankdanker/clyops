@@ -25,16 +25,47 @@ export interface SchemaOption {
   required: boolean;
   validation: string;
   choices: string[];
+  /** Holds a secret (spec section 1.5); absent in schemas from before 0.2. */
+  secret?: boolean;
 }
 
-export interface Schema {
-  clyops: number;
-  script: string;
+/** What running a tool does (spec section 1.3). */
+export type Effect = 'read-only' | 'idempotent' | 'destructive' | 'network';
+
+/** A declared stdin or stdout (spec section 1.3). */
+export interface SchemaStream {
+  description: string;
+  contentType: string;
+}
+
+/** An option relationship (spec section 1.6). */
+export interface SchemaConstraint {
+  type: 'exclusive' | 'requires' | 'oneOf';
+  options: string[];
+}
+
+/** The fields a program and each of its commands share. Fields added in 0.2 are optional. */
+export interface SchemaBody {
   description: string;
   epilog: string;
   arguments: SchemaArgument[];
   options: SchemaOption[];
   requiredCommands: { command: string; description: string; installHint: string }[];
+  effects?: Effect[];
+  constraints?: SchemaConstraint[];
+  stdin?: SchemaStream | null;
+  stdout?: SchemaStream | null;
+  commands?: SchemaCommand[];
+}
+
+/** A command (spec section 1.7): its own options only. */
+export interface SchemaCommand extends SchemaBody {
+  name: string;
+}
+
+export interface Schema extends SchemaBody {
+  clyops: number;
+  script: string;
 }
 
 /** What an executable is, judged from its contents (spec section 12). */

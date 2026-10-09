@@ -4,10 +4,11 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { classify, commands, discover, inputKeys, loadSchema, run, tail, toArgv, toJsonSchema, watchTools } from '../dist/index.js';
+import { allowed, checkWithin, classify, commands, discover, expandCommands, inputKeys, loadSchema, loadTools, redactArgv, run, runTool, start, startTool, tail, toArgv, toJsonSchema, watchTools } from '../dist/index.js';
 
 const repo = fileURLToPath(new URL('../../..', import.meta.url));
 const golden = JSON.parse(readFileSync(join(repo, 'spec/conformance/golden/schema.json'), 'utf8'));
+const tasksGolden = JSON.parse(readFileSync(join(repo, 'spec/conformance/golden/tasks-schema.json'), 'utf8'));
 
 function file(path, text, exec = true) {
   writeFileSync(path, text);
@@ -214,4 +215,119 @@ test('watchTools reloads when tools change', { timeout: 30_000 }, async () => {
   } finally {
     watcher.close();
   }
+});
+
+test('expandCommands makes a tool of each command', () => {
+  const cmd = { name: 'tasks', words: ['ops', 'tasks'], file: '/x/tasks', kind: 'tool' };
+  const tools = expandCommands(cmd, tasksGolden);
+  assert.deepEqual(tools.map((t) => t.words.join(' ')), ['ops tasks db migrate', 'ops tasks db status', 'ops tasks send']);
+  const migrate = tools[0];
+  assert.deepEqual(migrate.subcommand, ['db', 'migrate']);
+  assert.equal(migrate.name, 'migrate');
+  assert.equal(migrate.description, 'Apply migrations');
+  assert.equal(migrate.schema.script, 'tasks db migrate');
+  assert.deepEqual(migrate.schema.options.map((o) => o.name), ['dry-run', 'url', 'verbose', 'help']);
+  assert.deepEqual(migrate.schema.arguments.map((a) => a.name), ['target']);
+  assert.deepEqual(migrate.schema.effects, ['destructive']);
+  const send = tools[2];
+  assert.deepEqual(send.schema.constraints, [{ type: 'oneOf', options: ['webhook', 'email'] }]);
+  assert.deepEqual(send.schema.stdin, { description: 'Attachment', contentType: 'application/octet-stream' });
+  assert.deepEqual(expandCommands(cmd, golden).map((t) => [t.words, t.subcommand]), [[['ops', 'tasks'], undefined]]);
+});
+
+test('allowed: globs over words, deny wins, read-only', () => {
+  const tool = (words, effects = []) => ({ words, schema: { effects } });
+  assert.ok(allowed(tool(['media', 'to-pcm']), {}));
+  assert.ok(allowed(tool(['media', 'to-pcm']), { allow: ['media/*'] }));
+  assert.ok(!allowed(tool(['media', 'fp', 'index']), { allow: ['media/*'] }));
+  assert.ok(allowed(tool(['media', 'fp', 'index']), { allow: ['media/**'] }));
+  assert.ok(!allowed(tool(['admin', 'wipe']), { allow: ['**'], deny: ['admin/*'] }));
+  assert.ok(!allowed(tool(['media', 'info']), { readOnly: true }));
+  assert.ok(allowed(tool(['media', 'info'], ['read-only']), { readOnly: true }));
+});
+
+test('loadTools expands commands and applies the filter and the root settings', async () => {
+  const root = tree();
+  file(join(root, 'tasks'), `#!/bin/sh\n# clyops-tool\nexec node ${join(repo, 'packages/js/examples/tasks.cjs')} "$@"\n`);
+  const names = async (filter) => (await loadTools(root, { filter })).tools.map((t) => t.words.join(' ')).sort();
+  assert.deepEqual((await names()).filter((n) => n.startsWith('tasks')), ['tasks db migrate', 'tasks db status', 'tasks send']);
+  assert.deepEqual(await names({ readOnly: true }), ['tasks db status']);
+  assert.deepEqual(await names({ allow: ['tasks/**'], deny: ['tasks/send'] }), ['tasks db migrate', 'tasks db status']);
+  file(join(root, '.clyops'), 'description: Test tools\nignore: lib, skipped\nallow: media/*, tasks/db/*\ndeny: tasks/db/migrate\n', false);
+  assert.deepEqual(await names(), ['media to-pcm', 'tasks db status']);
+  assert.deepEqual(await names({ deny: ['media/*'] }), ['tasks db status'], 'both the settings and the filter apply');
+});
+
+test('runTool runs a command of a program', async () => {
+  const root = tree();
+  file(join(root, 'tasks'), `#!/bin/sh\n# clyops-tool\nexec node ${join(repo, 'packages/js/examples/tasks.cjs')} "$@"\n`);
+  const { tools } = await loadTools(root);
+  const migrate = tools.find((t) => t.words.join(' ') === 'tasks db migrate');
+  const result = await runTool(migrate, { target: '7', dry_run: true, verbose: true }, { cwd: root });
+  assert.equal(result.exitCode, 0, result.stderr);
+  assert.deepEqual(result.json.values, { DRY_RUN: true, DB_URL: 'sqlite:app.db', VERBOSE: true, HELP: false, target: '7', command: ['db', 'migrate'] });
+  assert.deepEqual(result.command.slice(1), ['db', 'migrate', '--dry-run', '--verbose', '--', '7']);
+});
+
+test('secrets: redacted in the command, passed in the environment', async () => {
+  assert.deepEqual(redactArgv(golden, ['--key', 's3cret', '--key=x', '--host', 'h', '--', '--key']), ['--key', '***', '--key=***', '--host', 'h', '--', '--key']);
+  const { argv, env } = toArgv(golden, { input: 'in.txt', key: 's3cret' }, { secretEnv: true });
+  assert.deepEqual([argv, env], [['--', 'in.txt'], { KEY: 's3cret' }]);
+  assert.deepEqual(toArgv(golden, { key: 's3cret' }).argv, ['--key', 's3cret']);
+
+  const root = tree();
+  const tool = { name: 'demo', words: ['demo'], file: join(root, 'demo.sh'), kind: 'tool', schema: golden, description: '' };
+  const envOnly = { PATH: process.env.PATH, DEMO_ROOT: root };
+  const viaEnv = await runTool(tool, { input: 'in.txt', key: 's3cret' }, { cwd: root, env: envOnly });
+  assert.equal(viaEnv.exitCode, 0, viaEnv.stderr);
+  assert.equal(viaEnv.json.sources.key, 'env');
+  assert.ok(!viaEnv.command.includes('s3cret'));
+  const viaArgv = await runTool(tool, { input: 'in.txt', key: 's3cret' }, { cwd: root, env: envOnly, secretsInEnv: false });
+  assert.equal(viaArgv.json.sources.key, 'cli');
+  assert.deepEqual(viaArgv.command.slice(-4), ['--key', '***', '--', 'in.txt']);
+});
+
+test('toJsonSchema marks secrets and exclusive options', () => {
+  const s = toJsonSchema(golden);
+  assert.equal(s.properties.key.writeOnly, true);
+  assert.equal(s.properties.key.format, 'password');
+  assert.deepEqual(s.allOf, [{
+    not: { required: ['endpoint', 'addr'], properties: { endpoint: { not: { type: 'null' } }, addr: { not: { type: 'null' } } } },
+    description: '--endpoint and --addr cannot be used together',
+  }]);
+});
+
+test('within confines path inputs', () => {
+  const root = tree();
+  const outside = realpathSync(mkdtempSync(join(tmpdir(), 'clyops-outside-')));
+  symlinkSync(outside, join(root, 'escape'));
+  assert.doesNotThrow(() => checkWithin('--src', 'media/new.txt', [root], root));
+  assert.doesNotThrow(() => checkWithin('--src', '-', [root], '/'));
+  assert.throws(() => checkWithin('--src', '../x', [root], root), (e) => e.status === 400 && /outside the allowed directories/.test(e.message));
+  assert.throws(() => checkWithin('--src', 'escape/secret', [root], root), /outside/, 'symlinks are followed');
+  assert.throws(() => checkWithin('--src', 'file:///etc/passwd', [root], root), /not a path/);
+  assert.throws(() => toArgv(golden, { input: '/etc/passwd' }, { within: [root], cwd: root }), /input: \/etc\/passwd is outside/);
+  assert.deepEqual(toArgv(golden, { input: 'in.txt', src: 'a' }, { within: [root], cwd: root }).argv, ['--src', 'a', '--', 'in.txt']);
+});
+
+test('run feeds stdin, keeps binary stdout and caps output', async () => {
+  const root = tree();
+  file(join(root, 'cat'), '#!/bin/sh\ncat\n');
+  assert.equal((await run(join(root, 'cat'), [], { stdin: 'hello' })).stdout, 'hello');
+  const { Readable } = await import('node:stream');
+  assert.equal((await run(join(root, 'cat'), [], { stdin: Readable.from([Buffer.from('a'), Buffer.from('b')]) })).stdout, 'ab');
+  const bytes = Buffer.from([0, 255, 1, 128]);
+  const binary = await run(join(root, 'cat'), [], { stdin: bytes, stdout: 'buffer' });
+  assert.deepEqual([binary.stdout, binary.stdoutBuffer], ['', bytes]);
+  const capped = await run(join(root, 'cat'), [], { stdin: 'x'.repeat(100), maxOutput: 10 });
+  assert.deepEqual([capped.stdout, capped.truncated], ['x'.repeat(10), true]);
+  const started = start(join(root, 'cat'), [], { stdin: 'streamed', stdout: 'stream' });
+  const chunks = [];
+  for await (const c of started.stdout) chunks.push(c);
+  assert.equal(Buffer.concat(chunks).toString(), 'streamed');
+  assert.equal((await started.result).exitCode, 0);
+  assert.throws(() => run(join(root, 'cat'), [], { stdout: 'stream' }), /use start/);
+  const tool = { name: 'cat', words: ['cat'], file: join(root, 'cat'), kind: 'tool', schema: { ...golden, options: [], arguments: [] }, description: '' };
+  assert.equal((await runTool(tool, {}, { stdin: '{"a":1}' })).json.a, 1);
+  assert.equal(typeof startTool(tool, {}, { stdout: 'stream' }).stdout.pipe, 'function');
 });

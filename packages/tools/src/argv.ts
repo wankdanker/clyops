@@ -1,6 +1,12 @@
 // JSON input -> command line for a clyops tool (spec/SPEC.md section 13).
-import { isAbsolute, resolve } from 'node:path';
+import { existsSync, realpathSync } from 'node:fs';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import type { Schema, SchemaArgument, SchemaOption } from './schema.js';
+
+/** Input the caller got wrong: an API answers it with `status` (400). */
+export class InputError extends Error {
+  status = 400;
+}
 
 export type Input = Record<string, unknown>;
 
@@ -13,10 +19,25 @@ export interface ArgvOptions {
   render?: (value: string) => string;
   /** Use these positionals instead of mapping the schema's arguments from the input. */
   positionals?: string[];
+  /**
+   * Pass secret options (spec section 1.5) in the environment, under their
+   * variable names, instead of on the command line where `ps` shows them.
+   * Array options stay on the command line.
+   */
+  secretEnv?: boolean;
+  /**
+   * Path-valued inputs must resolve inside one of these directories (relative
+   * ones against `base`, else `cwd`); anything else is an InputError.
+   */
+  within?: string[];
+  /** The tool's working directory, for `within` (default: this process's). */
+  cwd?: string;
 }
 
 export interface Argv {
   argv: string[];
+  /** Variables to add to the tool's environment (secrets, with `secretEnv`). */
+  env: Record<string, string>;
   /** Input keys that matched no option or argument. */
   unknown: string[];
   /** Input keys for options named in `controlled`, not passed on. */
@@ -52,7 +73,7 @@ const TRUE = /^(true|1|yes|on)$/i;
  */
 export function toArgv(schema: Schema, input: Input, opts: ArgvOptions = {}): Argv {
   const used = new Set<string>();
-  const out: Argv = { argv: [], unknown: [], controlled: [] };
+  const out: Argv = { argv: [], env: {}, unknown: [], controlled: [] };
 
   const pick = (item: SchemaOption | SchemaArgument): { key: string; value: unknown } | undefined => {
     for (const key of inputKeys(item)) {
@@ -64,7 +85,7 @@ export function toArgv(schema: Schema, input: Input, opts: ArgvOptions = {}): Ar
     return undefined;
   };
 
-  const text = (value: unknown, pathValued: boolean): string => {
+  const text = (value: unknown, pathValued: boolean, name = ''): string => {
     let s = typeof value === 'object' ? JSON.stringify(value) : String(value);
     if (opts.render) s = opts.render(s);
     // Empty, '-' (stdin), absolute paths and URLs are left alone, as are the
@@ -72,6 +93,7 @@ export function toArgv(schema: Schema, input: Input, opts: ArgvOptions = {}): Ar
     if (pathValued && opts.base && !['', '-', 'disabled', 'false'].includes(s) && !isAbsolute(s) && !/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) {
       s = resolve(opts.base, s);
     }
+    if (pathValued && opts.within) checkWithin(name, s, opts.within, opts.base ?? opts.cwd ?? process.cwd());
     return s;
   };
 
@@ -88,8 +110,12 @@ export function toArgv(schema: Schema, input: Input, opts: ArgvOptions = {}): Ar
       out.argv.push(on ? `--${option.name}` : `--no-${option.name}`);
       continue;
     }
+    if (opts.secretEnv && option.secret && !option.isArray) {
+      out.env[option.variableName] = text(found.value, isPathValued(option.validation, option.type), `--${option.name}`);
+      continue;
+    }
     for (const item of Array.isArray(found.value) ? found.value : [found.value]) {
-      out.argv.push(`--${option.name}`, text(item, isPathValued(option.validation, option.type)));
+      out.argv.push(`--${option.name}`, text(item, isPathValued(option.validation, option.type), `--${option.name}`));
     }
   }
 
@@ -110,11 +136,49 @@ export function toArgv(schema: Schema, input: Input, opts: ArgvOptions = {}): Ar
       }
       skipped = [];
       const values = Array.isArray(found.value) ? found.value : [found.value];
-      positionals.push(...values.map((v) => text(v, isPathValued(argument.validation))));
+      positionals.push(...values.map((v) => text(v, isPathValued(argument.validation), argument.name)));
     }
   }
   if (positionals.length) out.argv.push('--', ...positionals);
 
   out.unknown = Object.keys(input).filter((k) => !used.has(k));
+  return out;
+}
+
+// The real path of `p`, or of its deepest existing ancestor joined with the rest.
+function realish(p: string): string {
+  let head = p;
+  const tail: string[] = [];
+  while (!existsSync(head) && dirname(head) !== head) {
+    tail.unshift(head.slice(dirname(head).length).replace(/^[\\/]/, ''));
+    head = dirname(head);
+  }
+  return resolve(existsSync(head) ? realpathSync(head) : head, ...tail);
+}
+
+/** Throws an InputError unless path value `value` of `name` resolves inside one of `dirs`. */
+export function checkWithin(name: string, value: string, dirs: string[], base: string): void {
+  if (['', '-', 'disabled', 'false'].includes(value)) return;
+  if (/^[a-z][a-z0-9+.-]+:/i.test(value) && !isAbsolute(value)) {
+    throw new InputError(`${name}: ${value} is not a path inside the allowed directories`);
+  }
+  const target = realish(resolve(base, value));
+  const inside = dirs.some((dir) => {
+    const rel = relative(realish(resolve(dir)), target);
+    return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+  });
+  if (!inside) throw new InputError(`${name}: ${value} is outside the allowed directories`);
+}
+
+/** `argv` with the values of secret options replaced by `***`, for display and logs. */
+export function redactArgv(schema: Schema, argv: string[]): string[] {
+  const secret = new Set(schema.options.filter((o) => o.secret).map((o) => `--${o.name}`));
+  const out = [...argv];
+  for (let i = 0; i < out.length; i++) {
+    if (out[i] === '--') break;
+    const eq = out[i].indexOf('=');
+    if (eq > 0 && secret.has(out[i].slice(0, eq))) out[i] = `${out[i].slice(0, eq)}=***`;
+    else if (secret.has(out[i]) && i + 1 < out.length) out[++i] = '***';
+  }
   return out;
 }

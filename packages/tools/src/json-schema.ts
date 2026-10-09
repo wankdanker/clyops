@@ -58,6 +58,7 @@ function property(item: SchemaOption | SchemaArgument, many: boolean, flag: bool
   const out: JsonSchema = many ? { type: 'array', items: value } : { ...value };
   if (item.description) out.description = item.description;
   if (item.default !== '' && !many) out.default = typedDefault(item.default, value);
+  if ('secret' in item && item.secret) Object.assign(out, { writeOnly: true, format: 'password' });
   return out;
 }
 
@@ -77,11 +78,33 @@ export function toJsonSchema(schema: Schema): JsonSchema {
     if (option.name === 'help') continue;
     properties[inputKey(option.name)] = property(option, option.isArray, isBareFlag(option));
   }
+  // Exclusive options can't both be given (spec section 1.6). The other
+  // relationships are left to the tool: like required options, they may be
+  // satisfied by its config file or environment.
+  const given = (long: string): JsonSchema => {
+    const option = schema.options.find((o) => o.name === long);
+    if (option && isBareFlag(option)) return { const: true };
+    return option?.isArray ? { type: 'array', minItems: 1 } : { not: { type: 'null' } };
+  };
+  const allOf: JsonSchema[] = [];
+  for (const c of schema.constraints ?? []) {
+    if (c.type !== 'exclusive') continue;
+    for (let i = 0; i < c.options.length; i++) {
+      for (let j = i + 1; j < c.options.length; j++) {
+        const [a, b] = [c.options[i], c.options[j]];
+        allOf.push({
+          not: { required: [inputKey(a), inputKey(b)], properties: { [inputKey(a)]: given(a), [inputKey(b)]: given(b) } },
+          description: `--${a} and --${b} cannot be used together`,
+        });
+      }
+    }
+  }
   return {
     type: 'object',
     ...(schema.description ? { description: schema.description } : {}),
     properties,
     ...(required.length ? { required } : {}),
+    ...(allOf.length ? { allOf } : {}),
     additionalProperties: false,
   };
 }

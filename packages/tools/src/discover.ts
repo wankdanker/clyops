@@ -19,12 +19,18 @@ export interface Group {
   description: string;
   groups: Group[];
   commands: Command[];
+  /** From the root's settings: which tools a server exposes (see `allowed`). */
+  allow?: string[];
+  deny?: string[];
 }
 
 export interface Settings {
   description: string;
   dir?: string;
   ignore: string[];
+  /** Tool patterns a server exposes / leaves out (`media/*`); ignored by the dispatcher. */
+  allow?: string[];
+  deny?: string[];
 }
 
 /** Read a dispatcher definition (`allowDir`) or a group's `.clyops` file. */
@@ -39,6 +45,7 @@ export function readSettings(file: string, allowDir: boolean): Settings {
     const value = line.slice(colon + 1).trim();
     if (key === 'description') settings.description = value;
     else if (key === 'ignore') settings.ignore = value.split(',').map((s) => s.trim()).filter(Boolean);
+    else if (key === 'allow' || key === 'deny') settings[key] = value.split(',').map((s) => s.trim()).filter(Boolean);
     else if (key === 'dir' && allowDir) settings.dir = value;
     else throw new Error(`${file}:${n + 1}: unknown key '${key}'`);
   });
@@ -70,11 +77,11 @@ export function discover(root: string, opts: { name?: string } = {}): Group {
   if (statSync(real).isFile()) {
     const settings = readSettings(real, true);
     const dir = resolve(dirname(real), settings.dir ?? '.');
-    return walk(dir, opts.name ?? basename(root), [], settings, new Set([real]));
+    return { ...walk(dir, opts.name ?? basename(root), [], settings, new Set([real])), allow: settings.allow, deny: settings.deny };
   }
   const file = join(real, '.clyops');
   const settings = exists(file) ? readSettings(file, false) : { description: '', ignore: [] };
-  return walk(real, opts.name ?? basename(real), [], settings, new Set());
+  return { ...walk(real, opts.name ?? basename(real), [], settings, new Set()), allow: settings.allow, deny: settings.deny };
 }
 
 function exists(file: string): boolean {
