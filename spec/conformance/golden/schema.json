@@ -42,7 +42,8 @@
       "isArray": false,
       "required": false,
       "validation": "path",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "verbose",
@@ -56,7 +57,8 @@
       "isArray": false,
       "required": false,
       "validation": "",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "quiet",
@@ -70,7 +72,8 @@
       "isArray": false,
       "required": false,
       "validation": "",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "color",
@@ -88,7 +91,8 @@
         "auto",
         "always",
         "never"
-      ]
+      ],
+      "secret": false
     },
     {
       "name": "out",
@@ -102,7 +106,8 @@
       "isArray": false,
       "required": false,
       "validation": "path",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "notes",
@@ -116,7 +121,8 @@
       "isArray": false,
       "required": false,
       "validation": "",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "count",
@@ -130,7 +136,8 @@
       "isArray": false,
       "required": false,
       "validation": "int:1-10",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "ratio",
@@ -144,7 +151,8 @@
       "isArray": false,
       "required": false,
       "validation": "float:0-1",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "enabled",
@@ -158,7 +166,8 @@
       "isArray": false,
       "required": false,
       "validation": "bool",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "tag",
@@ -172,7 +181,8 @@
       "isArray": true,
       "required": false,
       "validation": "string:1-8",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "no-cache",
@@ -186,7 +196,8 @@
       "isArray": false,
       "required": false,
       "validation": "",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "key",
@@ -200,7 +211,8 @@
       "isArray": false,
       "required": true,
       "validation": "",
-      "choices": []
+      "choices": [],
+      "secret": true
     },
     {
       "name": "host",
@@ -214,7 +226,8 @@
       "isArray": false,
       "required": false,
       "validation": "hostname",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "port",
@@ -228,7 +241,8 @@
       "isArray": false,
       "required": false,
       "validation": "port",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "endpoint",
@@ -242,7 +256,8 @@
       "isArray": false,
       "required": false,
       "validation": "url",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "addr",
@@ -256,7 +271,8 @@
       "isArray": false,
       "required": false,
       "validation": "ip",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "id",
@@ -270,7 +286,8 @@
       "isArray": false,
       "required": false,
       "validation": "uuid",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "email",
@@ -284,7 +301,8 @@
       "isArray": false,
       "required": false,
       "validation": "email",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "date",
@@ -298,7 +316,8 @@
       "isArray": false,
       "required": false,
       "validation": "date:YYYY-MM-DD",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "code",
@@ -312,7 +331,8 @@
       "isArray": false,
       "required": false,
       "validation": "regex:^[A-Z]{3}$",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "level",
@@ -326,7 +346,8 @@
       "isArray": false,
       "required": false,
       "validation": "int",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "size",
@@ -340,7 +361,8 @@
       "isArray": false,
       "required": false,
       "validation": "string:4",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "data-dir",
@@ -354,7 +376,8 @@
       "isArray": false,
       "required": false,
       "validation": "dir:exists",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "src",
@@ -368,7 +391,8 @@
       "isArray": false,
       "required": false,
       "validation": "file:exists",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "dest",
@@ -382,7 +406,8 @@
       "isArray": false,
       "required": false,
       "validation": "file:writable",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "include",
@@ -396,7 +421,8 @@
       "isArray": true,
       "required": false,
       "validation": "path",
-      "choices": []
+      "choices": [],
+      "secret": false
     },
     {
       "name": "help",
@@ -410,7 +436,8 @@
       "isArray": false,
       "required": false,
       "validation": "",
-      "choices": []
+      "choices": [],
+      "secret": false
     }
   ],
   "requiredCommands": [
@@ -419,5 +446,34 @@
       "description": "POSIX shell",
       "installHint": "install dash"
     }
-  ]
+  ],
+  "effects": [
+    "idempotent",
+    "network"
+  ],
+  "constraints": [
+    {
+      "type": "exclusive",
+      "options": [
+        "endpoint",
+        "addr"
+      ]
+    },
+    {
+      "type": "requires",
+      "options": [
+        "dest",
+        "src"
+      ]
+    }
+  ],
+  "stdin": {
+    "description": "Lines to process",
+    "contentType": "text/plain"
+  },
+  "stdout": {
+    "description": "The resolved values",
+    "contentType": "application/json"
+  },
+  "commands": []
 }

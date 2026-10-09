@@ -1,0 +1,14 @@
+Usage: tasks db <command> [OPTIONS]
+
+Database tasks
+
+Commands:
+  migrate                       Apply migrations
+  status                        Show migration status
+
+Database:
+  -u, --url=<value>             Database URL (default: sqlite:app.db)
+
+Global:
+  -v, --verbose                 Verbose output
+  -h, --help                    Show this help message and exit

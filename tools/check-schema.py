@@ -20,7 +20,8 @@ def main():
         schema = json.load(fh)
     jsonschema.Draft202012Validator.check_schema(schema)
     validator = jsonschema.Draft202012Validator(schema)
-    paths = sys.argv[1:] or [os.path.join(ROOT, "spec", "conformance", "golden", "schema.json")]
+    golden = os.path.join(ROOT, "spec", "conformance", "golden")
+    paths = sys.argv[1:] or [os.path.join(golden, "schema.json"), os.path.join(golden, "tasks-schema.json")]
     failed = 0
     for path in paths:
         with open(path) as fh:

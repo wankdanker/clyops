@@ -3,6 +3,9 @@ Usage: demo <input> [<mode>] [<rest...>] [OPTIONS]
 Demo program for the clyops conformance suite. It registers one of every kind of option and argument
 so that each implementation can be checked against the same help text, schema and resolved values.
 
+Input: Lines to process (text/plain)
+Output: The resolved values (application/json)
+
 Positional Arguments:
   input                         Input file (accepts: path)
   mode                          Processing mode (default: fast, accepts: choices: fast, slow)
@@ -33,14 +36,14 @@ Options:
       --no-cache                Disable the cache
 
 Auth:
-  -k, --key=<value>             API key (required)
+  -k, --key=<value>             API key (required, secret, config: ***)
 
 Network:
   -H, --host=<value>            Server host (config: example.com, default: localhost, accepts:
                                 hostname)
   -p, --port=<value>            Server port (default: 8080, accepts: port: 1-65535)
-      --endpoint=<value>        Endpoint URL (accepts: URL)
-      --addr=<value>            Bind address (accepts: IP address)
+      --endpoint=<value>        Endpoint URL (accepts: URL, conflicts with: --addr)
+      --addr=<value>            Bind address (accepts: IP address, conflicts with: --endpoint)
 
 Validation:
       --id=<value>              Request identifier (accepts: UUID)
@@ -53,7 +56,7 @@ Validation:
 Files:
   -d, --data-dir=<value>        Data directory (accepts: existing directory)
       --src=<value>             Source file (accepts: existing file)
-      --dest=<value>            Destination file (accepts: writable file)
+      --dest=<value>            Destination file (accepts: writable file, requires: --src)
   -I, --include=<value>         Include directory (multiple, accepts: path)
 
 Global:

@@ -72,3 +72,64 @@ test('resolvePath passes through special values', () => {
 test('wrapText keeps paragraphs and long words', () => {
   assert.deepEqual(wrapText('aa bb cc\n\nsupercalifragilistic dd', 5), ['aa bb', 'cc', '', 'supercalifragilistic', 'dd']);
 });
+
+test('registration errors for effects, constraints and commands', () => {
+  assert.throws(() => new Cli({ name: 't' }).setEffects('sideways'), /Unknown effect 'sideways'/);
+  assert.throws(() => new Cli({ name: 't' }).opt('A', 'a', '', 'flag', 'A').exclusive('a', 'b'), /Unknown option --b in constraint/);
+  assert.throws(() => new Cli({ name: 't' }).arg('x', 'X').command('c', 'C'), /Cannot mix commands and positional arguments/);
+  assert.throws(() => { const c = new Cli({ name: 't' }); c.command('c', 'C'); c.arg('x', 'X'); }, /Cannot mix/);
+});
+
+test('secret options keep their value but print masked', () => {
+  const cli = new Cli({ name: 't', env: {} }).opt('TOKEN', 'token', '', '', 'Token', 'Auth', 'secret:string:3-')
+    .optArray('PW', 'pw', '', 'Passwords', 'Auth', 'secret');
+  assert.deepEqual(cli.parse(['--token', 'abcd', '--pw', 'x', '--pw', 'y']), { status: 'ok' });
+  assert.equal(cli.get('TOKEN'), 'abcd');
+  assert.deepEqual(JSON.parse(cli.valuesJson()), { TOKEN: '***', PW: ['***', '***'], HELP: false });
+  assert.equal(cli.parse(['--token', 'ab']).status, 'error');
+  const schema = JSON.parse(cli.jsonSchema());
+  assert.equal(schema.options[0].secret, true);
+  assert.equal(schema.options[0].validation, 'string:3-');
+  assert.match(cli.usage(), /Token \(required, secret, accepts: text: >=3 chars\)/);
+});
+
+test('relationships: given means set explicitly and not false', () => {
+  const make2 = (env = {}) => new Cli({ name: 't', env })
+    .opt('A', 'a', 'a', 'flag', 'A').opt('B', 'b', 'b', 'flag', 'B').opt('C', 'c', 'c', 'optional', 'C')
+    .exclusive('a', 'b').requires('c', 'a').oneOf('a', 'b', 'c');
+  assert.equal(make2().parse(['-a', '-b']).error, 'Options --a and --b cannot be used together');
+  assert.equal(make2().parse(['-a', '--no-b']).status, 'ok');
+  assert.equal(make2().parse(['-c', 'x']).error, 'Option --c requires --a');
+  assert.equal(make2({ A: 'true' }).parse(['-c', 'x']).status, 'ok');
+  assert.equal(make2().parse([]).error, 'One of --a, --b, --c is required');
+  assert.equal(make2().parse(['--no-a']).error, 'One of --a, --b, --c is required');
+});
+
+test('effects, stdin and stdout are in the schema and help', () => {
+  const cli = new Cli({ name: 't' }).setEffects('read-only', 'network').setStdin('Audio', 'audio/wav,audio/flac').setStdout('', 'audio/mpeg');
+  const schema = JSON.parse(cli.jsonSchema());
+  assert.deepEqual(schema.effects, ['read-only', 'network']);
+  assert.deepEqual(schema.stdin, { description: 'Audio', contentType: 'audio/wav,audio/flac' });
+  assert.deepEqual(schema.stdout, { description: '', contentType: 'audio/mpeg' });
+  assert.match(cli.usage(), /\n\nInput: Audio \(audio\/wav,audio\/flac\)\nOutput: \(audio\/mpeg\)\n\n/);
+});
+
+test('commands: scanning, values and the chain', () => {
+  const cli = new Cli({ name: 'm', env: {} }).opt('CONFIG', 'config', 'c', 'optional', 'Config', 'Global');
+  const db = cli.command('db', 'Database');
+  const migrate = db.command('migrate', 'Migrate').opt('TO', 'to', '', 'optional', 'Target', 'Options', 'int');
+  migrate.arg('name', 'Name', 'all');
+  assert.deepEqual(cli.parse(['db', '-c', 'x', 'migrate', '--to', '3']), { status: 'ok' });
+  assert.deepEqual(cli.commandPath, ['db', 'migrate']);
+  assert.deepEqual({ ...cli.values }, { TO: 3, CONFIG: 'x', HELP: false, name: 'all', command: ['db', 'migrate'] });
+  assert.equal(cli.source('to'), 'cli');
+  assert.equal(cli.parse(['--to', '3', 'db', 'migrate']).error, 'Unknown option: --to');
+  assert.equal(cli.parse(['db']).error, 'Missing command');
+  assert.equal(cli.parse(['db', 'seed']).error, 'Unknown command: seed');
+  assert.deepEqual(cli.parse(['db', 'migrate', '--help']), { status: 'help' });
+  assert.match(cli.usage(), /^Usage: m db migrate \[<name>\] \[OPTIONS\]/);
+  const schema = JSON.parse(cli.jsonSchema());
+  assert.equal(schema.commands[0].name, 'db');
+  assert.equal(schema.commands[0].commands[0].options[0].name, 'to');
+  assert.equal(schema.commands[0].commands[0].arguments[0].name, 'name');
+});

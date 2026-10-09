@@ -15,7 +15,7 @@ demo() { (cd "$tmp" && env -i PATH="$PATH" LANG=C.UTF-8 KEY=secret DEMO_ROOT="$t
 
 args=(--help); demo > "$golden/help.txt"
 args=(--help); demo CLYOPS_MAX_WIDTH=60 > "$golden/help-60.txt"
-printf 'demo:count=5\nshared:host=example.com\n' > "$tmp/demo.conf"
+printf 'demo:count=5\nshared:host=example.com\ndemo:key=topsecret\n' > "$tmp/demo.conf"
 args=(--help -c demo.conf); demo > "$golden/help-config.txt"
 args=(--help-json-schema); demo > "$golden/schema.json"
 args=(--bash-completion); demo | sed "s|$tmp|{tmp}|g" > "$golden/completion.txt"
@@ -23,4 +23,15 @@ args=(--bash-completion); demo | sed "s|$tmp|{tmp}|g" > "$golden/completion.txt"
 for shell in bash zsh fish; do
     args=(--completion "$shell"); demo > "$golden/completion-$shell.$shell"
 done
+
+# The commands demo sits next to the demo, named tasks (tools/conformance.py).
+cmd[${#cmd[@]}-1]=$(sed 's/\(.*\)demo/\1tasks/' <<< "${cmd[${#cmd[@]}-1]}")
+args=(--help); demo > "$golden/tasks-help.txt"
+args=(db --help); demo > "$golden/tasks-db-help.txt"
+args=(db migrate -h); demo > "$golden/tasks-migrate-help.txt"
+args=(-v send --help); demo > "$golden/tasks-send-help.txt"
+args=(--help-json-schema); demo > "$golden/tasks-schema.json"
+args=(--bash-completion); demo > "$golden/tasks-completion.txt"
+args=(--bash-completion -- db); demo > "$golden/tasks-completion-db.txt"
+args=(--bash-completion -- db migrate x); demo > "$golden/tasks-completion-migrate.txt"
 echo "wrote goldens from $impl"

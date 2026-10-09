@@ -4,26 +4,71 @@
   "title": "clyops --help-json-schema output",
   "description": "Describes a clyops program's interface (spec/SPEC.md section 8). Consumers such as apps/runner build forms from it.",
   "type": "object",
-  "required": ["clyops", "script", "description", "epilog", "arguments", "options", "requiredCommands"],
+  "required": [
+    "clyops",
+    "script",
+    "description",
+    "epilog",
+    "arguments",
+    "options",
+    "requiredCommands",
+    "effects",
+    "constraints",
+    "stdin",
+    "stdout",
+    "commands"
+  ],
   "additionalProperties": false,
   "properties": {
-    "clyops": { "const": 1, "description": "Format version." },
-    "script": { "type": "string", "description": "Program name shown in usage." },
-    "description": { "type": "string" },
-    "epilog": { "type": "string" },
+    "clyops": {
+      "const": 1,
+      "description": "Format version."
+    },
+    "script": {
+      "type": "string",
+      "description": "Program name shown in usage."
+    },
+    "description": {
+      "type": "string"
+    },
+    "epilog": {
+      "type": "string"
+    },
     "arguments": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name", "description", "required", "isVariadic", "default", "validation"],
+        "required": [
+          "name",
+          "description",
+          "required",
+          "isVariadic",
+          "default",
+          "validation"
+        ],
         "additionalProperties": false,
         "properties": {
-          "name": { "type": "string", "minLength": 1 },
-          "description": { "type": "string" },
-          "required": { "type": "boolean", "description": "True when the argument has no default and is not variadic." },
-          "isVariadic": { "type": "boolean", "description": "Collects every remaining positional token; only the last argument." },
-          "default": { "type": "string" },
-          "validation": { "$ref": "#/$defs/rule" }
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean",
+            "description": "True when the argument has no default and is not variadic."
+          },
+          "isVariadic": {
+            "type": "boolean",
+            "description": "Collects every remaining positional token; only the last argument."
+          },
+          "default": {
+            "type": "string"
+          },
+          "validation": {
+            "$ref": "#/$defs/rule"
+          }
         }
       }
     },
@@ -31,21 +76,81 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name", "shortName", "variableName", "description", "default", "group", "type", "isFlag", "isArray", "required", "validation", "choices"],
+        "required": [
+          "name",
+          "shortName",
+          "variableName",
+          "description",
+          "default",
+          "group",
+          "type",
+          "isFlag",
+          "isArray",
+          "required",
+          "validation",
+          "choices",
+          "secret"
+        ],
         "additionalProperties": false,
         "properties": {
-          "name": { "type": "string", "minLength": 1, "description": "Long name without --." },
-          "shortName": { "type": "string", "maxLength": 1, "description": "Single character without -, or empty." },
-          "variableName": { "type": "string", "minLength": 1, "description": "Value key and environment variable name." },
-          "description": { "type": "string" },
-          "default": { "type": "string", "description": "\"false\" for flags, \"\" when there is none." },
-          "group": { "type": "string", "minLength": 1 },
-          "type": { "enum": ["string", "integer", "number", "boolean", "choice", "path"] },
-          "isFlag": { "type": "boolean" },
-          "isArray": { "type": "boolean" },
-          "required": { "type": "boolean" },
-          "validation": { "$ref": "#/$defs/rule" },
-          "choices": { "type": "array", "items": { "type": "string" } }
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Long name without --."
+          },
+          "shortName": {
+            "type": "string",
+            "maxLength": 1,
+            "description": "Single character without -, or empty."
+          },
+          "variableName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Value key and environment variable name."
+          },
+          "description": {
+            "type": "string"
+          },
+          "default": {
+            "type": "string",
+            "description": "\"false\" for flags, \"\" when there is none."
+          },
+          "group": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "enum": [
+              "string",
+              "integer",
+              "number",
+              "boolean",
+              "choice",
+              "path"
+            ]
+          },
+          "isFlag": {
+            "type": "boolean"
+          },
+          "isArray": {
+            "type": "boolean"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "validation": {
+            "$ref": "#/$defs/rule"
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "secret": {
+            "type": "boolean",
+            "description": "Holds a secret (spec section 1.5): mask it in logs and use a password field."
+          }
         }
       }
     },
@@ -53,14 +158,80 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["command", "description", "installHint"],
+        "required": [
+          "command",
+          "description",
+          "installHint"
+        ],
         "additionalProperties": false,
         "properties": {
-          "command": { "type": "string", "minLength": 1 },
-          "description": { "type": "string" },
-          "installHint": { "type": "string" }
+          "command": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "installHint": {
+            "type": "string"
+          }
         }
       }
+    },
+    "effects": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "read-only",
+          "idempotent",
+          "destructive",
+          "network"
+        ]
+      },
+      "description": "What running the program does (spec section 1.3); empty when unknown."
+    },
+    "constraints": {
+      "type": "array",
+      "description": "Option relationships (spec section 1.6).",
+      "items": {
+        "type": "object",
+        "required": [
+          "type",
+          "options"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "enum": [
+              "exclusive",
+              "requires",
+              "oneOf"
+            ]
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "description": "Long option names; for requires, the first needs the others."
+          }
+        }
+      }
+    },
+    "stdin": {
+      "$ref": "#/$defs/stream"
+    },
+    "stdout": {
+      "$ref": "#/$defs/stream"
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/command"
+      },
+      "description": "Commands (spec section 1.7)."
     }
   },
   "$defs": {
@@ -68,6 +239,260 @@
       "description": "Validation rule (spec/SPEC.md section 5), or empty.",
       "type": "string",
       "pattern": "^(|int|float|string|path|ip|hostname|url|port|email|uuid|bool|date:YYYY-MM-DD|file:(exists|readable|writable)|dir:(exists|writable)|int:([0-9]+-[0-9]*|-[0-9]+)|float:([0-9]*\\.?[0-9]+-([0-9]*\\.?[0-9]+)?|-[0-9]*\\.?[0-9]+)|string:([0-9]+|[0-9]+-[0-9]*|-[0-9]+)|choice:.+|regex:.+)$"
+    },
+    "stream": {
+      "description": "Declared standard input or output (spec section 1.3), or null.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "description",
+            "contentType"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "contentType": {
+              "type": "string",
+              "description": "MIME type; for stdin possibly a comma-separated list."
+            }
+          }
+        }
+      ]
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "description",
+        "epilog",
+        "arguments",
+        "options",
+        "requiredCommands",
+        "effects",
+        "constraints",
+        "stdin",
+        "stdout",
+        "commands"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The command word."
+        },
+        "description": {
+          "type": "string"
+        },
+        "epilog": {
+          "type": "string"
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "description",
+              "required",
+              "isVariadic",
+              "default",
+              "validation"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean",
+                "description": "True when the argument has no default and is not variadic."
+              },
+              "isVariadic": {
+                "type": "boolean",
+                "description": "Collects every remaining positional token; only the last argument."
+              },
+              "default": {
+                "type": "string"
+              },
+              "validation": {
+                "$ref": "#/$defs/rule"
+              }
+            }
+          }
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "shortName",
+              "variableName",
+              "description",
+              "default",
+              "group",
+              "type",
+              "isFlag",
+              "isArray",
+              "required",
+              "validation",
+              "choices",
+              "secret"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Long name without --."
+              },
+              "shortName": {
+                "type": "string",
+                "maxLength": 1,
+                "description": "Single character without -, or empty."
+              },
+              "variableName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Value key and environment variable name."
+              },
+              "description": {
+                "type": "string"
+              },
+              "default": {
+                "type": "string",
+                "description": "\"false\" for flags, \"\" when there is none."
+              },
+              "group": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "enum": [
+                  "string",
+                  "integer",
+                  "number",
+                  "boolean",
+                  "choice",
+                  "path"
+                ]
+              },
+              "isFlag": {
+                "type": "boolean"
+              },
+              "isArray": {
+                "type": "boolean"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "validation": {
+                "$ref": "#/$defs/rule"
+              },
+              "choices": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "secret": {
+                "type": "boolean",
+                "description": "Holds a secret (spec section 1.5): mask it in logs and use a password field."
+              }
+            }
+          }
+        },
+        "requiredCommands": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "command",
+              "description",
+              "installHint"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "command": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": {
+                "type": "string"
+              },
+              "installHint": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "read-only",
+              "idempotent",
+              "destructive",
+              "network"
+            ]
+          },
+          "description": "What running the program does (spec section 1.3); empty when unknown."
+        },
+        "constraints": {
+          "type": "array",
+          "description": "Option relationships (spec section 1.6).",
+          "items": {
+            "type": "object",
+            "required": [
+              "type",
+              "options"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "enum": [
+                  "exclusive",
+                  "requires",
+                  "oneOf"
+                ]
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1,
+                "description": "Long option names; for requires, the first needs the others."
+              }
+            }
+          }
+        },
+        "stdin": {
+          "$ref": "#/$defs/stream"
+        },
+        "stdout": {
+          "$ref": "#/$defs/stream"
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/command"
+          },
+          "description": "Commands (spec section 1.7)."
+        }
+      }
     }
   }
 }

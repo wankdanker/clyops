@@ -82,11 +82,26 @@ resolves to a list.
 * `root`: base directory for default/env path values and relative search dirs.
   Defaults to the current working directory.
 * `name`: program name shown in usage. Defaults to the basename of `argv[0]`.
+* `effects(EFFECT...)`: what running the program does, for the agents and
+  servers that run it on someone's behalf (section 8): `read-only` (changes
+  nothing), `idempotent` (running it twice is the same as once), `destructive`
+  (deletes or overwrites things) and `network` (talks to the outside world).
+  Each call replaces the list; unset means unknown.
+* `stdin(description, contentType)` / `stdout(description, contentType)`:
+  what the program reads on standard input and writes on standard output.
+  `contentType` is a MIME type (`audio/wav`); for stdin it may be a
+  comma-separated list of accepted types (`audio/wav,audio/flac`). Undeclared
+  stdin means the program doesn't read it; undeclared stdout means text.
+* Option relationships (1.6) and commands (1.7).
 
-Registering an unknown validation rule, a duplicate long/short name, or a
-positional argument after a variadic is a programming error, reported at
-registration time in the language's usual way (exception, panic, or a message
-and exit status 2 in Bash and C), e.g. `Unknown validation rule 'R' for --NAME`.
+Registering an unknown validation rule, a duplicate long/short name, a
+positional argument after a variadic, an unknown effect (`Unknown effect 'E'`),
+a relationship naming an option that isn't registered (`Unknown option --NAME
+in constraint`), or mixing commands and positional arguments on one level
+(`Cannot mix commands and positional arguments`) is a programming error,
+reported at registration time in the language's usual way (exception, panic, or
+a message and exit status 2 in Bash and C), e.g. `Unknown validation rule 'R'
+for --NAME`.
 
 ### 1.4 Built-in help option
 
@@ -96,7 +111,60 @@ help message and exit"`. The short `-h` is omitted if another option already
 uses `h`. It is registered last, so `Global` is the last group unless the user
 also used it.
 
-## 2. Command-line scanning
+### 1.5 Secret options
+
+An option whose rule is `secret`, or `secret:RULE` for a secret that is also
+validated by `RULE` (`secret:string:32-`), holds a secret such as an API key or
+a token. Its validation is `RULE` (empty for a bare `secret`) everywhere else;
+the secret marking only changes what is shown:
+
+* help prints `config: ***` instead of the value from the config file, and
+  adds the annotation `secret` (section 7);
+* `valuesJson()` prints `"***"` for a set value (a list of them for an array
+  option); the program still reads the real value through the usual accessors;
+* the schema marks the option `"secret": true` (section 8), so consumers can
+  redact it, keep it out of logs and use a password field.
+
+Values on the command line are visible to other users in `ps`; prefer the
+environment or a config file for secrets. Positional arguments can't be secret.
+
+### 1.6 Option relationships
+
+Three registrations, each naming registered long options:
+
+| Registration | Meaning | Error |
+| --- | --- | --- |
+| `exclusive(A, B, ...)` | at most one of them is given | `Options --A and --B cannot be used together` |
+| `requires(A, B, ...)` | when A is given, every other one is too | `Option --A requires --B` |
+| `oneOf(A, B, ...)` | at least one of them is given | `One of --A, --B is required` |
+
+(`exclusive` plus `oneOf` over the same options means exactly one.) An option
+**is given** when its source is `cli`, `config` or `env` and its value is not
+`false` (so `--no-quiet` doesn't count) or an empty list. Defaults never count.
+The errors name the first two given options (`exclusive`), the first missing
+one (`requires`) or every option (`oneOf`), in the order registered.
+
+### 1.7 Commands
+
+A program can have **commands**, each a nested CLI with its own options,
+arguments, metadata and commands of its own: `mytool db migrate --to 3`.
+`command(name, description)` registers a command and returns it to register
+on. A level has either commands or positional arguments, not both.
+
+* The program's own options (and every ancestor's) are accepted at any depth,
+  before and after the command words; a command's options only after its word.
+  Register a level's options before its commands: an option of a command that
+  reuses a name of an ancestor's option shadows it.
+* The **chain** of a run is the selected command, its parent, and so on up to
+  the program. The chain's options, in that order, are what is resolved,
+  validated, shown in help and printed by `valuesJson()`; its required commands
+  and relationships are checked. Positional arguments are the selected
+  command's. Config files (section 4) are the program's: `config()` is
+  registered on the program, and its keys set the chain's options.
+* The selected command words are available as `command` (a list, e.g.
+  `["db", "migrate"]`; empty when no command was given) through an accessor in
+  each language, and in `valuesJson()` under the key `command`.
+
 
 Tokens are processed left to right. Scanning stops at the first error.
 
@@ -108,7 +176,7 @@ Tokens are processed left to right. Scanning stops at the first error.
 | `--no-name` | If an option literally named `no-name` exists, it is that option. Otherwise sets option `name` to `false`; only allowed for flags and for options validated by `bool`, `choice:true,false` or `choice:false,true`. |
 | `-` | Positional. |
 | `-abc` | Short cluster. For each char: a flag is set `true`; a value option takes the rest of the cluster as its value (`-ofile`), or, if nothing is left, the next token, which must exist and not start with `-`. |
-| other | Positional. Assigned to the next positional argument, or appended to the variadic once reached. |
+| other | Positional. At a level with commands, the name of the command to descend into (error if there is no such command); otherwise assigned to the next positional argument, or appended to the variadic once reached. |
 
 Array options append on every occurrence; scalar options keep the last value.
 Options may appear anywhere, including after the variadic starts.
@@ -120,6 +188,9 @@ Error messages:
 * `Option --name expects a boolean value, got 'V'`
 * `Option --no-name can only be used with flag/boolean options`
 * `Unexpected argument: TOKEN`
+* `Unknown command: TOKEN`
+
+Options are looked up in the chain selected so far, the deepest command first.
 
 ## 3. Resolution pipeline
 
@@ -136,8 +207,10 @@ Error messages:
 4. If the help option was set on the command line, print usage (7) to stdout
    and exit 0, whether or not steps 2–3 failed.
 5. If steps 2–3 failed, print the error, then usage to stderr, and exit 1.
-6. Positional arguments not given take their default. The first one without a
-   default is an error: `Missing required positional argument: NAME`.
+6. If scanning ended at a level with commands, that is an error:
+   `Missing command`. Positional arguments not given take their default. The
+   first one without a default is an error: `Missing required positional
+   argument: NAME`.
 7. Options not set by the command line or config take, in order, the
    environment variable named `var` (if set and non-empty), then the default.
    Array options ignore the environment.
@@ -150,8 +223,12 @@ Error messages:
     `  CMD - DESCRIPTION` plus `    Install: HINT` when a hint exists; exit 1.
 11. Required options (`default` `""`) still empty are an error:
     `Missing required argument(s): --a --b`, then usage to stderr, exit 1.
+12. Option relationships (1.6) are checked, in the order registered, from the
+    program down the chain. The first that fails is an error, then usage to
+    stderr, exit 1.
 
-Errors in steps 6–9 print the error and usage to stderr and exit 1.
+Errors in steps 6–9 print the error and usage to stderr and exit 1. Usage is
+always that of the selected command.
 
 Precedence is therefore **command line > config file > environment > default**.
 
@@ -268,23 +345,30 @@ newline. Lines have no trailing whitespace.
 
 `MAXW` is the integer in `CLYOPS_MAX_WIDTH`, else `100`.
 
-1. **Usage line:** `Usage: NAME` then, per positional argument, ` <name>`
-   (required), ` [<name>]` (has default) or ` [<name>...]` (variadic), then
-   ` [OPTIONS]`.
+Help is that of the selected command (1.7): `mytool db --help` describes
+`db`.
+
+1. **Usage line:** `Usage: NAME` (for a command, the program name and the
+   command words: `Usage: mytool db migrate`) then ` <command>` at a level with
+   commands, or per positional argument ` <name>` (required), ` [<name>]` (has
+   default) or ` [<name>...]` (variadic), then ` [OPTIONS]`.
 2. **Description** (if any), word-wrapped at `MAXW`.
-3. **`Positional Arguments:`** (if any), one row per argument.
-4. **`Required Commands:`** (if any), one row per command. Label is
-   `CMD [installed]` or `CMD [not found]`; text is the description followed by
-   ` (HINT)` when a hint exists.
-5. One section per option group, in order of first appearance, headed
-   `GROUP:`, one row per option in registration order.
-6. **Epilog** (if any), verbatim with trailing newlines removed.
+3. **Input and output** (if declared): `Input: DESCRIPTION (TYPE)` and
+   `Output: DESCRIPTION (TYPE)` lines, leaving out an empty description or type.
+4. **`Commands:`** (if any), one row per command: its name and description.
+5. **`Positional Arguments:`** (if any), one row per argument.
+6. **`Required Commands:`** (if any) of the chain, one row per command. Label
+   is `CMD [installed]` or `CMD [not found]`; text is the description followed
+   by ` (HINT)` when a hint exists.
+7. One section per option group of the chain's options, in order of first
+   appearance, headed `GROUP:`, one row per option in registration order.
+8. **Epilog** (if any), verbatim with trailing newlines removed.
 
 Option labels are `-s, --long` or `    --long` (four spaces when there is no
 short), followed by `=<value>` unless the option is a flag.
 
 The description column `INDENT` is `clamp(L + 4, 32, 50)` where `L` is the
-longest option label. A row is `"  " + label`, padded with spaces to `INDENT`
+longest option label or command name. A row is `"  " + label`, padded with spaces to `INDENT`
 (or followed by one space if it is already that long), then the text wrapped
 at `max(20, MAXW - INDENT)` with continuation lines indented by `INDENT`
 spaces.
@@ -293,9 +377,12 @@ Row text is the description followed by ` (A, B, …)` when there are
 annotations:
 
 * Arguments: `variadic`; `default: D`; `accepts: HELP` (section 5 help text).
-* Options: `required` (default `""`); `multiple` (array); `config: V` (the
-  config file has the key); `default: D` (a real default, not for flags or
-  `optional`); `accepts: HELP`.
+* Options: `required` (default `""`); `multiple` (array); `secret`;
+  `config: V` (the config file has the key; `config: ***` for a secret);
+  `default: D` (a real default, not for flags or `optional`); `accepts: HELP`;
+  then per relationship it is in (1.6): `conflicts with: --B, --C` (the other
+  options of an `exclusive`), `requires: --B, --C` (when it is the first option
+  of a `requires`) and `one of: --A, --B` (every option of a `oneOf`).
 
 Word wrapping keeps existing line breaks, splits words on whitespace, and
 greedily fills lines to the width (a single word longer than the width gets a
@@ -319,6 +406,17 @@ line of its own).
   ],
   "requiredCommands": [
     { "command": "", "description": "", "installHint": "" }
+  ],
+  "effects": ["read-only"],
+  "constraints": [
+    { "type": "exclusive", "options": ["json", "quiet"] }
+  ],
+  "stdin": { "description": "", "contentType": "" },
+  "stdout": null,
+  "commands": [
+    { "name": "", "description": "", "epilog": "", "arguments": [], "options": [],
+      "requiredCommands": [], "effects": [], "constraints": [], "stdin": null, "stdout": null,
+      "commands": [] }
   ]
 }
 ```
@@ -326,7 +424,13 @@ line of its own).
 `default` is `"false"` for flags and `""` for `optional`. `type` is
 `boolean` (flags and `bool`), `integer` (`int*`, `port`), `number` (`float*`),
 `choice` (`choice:*`), `path` (`path`, `file:*`, `dir:*`) or `string`.
-`choices` lists the `choice:` values. Output is indented with two spaces. [schema.json](schema.json) is the formal JSON Schema of this output.
+`choices` lists the `choice:` values. Options also have `"secret"` (1.5).
+`effects` lists the declared effects (1.3) in the order given; `constraints`
+the relationships (1.6) in registration order, `type` being `exclusive`,
+`requires` or `oneOf` and `options` the long names; `stdin` and `stdout` are
+`null` unless declared. `commands` holds each command (1.7) with the same
+fields as the program, `name` in place of `clyops` and `script`, and only its
+own options. Output is indented with two spaces. [schema.json](schema.json) is the formal JSON Schema of this output.
 
 ## 9. Completion data (`--bash-completion`)
 
@@ -346,6 +450,13 @@ the subcommand being typed, with two more records:
 skip  N                  the first N words are subcommand names; complete as if the line started after them
 cmd   NAME  DESCRIPTION  a subcommand that can be typed at this position
 ```
+
+A program with commands (1.7) answers like a dispatcher: it follows the words
+through its commands, stopping at the first that isn't one, and prints
+`skip N` (the command words followed), then a `cmd` record per command of
+that level, then the `opt` records of the chain and the `arg` records of the
+selected command. A word that is neither an option nor a command where one
+is expected gives only the header.
 
 Tabs and newlines inside descriptions become spaces. Each flag is followed by a
 `--no-LONG` record (`-`, `flag`, `none`, `-`). Value options validated by
@@ -391,11 +502,12 @@ the records above, so they never go stale:
 
 ## 10. Resolved values as JSON
 
-`valuesJson()` returns an object keyed by option `var` (registration order,
-including `HELP`) then argument name. Flags are booleans; values validated by
+`valuesJson()` returns an object keyed by option `var` (the chain's options,
+section 1.7, each level in registration order, including `HELP`) then argument
+name, then `command` for a program with commands. Flags are booleans; values validated by
 `int*` and `port` are integers, `float*` numbers, `bool` booleans; everything
 else is a string. Array options and variadics are lists. Unset values are
-`null`.
+`null`. Set secrets (1.5) are `"***"`.
 
 ## 11. Logging
 

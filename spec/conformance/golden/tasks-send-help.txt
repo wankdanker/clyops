@@ -1,0 +1,16 @@
+Usage: tasks send <message> [OPTIONS]
+
+Send a message
+
+Input: Attachment (application/octet-stream)
+
+Positional Arguments:
+  message                       Message text
+
+Options:
+  -w, --webhook=<value>         Webhook URL (accepts: URL, one of: --webhook, --email)
+  -e, --email=<value>           Email address (accepts: email address, one of: --webhook, --email)
+
+Global:
+  -v, --verbose                 Verbose output
+  -h, --help                    Show this help message and exit

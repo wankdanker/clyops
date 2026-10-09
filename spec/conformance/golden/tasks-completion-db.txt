@@ -1,0 +1,9 @@
+#clyops-completion 1
+skip	1
+cmd	migrate	Apply migrations
+cmd	status	Show migration status
+opt	--url	-u	value	default	-	Database URL
+opt	--verbose	-v	flag	none	-	Verbose output
+opt	--no-verbose	-	flag	none	-	Verbose output
+opt	--help	-h	flag	none	-	Show this help message and exit
+opt	--no-help	-	flag	none	-	Show this help message and exit

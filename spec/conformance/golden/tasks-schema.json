@@ -1,0 +1,197 @@
+{
+  "clyops": 1,
+  "script": "tasks",
+  "description": "Commands demo for the clyops conformance suite.",
+  "epilog": "Run 'tasks <command> --help' for a command's options.",
+  "arguments": [],
+  "options": [
+    {
+      "name": "verbose",
+      "shortName": "v",
+      "variableName": "VERBOSE",
+      "description": "Verbose output",
+      "default": "false",
+      "group": "Global",
+      "type": "boolean",
+      "isFlag": true,
+      "isArray": false,
+      "required": false,
+      "validation": "",
+      "choices": [],
+      "secret": false
+    },
+    {
+      "name": "help",
+      "shortName": "h",
+      "variableName": "HELP",
+      "description": "Show this help message and exit",
+      "default": "false",
+      "group": "Global",
+      "type": "boolean",
+      "isFlag": true,
+      "isArray": false,
+      "required": false,
+      "validation": "",
+      "choices": [],
+      "secret": false
+    }
+  ],
+  "requiredCommands": [],
+  "effects": [],
+  "constraints": [],
+  "stdin": null,
+  "stdout": null,
+  "commands": [
+    {
+      "name": "db",
+      "description": "Database tasks",
+      "epilog": "",
+      "arguments": [],
+      "options": [
+        {
+          "name": "url",
+          "shortName": "u",
+          "variableName": "DB_URL",
+          "description": "Database URL",
+          "default": "sqlite:app.db",
+          "group": "Database",
+          "type": "string",
+          "isFlag": false,
+          "isArray": false,
+          "required": false,
+          "validation": "",
+          "choices": [],
+          "secret": false
+        }
+      ],
+      "requiredCommands": [],
+      "effects": [],
+      "constraints": [],
+      "stdin": null,
+      "stdout": null,
+      "commands": [
+        {
+          "name": "migrate",
+          "description": "Apply migrations",
+          "epilog": "",
+          "arguments": [
+            {
+              "name": "target",
+              "description": "Target version",
+              "required": false,
+              "isVariadic": false,
+              "default": "latest",
+              "validation": ""
+            }
+          ],
+          "options": [
+            {
+              "name": "dry-run",
+              "shortName": "n",
+              "variableName": "DRY_RUN",
+              "description": "Show what would run",
+              "default": "false",
+              "group": "Options",
+              "type": "boolean",
+              "isFlag": true,
+              "isArray": false,
+              "required": false,
+              "validation": "",
+              "choices": [],
+              "secret": false
+            }
+          ],
+          "requiredCommands": [],
+          "effects": [
+            "destructive"
+          ],
+          "constraints": [],
+          "stdin": null,
+          "stdout": null,
+          "commands": []
+        },
+        {
+          "name": "status",
+          "description": "Show migration status",
+          "epilog": "",
+          "arguments": [],
+          "options": [],
+          "requiredCommands": [],
+          "effects": [
+            "read-only"
+          ],
+          "constraints": [],
+          "stdin": null,
+          "stdout": null,
+          "commands": []
+        }
+      ]
+    },
+    {
+      "name": "send",
+      "description": "Send a message",
+      "epilog": "",
+      "arguments": [
+        {
+          "name": "message",
+          "description": "Message text",
+          "required": true,
+          "isVariadic": false,
+          "default": "",
+          "validation": ""
+        }
+      ],
+      "options": [
+        {
+          "name": "webhook",
+          "shortName": "w",
+          "variableName": "WEBHOOK",
+          "description": "Webhook URL",
+          "default": "",
+          "group": "Options",
+          "type": "string",
+          "isFlag": false,
+          "isArray": false,
+          "required": false,
+          "validation": "url",
+          "choices": [],
+          "secret": false
+        },
+        {
+          "name": "email",
+          "shortName": "e",
+          "variableName": "EMAIL",
+          "description": "Email address",
+          "default": "",
+          "group": "Options",
+          "type": "string",
+          "isFlag": false,
+          "isArray": false,
+          "required": false,
+          "validation": "email",
+          "choices": [],
+          "secret": false
+        }
+      ],
+      "requiredCommands": [],
+      "effects": [
+        "network"
+      ],
+      "constraints": [
+        {
+          "type": "oneOf",
+          "options": [
+            "webhook",
+            "email"
+          ]
+        }
+      ],
+      "stdin": {
+        "description": "Attachment",
+        "contentType": "application/octet-stream"
+      },
+      "stdout": null,
+      "commands": []
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+Usage: tasks db migrate [<target>] [OPTIONS]
+
+Apply migrations
+
+Positional Arguments:
+  target                        Target version (default: latest)
+
+Options:
+  -n, --dry-run                 Show what would run
+
+Database:
+  -u, --url=<value>             Database URL (default: sqlite:app.db)
+
+Global:
+  -v, --verbose                 Verbose output
+  -h, --help                    Show this help message and exit

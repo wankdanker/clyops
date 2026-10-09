@@ -15,7 +15,24 @@ export type Source = 'cli' | 'config' | 'env' | 'default' | 'unset';
 export type Validation =
   | '' | 'int' | 'float' | 'string' | 'path' | 'ip' | 'hostname' | 'url' | 'port' | 'email' | 'uuid' | 'bool'
   | 'date:YYYY-MM-DD' | 'file:exists' | 'file:readable' | 'file:writable' | 'dir:exists' | 'dir:writable'
-  | `int:${string}` | `float:${string}` | `string:${string}` | `choice:${string}` | `regex:${string}`;
+  | `int:${string}` | `float:${string}` | `string:${string}` | `choice:${string}` | `regex:${string}`
+  | 'secret' | `secret:${string}`;
+
+/** What running a program does (spec section 1.3). */
+export type Effect = 'read-only' | 'idempotent' | 'destructive' | 'network';
+const EFFECTS = ['read-only', 'idempotent', 'destructive', 'network'];
+
+/** A declared stdin or stdout (spec section 1.3). */
+export interface Stream {
+  description: string;
+  contentType: string;
+}
+
+/** An option relationship (spec section 1.6). */
+export interface Constraint {
+  type: 'exclusive' | 'requires' | 'oneOf';
+  options: string[];
+}
 
 export interface CliOptions {
   /** Program name shown in usage. Defaults to the basename of process.argv[1]. */
@@ -44,6 +61,7 @@ interface OptionDef {
   group: string;
   validation: string;
   searchDirs: string[];
+  secret: boolean;
 }
 
 interface ArgDef {
@@ -358,6 +376,15 @@ export class Cli {
   private commands: RequiredCommand[] = [];
   private configOption = '';
   private configPrefixes: string[] = [];
+  private effects: Effect[] = [];
+  private stdinDecl: Stream | null = null;
+  private stdoutDecl: Stream | null = null;
+  private constraints: Constraint[] = [];
+  private children: Cli[] = [];
+  private parent?: Cli;
+  private word = '';
+  // The command selected by the last parse (this one when it has no commands).
+  private selected: Cli = this;
 
   // Per-parse state
   private raw = new Map<string, string | string[]>(); // options, by long name
@@ -374,6 +401,70 @@ export class Cli {
 
   setDescription(text: string): this { this.description = text; return this; }
   setEpilog(text: string): this { this.epilog = text; return this; }
+
+  /** What running the program does: read-only, idempotent, destructive, network. */
+  setEffects(...effects: Effect[]): this {
+    for (const e of effects) if (!EFFECTS.includes(e)) throw new Error(`Unknown effect '${e}'`);
+    this.effects = [...effects];
+    return this;
+  }
+
+  /** What the program reads on stdin; `contentType` is a MIME type or a comma-separated list. */
+  setStdin(description: string, contentType = ''): this { this.stdinDecl = { description, contentType }; return this; }
+  /** What the program writes on stdout; undeclared means text. */
+  setStdout(description: string, contentType = ''): this { this.stdoutDecl = { description, contentType }; return this; }
+
+  /** At most one of these options may be given. */
+  exclusive(...longs: string[]): this { return this.addConstraint('exclusive', longs); }
+  /** When the first option is given, the others must be too. */
+  requires(long: string, ...longs: string[]): this { return this.addConstraint('requires', [long, ...longs]); }
+  /** At least one of these options must be given. */
+  oneOf(...longs: string[]): this { return this.addConstraint('oneOf', longs); }
+
+  private addConstraint(type: Constraint['type'], longs: string[]): this {
+    for (const long of longs) if (!this.findOption(long, false)) throw new Error(`Unknown option --${long} in constraint`);
+    this.constraints.push({ type, options: longs });
+    return this;
+  }
+
+  /** Register a command (spec section 1.7) and return it, to register its options and arguments on. */
+  command(name: string, description: string): Cli {
+    if (this.args.length > 0) throw new Error('Cannot mix commands and positional arguments');
+    if (this.children.some((c) => c.word === name)) throw new Error(`Duplicate command ${name}`);
+    const child = new Cli({ name: `${this.name} ${name}`, root: this.root, cwd: this.cwd, env: this.env });
+    child.description = description;
+    child.parent = this;
+    child.word = name;
+    this.children.push(child);
+    return child;
+  }
+
+  /** The command words selected by the last parse, e.g. ['db', 'migrate']. */
+  get commandPath(): string[] {
+    const words: string[] = [];
+    for (let node: Cli | undefined = this.selected; node && node !== this; node = node.parent) words.unshift(node.word);
+    return words;
+  }
+
+  /** The selected command, its parent, ... up to this one. */
+  private chain(): Cli[] {
+    const out: Cli[] = [];
+    for (let node: Cli | undefined = this.selected; node; node = node === this ? undefined : node.parent) out.push(node);
+    return out;
+  }
+
+  private chainOptions(): OptionDef[] {
+    return this.chain().flatMap((n) => n.options);
+  }
+
+  /** An option by long (or, with `short`, short) name, in this level and its ancestors. */
+  private findOption(name: string, short: boolean): OptionDef | undefined {
+    for (let node: Cli | undefined = this; node; node = node.parent) {
+      const opt = short ? node.byShort.get(name) : node.byLong.get(name);
+      if (opt) return opt;
+    }
+    return undefined;
+  }
 
   /** `option` holds the config file path; `prefixes` is comma-separated. */
   setConfig(option: string, prefixes: string): this {
@@ -406,14 +497,14 @@ export class Cli {
     const kind = defaultValue === 'flag' ? 'flag' : 'value';
     const dflt = defaultValue === 'flag' || defaultValue === 'optional' ? '' : defaultValue;
     return this.addOption({ varName, long, short, kind, defaultValue: dflt, required: defaultValue === '',
-      description, group, validation, searchDirs: [] });
+      description, group, validation, searchDirs: [], secret: false });
   }
 
   /** Register a repeatable option whose values accumulate into a list. */
   optArray(varName: string, long: string, short: string, description: string,
     group = 'Options', validation: Validation = ''): this {
     return this.addOption({ varName, long, short, kind: 'array', defaultValue: '', required: false,
-      description, group, validation, searchDirs: [] });
+      description, group, validation, searchDirs: [], secret: false });
   }
 
   /** Register a positional argument. An empty default makes it required. */
@@ -440,6 +531,10 @@ export class Cli {
     if (opt.short && (opt.short.length !== 1 || this.byShort.has(opt.short))) {
       throw new Error(`Invalid or duplicate short option -${opt.short}`);
     }
+    if (opt.validation === 'secret' || opt.validation.startsWith('secret:')) {
+      opt.secret = true;
+      opt.validation = opt.validation.slice(7);
+    }
     if (!isKnownRule(opt.validation)) throw new Error(`Unknown validation rule '${opt.validation}' for --${opt.long}`);
     this.options.push(opt);
     this.byLong.set(opt.long, opt);
@@ -448,6 +543,7 @@ export class Cli {
   }
 
   private addArg(arg: ArgDef): this {
+    if (this.children.length > 0) throw new Error('Cannot mix commands and positional arguments');
     if (this.args.some((a) => a.variadic)) throw new Error(`Argument ${arg.name} registered after a variadic argument`);
     if (!isKnownRule(arg.validation)) throw new Error(`Unknown validation rule '${arg.validation}' for ${arg.name}`);
     this.args.push(arg);
@@ -458,7 +554,7 @@ export class Cli {
     if (this.byLong.has('help')) return;
     this.addOption({ varName: 'HELP', long: 'help', short: this.byShort.has('h') ? '' : 'h', kind: 'flag',
       defaultValue: '', required: false, description: 'Show this help message and exit', group: 'Global',
-      validation: '', searchDirs: [] });
+      validation: '', searchDirs: [], secret: false });
   }
 
   // -------------------------------------------------------------------------
@@ -472,6 +568,7 @@ export class Cli {
     this.sources.clear();
     this.configValues.clear();
     this.values = Object.create(null);
+    this.selected = this;
     this.ensureHelp();
 
     let err = this.scan(argv);
@@ -485,7 +582,7 @@ export class Cli {
       return { status: 'error', error: (e as Error).message, showUsage: true };
     }
 
-    const missingCmds = this.commands.filter((c) => !isCommandAvailable(c.command, this.env));
+    const missingCmds = this.chain().flatMap((n) => n.commands).filter((c) => !isCommandAvailable(c.command, this.env));
     if (missingCmds.length > 0) {
       const detail: string[] = [];
       for (const c of missingCmds) {
@@ -496,11 +593,34 @@ export class Cli {
         showUsage: false, detail };
     }
 
-    const missing = this.options.filter((o) => o.required && !this.raw.get(o.long)).map((o) => `--${o.long}`);
+    const missing = this.chainOptions().filter((o) => o.required && !this.raw.get(o.long)).map((o) => `--${o.long}`);
     if (missing.length > 0) {
       return { status: 'error', error: `Missing required argument(s): ${missing.join(' ')}`, showUsage: true };
     }
+
+    const conflict = this.checkConstraints();
+    if (conflict) return { status: 'error', error: conflict, showUsage: true };
     return { status: 'ok' };
+  }
+
+  /** Spec section 1.6: the first relationship that fails, from the program down. */
+  private checkConstraints(): string | undefined {
+    const given = (long: string): boolean => {
+      const v = this.raw.get(long);
+      return ['cli', 'config', 'env'].includes(this.source(long)) && v !== 'false' && !(Array.isArray(v) && v.length === 0);
+    };
+    for (const node of this.chain().reverse()) {
+      for (const c of node.constraints) {
+        const on = c.options.filter(given);
+        if (c.type === 'exclusive' && on.length > 1) return `Options --${on[0]} and --${on[1]} cannot be used together`;
+        if (c.type === 'requires' && given(c.options[0])) {
+          const absent = c.options.slice(1).find((o) => !given(o));
+          if (absent) return `Option --${c.options[0]} requires --${absent}`;
+        }
+        if (c.type === 'oneOf' && on.length === 0) return `One of ${c.options.map((o) => `--${o}`).join(', ')} is required`;
+      }
+    }
+    return undefined;
   }
 
   private setCli(opt: OptionDef, value: string): void {
@@ -520,7 +640,14 @@ export class Cli {
 
     const positional = (token: string): string | undefined => {
       if (rest) { rest.push(token); return; }
-      const arg = this.args[pos];
+      const node = this.selected;
+      if (node.children.length > 0) {
+        const child = node.children.find((c) => c.word === token);
+        if (!child) return `Unknown command: ${token}`;
+        this.selected = child;
+        return;
+      }
+      const arg = node.args[pos];
       if (!arg) return `Unexpected argument: ${token}`;
       pos++;
       if (arg.variadic) { rest = [token]; this.argRaw.set(arg.name, rest); } else this.argRaw.set(arg.name, token);
@@ -537,7 +664,7 @@ export class Cli {
       } else if (token.startsWith('--')) {
         const eq = token.indexOf('=');
         const name = eq >= 0 ? token.slice(2, eq) : token.slice(2);
-        const opt = this.byLong.get(name);
+        const opt = this.selected.findOption(name, false);
         if (opt && eq >= 0) {
           const value = token.slice(eq + 1);
           if (opt.kind === 'flag') {
@@ -553,8 +680,8 @@ export class Cli {
             this.setCli(opt, next);
             i++;
           }
-        } else if (name.startsWith('no-') && eq < 0 && this.byLong.has(name.slice(3))) {
-          const target = this.byLong.get(name.slice(3)) as OptionDef;
+        } else if (name.startsWith('no-') && eq < 0 && this.selected.findOption(name.slice(3), false)) {
+          const target = this.selected.findOption(name.slice(3), false) as OptionDef;
           if (!isBoolLike(target)) return `Option --${name} can only be used with flag/boolean options`;
           this.setCli(target, 'false');
         } else {
@@ -563,7 +690,7 @@ export class Cli {
       } else {
         const cluster = token.slice(1);
         for (let j = 0; j < cluster.length; j++) {
-          const opt = this.byShort.get(cluster[j]);
+          const opt = this.selected.findOption(cluster[j], true);
           if (!opt) return `Unknown option: -${cluster[j]}`;
           if (opt.kind === 'flag') { this.setCli(opt, 'true'); continue; }
           if (j + 1 < cluster.length) { this.setCli(opt, cluster.slice(j + 1)); break; }
@@ -579,7 +706,7 @@ export class Cli {
   }
 
   private loadConfig(): string | undefined {
-    const opt = this.byLong.get(this.configOption);
+    const opt = this.selected.findOption(this.configOption, false);
     if (!opt) return undefined;
     let file = this.raw.get(opt.long) as string | undefined;
     let source: Source = 'cli';
@@ -594,7 +721,7 @@ export class Cli {
     if (err) return err;
 
     for (const [key, { value }] of this.configValues) {
-      const target = this.byLong.get(key);
+      const target = this.selected.findOption(key, false);
       if (!target || this.sources.get(key) === 'cli' || target === opt) continue;
       if (target.kind === 'flag') {
         const b = boolWord(value);
@@ -644,14 +771,17 @@ export class Cli {
 
   /** Steps 6–9 of the pipeline. Throws with the spec error text. */
   private resolve(): void {
-    for (const arg of this.args) {
+    if (this.selected.children.length > 0) throw new Error('Missing command');
+    const options = this.chainOptions();
+    const args = this.selected.args;
+    for (const arg of args) {
       if (this.argRaw.has(arg.name)) continue;
       if (arg.variadic) { this.argRaw.set(arg.name, []); continue; }
       if (!arg.defaultValue) throw new Error(`Missing required positional argument: ${arg.name}`);
       this.argRaw.set(arg.name, arg.defaultValue);
     }
 
-    for (const opt of this.options) {
+    for (const opt of options) {
       if (this.sources.has(opt.long)) continue;
       const envValue = opt.kind === 'array' ? undefined : this.env[opt.varName];
       if (envValue) {
@@ -671,7 +801,7 @@ export class Cli {
     }
 
     // Path resolution: base depends on where the value came from.
-    for (const opt of this.options) {
+    for (const opt of options) {
       // The config option was already resolved by loadConfig.
       if (!isPathRule(opt.validation) || !this.raw.has(opt.long) || opt.long === this.configOption) continue;
       const src = this.sources.get(opt.long);
@@ -680,7 +810,7 @@ export class Cli {
       const v = this.raw.get(opt.long) as string | string[];
       this.raw.set(opt.long, Array.isArray(v) ? v.map((x) => resolvePath(x, base, opt.searchDirs)) : resolvePath(v, base, opt.searchDirs));
     }
-    for (const arg of this.args) {
+    for (const arg of args) {
       if (!isPathRule(arg.validation)) continue;
       const v = this.argRaw.get(arg.name) as string | string[];
       this.argRaw.set(arg.name, Array.isArray(v) ? v.map((x) => resolvePath(x, this.cwd)) : resolvePath(v, this.cwd));
@@ -688,17 +818,18 @@ export class Cli {
 
     // Validation and conversion.
     const convert = (v: string, rule: string, name: string): Scalar => (v === '' || !rule ? v : validate(v, rule, name));
-    for (const opt of this.options) {
+    for (const opt of options) {
       const v = this.raw.get(opt.long);
       if (v === undefined) this.values[opt.varName] = opt.kind === 'array' ? [] : null;
       else if (opt.kind === 'flag') this.values[opt.varName] = v === 'true';
       else if (Array.isArray(v)) this.values[opt.varName] = v.map((x) => convert(x, opt.validation, `--${opt.long}`));
       else this.values[opt.varName] = convert(v, opt.validation, `--${opt.long}`);
     }
-    for (const arg of this.args) {
+    for (const arg of args) {
       const v = this.argRaw.get(arg.name) as string | string[];
       this.values[arg.name] = Array.isArray(v) ? v.map((x) => convert(x, arg.validation, arg.name)) : convert(v, arg.validation, arg.name);
     }
+    if (this.children.length > 0) this.values.command = this.commandPath;
   }
 
   /**
@@ -709,7 +840,11 @@ export class Cli {
     const end = argv.indexOf('--');
     const head = end >= 0 ? argv.slice(0, end) : argv;
     if (head.includes('--help-json-schema')) { this.ensureHelp(); process.stdout.write(this.jsonSchema() + '\n'); process.exit(0); }
-    if (head.includes('--bash-completion')) { this.ensureHelp(); process.stdout.write(this.completionData()); process.exit(0); }
+    if (head.includes('--bash-completion')) {
+      this.ensureHelp();
+      process.stdout.write(this.completionData(end >= 0 ? argv.slice(end + 1) : []));
+      process.exit(0);
+    }
     const shellAt = head.indexOf('--completion');
     if (shellAt >= 0) {
       const script = this.completionScript(head[shellAt + 1] ?? '');
@@ -752,8 +887,12 @@ export class Cli {
   /** Resolved values as JSON (spec section 10). */
   valuesJson(): string {
     const out: Record<string, Value> = {};
-    for (const opt of this.options) out[opt.varName] = this.values[opt.varName] ?? null;
-    for (const arg of this.args) out[arg.name] = this.values[arg.name] ?? null;
+    for (const opt of this.chainOptions()) {
+      const v = this.values[opt.varName] ?? null;
+      out[opt.varName] = opt.secret && v !== null ? (Array.isArray(v) ? v.map(() => '***') : '***') : v;
+    }
+    for (const arg of this.selected.args) out[arg.name] = this.values[arg.name] ?? null;
+    if (this.children.length > 0) out.command = this.commandPath;
     return JSON.stringify(out, null, 2);
   }
 
@@ -766,11 +905,14 @@ export class Cli {
     return opt.kind === 'flag' ? head : `${head}=<value>`;
   }
 
-  /** Help text (spec section 7). */
+  /** Help text (spec section 7), for the selected command. */
   usage(): string {
     this.ensureHelp();
+    const node = this.selected;
+    const chain = this.chain();
+    const options = this.chainOptions();
     const maxWidth = Number(this.env.CLYOPS_MAX_WIDTH) || 100;
-    const longest = Math.max(0, ...this.options.map((o) => this.label(o).length));
+    const longest = Math.max(0, ...options.map((o) => this.label(o).length), ...node.children.map((c) => c.word.length));
     const indent = Math.min(50, Math.max(32, longest + 4));
     const textWidth = Math.max(20, maxWidth - indent);
 
@@ -783,17 +925,24 @@ export class Cli {
     const annotate = (text: string, notes: string[]) => (notes.length ? `${text} (${notes.join(', ')})` : text);
 
     const sections: string[][] = [];
-    let usageLine = `Usage: ${this.name}`;
-    for (const arg of this.args) {
+    let usageLine = `Usage: ${node.name}`;
+    if (node.children.length > 0) usageLine += ' <command>';
+    for (const arg of node.args) {
       usageLine += arg.variadic ? ` [<${arg.name}...>]` : arg.defaultValue ? ` [<${arg.name}>]` : ` <${arg.name}>`;
     }
     sections.push([usageLine + ' [OPTIONS]']);
 
-    if (this.description) sections.push(wrapText(this.description, maxWidth));
+    if (node.description) sections.push(wrapText(node.description, maxWidth));
 
-    if (this.args.length > 0) {
+    const stream = (label: string, s: Stream) => [label, s.description, s.contentType && `(${s.contentType})`].filter(Boolean).join(' ');
+    const io = [node.stdinDecl && stream('Input:', node.stdinDecl), node.stdoutDecl && stream('Output:', node.stdoutDecl)];
+    if (io.some(Boolean)) sections.push(io.filter((l): l is string => Boolean(l)));
+
+    if (node.children.length > 0) sections.push(['Commands:', ...node.children.flatMap((c) => row(c.word, c.description))]);
+
+    if (node.args.length > 0) {
       const lines = ['Positional Arguments:'];
-      for (const arg of this.args) {
+      for (const arg of node.args) {
         const notes: string[] = [];
         if (arg.variadic) notes.push('variadic');
         if (arg.defaultValue) notes.push(`default: ${arg.defaultValue}`);
@@ -803,38 +952,53 @@ export class Cli {
       sections.push(lines);
     }
 
-    if (this.commands.length > 0) {
+    const commands = chain.flatMap((n) => n.commands);
+    if (commands.length > 0) {
       const lines = ['Required Commands:'];
-      for (const c of this.commands) {
+      for (const c of commands) {
         const status = isCommandAvailable(c.command, this.env) ? 'installed' : 'not found';
         lines.push(...row(`${c.command} [${status}]`, c.installHint ? `${c.description} (${c.installHint})` : c.description));
       }
       sections.push(lines);
     }
 
-    const groups = [...new Set(this.options.map((o) => o.group))];
+    const constraints = [...chain].reverse().flatMap((n) => n.constraints);
+    const groups = [...new Set(options.map((o) => o.group))];
     for (const group of groups) {
       const lines = [`${group}:`];
-      for (const opt of this.options.filter((o) => o.group === group)) {
+      for (const opt of options.filter((o) => o.group === group)) {
         const notes: string[] = [];
         if (opt.required) notes.push('required');
         if (opt.kind === 'array') notes.push('multiple');
+        if (opt.secret) notes.push('secret');
         const cfg = this.configValues.get(opt.long);
-        if (cfg) notes.push(`config: ${cfg.value}`);
+        if (cfg) notes.push(`config: ${opt.secret ? '***' : cfg.value}`);
         if (opt.defaultValue) notes.push(`default: ${opt.defaultValue}`);
         if (opt.validation) notes.push(`accepts: ${describeRule(opt.validation)}`);
+        const list = (longs: string[]) => longs.map((l) => `--${l}`).join(', ');
+        for (const c of constraints) {
+          if (!c.options.includes(opt.long)) continue;
+          if (c.type === 'exclusive') notes.push(`conflicts with: ${list(c.options.filter((l) => l !== opt.long))}`);
+          if (c.type === 'requires' && c.options[0] === opt.long) notes.push(`requires: ${list(c.options.slice(1))}`);
+          if (c.type === 'oneOf') notes.push(`one of: ${list(c.options)}`);
+        }
         lines.push(...row(this.label(opt), annotate(opt.description, notes)));
       }
       sections.push(lines);
     }
 
-    if (this.epilog) sections.push(this.epilog.replace(/\n+$/, '').split('\n'));
+    if (node.epilog) sections.push(node.epilog.replace(/\n+$/, '').split('\n'));
 
     return sections.map((s) => s.join('\n')).join('\n\n').split('\n').map((l) => l.trimEnd()).join('\n') + '\n';
   }
 
   /** JSON description of the CLI (spec section 8). */
   jsonSchema(): string {
+    this.ensureHelp();
+    return JSON.stringify({ clyops: 1, script: this.name, ...this.schemaNode() }, null, 2);
+  }
+
+  private schemaNode(): Record<string, unknown> {
     const type = (o: OptionDef): string => {
       const v = o.validation;
       if (o.kind === 'flag' || v === 'bool') return 'boolean';
@@ -844,9 +1008,8 @@ export class Cli {
       if (isPathRule(v)) return 'path';
       return 'string';
     };
-    return JSON.stringify({
-      clyops: 1,
-      script: this.name,
+    return {
+      ...(this.parent ? { name: this.word } : {}),
       description: this.description,
       epilog: this.epilog,
       arguments: this.args.map((a) => ({
@@ -857,10 +1020,15 @@ export class Cli {
         name: o.long, shortName: o.short, variableName: o.varName, description: o.description,
         default: o.kind === 'flag' ? 'false' : o.defaultValue, group: o.group, type: type(o),
         isFlag: o.kind === 'flag', isArray: o.kind === 'array', required: o.required, validation: o.validation,
-        choices: o.validation.startsWith('choice:') ? o.validation.slice(7).split(',') : [],
+        choices: o.validation.startsWith('choice:') ? o.validation.slice(7).split(',') : [], secret: o.secret,
       })),
       requiredCommands: this.commands.map((c) => ({ command: c.command, description: c.description, installHint: c.installHint })),
-    }, null, 2);
+      effects: this.effects,
+      constraints: this.constraints,
+      stdin: this.stdinDecl,
+      stdout: this.stdoutDecl,
+      commands: this.children.map((c) => c.schemaNode()),
+    };
   }
 
   /**
@@ -872,11 +1040,29 @@ export class Cli {
     return template?.split('__CLYOPS_FUNC__').join(this.name.replace(/[^A-Za-z0-9_]/g, '_')).split('__CLYOPS_PROG__').join(this.name);
   }
 
-  /** Tab-separated completion records (spec section 9). */
-  completionData(): string {
+  /**
+   * Tab-separated completion records (spec section 9). `words` are the words
+   * typed after the program name; a program with commands follows them.
+   */
+  completionData(words: string[] = []): string {
     const clean = (s: string) => s.replace(/[\t\n]/g, ' ');
     const lines = ['#clyops-completion 1'];
-    for (const o of this.options) {
+    let node: Cli = this;
+    if (this.children.length > 0) {
+      let skip = 0;
+      for (const w of words) {
+        const child = node.children.find((c) => c.word === w);
+        if (!child) break;
+        node = child;
+        skip++;
+      }
+      if (node.children.length > 0 && skip < words.length && !words[skip].startsWith('-')) return lines.join('\n') + '\n';
+      lines.push(`skip\t${skip}`);
+      for (const c of node.children) lines.push(`cmd\t${c.word}\t${clean(c.description)}`);
+    }
+    const options: OptionDef[] = [];
+    for (let n: Cli | undefined = node; n; n = n.parent) options.push(...n.options);
+    for (const o of options) {
       const noLine = `opt\t--no-${o.long}\t-\tflag\tnone\t-\t${clean(o.description)}`;
       if (o.kind === 'flag') {
         lines.push(`opt\t--${o.long}\t${o.short ? '-' + o.short : '-'}\tflag\tnone\t-\t${clean(o.description)}`, noLine);
@@ -886,7 +1072,7 @@ export class Cli {
       lines.push(`opt\t--${o.long}\t${o.short ? '-' + o.short : '-'}\tvalue\t${kind}\t${values || '-'}\t${clean(o.description)}`);
       if (isBoolLike(o)) lines.push(noLine);
     }
-    for (const a of this.args) {
+    for (const a of node.args) {
       const [kind, values] = completionKind(a.validation, []);
       lines.push(`arg\t${a.name}\t${a.variadic ? 'variadic' : 'single'}\t${kind}\t${values || '-'}\t${clean(a.description)}`);
     }

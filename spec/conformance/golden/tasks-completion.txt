@@ -1,0 +1,8 @@
+#clyops-completion 1
+skip	0
+cmd	db	Database tasks
+cmd	send	Send a message
+opt	--verbose	-v	flag	none	-	Verbose output
+opt	--no-verbose	-	flag	none	-	Verbose output
+opt	--help	-h	flag	none	-	Show this help message and exit
+opt	--no-help	-	flag	none	-	Show this help message and exit

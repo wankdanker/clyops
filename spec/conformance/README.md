@@ -32,6 +32,7 @@ python3 tools/conformance.py js -k config   # cases whose name contains "config"
   "files": { "demo.conf": "demo:count=5\n" },  // optional, relative to {tmp}
   "dirs": ["data"],                    // optional, created under {tmp}
   "cwd": "sub",                        // optional, relative to {tmp}
+  "program": "tasks",                  // optional: the commands demo instead of demo
   "expect": {
     "exit": 0,
     "values": { "COUNT": 5 },          // subset match
@@ -51,6 +52,9 @@ python3 tools/conformance.py js -k config   # cases whose name contains "config"
 * required command: `sh`, `POSIX shell`, `install dash`
 * root: `$DEMO_ROOT` when set, else the current directory
 * path search: `config` → `conf`
+* effects: `idempotent`, `network`
+* stdin: `Lines to process`, `text/plain`; stdout: `The resolved values`, `application/json`
+* relationships: `exclusive(endpoint, addr)`, `requires(dest, src)`
 
 Positional arguments:
 
@@ -75,7 +79,7 @@ Options, in registration order:
 | `ENABLED` | `enabled` | | `true` | `Enable processing` | `Options` | `bool` |
 | `TAG` | `tag` | `t` | *(array)* | `Tag to attach` | `Options` | `string:1-8` |
 | `NO_CACHE` | `no-cache` | | `flag` | `Disable the cache` | `Options` | |
-| `KEY` | `key` | `k` | `""` | `API key` | `Auth` | |
+| `KEY` | `key` | `k` | `""` | `API key` | `Auth` | `secret` |
 | `HOST` | `host` | `H` | `localhost` | `Server host` | `Network` | `hostname` |
 | `PORT` | `port` | `p` | `8080` | `Server port` | `Network` | `port` |
 | `ENDPOINT` | `endpoint` | | `optional` | `Endpoint URL` | `Network` | `url` |
@@ -94,3 +98,24 @@ Options, in registration order:
 The built-in `--help`/`-h` (`HELP`) is added last in group `Global`.
 
 `sources` lists every option long name (including `help`).
+
+## The commands demo
+
+`tasks` sits next to `demo` (the last `demo` in its `impls.json` command
+replaced by `tasks`, e.g. `examples/tasks.py`) and checks commands (spec
+section 1.7). It prints `{ "values": { …valuesJson()… } }`.
+
+* name `tasks`, description `Commands demo for the clyops conformance suite.`,
+  epilog `Run 'tasks <command> --help' for a command's options.`
+* option `VERBOSE` `verbose` `v` `flag` `Verbose output` `Global`
+* command `db` `Database tasks`
+  * option `DB_URL` `url` `u` `sqlite:app.db` `Database URL` `Database`
+  * command `migrate` `Apply migrations`: argument `target` `Target version`
+    default `latest`; option `DRY_RUN` `dry-run` `n` `flag` `Show what would
+    run` (group `Options`); effects `destructive`
+  * command `status` `Show migration status`: effects `read-only`
+* command `send` `Send a message`: argument `message` `Message text`
+  (required); options `WEBHOOK` `webhook` `w` `optional` `Webhook URL`
+  `Options` `url` and `EMAIL` `email` `e` `optional` `Email address` `Options`
+  `email`; `oneOf(webhook, email)`; effects `network`; stdin `Attachment`,
+  `application/octet-stream`

@@ -1,0 +1,13 @@
+Usage: tasks <command> [OPTIONS]
+
+Commands demo for the clyops conformance suite.
+
+Commands:
+  db                            Database tasks
+  send                          Send a message
+
+Global:
+  -v, --verbose                 Verbose output
+  -h, --help                    Show this help message and exit
+
+Run 'tasks <command> --help' for a command's options.

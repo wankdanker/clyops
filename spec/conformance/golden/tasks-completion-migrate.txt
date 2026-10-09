@@ -1,0 +1,10 @@
+#clyops-completion 1
+skip	2
+opt	--dry-run	-n	flag	none	-	Show what would run
+opt	--no-dry-run	-	flag	none	-	Show what would run
+opt	--url	-u	value	default	-	Database URL
+opt	--verbose	-v	flag	none	-	Verbose output
+opt	--no-verbose	-	flag	none	-	Verbose output
+opt	--help	-h	flag	none	-	Show this help message and exit
+opt	--no-help	-	flag	none	-	Show this help message and exit
+arg	target	single	default	-	Target version

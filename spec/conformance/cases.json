@@ -18,7 +18,7 @@
         "ENABLED": true,
         "TAG": [],
         "NO_CACHE": false,
-        "KEY": "secret",
+        "KEY": "***",
         "HOST": "localhost",
         "PORT": 8080,
         "ENDPOINT": null,
@@ -101,7 +101,7 @@
       "demo.conf"
     ],
     "files": {
-      "demo.conf": "demo:count=5\nshared:host=example.com\n"
+      "demo.conf": "demo:count=5\nshared:host=example.com\ndemo:key=topsecret\n"
     },
     "expect": {
       "exit": 0,
@@ -214,7 +214,7 @@
     "expect": {
       "exit": 0,
       "values": {
-        "KEY": "abc"
+        "KEY": "***"
       },
       "sources": {
         "key": "cli"
@@ -1483,8 +1483,6 @@
       "in.txt",
       "--endpoint",
       "https://api.example.com:8443/v1",
-      "--addr",
-      "10.0.0.1",
       "--id",
       "123e4567-e89b-12d3-a456-426614174000",
       "--email",
@@ -1502,7 +1500,6 @@
       "exit": 0,
       "values": {
         "ENDPOINT": "https://api.example.com:8443/v1",
-        "ADDR": "10.0.0.1",
         "ID": "123e4567-e89b-12d3-a456-426614174000",
         "EMAIL": "a.b@example.org",
         "DATE": "2026-10-08",
@@ -1669,13 +1666,18 @@
     "args": [
       "in.txt",
       "--dest",
-      "new.txt"
+      "new.txt",
+      "--src",
+      "s.txt"
     ],
     "expect": {
       "exit": 0,
       "values": {
         "DEST": "{tmp}/new.txt"
       }
+    },
+    "files": {
+      "s.txt": ""
     }
   },
   {
@@ -1689,6 +1691,538 @@
       "exit": 1,
       "stderr": [
         "--dest directory is not writable: {tmp}/nodir"
+      ]
+    }
+  },
+  {
+    "name": "secret value is masked in values json",
+    "args": [
+      "in.txt",
+      "--key=hunter2"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "KEY": "***"
+      },
+      "sources": {
+        "key": "cli"
+      }
+    }
+  },
+  {
+    "name": "secret from config is masked in values json",
+    "args": [
+      "in.txt",
+      "-c",
+      "demo.conf"
+    ],
+    "env": {
+      "KEY": null
+    },
+    "files": {
+      "demo.conf": "demo:key=topsecret\n"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "KEY": "***"
+      },
+      "sources": {
+        "key": "config"
+      }
+    }
+  },
+  {
+    "name": "exclusive options",
+    "args": [
+      "in.txt",
+      "--endpoint",
+      "https://x.example",
+      "--addr",
+      "10.0.0.1"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Options --endpoint and --addr cannot be used together",
+        "Usage: demo"
+      ]
+    }
+  },
+  {
+    "name": "exclusive counts the environment",
+    "args": [
+      "in.txt",
+      "--addr",
+      "10.0.0.1"
+    ],
+    "env": {
+      "ENDPOINT": "https://x.example"
+    },
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Options --endpoint and --addr cannot be used together"
+      ]
+    }
+  },
+  {
+    "name": "exclusive counts config",
+    "args": [
+      "in.txt",
+      "--addr",
+      "10.0.0.1",
+      "-c",
+      "demo.conf"
+    ],
+    "files": {
+      "demo.conf": "demo:endpoint=https://x.example\n"
+    },
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Options --endpoint and --addr cannot be used together"
+      ]
+    }
+  },
+  {
+    "name": "exclusive option alone",
+    "args": [
+      "in.txt",
+      "--addr",
+      "10.0.0.1"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "ADDR": "10.0.0.1",
+        "ENDPOINT": null
+      }
+    }
+  },
+  {
+    "name": "requires a missing option",
+    "args": [
+      "in.txt",
+      "--dest",
+      "new.txt"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Option --dest requires --src",
+        "Usage: demo"
+      ]
+    }
+  },
+  {
+    "name": "required option of a relationship may come from the environment",
+    "args": [
+      "in.txt",
+      "--dest",
+      "new.txt"
+    ],
+    "env": {
+      "SRC": "s.txt"
+    },
+    "files": {
+      "s.txt": ""
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "DEST": "{tmp}/new.txt",
+        "SRC": "{tmp}/s.txt"
+      }
+    }
+  },
+  {
+    "name": "requires is checked after validation",
+    "args": [
+      "in.txt",
+      "--dest",
+      "nodir/new.txt"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--dest directory is not writable: {tmp}/nodir"
+      ]
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: help",
+    "args": [
+      "--help"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@tasks-help.txt"
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: help of a command group",
+    "args": [
+      "db",
+      "--help"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@tasks-db-help.txt"
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: help of a command",
+    "args": [
+      "db",
+      "migrate",
+      "-h"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@tasks-migrate-help.txt"
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: help after the command words and options",
+    "args": [
+      "-v",
+      "send",
+      "--help"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@tasks-send-help.txt"
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: json schema",
+    "args": [
+      "--help-json-schema"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@tasks-schema.json"
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: completion data at the top",
+    "args": [
+      "--bash-completion"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@tasks-completion.txt"
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: completion data in a group",
+    "args": [
+      "--bash-completion",
+      "--",
+      "db"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@tasks-completion-db.txt"
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: completion data for a command",
+    "args": [
+      "--bash-completion",
+      "--",
+      "db",
+      "migrate",
+      "x"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@tasks-completion-migrate.txt"
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: completion data for an unknown command",
+    "args": [
+      "--bash-completion",
+      "--",
+      "bogus"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "#clyops-completion 1\n"
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: values",
+    "args": [
+      "db",
+      "migrate",
+      "3",
+      "-n"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "DRY_RUN": true,
+        "DB_URL": "sqlite:app.db",
+        "VERBOSE": false,
+        "HELP": false,
+        "target": "3",
+        "command": [
+          "db",
+          "migrate"
+        ]
+      }
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: options of the program and the parents anywhere",
+    "args": [
+      "-v",
+      "db",
+      "migrate",
+      "--url",
+      "pg:x",
+      "--dry-run"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "DRY_RUN": true,
+        "DB_URL": "pg:x",
+        "VERBOSE": true,
+        "target": "latest",
+        "command": [
+          "db",
+          "migrate"
+        ]
+      }
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: options after the arguments",
+    "args": [
+      "db",
+      "migrate",
+      "5",
+      "-vu",
+      "pg:y"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "VERBOSE": true,
+        "DB_URL": "pg:y",
+        "target": "5"
+      }
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: environment and defaults apply along the chain",
+    "args": [
+      "db",
+      "status"
+    ],
+    "env": {
+      "DB_URL": "pg:env",
+      "VERBOSE": "yes"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "DB_URL": "pg:env",
+        "VERBOSE": true,
+        "command": [
+          "db",
+          "status"
+        ]
+      }
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: a command's option before its word",
+    "args": [
+      "db",
+      "-n",
+      "migrate"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Unknown option: -n",
+        "Usage: tasks db <command>"
+      ]
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: missing command",
+    "args": [],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Missing command",
+        "Usage: tasks <command> [OPTIONS]"
+      ]
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: missing subcommand",
+    "args": [
+      "db",
+      "-v"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Missing command",
+        "Usage: tasks db <command> [OPTIONS]"
+      ]
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: unknown command",
+    "args": [
+      "deploy"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Unknown command: deploy",
+        "Usage: tasks <command>"
+      ]
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: unknown subcommand",
+    "args": [
+      "db",
+      "seed"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Unknown command: seed",
+        "Usage: tasks db <command>"
+      ]
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: too many arguments",
+    "args": [
+      "db",
+      "status",
+      "x"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Unexpected argument: x",
+        "Usage: tasks db status [OPTIONS]"
+      ]
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: missing positional of a command",
+    "args": [
+      "send",
+      "-e",
+      "a@b.co"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "Missing required positional argument: message",
+        "Usage: tasks send <message>"
+      ]
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: one of",
+    "args": [
+      "send",
+      "hi"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "One of --webhook, --email is required",
+        "Usage: tasks send"
+      ]
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: one of satisfied",
+    "args": [
+      "send",
+      "hi",
+      "--email",
+      "a@b.co"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "message": "hi",
+        "EMAIL": "a@b.co",
+        "WEBHOOK": null,
+        "command": [
+          "send"
+        ]
+      }
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: one of satisfied by the environment",
+    "args": [
+      "send",
+      "hi"
+    ],
+    "env": {
+      "WEBHOOK": "https://hook.example/x"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "WEBHOOK": "https://hook.example/x"
+      }
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: double dash then a command",
+    "args": [
+      "--",
+      "send",
+      "-x"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "One of --webhook, --email is required"
       ]
     }
   }

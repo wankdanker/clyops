@@ -48,6 +48,14 @@ def subset_diff(expected, actual, path=""):
     return [] if ok else [f"{path or '.'}: expected {expected!r}, got {actual!r}"]
 
 
+def program(cmd, name):
+    """The command for a demo program: the commands demo sits next to `demo`, named `tasks`."""
+    if name == "demo":
+        return cmd
+    head, _, tail = cmd[-1].rpartition("demo")
+    return cmd[:-1] + [head + name + tail]
+
+
 def run_case(cmd, case, verbose):
     tmp = os.path.realpath(tempfile.mkdtemp(prefix="clyops-"))
     try:
@@ -105,8 +113,9 @@ def run_case(cmd, case, verbose):
                     errors.append(f"stdout is not JSON: {exc}")
                     out = None
                 if out is not None:
-                    errors += subset_diff(expect.get("values", {}), out.get("values"), "values")
-                    errors += subset_diff(expect.get("sources", {}), out.get("sources"), "sources")
+                    for key in ("values", "sources"):
+                        if key in expect:
+                            errors += subset_diff(expect[key], out.get(key), key)
 
         if errors and verbose:
             errors.append("--- stdout ---\n" + proc.stdout + "--- stderr ---\n" + proc.stderr)
@@ -137,7 +146,7 @@ def main():
         cmd = [os.path.join(ROOT, part) if part.startswith(("packages/", "./")) else part for part in impls[name]]
         bad = 0
         for case in cases:
-            errors = run_case(cmd, case, args.verbose)
+            errors = run_case(program(cmd, case.get("program", "demo")), case, args.verbose)
             if errors:
                 bad += 1
                 print(f"FAIL [{name}] {case['name']}")
