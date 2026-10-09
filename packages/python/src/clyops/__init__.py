@@ -18,7 +18,7 @@ import shutil
 import sys
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, NoReturn, Optional, Sequence, Union
+from typing import Dict, List, Mapping, NoReturn, Optional, Sequence, Union
 
 from ._completions import SCRIPTS as _COMPLETION_SCRIPTS
 
@@ -87,6 +87,9 @@ _FIXED_RULES = {
     "date:YYYY-MM-DD", "file:exists", "file:readable", "file:writable", "dir:exists", "dir:writable",
 }
 _HOSTNAME = r"[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*"
+
+
+_EFFECTS = ("read-only", "idempotent", "destructive", "network")
 
 
 def _bool_word(value: str) -> Optional[bool]:
@@ -323,6 +326,7 @@ class _Option:
     group: str
     rule: str
     search_dirs: List[str] = field(default_factory=list)
+    secret: bool = False
 
     @property
     def label(self) -> str:
@@ -367,7 +371,7 @@ class _ParseError(Exception):
 
 class Cli:
     def __init__(self, name: Optional[str] = None, root: Optional[str] = None, cwd: Optional[str] = None,
-                 env: Optional[Dict[str, str]] = None):
+                 env: Optional[Mapping[str, str]] = None):
         self.name = name or os.path.basename(sys.argv[0] or "cli")
         self.cwd = cwd or os.getcwd()
         self.root = os.path.normpath(os.path.join(self.cwd, root or "."))
@@ -386,6 +390,15 @@ class Cli:
         self._arg_raw: Dict[str, Union[str, List[str]]] = {}
         self._sources: Dict[str, str] = {}
         self._config: Dict[str, tuple] = {}  # key -> (value, dir)
+        self._effects: List[str] = []
+        self._stdin: Optional[Dict[str, str]] = None
+        self._stdout: Optional[Dict[str, str]] = None
+        self._constraints: List[Dict[str, object]] = []
+        self._children: List["Cli"] = []
+        self._parent: Optional["Cli"] = None
+        self._word = ""
+        # The command selected by the last parse (this one when it has no commands).
+        self._selected: "Cli" = self
 
     # -- registration ---------------------------------------------------------
 
@@ -396,6 +409,88 @@ class Cli:
     def set_epilog(self, text: str) -> "Cli":
         self.epilog = text
         return self
+
+    def set_effects(self, *effects: str) -> "Cli":
+        """What running the program does: read-only, idempotent, destructive, network."""
+        for e in effects:
+            if e not in _EFFECTS:
+                raise ValueError(f"Unknown effect '{e}'")
+        self._effects = list(effects)
+        return self
+
+    def set_stdin(self, description: str, content_type: str = "") -> "Cli":
+        """What the program reads on stdin; `content_type` is a MIME type or a comma-separated list."""
+        self._stdin = {"description": description, "contentType": content_type}
+        return self
+
+    def set_stdout(self, description: str, content_type: str = "") -> "Cli":
+        """What the program writes on stdout; undeclared means text."""
+        self._stdout = {"description": description, "contentType": content_type}
+        return self
+
+    def exclusive(self, *longs: str) -> "Cli":
+        """At most one of these options may be given."""
+        return self._constraint("exclusive", longs)
+
+    def requires(self, long: str, *longs: str) -> "Cli":
+        """When the first option is given, the others must be too."""
+        return self._constraint("requires", (long,) + longs)
+
+    def one_of(self, *longs: str) -> "Cli":
+        """At least one of these options must be given."""
+        return self._constraint("oneOf", longs)
+
+    def _constraint(self, kind: str, longs: Sequence[str]) -> "Cli":
+        for long in longs:
+            if not self._find(long, False):
+                raise ValueError(f"Unknown option --{long} in constraint")
+        self._constraints.append({"type": kind, "options": list(longs)})
+        return self
+
+    def command(self, name: str, description: str = "") -> "Cli":
+        """Register a command (spec section 1.7) and return it, to register its options and arguments on."""
+        if self._args:
+            raise ValueError("Cannot mix commands and positional arguments")
+        if any(c._word == name for c in self._children):
+            raise ValueError(f"Duplicate command {name}")
+        child = Cli(f"{self.name} {name}", self.root, self.cwd, self.env)
+        child.description = description
+        child._parent = self
+        child._word = name
+        self._children.append(child)
+        return child
+
+    @property
+    def command_path(self) -> List[str]:
+        """The command words selected by the last parse, e.g. ["db", "migrate"]."""
+        words: List[str] = []
+        node: Optional[Cli] = self._selected
+        while node is not None and node is not self:
+            words.insert(0, node._word)
+            node = node._parent
+        return words
+
+    def _chain(self) -> List["Cli"]:
+        """The selected command, its parent, ... up to this one."""
+        out: List[Cli] = []
+        node: Optional[Cli] = self._selected
+        while node is not None:
+            out.append(node)
+            node = None if node is self else node._parent
+        return out
+
+    def _chain_options(self) -> List[_Option]:
+        return [o for n in self._chain() for o in n._options]
+
+    def _find(self, name: str, short: bool) -> Optional[_Option]:
+        """An option by long (or short) name, in this level and its ancestors."""
+        node: Optional[Cli] = self
+        while node is not None:
+            opt = (node._by_short if short else node._by_long).get(name)
+            if opt:
+                return opt
+            node = node._parent
+        return None
 
     def set_config(self, option: str, prefixes: str) -> "Cli":
         """`option` holds the config file path; `prefixes` is comma-separated."""
@@ -441,6 +536,8 @@ class Cli:
             raise ValueError(f"Duplicate option --{opt.long}")
         if opt.short and (len(opt.short) != 1 or opt.short in self._by_short):
             raise ValueError(f"Invalid or duplicate short option -{opt.short}")
+        if opt.rule == "secret" or opt.rule.startswith("secret:"):
+            opt.secret, opt.rule = True, opt.rule[7:]
         if not _known_rule(opt.rule):
             raise ValueError(f"Unknown validation rule '{opt.rule}' for --{opt.long}")
         self._options.append(opt)
@@ -450,6 +547,8 @@ class Cli:
         return self
 
     def _add_arg(self, arg: _Arg) -> "Cli":
+        if self._children:
+            raise ValueError("Cannot mix commands and positional arguments")
         if any(a.variadic for a in self._args):
             raise ValueError(f"Argument {arg.name} registered after a variadic argument")
         if not _known_rule(arg.rule):
@@ -469,6 +568,7 @@ class Cli:
         argv = list(sys.argv[1:] if argv is None else argv)
         self._raw, self._arg_raw, self._sources, self._config = {}, {}, {}, {}
         self.values = Values()
+        self._selected = self
         self._ensure_help()
 
         try:
@@ -491,7 +591,7 @@ class Cli:
         except (_ParseError, ValidationError) as exc:
             return ParseResult("error", str(exc))
 
-        missing_cmds = [c for c in self._commands if not shutil.which(c[0], path=self.env.get("PATH", ""))]
+        missing_cmds = [c for n in self._chain() for c in n._commands if not shutil.which(c[0], path=self.env.get("PATH", ""))]
         if missing_cmds:
             detail = []
             for cmd, desc, hint in missing_cmds:
@@ -501,10 +601,33 @@ class Cli:
             return ParseResult("error", "Missing required command(s): " + ", ".join(c[0] for c in missing_cmds),
                                False, detail)
 
-        missing = [f"--{o.long}" for o in self._options if o.required and not self._raw.get(o.long)]
+        missing = [f"--{o.long}" for o in self._chain_options() if o.required and not self._raw.get(o.long)]
         if missing:
             return ParseResult("error", "Missing required argument(s): " + " ".join(missing))
+        conflict = self._check_constraints()
+        if conflict:
+            return ParseResult("error", conflict)
         return ParseResult("ok")
+
+    def _check_constraints(self) -> Optional[str]:
+        """Spec section 1.6: the first relationship that fails, from the program down."""
+        def given(long: str) -> bool:
+            v = self._raw.get(long)
+            return self.source(long) in ("cli", "config", "env") and v != "false" and v != []
+
+        for node in reversed(self._chain()):
+            for c in node._constraints:
+                longs: List[str] = c["options"]  # type: ignore[assignment]
+                on = [o for o in longs if given(o)]
+                if c["type"] == "exclusive" and len(on) > 1:
+                    return f"Options --{on[0]} and --{on[1]} cannot be used together"
+                if c["type"] == "requires" and given(longs[0]):
+                    absent = next((o for o in longs[1:] if not given(o)), None)
+                    if absent:
+                        return f"Option --{longs[0]} requires --{absent}"
+                if c["type"] == "oneOf" and not on:
+                    return "One of " + ", ".join(f"--{o}" for o in longs) + " is required"
+        return None
 
     def _set_cli(self, opt: _Option, value: str) -> None:
         if opt.kind == "array":
@@ -523,12 +646,18 @@ class Cli:
             token = argv[i]
             i += 1
             if end_of_options or token == "-" or not token.startswith("-"):
+                node = self._selected
                 if rest is not None:
                     rest.append(token)
-                elif pos >= len(self._args):
+                elif node._children:
+                    child = next((c for c in node._children if c._word == token), None)
+                    if child is None:
+                        raise _ParseError(f"Unknown command: {token}")
+                    self._selected = child
+                elif pos >= len(node._args):
                     raise _ParseError(f"Unexpected argument: {token}")
                 else:
-                    arg = self._args[pos]
+                    arg = node._args[pos]
                     pos += 1
                     if arg.variadic:
                         rest = [token]
@@ -539,7 +668,7 @@ class Cli:
                 end_of_options = True
             elif token.startswith("--"):
                 name, eq, value = token[2:].partition("=")
-                opt = self._by_long.get(name)
+                opt = self._selected._find(name, False)
                 if opt and eq:
                     if opt.kind == "flag":
                         b = _bool_word(value)
@@ -555,8 +684,9 @@ class Cli:
                             raise _ParseError(f"Option --{name} requires an argument")
                         self._set_cli(opt, argv[i])
                         i += 1
-                elif name.startswith("no-") and not eq and name[3:] in self._by_long:
-                    target = self._by_long[name[3:]]
+                elif name.startswith("no-") and not eq and self._selected._find(name[3:], False):
+                    target = self._selected._find(name[3:], False)
+                    assert target is not None
                     if not target.bool_like:
                         raise _ParseError(f"Option --{name} can only be used with flag/boolean options")
                     self._set_cli(target, "false")
@@ -565,7 +695,7 @@ class Cli:
             else:
                 cluster = token[1:]
                 for j, ch in enumerate(cluster):
-                    opt = self._by_short.get(ch)
+                    opt = self._selected._find(ch, True)
                     if not opt:
                         raise _ParseError(f"Unknown option: -{ch}")
                     if opt.kind == "flag":
@@ -581,7 +711,7 @@ class Cli:
                     break
 
     def _load_config(self) -> None:
-        opt = self._by_long.get(self._config_option)
+        opt = self._selected._find(self._config_option, False)
         if not opt:
             return
         path, source = self._raw.get(opt.long), "cli"
@@ -598,7 +728,7 @@ class Cli:
         self._read_config(resolved, 0, set())
 
         for key, (value, _) in self._config.items():
-            target = self._by_long.get(key)
+            target = self._selected._find(key, False)
             if not target or target is opt or self._sources.get(key) == "cli":
                 continue
             if target.kind == "flag":
@@ -651,7 +781,11 @@ class Cli:
         stack.discard(path)
 
     def _resolve(self) -> None:
-        for arg in self._args:
+        if self._selected._children:
+            raise _ParseError("Missing command")
+        options = self._chain_options()
+        args = self._selected._args
+        for arg in args:
             if arg.name in self._arg_raw:
                 continue
             if arg.variadic:
@@ -661,7 +795,7 @@ class Cli:
             else:
                 self._arg_raw[arg.name] = arg.default
 
-        for opt in self._options:
+        for opt in options:
             if opt.long in self._sources:
                 continue
             env_value = None if opt.kind == "array" else self.env.get(opt.var)
@@ -681,7 +815,7 @@ class Cli:
                 self._sources[opt.long] = "default"
 
         # Path resolution: the base depends on where the value came from.
-        for opt in self._options:
+        for opt in options:
             if not _is_path_rule(opt.rule) or opt.long not in self._raw or opt.long == self._config_option:
                 continue
             source = self._sources[opt.long]
@@ -691,7 +825,7 @@ class Cli:
                 self._raw[opt.long] = [resolve_path(v, base, opt.search_dirs) for v in value]
             else:
                 self._raw[opt.long] = resolve_path(value, base, opt.search_dirs)
-        for arg in self._args:
+        for arg in args:
             if _is_path_rule(arg.rule):
                 value = self._arg_raw[arg.name]
                 if isinstance(value, list):
@@ -702,7 +836,7 @@ class Cli:
         def convert(v: str, rule: str, name: str) -> Scalar:
             return validate(v, rule, name) if v and rule else v
 
-        for opt in self._options:
+        for opt in options:
             raw = self._raw.get(opt.long)
             if raw is None:
                 self.values[opt.var] = [] if opt.kind == "array" else None
@@ -712,12 +846,14 @@ class Cli:
                 self.values[opt.var] = [convert(v, opt.rule, f"--{opt.long}") for v in raw]
             else:
                 self.values[opt.var] = convert(raw, opt.rule, f"--{opt.long}")
-        for arg in self._args:
+        for arg in args:
             value = self._arg_raw[arg.name]
             if isinstance(value, list):
                 self.values[arg.name] = [convert(v, arg.rule, arg.name) for v in value]
             else:
                 self.values[arg.name] = convert(value, arg.rule, arg.name)
+        if self._children:
+            self.values["command"] = self.command_path  # type: ignore[assignment]
 
     def run(self, argv: Optional[Sequence[str]] = None) -> Values:
         """Parse like a CLI: handles --help, --help-json-schema and --bash-completion,
@@ -728,7 +864,7 @@ class Cli:
             sys.stdout.write(self.json_schema() + "\n")
             sys.exit(0)
         if "--bash-completion" in head:
-            sys.stdout.write(self.completion_data())
+            sys.stdout.write(self.completion_data(argv[argv.index("--") + 1:] if "--" in argv else []))
             sys.exit(0)
         if "--completion" in head:
             shell = head[head.index("--completion") + 1] if head.index("--completion") + 1 < len(head) else ""
@@ -768,18 +904,26 @@ class Cli:
 
     def values_json(self) -> str:
         """Resolved values as JSON (spec section 10)."""
-        out = {o.var: self.values.get(o.var) for o in self._options}
-        out.update({a.name: self.values.get(a.name) for a in self._args})
+        out: Dict[str, object] = {}
+        for o in self._chain_options():
+            v = self.values.get(o.var)
+            out[o.var] = (["***"] * len(v) if isinstance(v, list) else "***") if o.secret and v is not None else v
+        out.update({a.name: self.values.get(a.name) for a in self._selected._args})
+        if self._children:
+            out["command"] = self.command_path
         return json.dumps(out, indent=2, ensure_ascii=False)
 
     # -- output ---------------------------------------------------------------
 
     def usage(self) -> str:
-        """Help text (spec section 7)."""
+        """Help text (spec section 7), for the selected command."""
         self._ensure_help()
+        node = self._selected
+        chain = self._chain()
+        options = self._chain_options()
         width = self.env.get("CLYOPS_MAX_WIDTH", "")
         max_width = int(width) if width.isdigit() and int(width) > 0 else 100
-        longest = max((len(o.label) for o in self._options), default=0)
+        longest = max([len(o.label) for o in options] + [len(c._word) for c in node._children], default=0)
         indent = min(50, max(32, longest + 4))
         text_width = max(20, max_width - indent)
 
@@ -793,50 +937,77 @@ class Cli:
             return f"{text} ({', '.join(notes)})" if notes else text
 
         sections: List[List[str]] = []
-        usage = f"Usage: {self.name}"
-        for arg in self._args:
+        usage = f"Usage: {node.name}"
+        if node._children:
+            usage += " <command>"
+        for arg in node._args:
             usage += f" [<{arg.name}...>]" if arg.variadic else f" [<{arg.name}>]" if arg.default else f" <{arg.name}>"
         sections.append([usage + " [OPTIONS]"])
 
-        if self.description:
-            sections.append(wrap_text(self.description, max_width))
+        if node.description:
+            sections.append(wrap_text(node.description, max_width))
 
-        if self._args:
+        io = []
+        for label, decl in (("Input:", node._stdin), ("Output:", node._stdout)):
+            if decl is not None:
+                ctype = decl["contentType"]
+                io.append(" ".join(x for x in (label, decl["description"], ctype and f"({ctype})") if x))
+        if io:
+            sections.append(io)
+
+        if node._children:
+            sections.append(["Commands:"] + [line for c in node._children for line in row(c._word, c.description)])
+
+        if node._args:
             lines = ["Positional Arguments:"]
-            for arg in self._args:
+            for arg in node._args:
                 notes = (["variadic"] if arg.variadic else []) + ([f"default: {arg.default}"] if arg.default else [])
                 if arg.rule:
                     notes.append(f"accepts: {describe_rule(arg.rule)}")
                 lines += row(arg.name, annotate(arg.description, notes))
             sections.append(lines)
 
-        if self._commands:
+        commands = [c for n in chain for c in n._commands]
+        if commands:
             lines = ["Required Commands:"]
-            for cmd, desc, hint in self._commands:
+            for cmd, desc, hint in commands:
                 status = "installed" if shutil.which(cmd, path=self.env.get("PATH", "")) else "not found"
                 lines += row(f"{cmd} [{status}]", f"{desc} ({hint})" if hint else desc)
             sections.append(lines)
 
-        groups = list(dict.fromkeys(o.group for o in self._options))
+        constraints = [c for n in reversed(chain) for c in n._constraints]
+        groups = list(dict.fromkeys(o.group for o in options))
         for group in groups:
             lines = [f"{group}:"]
-            for opt in (o for o in self._options if o.group == group):
+            for opt in (o for o in options if o.group == group):
                 notes = []
                 if opt.required:
                     notes.append("required")
                 if opt.kind == "array":
                     notes.append("multiple")
+                if opt.secret:
+                    notes.append("secret")
                 if opt.long in self._config:
-                    notes.append(f"config: {self._config[opt.long][0]}")
+                    notes.append(f"config: {'***' if opt.secret else self._config[opt.long][0]}")
                 if opt.default:
                     notes.append(f"default: {opt.default}")
                 if opt.rule:
                     notes.append(f"accepts: {describe_rule(opt.rule)}")
+                for c in constraints:
+                    longs: List[str] = c["options"]  # type: ignore[assignment]
+                    if opt.long not in longs:
+                        continue
+                    if c["type"] == "exclusive":
+                        notes.append("conflicts with: " + ", ".join(f"--{o}" for o in longs if o != opt.long))
+                    elif c["type"] == "requires" and longs[0] == opt.long:
+                        notes.append("requires: " + ", ".join(f"--{o}" for o in longs[1:]))
+                    elif c["type"] == "oneOf":
+                        notes.append("one of: " + ", ".join(f"--{o}" for o in longs))
                 lines += row(opt.label, annotate(opt.description, notes))
             sections.append(lines)
 
-        if self.epilog:
-            sections.append(self.epilog.rstrip("\n").split("\n"))
+        if node.epilog:
+            sections.append(node.epilog.rstrip("\n").split("\n"))
 
         text = "\n\n".join("\n".join(s) for s in sections)
         return "\n".join(line.rstrip() for line in text.split("\n")) + "\n"
@@ -844,7 +1015,9 @@ class Cli:
     def json_schema(self) -> str:
         """JSON description of the CLI (spec section 8)."""
         self._ensure_help()
+        return json.dumps({"clyops": 1, "script": self.name, **self._schema_node()}, indent=2, ensure_ascii=False)
 
+    def _schema_node(self) -> Dict[str, object]:
         def type_of(o: _Option) -> str:
             r = o.rule
             if o.kind == "flag" or r == "bool":
@@ -857,9 +1030,8 @@ class Cli:
                 return "choice"
             return "path" if _is_path_rule(r) else "string"
 
-        return json.dumps({
-            "clyops": 1,
-            "script": self.name,
+        return {
+            **({"name": self._word} if self._parent else {}),
             "description": self.description,
             "epilog": self.epilog,
             "arguments": [{
@@ -871,9 +1043,15 @@ class Cli:
                 "default": "false" if o.kind == "flag" else o.default, "group": o.group, "type": type_of(o),
                 "isFlag": o.kind == "flag", "isArray": o.kind == "array", "required": o.required,
                 "validation": o.rule, "choices": o.rule[7:].split(",") if o.rule.startswith("choice:") else [],
+                "secret": o.secret,
             } for o in self._options],
             "requiredCommands": [{"command": c, "description": d, "installHint": h} for c, d, h in self._commands],
-        }, indent=2, ensure_ascii=False)
+            "effects": self._effects,
+            "constraints": self._constraints,
+            "stdin": self._stdin,
+            "stdout": self._stdout,
+            "commands": [c._schema_node() for c in self._children],
+        }
 
     def completion_script(self, shell: str) -> Optional[str]:
         """Shell script that enables completion for this program (spec section 9):
@@ -884,15 +1062,33 @@ class Cli:
         func = re.sub(r"[^A-Za-z0-9_]", "_", self.name)
         return template.replace("__CLYOPS_FUNC__", func).replace("__CLYOPS_PROG__", self.name)
 
-    def completion_data(self) -> str:
-        """Tab-separated completion records (spec section 9)."""
+    def completion_data(self, words: Sequence[str] = ()) -> str:
+        """Tab-separated completion records (spec section 9). `words` are the words typed
+        after the program name; a program with commands follows them."""
         self._ensure_help()
 
         def clean(s: str) -> str:
             return s.replace("\t", " ").replace("\n", " ")
 
         lines = ["#clyops-completion 1"]
-        for o in self._options:
+        node: Cli = self
+        if self._children:
+            skip = 0
+            for w in words:
+                child = next((c for c in node._children if c._word == w), None)
+                if child is None:
+                    break
+                node, skip = child, skip + 1
+            if node._children and skip < len(words) and not words[skip].startswith("-"):
+                return lines[0] + "\n"
+            lines.append(f"skip\t{skip}")
+            lines += [f"cmd\t{c._word}\t{clean(c.description)}" for c in node._children]
+        options: List[_Option] = []
+        current: Optional[Cli] = node
+        while current is not None:
+            options += current._options
+            current = current._parent
+        for o in options:
             short = f"-{o.short}" if o.short else "-"
             if o.kind == "flag":
                 lines.append(f"opt\t--{o.long}\t{short}\tflag\tnone\t-\t{clean(o.description)}")
@@ -901,7 +1097,7 @@ class Cli:
                 lines.append(f"opt\t--{o.long}\t{short}\tvalue\t{kind}\t{values or '-'}\t{clean(o.description)}")
             if o.bool_like:
                 lines.append(f"opt\t--no-{o.long}\t-\tflag\tnone\t-\t{clean(o.description)}")
-        for a in self._args:
+        for a in node._args:
             kind, values = _completion_kind(a.rule, [])
             arity = "variadic" if a.variadic else "single"
             lines.append(f"arg\t{a.name}\t{arity}\t{kind}\t{values or '-'}\t{clean(a.description)}")
