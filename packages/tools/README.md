@@ -53,3 +53,8 @@ ESM only, Node 20+.
 Positionals come first by default. Set `{ positionals: 'last' }` to put them
 after options. `--` is emitted only when a positional starts with `-`; then all
 positionals follow it. Explicit positional arrays also accept `positionalsOrder`.
+
+A stdin stream error rejects execution with the original input error after the
+tool is stopped and reaped. Execution closes and unpipes supplied streams on
+completion or failure; a tool that exits before consuming all input still
+succeeds, including when its stdin pipe closes early.

@@ -327,12 +327,6 @@ function start(file, argv, opts = {}) {
     stdio: [opts.stdin === void 0 ? "ignore" : "pipe", "pipe", "pipe"],
     signal: opts.signal
   });
-  if (opts.stdin !== void 0 && child.stdin) {
-    child.stdin.on("error", () => {
-    });
-    if (opts.stdin instanceof import_node_stream.Readable) opts.stdin.pipe(child.stdin);
-    else child.stdin.end(opts.stdin);
-  }
   const limit = opts.maxOutput || Infinity;
   let truncated = false;
   const collect = (stream, onChunk) => {
@@ -357,17 +351,54 @@ function start(file, argv, opts = {}) {
   const stderr = collect(childErr, opts.onStderr);
   const result = new Promise((resolve5, reject) => {
     let timedOut = false;
+    let failure;
+    let exited = false;
+    const source = opts.stdin instanceof import_node_stream.Readable ? opts.stdin : void 0;
+    const forgetSource = () => {
+      source?.removeListener("error", inputError);
+      source?.removeListener("close", forgetSource);
+    };
+    const closeInput = () => {
+      if (source) {
+        source.unpipe(child.stdin ?? void 0);
+        if (source.closed) forgetSource();
+        else {
+          source.once("close", forgetSource);
+          source.destroy();
+        }
+      }
+      child.stdin?.destroy();
+    };
+    const inputError = (err) => {
+      if (exited || failure) return;
+      failure = err;
+      child.kill("SIGKILL");
+      closeInput();
+    };
     const timer = opts.timeoutMs ? setTimeout(() => {
       timedOut = true;
       child.kill("SIGKILL");
+      closeInput();
     }, opts.timeoutMs) : void 0;
     child.on("error", (err) => {
-      if (err.name === "AbortError") return;
-      clearTimeout(timer);
-      reject(err);
+      if (err.name === "AbortError") {
+        closeInput();
+        return;
+      }
+      failure ??= err;
+      closeInput();
     });
-    child.on("close", (exitCode, signal) => {
+    child.once("exit", () => {
+      exited = true;
+      closeInput();
+    });
+    child.once("close", (exitCode, signal) => {
       clearTimeout(timer);
+      closeInput();
+      if (failure) {
+        reject(failure);
+        return;
+      }
       const out = stdout();
       resolve5({
         command: [file, ...argv],
@@ -381,6 +412,15 @@ function start(file, argv, opts = {}) {
         durationMs: Date.now() - started
       });
     });
+    if (opts.stdin !== void 0 && child.stdin) {
+      child.stdin.on("error", closeInput);
+      child.stdin.once("close", () => child.stdin?.removeListener("error", closeInput));
+      if (source) {
+        source.on("error", inputError);
+        if (source.errored) inputError(source.errored);
+        else source.pipe(child.stdin);
+      } else child.stdin.end(opts.stdin);
+    }
   });
   return { child, stdout: childOut, result };
 }

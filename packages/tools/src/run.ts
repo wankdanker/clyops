@@ -54,12 +54,6 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
     stdio: [opts.stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
     signal: opts.signal,
   });
-  if (opts.stdin !== undefined && child.stdin) {
-    // A tool that exits without reading all of its input is not an error here.
-    child.stdin.on('error', () => {});
-    if (opts.stdin instanceof Readable) opts.stdin.pipe(child.stdin);
-    else child.stdin.end(opts.stdin);
-  }
   const limit = opts.maxOutput || Infinity;
   let truncated = false;
   const collect = (stream: Readable, onChunk?: (chunk: string) => void) => {
@@ -86,20 +80,50 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
 
   const result = new Promise<RunResult>((resolve, reject) => {
     let timedOut = false;
+    let failure: Error | undefined;
+    let exited = false;
+    const source = opts.stdin instanceof Readable ? opts.stdin : undefined;
+    const forgetSource = () => {
+      source?.removeListener('error', inputError);
+      source?.removeListener('close', forgetSource);
+    };
+    const closeInput = () => {
+      if (source) {
+        source.unpipe(child.stdin ?? undefined);
+        // destroy() may finish a pending read asynchronously. Keep the error
+        // handler until close so an early tool exit cannot crash its caller.
+        if (source.closed) forgetSource();
+        else {
+          source.once('close', forgetSource);
+          source.destroy();
+        }
+      }
+      child.stdin?.destroy();
+    };
+    const inputError = (err: Error) => {
+      if (exited || failure) return;
+      failure = err;
+      child.kill('SIGKILL');
+      closeInput();
+    };
     const timer = opts.timeoutMs
       ? setTimeout(() => {
           timedOut = true;
           child.kill('SIGKILL');
+          closeInput();
         }, opts.timeoutMs)
       : undefined;
     child.on('error', (err) => {
       // An abort still ends in 'close' with the signal; only report real failures.
-      if (err.name === 'AbortError') return;
-      clearTimeout(timer);
-      reject(err);
+      if (err.name === 'AbortError') { closeInput(); return; }
+      failure ??= err;
+      closeInput();
     });
-    child.on('close', (exitCode, signal) => {
+    child.once('exit', () => { exited = true; closeInput(); });
+    child.once('close', (exitCode, signal) => {
       clearTimeout(timer);
+      closeInput();
+      if (failure) { reject(failure); return; }
       const out = stdout();
       resolve({
         command: [file, ...argv],
@@ -113,6 +137,16 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
         durationMs: Date.now() - started,
       });
     });
+    if (opts.stdin !== undefined && child.stdin) {
+      // A tool closing its input early (EPIPE) remains a successful run.
+      child.stdin.on('error', closeInput);
+      child.stdin.once('close', () => child.stdin?.removeListener('error', closeInput));
+      if (source) {
+        source.on('error', inputError);
+        if (source.errored) inputError(source.errored);
+        else source.pipe(child.stdin);
+      } else child.stdin.end(opts.stdin);
+    }
   });
   return { child, stdout: childOut, result };
 }

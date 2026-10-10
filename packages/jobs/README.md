@@ -89,3 +89,7 @@ queue.get(job.record.job_id)?.cancel();
 ```
 
 ESM only, Node 20+.
+
+A missing or unreadable configured stdin file rejects `runScriptFunction()`
+with its input-file error. It fails that job and stops its tool; the host worker
+stays alive.
