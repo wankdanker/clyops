@@ -183,6 +183,11 @@ test('toJsonSchema', () => {
 
 test('watchTools reloads when tools change', { timeout: 30_000 }, async () => {
   const root = tree();
+  // Keep probe output outside the watched tree so it can't trigger reloads.
+  const counter = `${root}.probes`;
+  const demo = join(root, 'demo.sh');
+  const template = readFileSync(demo, 'utf8');
+  file(demo, template.replace('# clyops-tool\n', `# clyops-tool\necho probe >> ${counter}\n`));
   const sets = [];
   let wake = () => {};
   const watcher = await watchTools(root, { debounceMs: 50, onChange: (loaded) => { sets.push(loaded); wake(); } });
@@ -198,11 +203,11 @@ test('watchTools reloads when tools change', { timeout: 30_000 }, async () => {
     // Not a tool: rescanned, but not reported.
     writeFileSync(join(root, 'notes.log'), 'x');
 
-    file(join(root, 'media/new.sh'), readFileSync(join(root, 'demo.sh'), 'utf8'));
+    file(join(root, 'media/new.sh'), template);
     await until((l) => names(l).includes('media new'));
 
     mkdirSync(join(root, 'extra'));
-    file(join(root, 'extra/deep'), readFileSync(join(root, 'demo.sh'), 'utf8'));
+    file(join(root, 'extra/deep'), template);
     await until((l) => names(l).includes('extra deep'));
 
     writeFileSync(join(root, '.clyops'), 'description: Renamed\n');
@@ -212,8 +217,10 @@ test('watchTools reloads when tools change', { timeout: 30_000 }, async () => {
     const last = await until((l) => !names(l).includes('media new'));
     assert.equal(watcher.current(), last);
     assert.equal(sets.length, 4, 'one report per real change');
+    assert.equal(readFileSync(counter, 'utf8'), 'probe\n', 'watcher reloads reuse unchanged schemas');
   } finally {
     watcher.close();
+    rmSync(counter, { force: true });
   }
 });
 
@@ -357,20 +364,28 @@ test('loadSchema rejects non-clyops JSON', async () => {
   await assert.rejects(loadSchema(join(root, 'fake')), /expected a clyops: 1 schema/);
 });
 
-test('hot reload does not re-probe unchanged files', async () => {
+test('reloads only re-probe tools whose stamp changed', async () => {
   const root = tree();
   const counter = join(root, 'probes.log');
   const path = join(root, 'counted.sh');
   const source = `#!/bin/sh\n# clyops-tool\necho probe >> ${counter}\nexec node ${join(repo, 'packages/js/examples/demo.cjs')} "$@"\n`;
   file(path, source);
-  let wake;
-  const changed = new Promise((resolve) => { wake = resolve; });
-  const watcher = await watchTools(root, { debounceMs: 20, onChange: wake });
-  try {
-    file(join(root, 'added.sh'), readFileSync(join(root, 'demo.sh'), 'utf8'));
-    await Promise.race([changed, new Promise((_, reject) => setTimeout(() => reject(new Error('reload did not finish')), 5000).unref())]);
-    assert.equal(readFileSync(counter, 'utf8'), 'probe\n');
-  } finally { watcher.close(); }
+  // watchTools uses loadTools for every reload. Exercise its cache behavior
+  // directly, independently of filesystem event startup/coalescing on macOS.
+  await loadTools(root);
+  assert.equal(readFileSync(counter, 'utf8'), 'probe\n');
+
+  file(join(root, 'added.sh'), readFileSync(join(root, 'demo.sh'), 'utf8'));
+  const loaded = await loadTools(root);
+  assert.ok(loaded.tools.some((tool) => tool.words.join(' ') === 'added'));
+  assert.equal(readFileSync(counter, 'utf8'), 'probe\n');
+
+  // Change size as well as mtime to avoid filesystem timestamp granularity.
+  file(path, source + '# changed\n');
+  await loadTools(root);
+  assert.equal(readFileSync(counter, 'utf8'), 'probe\nprobe\n');
+  await loadTools(root);
+  assert.equal(readFileSync(counter, 'utf8'), 'probe\nprobe\n');
 });
 
 test('toArgv supports both orders, with -- only for dash positionals', () => {

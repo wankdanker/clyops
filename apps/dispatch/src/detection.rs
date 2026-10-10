@@ -62,7 +62,7 @@ pub fn uses_clyops(source: &[u8]) -> bool {
         let token_first = first;
         let literal;
         let value;
-        if [b'\'', b'"', b'`'].contains(&c) {
+        if b"'\"`".contains(&c) {
             let quote = if source[i..].starts_with(&[c, c, c]) { 3 } else { 1 };
             i += quote;
             let content = i;
