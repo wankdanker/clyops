@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './Car
 import { Button } from './Button';
 import { Input } from './Input';
 import { Label } from './Label';
-import { buildCommandArgs, constraintIssues, expandCommands, formatCommandLine, isTextType, parseCommandLine } from '../lib/utils';
+import { buildCommandArgs, constraintIssues, expandCommands, formatCommandLine, initialFormValues, isTextType, parseCommandLine } from '../lib/utils';
 import { TemplateJsonEditor } from './TemplateJsonEditor';
 
 /** Where a run's stdin comes from and its binary stdout goes (spec section 1.3). */
@@ -79,52 +79,11 @@ export function ScriptForm({ schema: program, onRun, onSaveTemplate, isRunning, 
     setValues(newValues);
   };
 
-  // Helper function to get default values from schema
-  const getDefaultValues = (): FormValues => {
-    const defaultValues: FormValues = {};
+  const getDefaultValues = (): FormValues => initialFormValues(schema);
 
-    schema.arguments.forEach((arg) => {
-      defaultValues[arg.name] = arg.isVariadic ? [] : arg.default || '';
-    });
-
-    schema.options.forEach((opt) => {
-      if (opt.isFlag) {
-        defaultValues[opt.name] = opt.default === 'true';
-      } else if (opt.isArray) {
-        defaultValues[opt.name] = [];
-      } else {
-        defaultValues[opt.name] = opt.default || '';
-      }
-    });
-
-    return defaultValues;
-  };
-
-  // Initialize form with default values or template values
+  // Display, copy and execution all use the same restored values.
   useEffect(() => {
-    const defaultValues = getDefaultValues();
-
-    // Merge with initialValues if provided
-    if (initialValues) {
-      Object.entries(initialValues).forEach(([key, value]) => {
-        // Convert string values back to proper types based on schema
-        const option = schema.options.find(opt => opt.name === key);
-        const isVariadic = schema.arguments.some(arg => arg.name === key && arg.isVariadic);
-        if (option || isVariadic) {
-          if (option?.isFlag) {
-            defaultValues[key] = value === 'true' || value === true;
-          } else if (option?.isArray || isVariadic) {
-            defaultValues[key] = typeof value === 'string' ? value.split(',').filter(Boolean) : value;
-          } else {
-            defaultValues[key] = value;
-          }
-        } else {
-          defaultValues[key] = value;
-        }
-      });
-    }
-
-    setValues(defaultValues);
+    setValues(initialFormValues(schema, initialValues));
   }, [schema, initialValues]);
 
   // Initialize collapsed state for all groups when schema changes

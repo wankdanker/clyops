@@ -34,13 +34,9 @@ export function formatDuration(startDate: Date, endDate?: Date): string {
  * Quote a string for shell usage if it contains spaces or special characters
  */
 function shellQuote(value: string): string {
-  // If it contains spaces, quotes, or shell special chars, wrap in double quotes and escape
-  if (/[\s"'$`\\!&|;<>(){}[\]*?~]/.test(value) || value === '') {
-    // Escape backslashes and double quotes
-    const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    return `"${escaped}"`;
-  }
-  return value;
+  return /^[A-Za-z0-9_@%+=:,./-]+$/.test(value)
+    ? value
+    : `'${value.replace(/'/g, "'\\''")}'`;
 }
 
 /**
@@ -61,6 +57,7 @@ function tokenizeCommandLine(cmdLine: string): string[] {
   let inDoubleQuote = false;
   let inSingleQuote = false;
   let escaped = false;
+  let started = false;
 
   for (let i = 0; i < cmdLine.length; i++) {
     const char = cmdLine[i];
@@ -72,32 +69,37 @@ function tokenizeCommandLine(cmdLine: string): string[] {
     }
 
     if (char === '\\' && !inSingleQuote) {
+      started = true;
       escaped = true;
       continue;
     }
 
     if (char === '"' && !inSingleQuote) {
+      started = true;
       inDoubleQuote = !inDoubleQuote;
       continue;
     }
 
     if (char === "'" && !inDoubleQuote) {
+      started = true;
       inSingleQuote = !inSingleQuote;
       continue;
     }
 
     if (/\s/.test(char) && !inDoubleQuote && !inSingleQuote) {
-      if (current) {
+      if (started) {
         tokens.push(current);
         current = '';
+        started = false;
       }
       continue;
     }
 
+    started = true;
     current += char;
   }
 
-  if (current) {
+  if (started) {
     tokens.push(current);
   }
 
@@ -148,7 +150,7 @@ export function parseCommandLine(cmdLine: string, schema: any): Record<string, a
           if (!result[opt.name]) result[opt.name] = [];
           result[opt.name].push(optValue);
         } else {
-          result[opt.name] = optValue;
+          result[opt.name] = opt.isFlag ? flagValue(optValue, opt.name) : optValue;
         }
       }
       i++;
@@ -159,6 +161,12 @@ export function parseCommandLine(cmdLine: string, schema: any): Record<string, a
     if (!positionalOnly && token.startsWith('--')) {
       const optName = token.substring(2);
       const opt = optionByName.get(optName);
+      const negative = !opt && optName.startsWith('no-') ? optionByName.get(optName.slice(3)) : undefined;
+      if (negative?.isFlag) {
+        result[negative.name] = false;
+        i++;
+        continue;
+      }
 
       if (opt) {
         if (opt.isFlag) {
@@ -241,6 +249,32 @@ export function sanitizeFilename(name: string): string {
     .replace(/[^a-z0-9_-]/g, '_');
 }
 
+/** Boolean words accepted by clyops, including flags restored from templates. */
+export function flagValue(value: unknown, name: string): boolean {
+  if (['boolean', 'string', 'number'].includes(typeof value)) {
+    if (/^(true|1|yes|on)$/i.test(String(value))) return true;
+    if (/^(false|0|no|off)$/i.test(String(value))) return false;
+  }
+  throw new Error(`--${name} must be a boolean (true/false, yes/no, 1/0, on/off)`);
+}
+
+/** The form's displayed values, from schema defaults and a saved template. */
+export function initialFormValues(schema: ScriptSchema, initial?: Record<string, unknown>): Record<string, any> {
+  const values: Record<string, any> = {};
+  for (const arg of schema.arguments) values[arg.name] = arg.isVariadic ? [] : arg.default || '';
+  for (const opt of schema.options) {
+    values[opt.name] = opt.isFlag ? opt.default === 'true' : opt.isArray ? [] : opt.default || '';
+  }
+  for (const [key, value] of Object.entries(initial ?? {})) {
+    const opt = schema.options.find((o) => o.name === key);
+    const variadic = schema.arguments.some((a) => a.name === key && a.isVariadic);
+    if (opt?.isFlag) values[key] = value == null || value === '' ? undefined : flagValue(value, opt.name);
+    else if (opt?.isArray || variadic) values[key] = typeof value === 'string' ? value.split(',').filter(Boolean) : value;
+    else values[key] = value;
+  }
+  return values;
+}
+
 export function buildCommandArgs(
   schema: any,
   values: Record<string, any>
@@ -263,12 +297,10 @@ export function buildCommandArgs(
   schema.options?.forEach((opt: any) => {
     const value = values[opt.name];
 
-    if (value === undefined || value === '') return;
+    if (value === undefined || value === null || value === '') return;
 
     if (opt.isFlag) {
-      if (value === true || value === 'true') {
-        args.push(`--${opt.name}`);
-      }
+      args.push(flagValue(value, opt.name) ? `--${opt.name}` : `--no-${opt.name}`);
     } else if (opt.isArray && Array.isArray(value)) {
       value.forEach((v) => {
         args.push(`--${opt.name}`, String(v));
