@@ -35,7 +35,7 @@ impl Tree {
         self.file(
             rel,
             &format!(
-                "#!/bin/sh\ncase \"$1\" in\n  --help-json-schema) echo {name} >> {log}; printf '%s\\n' '{{\"clyops\": 1, \"description\": \"{description}\\nmore\"}}' ;;\n  --bash-completion) printf '#clyops-completion 1\\nopt\\t--fast\\t-f\\tflag\\tnone\\t-\\tGo fast\\n' ;;\n  *) echo \"{name} $*\"; exit 3 ;;\nesac\n",
+                "#!/bin/sh\n# clyops-tool\ncase \"$1\" in\n  --help-json-schema) echo {name} >> {log}; printf '%s\\n' '{{\"clyops\": 1, \"description\": \"{description}\\nmore\"}}' ;;\n  --bash-completion) printf '#clyops-completion 1\\nopt\\t--fast\\t-f\\tflag\\tnone\\t-\\tGo fast\\n' ;;\n  *) echo \"{name} $*\"; exit 3 ;;\nesac\n",
                 name = Path::new(rel).file_name().unwrap().to_string_lossy(),
                 log = log.display(),
             ),
@@ -188,13 +188,20 @@ fn caches_descriptions_until_a_tool_changes() {
 }
 
 #[test]
-fn only_probes_files_that_mention_clyops() {
+fn never_probes_comments_or_strings_that_mention_clyops() {
     let t = Tree::new("probe");
     t.file("tools", "description: T\n", true);
     let marker = t.root.join("ran");
     t.file("danger", &format!("#!/bin/sh\ntouch {}\n", marker.display()), true);
     // Mentioning clyops is not enough; the file must load a clyops library.
-    t.file("mentions", &format!("#!/bin/sh\n# see clyops docs\ntouch {}\n", marker.display()), true);
+    t.file(
+        "mentions",
+        &format!(
+            "#!/bin/sh\n# see scripts/lib/clyops.sh and import clyops\necho 'require(\"clyops\")' >/dev/null\ntouch {}\n",
+            marker.display()
+        ),
+        true,
+    );
     let text = stdout(&t.run("tools", &[]));
     assert!(text.contains("  danger\n") && text.contains("  mentions\n"), "{text}");
     assert!(!marker.exists(), "a non-clyops executable must not be run to list it");

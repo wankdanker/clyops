@@ -2,6 +2,7 @@
 // from a tool.
 import { execFile } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
+import { usesClyops } from './detection.js';
 
 export interface SchemaArgument {
   name: string;
@@ -71,11 +72,6 @@ export interface Schema extends SchemaBody {
 /** What an executable is, judged from its contents (spec section 12). */
 export type Kind = 'tool' | 'dispatcher' | 'other';
 
-// Strings found in programs built on a clyops library; see the dispatcher's
-// "Which programs are run". Only these are run to ask for their schema, since
-// running an arbitrary executable with an unknown flag could do real work.
-const MARKERS = ['#clyops-completion', 'clyops.sh', 'import clyops', 'from clyops', "'clyops'", '"clyops"', 'clyops-tool'];
-
 export function classify(file: string): Kind {
   let text: string;
   try {
@@ -85,7 +81,7 @@ export function classify(file: string): Kind {
   }
   const firstLine = text.slice(0, text.indexOf('\n') >>> 0);
   if (firstLine.startsWith('#!') && firstLine.includes('clyops-dispatch')) return 'dispatcher';
-  return MARKERS.some((m) => text.includes(m)) ? 'tool' : 'other';
+  return usesClyops(text) ? 'tool' : 'other';
 }
 
 /** A key that changes whenever the file does. */
@@ -111,7 +107,11 @@ export function loadSchema(file: string, opts: { cwd?: string; timeoutMs?: numbe
       const end = stdout.lastIndexOf('}');
       if (start < 0 || end < start) return reject(new Error(`${file} produced no JSON schema`));
       try {
-        resolve(JSON.parse(stdout.slice(start, end + 1)) as Schema);
+        const parsed = JSON.parse(stdout.slice(start, end + 1)) as Schema;
+        if (parsed.clyops !== 1 || !Array.isArray(parsed.options) || !Array.isArray(parsed.arguments) || typeof parsed.description !== 'string') {
+          throw new Error('expected a clyops: 1 schema with description, options and arguments');
+        }
+        resolve(parsed);
       } catch (e) {
         reject(new Error(`${file}: invalid JSON schema: ${(e as Error).message}`));
       }

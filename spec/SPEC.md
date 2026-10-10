@@ -591,13 +591,28 @@ modification time changes. `prog GROUP --list` prints the names at that level.
 An unknown command or option is an error (`Unknown command: X`), followed by
 the help on stderr, exit 1.
 
-**Which programs are run.** To describe or complete a command the dispatcher
-runs it, so only clyops programs are run: files containing `#clyops-completion`
-(compiled C and Rust programs), `clyops.sh`, `import clyops`, `from clyops`,
-`'clyops'` or `"clyops"` (Bash, Python and JavaScript scripts), or a
-`clyops-tool` comment (any wrapper can opt in); and files whose shebang names
-`clyops-dispatch` (nested dispatchers). Others are listed without a description
-and complete file names.
+**Which programs are run.** Describing or completing a command executes it.
+The check exists to avoid running arbitrary executables with an unknown flag,
+which could do real work. A comment, string, URL or passing mention of clyops
+is not an opt-in. Only these conservative source patterns qualify:
+
+* a line sourcing `clyops.sh` with `source` or `.`, including quoted paths;
+* a Python `import clyops` or `from clyops` statement;
+* JavaScript/TypeScript `require('clyops…')` or `import … from 'clyops…'`
+  (also side-effect imports and local `…/clyops.cjs`, `.js`, `.mjs`, `.ts` paths);
+* an exact standalone `# clyops-tool` or `// clyops-tool` comment in the first
+  ten lines, for wrappers or loaders that don't match these patterns;
+* `#clyops-completion` embedded in a binary (a file with NUL bytes, without
+  a shebang); or a shebang naming `clyops-dispatch` (nested dispatchers).
+
+Comments and quoted documentation, including multiline strings and shell
+here-documents, are skipped. This is conservative source inspection, not a
+proof of program behavior: opting in asserts that the program handles the
+probe flags without doing work. A schema probe has a five-second timeout and
+must return a schema with `"clyops": 1`. Schemas/descriptions are cached by
+file stamp, so hot reload only probes changed tools. Other executables are
+listed by the dispatcher without a description and complete file names;
+API/MCP servers don't offer them as tools.
 
 **Completion.** `prog --completion SHELL` prints the section 9.1 script for the
 dispatcher's name. `prog --bash-completion -- WORD...` follows the words like

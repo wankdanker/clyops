@@ -1,0 +1,147 @@
+[
+  {
+    "name": "bash source",
+    "source": "#!/bin/bash\nsource \"${SCRIPT_DIR}/lib/clyops.sh\"\n",
+    "tool": true
+  },
+  {
+    "name": "bash dot",
+    "source": "#!/bin/sh\n  . ./lib/clyops.sh\n",
+    "tool": true
+  },
+  {
+    "name": "python import",
+    "source": "#!/usr/bin/env python3\nimport clyops\n",
+    "tool": true
+  },
+  {
+    "name": "python from",
+    "source": "from clyops.cli import Cli\n",
+    "tool": true
+  },
+  {
+    "name": "require",
+    "source": "const { Cli } = require(\"clyops\");\n",
+    "tool": true
+  },
+  {
+    "name": "local require",
+    "source": "const cli = require('./lib/clyops.cjs');\n",
+    "tool": true
+  },
+  {
+    "name": "ESM import",
+    "source": "import { Cli } from 'clyops';\n",
+    "tool": true
+  },
+  {
+    "name": "side effect import",
+    "source": "import 'clyops';\n",
+    "tool": true
+  },
+  {
+    "name": "typescript import",
+    "source": "import {\n  Cli\n} from './lib/clyops.ts';\n",
+    "tool": true
+  },
+  {
+    "name": "binary",
+    "source": "\u007fELF\u0000some #clyops-completion 1\n",
+    "tool": true
+  },
+  {
+    "name": "header",
+    "source": "# clyops-tool\necho ok\n",
+    "tool": true
+  },
+  {
+    "name": "JS header",
+    "source": "#!/usr/bin/env node\n// clyops-tool\n",
+    "tool": true
+  },
+  {
+    "name": "comment",
+    "source": "#!/bin/sh\n# see scripts/lib/clyops.sh\necho ok\n",
+    "tool": false
+  },
+  {
+    "name": "python comment",
+    "source": "# import clyops\nprint(\"clyops\")\n",
+    "tool": false
+  },
+  {
+    "name": "JS comment",
+    "source": "// const cli = require('clyops');\n",
+    "tool": false
+  },
+  {
+    "name": "JS block comment",
+    "source": "/*\nimport { Cli } from 'clyops';\n*/\n",
+    "tool": false
+  },
+  {
+    "name": "JS string",
+    "source": "const docs = \"require('clyops')\";\n",
+    "tool": false
+  },
+  {
+    "name": "JS template",
+    "source": "const docs = `\nimport { Cli } from 'clyops';\n// clyops-tool\n`;\n",
+    "tool": false
+  },
+  {
+    "name": "python docstring",
+    "source": "\"\"\"\nimport clyops\n# clyops-tool\n\"\"\"\n",
+    "tool": false
+  },
+  {
+    "name": "bash string",
+    "source": "echo '\nsource ./lib/clyops.sh\n# clyops-tool\n'\n",
+    "tool": false
+  },
+  {
+    "name": "heredoc",
+    "source": "cat <<'DOC'\nsource ./lib/clyops.sh\n# clyops-tool\nDOC\n",
+    "tool": false
+  },
+  {
+    "name": "tab heredoc",
+    "source": "cat <<-DOC\n\timport clyops\nDOC\n",
+    "tool": false
+  },
+  {
+    "name": "passing opt in",
+    "source": "# uses clyops-tool for docs\n",
+    "tool": false
+  },
+  {
+    "name": "late opt in",
+    "source": "\n\n\n\n\n\n\n\n\n\n# clyops-tool\n",
+    "tool": false
+  },
+  {
+    "name": "completion in script",
+    "source": "#!/bin/sh\nprintf '#clyops-completion 1\\n'\n",
+    "tool": false
+  },
+  {
+    "name": "different python package",
+    "source": "import clyops_extra\n",
+    "tool": false
+  },
+  {
+    "name": "different shell library",
+    "source": "source ./clyops.sh.bak\n",
+    "tool": false
+  },
+  {
+    "name": "different JS package",
+    "source": "const x = require('not-clyops');\n",
+    "tool": false
+  },
+  {
+    "name": "string fake source",
+    "source": "\"source\" \"clyops.sh\"\n",
+    "tool": false
+  }
+]

@@ -331,3 +331,44 @@ test('run feeds stdin, keeps binary stdout and caps output', async () => {
   assert.equal((await runTool(tool, {}, { stdin: '{"a":1}' })).json.a, 1);
   assert.equal(typeof startTool(tool, {}, { stdout: 'stream' }).stdout.pipe, 'function');
 });
+
+test('classification uses library syntax, never comments or documentation strings', () => {
+  const root = tree();
+  const cases = JSON.parse(readFileSync(join(repo, 'spec/conformance/detection.json'), 'utf8'));
+  for (const c of cases) {
+    const path = join(root, 'candidate');
+    file(path, c.source);
+    assert.equal(classify(path), c.tool ? 'tool' : 'other', c.name);
+  }
+});
+
+test('loadTools never executes a packaging script that only mentions clyops', async () => {
+  const root = tree();
+  const marker = join(root, 'accidentally-ran');
+  file(join(root, 'build-tarball.sh'), `#!/bin/sh\n# see scripts/lib/clyops.sh\necho damage > ${marker}\n`);
+  assert.equal(classify(join(root, 'build-tarball.sh')), 'other');
+  await loadTools(root);
+  assert.throws(() => readFileSync(marker), /ENOENT/);
+});
+
+test('loadSchema rejects non-clyops JSON', async () => {
+  const root = tree();
+  file(join(root, 'fake'), '#!/bin/sh\n# clyops-tool\necho \'{"description":"not a schema","options":[],"arguments":[]}\'\n');
+  await assert.rejects(loadSchema(join(root, 'fake')), /expected a clyops: 1 schema/);
+});
+
+test('hot reload does not re-probe unchanged files', async () => {
+  const root = tree();
+  const counter = join(root, 'probes.log');
+  const path = join(root, 'counted.sh');
+  const source = `#!/bin/sh\n# clyops-tool\necho probe >> ${counter}\nexec node ${join(repo, 'packages/js/examples/demo.cjs')} "$@"\n`;
+  file(path, source);
+  let wake;
+  const changed = new Promise((resolve) => { wake = resolve; });
+  const watcher = await watchTools(root, { debounceMs: 20, onChange: wake });
+  try {
+    file(join(root, 'added.sh'), readFileSync(join(root, 'demo.sh'), 'utf8'));
+    await Promise.race([changed, new Promise((_, reject) => setTimeout(() => reject(new Error('reload did not finish')), 5000).unref())]);
+    assert.equal(readFileSync(counter, 'utf8'), 'probe\n');
+  } finally { watcher.close(); }
+});

@@ -177,7 +177,11 @@ function loadSchema(file, opts = {}) {
       const end = stdout.lastIndexOf("}");
       if (start2 < 0 || end < start2) return reject(new Error(`${file} produced no JSON schema`));
       try {
-        resolve5(JSON.parse(stdout.slice(start2, end + 1)));
+        const parsed = JSON.parse(stdout.slice(start2, end + 1));
+        if (parsed.clyops !== 1 || !Array.isArray(parsed.options) || !Array.isArray(parsed.arguments) || typeof parsed.description !== "string") {
+          throw new Error("expected a clyops: 1 schema with description, options and arguments");
+        }
+        resolve5(parsed);
       } catch (e) {
         reject(new Error(`${file}: invalid JSON schema: ${e.message}`));
       }

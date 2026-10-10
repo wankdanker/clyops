@@ -17,6 +17,8 @@
 //! alias mytool='clyops-dispatch --root ~/mytool/scripts --name mytool'
 //! ```
 
+mod detection;
+
 use clyops::{die, wrap_text, Cli};
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -228,13 +230,6 @@ enum Kind {
     Other,
 }
 
-/// Strings found in programs built on a clyops library: the completion
-/// header compiled into C and Rust binaries, how scripts load the Bash,
-/// Python and JavaScript libraries, and a `# clyops-tool` comment that
-/// wrapper scripts can add to opt in.
-const MARKERS: [&[u8]; 7] =
-    [b"#clyops-completion", b"clyops.sh", b"import clyops", b"from clyops", b"'clyops'", b"\"clyops\"", b"clyops-tool"];
-
 fn classify(path: &Path) -> Kind {
     let mut bytes = Vec::new();
     if fs::File::open(path).and_then(|mut f| f.read_to_end(&mut bytes)).is_err() {
@@ -244,7 +239,7 @@ fn classify(path: &Path) -> Kind {
     if first_line.starts_with(b"#!") && first_line.windows(15).any(|w| w == b"clyops-dispatch") {
         return Kind::Dispatcher;
     }
-    if MARKERS.iter().any(|m| bytes.windows(m.len()).any(|w| w == *m)) {
+    if detection::uses_clyops(&bytes) {
         Kind::Tool
     } else {
         Kind::Other
@@ -327,6 +322,7 @@ fn describe(commands: &[PathBuf]) -> HashMap<PathBuf, String> {
                     let description = match classify(&path) {
                         Kind::Tool => probe(&path, &["--help-json-schema".into()])
                             .and_then(|json| serde_json::from_str::<serde_json::Value>(&json).ok())
+                            .filter(|schema| schema["clyops"] == 1)
                             .and_then(|schema| schema["description"].as_str().map(first_line))
                             .unwrap_or_default(),
                         Kind::Dispatcher => first_line(&read_settings(&path, true).description),
