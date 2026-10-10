@@ -432,13 +432,35 @@ function redactArgv(schema, argv) {
 var import_node_child_process2 = require("node:child_process");
 var import_node_stream = require("node:stream");
 var import_node_string_decoder = require("node:string_decoder");
+var ABORT_GRACE_MS = 200;
+var STOP_WAIT_MS = 1e3;
+function terminateTree(child, signal) {
+  const pid = child.pid;
+  if (!pid || pid <= 0) return Promise.resolve();
+  if (process.platform === "win32") {
+    return new Promise((resolve3) => {
+      (0, import_node_child_process2.execFile)("taskkill", ["/PID", String(pid), "/T", "/F"], { windowsHide: true, timeout: 500 }, (err) => {
+        if (err && child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+        resolve3();
+      });
+    });
+  }
+  try {
+    process.kill(-pid, signal);
+  } catch (err) {
+    if (err.code !== "ESRCH") child.kill(signal);
+  }
+  return Promise.resolve();
+}
 function start(file, argv, opts = {}) {
   const started = Date.now();
   const child = (0, import_node_child_process2.spawn)(file, argv, {
     cwd: opts.cwd,
     env: opts.env ?? process.env,
     stdio: [opts.stdin === void 0 ? "ignore" : "pipe", "pipe", "pipe"],
-    signal: opts.signal
+    // POSIX detached children lead a new session/group, still with owned pipes.
+    detached: process.platform !== "win32",
+    windowsHide: true
   });
   const limit = opts.maxOutput || Infinity;
   let truncated = false;
@@ -466,12 +488,21 @@ function start(file, argv, opts = {}) {
     let timedOut = false;
     let failure;
     let exited = false;
+    let settled = false;
+    let stopping;
+    let timer;
+    let escalation;
+    let deadline;
+    let treeStopped;
+    let inputClosed = false;
     const source = opts.stdin instanceof import_node_stream.Readable ? opts.stdin : void 0;
     const forgetSource = () => {
       source?.removeListener("error", inputError);
       source?.removeListener("close", forgetSource);
     };
     const closeInput = () => {
+      if (inputClosed) return;
+      inputClosed = true;
       if (source) {
         source.unpipe(child.stdin ?? void 0);
         if (source.closed) forgetSource();
@@ -482,32 +513,16 @@ function start(file, argv, opts = {}) {
       }
       child.stdin?.destroy();
     };
-    const inputError = (err) => {
-      if (exited || failure) return;
-      failure = err;
-      child.kill("SIGKILL");
-      closeInput();
-    };
-    const timer = opts.timeoutMs ? setTimeout(() => {
-      timedOut = true;
-      child.kill("SIGKILL");
-      closeInput();
-    }, opts.timeoutMs) : void 0;
-    child.on("error", (err) => {
-      if (err.name === "AbortError") {
-        closeInput();
-        return;
-      }
-      failure ??= err;
-      closeInput();
-    });
-    child.once("exit", () => {
-      exited = true;
-      closeInput();
-    });
-    child.once("close", (exitCode, signal) => {
+    const finish = async (exitCode, signal) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
+      clearTimeout(escalation);
+      clearTimeout(deadline);
+      opts.signal?.removeEventListener("abort", abort);
       closeInput();
+      if (stopping && process.platform !== "win32") treeStopped = terminateTree(child, "SIGKILL");
+      await treeStopped;
       if (failure) {
         reject(failure);
         return;
@@ -516,7 +531,7 @@ function start(file, argv, opts = {}) {
       resolve3({
         command: [file, ...argv],
         exitCode,
-        signal,
+        signal: signal ?? stopping ?? null,
         timedOut,
         stdout: mode === "text" ? out.toString("utf8") : "",
         ...mode === "buffer" ? { stdoutBuffer: out } : {},
@@ -524,7 +539,52 @@ function start(file, argv, opts = {}) {
         ...truncated ? { truncated } : {},
         durationMs: Date.now() - started
       });
+    };
+    const stop = (signal) => {
+      if (settled || stopping) return;
+      stopping = signal;
+      clearTimeout(timer);
+      treeStopped = terminateTree(child, signal);
+      closeInput();
+      if (signal === "SIGTERM") {
+        escalation = setTimeout(() => {
+          treeStopped = terminateTree(child, "SIGKILL");
+        }, ABORT_GRACE_MS);
+      }
+      deadline = setTimeout(() => {
+        treeStopped = terminateTree(child, "SIGKILL");
+        for (const stream of [childOut, childErr]) {
+          if (!stream.destroyed) {
+            stream.once("end", () => stream.destroy());
+            stream.push(null);
+            stream.resume();
+          }
+        }
+        void finish(child.exitCode, child.signalCode);
+      }, STOP_WAIT_MS);
+    };
+    const abort = () => stop("SIGTERM");
+    const inputError = (err) => {
+      if (exited || failure || settled || stopping) return;
+      failure = err;
+      stop("SIGKILL");
+    };
+    child.on("error", (err) => {
+      failure ??= err;
+      stop("SIGKILL");
     });
+    child.once("exit", () => {
+      exited = true;
+      closeInput();
+    });
+    child.once("close", (exitCode, signal) => {
+      void finish(exitCode, signal);
+    });
+    timer = opts.timeoutMs ? setTimeout(() => {
+      timedOut = true;
+      stop("SIGKILL");
+    }, opts.timeoutMs) : void 0;
+    opts.signal?.addEventListener("abort", abort, { once: true });
     if (opts.stdin !== void 0 && child.stdin) {
       child.stdin.on("error", closeInput);
       child.stdin.once("close", () => child.stdin?.removeListener("error", closeInput));
@@ -534,6 +594,7 @@ function start(file, argv, opts = {}) {
         else source.pipe(child.stdin);
       } else child.stdin.end(opts.stdin);
     }
+    if (opts.signal?.aborted) abort();
   });
   return { child, stdout: childOut, result };
 }
@@ -739,7 +800,7 @@ function startTool(tool, input, opts = {}) {
 async function runTool(tool, input, opts = {}) {
   if (opts.stdout === "stream") throw new Error("runTool() collects stdout; use startTool() for stdout: 'stream'");
   const result = await startTool(tool, input, opts).result;
-  const out = { ...result, ok: result.exitCode === 0 };
+  const out = { ...result, ok: result.exitCode === 0 && !result.timedOut && !result.signal };
   try {
     if (result.stdout.trim()) out.json = JSON.parse(result.stdout);
   } catch {

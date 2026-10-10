@@ -1,14 +1,14 @@
 // Run a tool and collect what it printed.
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { Readable } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
 
 export interface RunOptions {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
-  /** Kill the tool (SIGKILL) after this long; 0 or unset waits forever. */
+  /** Kill the tool and its process tree after this long; 0 or unset waits forever. */
   timeoutMs?: number;
-  /** Abort to kill the tool (SIGTERM). */
+  /** Abort the process tree (SIGTERM, then SIGKILL after a short grace period). */
   signal?: AbortSignal;
   onStdout?: (chunk: string) => void;
   onStderr?: (chunk: string) => void;
@@ -45,6 +45,33 @@ export interface Started {
   result: Promise<RunResult>;
 }
 
+const ABORT_GRACE_MS = 200;
+const STOP_WAIT_MS = 1000;
+
+/** Terminate only the group we created, or the Windows child process tree. */
+function terminateTree(child: ChildProcess, signal: NodeJS.Signals): Promise<void> {
+  const pid = child.pid;
+  if (!pid || pid <= 0) return Promise.resolve();
+  if (process.platform === 'win32') {
+    // /T includes descendants; /F works for console processes too.
+    // https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/taskkill
+    return new Promise((resolve) => {
+      execFile('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, timeout: 500 }, (err) => {
+        if (err && child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+        resolve();
+      });
+    });
+  }
+  try {
+    process.kill(-pid, signal);
+  } catch (err) {
+    // An already exited group needs no cleanup. Never signal pid 0 (the
+    // caller's group), and fall back to just the child on other OS errors.
+    if ((err as NodeJS.ErrnoException).code !== 'ESRCH') child.kill(signal);
+  }
+  return Promise.resolve();
+}
+
 /** Start a tool; `result` settles when it exits. */
 export function start(file: string, argv: string[], opts: RunOptions = {}): Started {
   const started = Date.now();
@@ -52,7 +79,9 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
     cwd: opts.cwd,
     env: opts.env ?? process.env,
     stdio: [opts.stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
-    signal: opts.signal,
+    // POSIX detached children lead a new session/group, still with owned pipes.
+    detached: process.platform !== 'win32',
+    windowsHide: true,
   });
   const limit = opts.maxOutput || Infinity;
   let truncated = false;
@@ -82,12 +111,21 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
     let timedOut = false;
     let failure: Error | undefined;
     let exited = false;
+    let settled = false;
+    let stopping: NodeJS.Signals | undefined;
+    let timer: NodeJS.Timeout | undefined;
+    let escalation: NodeJS.Timeout | undefined;
+    let deadline: NodeJS.Timeout | undefined;
+    let treeStopped: Promise<void> | undefined;
+    let inputClosed = false;
     const source = opts.stdin instanceof Readable ? opts.stdin : undefined;
     const forgetSource = () => {
       source?.removeListener('error', inputError);
       source?.removeListener('close', forgetSource);
     };
     const closeInput = () => {
+      if (inputClosed) return;
+      inputClosed = true;
       if (source) {
         source.unpipe(child.stdin ?? undefined);
         // destroy() may finish a pending read asynchronously. Keep the error
@@ -100,35 +138,24 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
       }
       child.stdin?.destroy();
     };
-    const inputError = (err: Error) => {
-      if (exited || failure) return;
-      failure = err;
-      child.kill('SIGKILL');
-      closeInput();
-    };
-    const timer = opts.timeoutMs
-      ? setTimeout(() => {
-          timedOut = true;
-          child.kill('SIGKILL');
-          closeInput();
-        }, opts.timeoutMs)
-      : undefined;
-    child.on('error', (err) => {
-      // An abort still ends in 'close' with the signal; only report real failures.
-      if (err.name === 'AbortError') { closeInput(); return; }
-      failure ??= err;
-      closeInput();
-    });
-    child.once('exit', () => { exited = true; closeInput(); });
-    child.once('close', (exitCode, signal) => {
+    const finish = async (exitCode: number | null, signal: NodeJS.Signals | null) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
+      clearTimeout(escalation);
+      clearTimeout(deadline);
+      opts.signal?.removeEventListener('abort', abort);
       closeInput();
+      // A wrapper can exit before a descendant that ignores SIGTERM, even
+      // when that descendant has closed its output. Finish tree cleanup too.
+      if (stopping && process.platform !== 'win32') treeStopped = terminateTree(child, 'SIGKILL');
+      await treeStopped;
       if (failure) { reject(failure); return; }
       const out = stdout();
       resolve({
         command: [file, ...argv],
         exitCode,
-        signal,
+        signal: signal ?? stopping ?? null,
         timedOut,
         stdout: mode === 'text' ? out.toString('utf8') : '',
         ...(mode === 'buffer' ? { stdoutBuffer: out } : {}),
@@ -136,7 +163,48 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
         ...(truncated ? { truncated } : {}),
         durationMs: Date.now() - started,
       });
+    };
+    const stop = (signal: NodeJS.Signals) => {
+      if (settled || stopping) return;
+      stopping = signal;
+      clearTimeout(timer);
+      treeStopped = terminateTree(child, signal);
+      closeInput();
+      if (signal === 'SIGTERM') {
+        escalation = setTimeout(() => { treeStopped = terminateTree(child, 'SIGKILL'); }, ABORT_GRACE_MS);
+      }
+      // Inherited pipes must never make cancellation wait indefinitely, even
+      // if a descendant has deliberately left our process group.
+      deadline = setTimeout(() => {
+        treeStopped = terminateTree(child, 'SIGKILL');
+        for (const stream of [childOut, childErr]) {
+          // Give stream consumers EOF so their output files/HTTP responses
+          // finish too. Close the owned pipe after buffered data is drained.
+          if (!stream.destroyed) {
+            stream.once('end', () => stream.destroy());
+            stream.push(null);
+            stream.resume();
+          }
+        }
+        void finish(child.exitCode, child.signalCode);
+      }, STOP_WAIT_MS);
+    };
+    const abort = () => stop('SIGTERM');
+    const inputError = (err: Error) => {
+      if (exited || failure || settled || stopping) return;
+      failure = err;
+      stop('SIGKILL');
+    };
+    child.on('error', (err) => {
+      failure ??= err;
+      stop('SIGKILL');
     });
+    child.once('exit', () => { exited = true; closeInput(); });
+    child.once('close', (exitCode, signal) => { void finish(exitCode, signal); });
+    timer = opts.timeoutMs
+      ? setTimeout(() => { timedOut = true; stop('SIGKILL'); }, opts.timeoutMs)
+      : undefined;
+    opts.signal?.addEventListener('abort', abort, { once: true });
     if (opts.stdin !== undefined && child.stdin) {
       // A tool closing its input early (EPIPE) remains a successful run.
       child.stdin.on('error', closeInput);
@@ -147,6 +215,7 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
         else source.pipe(child.stdin);
       } else child.stdin.end(opts.stdin);
     }
+    if (opts.signal?.aborted) abort();
   });
   return { child, stdout: childOut, result };
 }

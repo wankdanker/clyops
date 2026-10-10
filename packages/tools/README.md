@@ -58,3 +58,10 @@ A stdin stream error rejects execution with the original input error after the
 tool is stopped and reaped. Execution closes and unpipes supplied streams on
 completion or failure; a tool that exits before consuming all input still
 succeeds, including when its stdin pipe closes early.
+
+Timeouts and stdin failures kill the launched process tree; abort requests
+start with SIGTERM and escalate to SIGKILL after 200 ms. Unix tools have their
+own process group; Windows uses `taskkill /T /F`. Cancellation waits at most
+one second for inherited output pipes (plus Windows termination overhead).
+A program deliberately creating a new Unix session leaves that group; its
+pipes still cannot delay settlement indefinitely.

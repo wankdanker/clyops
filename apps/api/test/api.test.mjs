@@ -460,3 +460,28 @@ test('API and embedded MCP honor positional order', async () => {
     await client.close(); close(); server.closeAllConnections(); server.close();
   }
 });
+
+test('an async streamed wrapper that times out is not reported as successful', async () => {
+  const root = tree();
+  const file = join(root, 'background');
+  writeFileSync(file, `#!/bin/sh\n# clyops-tool\n[ "$1" = --help-json-schema ] && exec node ${join(repo, 'packages/js/examples/demo.cjs')} --help-json-schema\necho begin\nsleep 3 &\nexit 0\n`);
+  chmodSync(file, 0o755);
+  const { app, close } = await createApi({ root, timeoutMs: 100 });
+  const server = app.listen(0);
+  const url = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const response = await fetch(`${url}/tools/background?async=true`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/octet-stream' }, body: JSON.stringify({ input: 'x' }) });
+    const job = await response.json();
+    let record;
+    for (let i = 0; i < 40; i++) {
+      record = await (await fetch(`${url}/jobs/${job.job_id}`)).json();
+      if (record.status === 'done' || record.status === 'error') break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert.equal(record.status, 'done', JSON.stringify(record));
+    assert.equal(record.result.exitCode, 0);
+    assert.equal(record.result.timedOut, true);
+    assert.equal(record.result.ok, false);
+    assert.ok(record.result.durationMs < 1500);
+  } finally { close(); server.closeAllConnections(); server.close(); }
+});

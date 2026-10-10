@@ -361,7 +361,7 @@ async function respond(opts: ApiOptions, ctx: Ctx, tool: ApiTool, input: Record<
       if (toFile) {
         const started = startTool(tool, input, { ...base, signal, stdin: open(), stdout: 'stream' });
         const [r] = await Promise.all([started.result, pipeline(started.stdout, createWriteStream(join(jobDir, 'stdout')))]);
-        result = { ...r, ok: r.exitCode === 0, stdoutUrl: `/jobs/${job.record.job_id}/stdout` };
+        result = { ...r, ok: r.exitCode === 0 && !r.timedOut && !r.signal, stdoutUrl: `/jobs/${job.record.job_id}/stdout` };
       } else {
         result = envelope(await runTool(tool, input, { ...base, signal, stdin: open(), stdout: binaryStdout(tool) ? 'buffer' : 'text' }));
       }

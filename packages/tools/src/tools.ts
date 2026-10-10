@@ -199,7 +199,7 @@ export function startTool(tool: Tool, input: Input, opts: ToolRunOptions = {}): 
 export async function runTool(tool: Tool, input: Input, opts: ToolRunOptions = {}): Promise<ToolResult> {
   if (opts.stdout === 'stream') throw new Error("runTool() collects stdout; use startTool() for stdout: 'stream'");
   const result = await startTool(tool, input, opts).result;
-  const out: ToolResult = { ...result, ok: result.exitCode === 0 };
+  const out: ToolResult = { ...result, ok: result.exitCode === 0 && !result.timedOut && !result.signal };
   try {
     if (result.stdout.trim()) out.json = JSON.parse(result.stdout);
   } catch {
