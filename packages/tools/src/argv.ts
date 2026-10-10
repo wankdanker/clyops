@@ -68,6 +68,7 @@ export function isPathValued(validation: string, type?: string): boolean {
 }
 
 const TRUE = /^(true|1|yes|on)$/i;
+const FALSE = /^(false|0|no|off)$/i;
 
 /**
  * Map `input` onto `schema`. Positionals come first unless configured otherwise
@@ -108,8 +109,14 @@ export function toArgv(schema: Schema, input: Input, opts: ArgvOptions = {}): Ar
     }
     if (found.value === null || found.value === undefined) continue;
     if (isBareFlag(option)) {
-      const on = found.value === true || TRUE.test(String(found.value));
-      out.argv.push(on ? `--${option.name}` : `--no-${option.name}`);
+      if (!['boolean', 'string', 'number'].includes(typeof found.value)) {
+        throw new InputError(`--${option.name} must be a boolean (true/false, yes/no, 1/0, on/off)`);
+      }
+      const value = text(found.value, false);
+      if (!TRUE.test(value) && !FALSE.test(value)) {
+        throw new InputError(`--${option.name} must be a boolean (true/false, yes/no, 1/0, on/off), got '${value}'`);
+      }
+      out.argv.push(TRUE.test(value) ? `--${option.name}` : `--no-${option.name}`);
       continue;
     }
     if (opts.secretEnv && option.secret && !option.isArray) {

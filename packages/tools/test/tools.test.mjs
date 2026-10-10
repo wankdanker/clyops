@@ -386,3 +386,21 @@ test('toArgv supports both orders, with -- only for dash positionals', () => {
   assert.deepEqual(toArgv(golden, { verbose: true }, { positionals: ['p'], positionalsOrder: 'last' }).argv, ['--verbose', 'p']);
   assert.throws(() => toArgv(golden, {}, { positionals: 'sideways' }), /order must be first or last/);
 });
+
+test('toArgv renders and validates bare flags', () => {
+  for (const value of [true, 'true', 'TRUE', 1, '1', 'yes', 'on']) {
+    assert.deepEqual(toArgv(golden, { verbose: value }).argv, ['--verbose']);
+  }
+  for (const value of [false, 'false', 'FALSE', 0, '0', 'no', 'off']) {
+    assert.deepEqual(toArgv(golden, { verbose: value }).argv, ['--no-verbose']);
+  }
+  for (const value of ['maybe', '', 2, [], ['true'], {}, { enabled: true }]) {
+    assert.throws(() => toArgv(golden, { verbose: value }), (err) => err.status === 400 && /--verbose must be a boolean/.test(err.message));
+  }
+  assert.deepEqual(toArgv(golden, { verbose: '${flag}' }, { render: () => 'true' }).argv, ['--verbose']);
+  assert.deepEqual(toArgv(golden, { verbose: '{{flag}}' }, { render: () => 'false' }).argv, ['--no-verbose']);
+  assert.deepEqual(toArgv(golden, { verbose: null, quiet: undefined }).argv, []);
+  const controlled = toArgv(golden, { verbose: 'invalid' }, { controlled: ['verbose'], render: () => { throw new Error('must not render'); } });
+  assert.deepEqual(controlled.argv, []);
+  assert.deepEqual(controlled.controlled, ['verbose']);
+});

@@ -213,6 +213,7 @@ function isPathValued(validation, type) {
   return type === "path" || validation === "path" || validation.startsWith("file:") || validation.startsWith("dir:");
 }
 var TRUE = /^(true|1|yes|on)$/i;
+var FALSE = /^(false|0|no|off)$/i;
 function toArgv(schema, input, opts = {}) {
   const used = /* @__PURE__ */ new Set();
   const out = { argv: [], env: {}, unknown: [], controlled: [] };
@@ -243,8 +244,14 @@ function toArgv(schema, input, opts = {}) {
     }
     if (found.value === null || found.value === void 0) continue;
     if (isBareFlag(option)) {
-      const on = found.value === true || TRUE.test(String(found.value));
-      out.argv.push(on ? `--${option.name}` : `--no-${option.name}`);
+      if (!["boolean", "string", "number"].includes(typeof found.value)) {
+        throw new InputError(`--${option.name} must be a boolean (true/false, yes/no, 1/0, on/off)`);
+      }
+      const value = text(found.value, false);
+      if (!TRUE.test(value) && !FALSE.test(value)) {
+        throw new InputError(`--${option.name} must be a boolean (true/false, yes/no, 1/0, on/off), got '${value}'`);
+      }
+      out.argv.push(TRUE.test(value) ? `--${option.name}` : `--no-${option.name}`);
       continue;
     }
     if (opts.secretEnv && option.secret && !option.isArray) {

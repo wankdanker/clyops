@@ -642,7 +642,10 @@ an error. A `null` value is the same as leaving the key out.
 
 * a flag (`isFlag`, unless its choices are `true,false`) becomes `--name` when
   the value is `true` or one of `true 1 yes on` (any case), and `--no-name`
-  otherwise, so `false` overrides a config file or environment variable;
+  when the value is `false` or one of `false 0 no off` (any case), so `false`
+  overrides a config file or environment variable. Flag values are rendered
+  before validation; other strings or shapes are input errors, never silently
+  false. Absent `null`/`undefined` inputs are still skipped;
 * any other option becomes `--name VALUE`, repeated for each element when the
   value is an array (array options);
 * values are strings as given, numbers and booleans in their JSON spelling,
