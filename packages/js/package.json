@@ -1,6 +1,6 @@
 {
   "name": "clyops",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Declarative one-line-per-option CLI parsing: validation, help text, JSON schema, config files and completion.",
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/wankdanker/clyops.git", "directory": "packages/js" },

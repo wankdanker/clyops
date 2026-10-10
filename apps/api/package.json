@@ -1,6 +1,6 @@
 {
   "name": "clyops-api",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Serve a directory of clyops tools as an HTTP API: an endpoint per tool, validated and documented in OpenAPI from its schema, with sync and async (job) runs.",
   "license": "MIT",
   "repository": {
@@ -43,10 +43,10 @@
   },
   "dependencies": {
     "busboy": "^1.6.0",
-    "clyops": "0.2.0",
-    "clyops-jobs": "0.2.0",
-    "clyops-mcp": "0.2.0",
-    "clyops-tools": "0.2.0",
+    "clyops": "0.3.0",
+    "clyops-jobs": "0.3.0",
+    "clyops-mcp": "0.3.0",
+    "clyops-tools": "0.3.0",
     "express": "^5.2.1",
     "plus-express": "^2.1.1"
   },

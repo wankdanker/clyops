@@ -5,6 +5,39 @@ section here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-10
+
+### Safer tool discovery and execution
+
+- **Source detection** in clyops-dispatch, clyops-tools and the desktop runner now
+  recognizes supported clyops import/source statements and an explicit
+  `# clyops-tool` / `// clyops-tool` marker in the first ten lines. Comments,
+  quoted documentation and incidental mentions no longer cause arbitrary
+  executables to be probed. Wrappers with other loaders can use the marker to
+  opt in. (#7)
+- **stdin failures** reject the Node execution promise and clean up the tool
+  instead of crashing the host process. (#9)
+- **Timeouts and cancellation** terminate tool process trees, escalate when
+  graceful termination fails, and clean up stdin/stdout streams. Timeout limits
+  also apply when a tool stops reading a large stdin payload. (#12)
+
+### Arguments, flags and desktop forms
+
+- **Generated command lines** put positionals first by default, supporting
+  wrappers that read their input from `$1`. Dash-prefixed positionals follow
+  the options and `--`; other values no longer get an unnecessary terminator.
+  `toArgv` callers can choose either order, jobs expose `positionals_order`,
+  and API/MCP servers expose `--positionals-order`. (#8)
+- **Flag inputs** are rendered before validation, so job templates can supply
+  booleans. Accepted values are `true`/`false`, `yes`/`no`, `1`/`0` and
+  `on`/`off` (case insensitive); invalid values produce an input error instead
+  of silently disabling the flag. (#10)
+- **Desktop forms** emit `--no-flag` for unchecked flags, overriding enabled
+  environment/config defaults. Template restoration preserves false and zero
+  values, and generated commands correctly quote shell values. (#11)
+
+### Node packages and development
+
 - **pnpm workspaces** for all Node packages and the desktop frontend, pinned to
   pnpm 10.34.6 with one root lockfile. Development, CI, release packing and
   publishing use pnpm; version bumps update workspace dependency pins in the
@@ -15,6 +48,10 @@ section here.
   `require()` it on Node 20+, with no build step or `node_modules`, the way `clyops.sh` is used.
   `require('clyops-tools')` and `require('clyops-jobs')` now load them (both were ESM-only). CI
   checks they match the sources, and `clyops.cjs` runs the conformance suite (`cjs-bundle`).
+
+- Reload tests check schema reuse and invalidation without relying on macOS
+  filesystem event timing; dispatcher code passes the newer Clippy byte-slice
+  lint used by CI.
 
 ## [0.2.0] - 2026-10-09
 

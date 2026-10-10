@@ -26,7 +26,7 @@ __all__ = [
     "Cli", "Values", "ParseResult", "ValidationError", "validate", "resolve_path", "describe_rule", "wrap_text",
     "info", "warn", "error", "success", "die", "set_silent",
 ]
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 Scalar = Union[str, int, float, bool]
 Value = Union[Scalar, List[Scalar], None]

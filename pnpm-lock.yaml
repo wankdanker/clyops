@@ -18,16 +18,16 @@ importers:
         specifier: ^1.6.0
         version: 1.6.0
       clyops:
-        specifier: 0.2.0
+        specifier: 0.3.0
         version: link:../../packages/js
       clyops-jobs:
-        specifier: 0.2.0
+        specifier: 0.3.0
         version: link:../../packages/jobs
       clyops-mcp:
-        specifier: 0.2.0
+        specifier: 0.3.0
         version: link:../mcp
       clyops-tools:
-        specifier: 0.2.0
+        specifier: 0.3.0
         version: link:../../packages/tools
       express:
         specifier: ^5.2.1
@@ -58,10 +58,10 @@ importers:
         specifier: ^1.32.1
         version: 1.32.1(zod@4.6.5)
       clyops:
-        specifier: 0.2.0
+        specifier: 0.3.0
         version: link:../../packages/js
       clyops-tools:
-        specifier: 0.2.0
+        specifier: 0.3.0
         version: link:../../packages/tools
     devDependencies:
       '@types/node':
@@ -135,7 +135,7 @@ importers:
   packages/jobs:
     dependencies:
       clyops-tools:
-        specifier: 0.2.0
+        specifier: 0.3.0
         version: link:../tools
     devDependencies:
       '@types/node':

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "clyops"
-version = "0.2.0"
+version = "0.3.0"
 description = "Declarative one-line-per-option CLI parsing: validation, help text, JSON schema, config files and completion."
 readme = "README.md"
 license = { text = "MIT" }

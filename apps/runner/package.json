@@ -1,6 +1,6 @@
 {
   "name": "clyops-runner",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Desktop UI that builds forms for clyops tools and runs them",
   "type": "module",

@@ -1,6 +1,6 @@
 [package]
 name = "clyops"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.70"
 description = "Declarative one-line-per-option CLI parsing: validation, help text, JSON schema, config files and completion."
