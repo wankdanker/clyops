@@ -75,7 +75,8 @@ Descriptions come from each command's `--help-json-schema` and are cached until 
 To describe or complete a command, the dispatcher has to run it, so it only runs programs that use
 a clyops library: files that load `clyops.sh` or import the Python or JavaScript package, compiled
 C and Rust clyops programs, and other dispatchers. A wrapper script can opt in with a
-`# clyops-tool` comment. Any other executable is still listed and runnable, just without a
+`# clyops-tool` comment on its own line in the first ten lines. Comments and
+quoted documentation that merely mention the library do not count. Any other executable is still listed and runnable, just without a
 description, and completes file names.
 
 On Windows there are no shebangs: run `clyops-dispatch path\to\definition <command> ...`. Commands

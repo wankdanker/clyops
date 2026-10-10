@@ -1,6 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod probe;
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
@@ -330,8 +332,7 @@ fn get_scripts_dir(app: tauri::AppHandle) -> Result<String, String> {
     Err("Tools directory not set. Choose one in settings or set CLYOPS_RUNNER_DIR.".to_string())
 }
 
-/// Executable files are candidate tools; whether one is a clyops tool is
-/// decided when its schema is read.
+/// Only executable files with a clyops loader or opt-in header are tools.
 #[cfg(unix)]
 fn is_executable(path: &std::path::Path) -> bool {
     use std::os::unix::fs::PermissionsExt;
@@ -357,7 +358,7 @@ fn discover_scripts(scripts_dir: String) -> Result<Vec<ScriptInfo>, String> {
         let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
 
-        if is_executable(&path) {
+        if is_executable(&path) && probe::is_tool(&path) {
             if let Some(name) = path.file_name() {
                 let name_str = name.to_string_lossy().to_string();
 
@@ -381,12 +382,8 @@ fn discover_scripts(scripts_dir: String) -> Result<Vec<ScriptInfo>, String> {
 
 #[tauri::command]
 fn get_script_schema(script_path: String) -> Result<ScriptSchema, String> {
-    // Execute the tool directly with --help-json-schema
-    let output = Command::new(&script_path)
-        .arg("--help-json-schema")
-        .current_dir(std::path::Path::new(&script_path).parent().unwrap())
-        .output()
-        .map_err(|e| format!("Failed to execute script: {}", e))?;
+    // Guard the direct RPC too, even when discovery has already filtered it.
+    let output = probe::schema_output(std::path::Path::new(&script_path))?;
 
     if !output.status.success() {
         return Err(format!(

@@ -316,8 +316,8 @@ fn describe(commands: &[PathBuf]) -> HashMap<PathBuf, String> {
     for chunk in todo.chunks(PROBE_PARALLELISM) {
         let handles: Vec<_> = chunk
             .iter()
-            .cloned()
-            .map(|(path, key, stamp)| {
+            .map(|entry| {
+                let (path, key, stamp) = entry.clone();
                 std::thread::spawn(move || {
                     let description = match classify(&path) {
                         Kind::Tool => probe(&path, &["--help-json-schema".into()])
