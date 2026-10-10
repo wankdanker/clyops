@@ -3,9 +3,23 @@
   "version": "0.3.0",
   "description": "Declarative one-line-per-option CLI parsing: validation, help text, JSON schema, config files and completion.",
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/wankdanker/clyops.git", "directory": "packages/js" },
-  "keywords": ["cli", "argv", "options", "parser", "argparse", "help", "completion"],
-  "engines": { "node": ">=20" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wankdanker/clyops.git",
+    "directory": "packages/js"
+  },
+  "keywords": [
+    "cli",
+    "argv",
+    "options",
+    "parser",
+    "argparse",
+    "help",
+    "completion"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",
   "types": "./dist/types/index.d.ts",
@@ -16,7 +30,13 @@
       "require": "./dist/cjs/index.js"
     }
   },
-  "files": ["dist/cjs", "dist/esm", "dist/types", "src", "clyops.cjs"],
+  "files": [
+    "dist/cjs",
+    "dist/esm",
+    "dist/types",
+    "src",
+    "clyops.cjs"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.cjs.json && tsc -p tsconfig.esm.json && node scripts/mark-dist.mjs && tsc -p tsconfig.examples.json",
     "typecheck": "tsc -p tsconfig.cjs.json --noEmit",
@@ -26,5 +46,6 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.6.0"
-  }
+  },
+  "homepage": "https://wankdanker.github.io/clyops/languages/javascript.html"
 }

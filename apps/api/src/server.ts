@@ -18,11 +18,15 @@ import { toZod } from './zod.js';
 
 /** A named API key and what it may run: globs over tool words (see clyops-tools' ToolFilter). */
 export interface ApiKey {
+  /** Secret bearer token identifying this API key; never expose it in logs. */
   key: string;
+  /** Allowed tool globs over slash-separated words; a tool must match when the list is nonempty. */
   allow?: string[];
+  /** Denied tool globs; a deny match takes precedence over allow. */
   deny?: string[];
 }
 
+/** Tool root, authorization, execution limits, and lifecycle settings for the HTTP server. */
 export interface ApiOptions {
   /** Positionals before or after options (default: first). */
   positionalsOrder?: 'first' | 'last';
@@ -55,12 +59,13 @@ export interface ApiOptions {
   /** Pick up added, changed and removed tools without a restart (default: false; call close() to stop). */
   watch?: boolean;
   /** Called after each reload when watching. */
-  onReload?: (loaded: { tree: Group; tools: ApiTool[] }) => void;
+  onReload?: (loaded: { /** Discovered directory tree. */ tree: Group; /** Discovered, schema-loaded tools offered by the server. */ tools: ApiTool[] }) => void;
+  /** Server version advertised to clients. */
   version?: string;
 }
 
 /** A tool the API serves, with the URL path of its endpoint, `/tools/<group>/.../<name>`. */
-export type ApiTool = Tool & { path: string };
+export type ApiTool = Tool & { /** Resolved filesystem path or HTTP endpoint path, according to the containing type. */ path: string };
 
 /** Who is calling: the key's name and what it may run. */
 interface Caller {
@@ -297,10 +302,12 @@ export async function createApi(opts: ApiOptions) {
   app.use(errorHandler);
 
   return {
+    /** Express-compatible HTTP application; mount it or call listen to serve requests. */
     app,
+    /** Queue retaining asynchronous job records and results. */
     queue,
     /** The tree and tools being served now. */
-    current: () => ({ tree: api.tree, tools: api.tools }),
+    current: () => ({ /** Discovered directory tree. */ tree: api.tree, /** Discovered, schema-loaded tools offered by the server. */ tools: api.tools }),
     /** Stop watching (the app keeps serving the last set). */
     close: () => watcher?.close(),
   };
@@ -577,7 +584,7 @@ function buildRoutes(opts: ApiOptions, ctx: Ctx, tree: Group, tools: ApiTool[]) 
 }
 
 /** Errors as JSON: validation failures (400) with zod's issues, anything else 500. */
-export function errorHandler(err: Error & { status?: number; errors?: unknown }, _req: Request, res: Response, _next: NextFunction): void {
+export function errorHandler(err: Error & { /** Lifecycle state or HTTP input-error status, according to the containing type. */ status?: number; errors?: unknown }, _req: Request, res: Response, _next: NextFunction): void {
   const status = err.status ?? 500;
   let issues = err.errors;
   if (typeof issues === 'string') {

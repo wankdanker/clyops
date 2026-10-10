@@ -5,6 +5,13 @@ section here.
 
 ## [Unreleased]
 
+- Per-language Markdown guides, runnable examples and complete generated API
+  references in an Eleventy documentation site. CI checks public documentation,
+  installed-consumer typing, examples and links; Pages deployment preserves
+  immutable documentation snapshots for future releases.
+- Expanded editor documentation, typed Python value mappings, and packaged Ruby
+  RBS signatures. Java builds and releases include source and Javadoc JARs.
+
 ## [0.3.0] - 2026-10-10
 
 ### Safer tool discovery and execution

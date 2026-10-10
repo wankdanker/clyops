@@ -30,7 +30,7 @@ and no `node_modules`. It includes clyops-tools. `require('clyops-jobs')` loads 
 - `functions.NAME.script` is the tool, relative to a script root.
 - `key` names the options block (default: the function name). Options are
   `deepMerge(defaults[key], config[key])`, keyed like the tool's options (`out_dir`, `out-dir`)
-  and mapped onto its command line through `--help-json-schema` ([spec §13](../../spec/SPEC.md#13-json-input-toargv)).
+  and mapped onto its command line through `--help-json-schema` ([spec §13](https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md#13-json-input-toargv)).
 - `positionals_order` (optional) is `first` (default) or `last`, for wrappers needing a specific order. `--` is only emitted for positional values starting with `-`.
 - `positionals` (optional) lists the tool's positional arguments explicitly; otherwise they're
   options keyed by argument name.
@@ -93,3 +93,9 @@ ESM only, Node 20+.
 A missing or unreadable configured stdin file rejects `runScriptFunction()`
 with its input-file error. It fails that job and stops its tool; the host worker
 stays alive.
+
+## Documentation
+
+Read the [Node guide](https://wankdanker.github.io/clyops/node-tools.html) and
+[complete public API reference](https://wankdanker.github.io/clyops/reference/node/index.html).
+Type declarations and documentation comments are included in the package.

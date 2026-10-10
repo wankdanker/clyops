@@ -470,8 +470,11 @@ function isBoolLike(opt) {
   return opt.kind === "flag" || ["bool", "choice:true,false", "choice:false,true"].includes(opt.validation);
 }
 var Cli = class _Cli {
+  /** Program name shown in help, schemas, and completion scripts. */
   name;
+  /** Base directory for default and environment path values. */
   root;
+  /** Working directory used to resolve command-line paths and execute tools. */
   cwd;
   /** Resolved, typed values keyed by option var / argument name. */
   values = /* @__PURE__ */ Object.create(null);
@@ -501,16 +504,19 @@ var Cli = class _Cli {
   // positional arguments, by name
   sources = /* @__PURE__ */ new Map();
   configValues = /* @__PURE__ */ new Map();
+  /** Create an instance with the supplied configuration; omitted fields use the documented defaults. */
   constructor(opts = {}) {
     this.name = opts.name ?? path.basename(process.argv[1] || "cli");
     this.cwd = opts.cwd ?? process.cwd();
     this.root = path.resolve(this.cwd, opts.root ?? ".");
     this.env = opts.env ?? process.env;
   }
+  /** Set the description shown below the usage line; returns this CLI. */
   setDescription(text) {
     this.description = text;
     return this;
   }
+  /** Set the text displayed after the help sections; returns this CLI. */
   setEpilog(text) {
     this.epilog = text;
     return this;
@@ -588,6 +594,7 @@ var Cli = class _Cli {
     this.configPrefixes = prefixes.split(",").map((p) => p.trim()).filter(Boolean);
     return this;
   }
+  /** Declare an external executable required at parse time; description and install hint explain a missing dependency. */
   requireCommand(command, description, installHint = "") {
     this.commands.push({ command, description, installHint });
     return this;
@@ -646,19 +653,27 @@ var Cli = class _Cli {
   argVariadic(name, description, validation = "") {
     return this.addArg({ name, description, defaultValue: "", validation, variadic: true });
   }
-  /** @deprecated Use {@link Cli.opt}; kept for scripts written against `getOpt`. */
+  /** Register an option using the legacy method name.
+   * @deprecated Use {@link Cli.opt}; kept for scripts written against `getOpt`.
+   */
   getOpt(...args) {
     return this.opt(...args);
   }
-  /** @deprecated Use {@link Cli.optArray}. */
+  /** Register a repeatable option using the legacy method name.
+   * @deprecated Use {@link Cli.optArray}.
+   */
   getOptArray(...args) {
     return this.optArray(...args);
   }
-  /** @deprecated Use {@link Cli.arg}. */
+  /** Register a positional argument using the legacy method name.
+   * @deprecated Use {@link Cli.arg}.
+   */
   getArg(...args) {
     return this.arg(...args);
   }
-  /** @deprecated Use {@link Cli.argVariadic}. */
+  /** Register a variadic argument using the legacy method name.
+   * @deprecated Use {@link Cli.argVariadic}.
+   */
   getArgVariadic(...args) {
     return this.argVariadic(...args);
   }
@@ -1014,6 +1029,7 @@ var Cli = class _Cli {
   // -------------------------------------------------------------------------
   // Accessors
   // -------------------------------------------------------------------------
+  /** Look up a resolved value by option variable name or positional argument name. */
   get(name) {
     return this.values[name] ?? null;
   }
@@ -1021,9 +1037,11 @@ var Cli = class _Cli {
   source(long) {
     return this.sources.get(long.replace(/^--/, "")) ?? "unset";
   }
+  /** Whether an option was explicitly supplied on the command line. */
   isSet(long) {
     return this.source(long) === "cli";
   }
+  /** Whether an option came from CLI, config, or environment rather than a default. */
   isExplicitlySet(long) {
     return ["cli", "config", "env"].includes(this.source(long));
   }

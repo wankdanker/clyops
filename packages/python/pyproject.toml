@@ -14,6 +14,8 @@ classifiers = ["Programming Language :: Python :: 3", "License :: OSI Approved :
 
 [project.urls]
 Homepage = "https://github.com/wankdanker/clyops"
+Documentation = "https://wankdanker.github.io/clyops/languages/python.html"
+Source = "https://github.com/wankdanker/clyops/tree/main/packages/python"
 
 [tool.setuptools.packages.find]
 where = ["src"]

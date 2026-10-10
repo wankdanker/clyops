@@ -17,10 +17,12 @@ export function truthy(value: unknown): boolean {
   return /^(true|1|yes|on)$/i.test(String(value));
 }
 
+/** Create the directory and missing ancestors; filesystem failures throw. */
 export function ensureDir(dir: string): void {
   mkdirSync(dir, { recursive: true });
 }
 
+/** Read and parse a UTF-8 JSON file; malformed JSON and filesystem failures throw. */
 export function readJson<T = unknown>(file: string): T {
   return JSON.parse(readFileSync(file, 'utf8')) as T;
 }
@@ -39,14 +41,17 @@ export function statFollowingSymlinks(file: string): Stats | null {
   }
 }
 
+/** Whether the path exists and refers to a directory, following symlinks. */
 export function isDirectoryPath(file: string): boolean {
   return Boolean(statFollowingSymlinks(file)?.isDirectory());
 }
 
+/** Whether the path exists and refers to a regular file, following symlinks. */
 export function isFilePath(file: string): boolean {
   return Boolean(statFollowingSymlinks(file)?.isFile());
 }
 
+/** Create destination parents and copy the file; filesystem failures throw. */
 export function copyFileEnsuringDir(source: string, destination: string): void {
   ensureDir(dirname(destination));
   copyFileSync(source, destination);
@@ -56,9 +61,10 @@ export function copyFileEnsuringDir(source: string, destination: string): void {
 export function pathParts(file: string) {
   const name = basename(file);
   const ext = extname(name);
-  return { path: file, dir: dirname(file), name, basename: ext ? name.slice(0, -ext.length) : name, ext: ext.replace(/^\./, '') };
+  return { /** Resolved filesystem path or HTTP endpoint path, according to the containing type. */ path: file, /** Directory represented by this group or specified in .clyops settings. */ dir: dirname(file), /** Program, command, option, or argument name as declared in its containing type. */ name, /** Filename without its extension. */ basename: ext ? name.slice(0, -ext.length) : name, /** Filename extension including the leading dot. */ ext: ext.replace(/^\./, '') };
 }
 
+/** A JSON object used for job configuration. */
 export type Json = { [key: string]: unknown };
 
 /** A plain object, or `{}` for scalars, arrays and null. */

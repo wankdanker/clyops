@@ -1,0 +1,93 @@
+---
+title: Maintaining the documentation
+---
+# Maintaining the documentation
+
+## Build and preview
+
+The full site build runs on Linux or macOS and uses Markdown guides and native
+API references. Install Node 20+,
+pnpm (the version pinned in `package.json`), Python 3.10+, Rust, Go 1.21+,
+Java 17+/Maven, Ruby 3.3+ and Doxygen. These are documentation build requirements;
+the supported library runtime versions remain those in each language guide.
+
+```sh
+pnpm install --frozen-lockfile
+python3 -m venv .venv-docs
+. .venv-docs/bin/activate
+pip install -r docs/requirements.txt
+gem install yard -v 0.9.38 --no-document
+gem install rbs -v 3.4.0 --no-document
+pnpm docs:build
+pnpm docs:serve
+```
+
+`docs:build` builds Node packages, native references, compiled/executed examples,
+then the site into `_site`, and validates local links and fragments.
+`docs:serve` previews the previously generated references and watches Markdown
+changes. Re-run the full build after changing public interfaces or native comments.
+`DOCS_PATH_PREFIX=/clyops/ pnpm docs:build` validates a GitHub project-site build.
+
+## Content and public interfaces
+
+- `docs/languages/*.md`: installation, runnable quickstart, native usage and editor setup.
+- `docs/guide.md`: shared behavior and recipes, linked to the specification.
+- `docs/examples`: runnable sources plus installed-consumer typing examples.
+- Source comments/docstrings: API descriptions used by editors and native generators.
+- `packages/ruby/sig/clyops.rbs`: type signatures shipped in the Ruby gem.
+
+Keep guides as ordinary Markdown. Website navigation/layout are applied by
+Eleventy; Markdown examples containing template syntax are not evaluated as templates.
+Local Markdown links work in the repository and are translated for the website.
+Generated native reference links point to website output, as explained in the
+[reference index](reference.md). Source/spec links lead to GitHub.
+
+When adding or changing a public method, document its behavior, parameters,
+return value, errors and an example where useful. Include ownership/lifetime
+for C and process-exit behavior for parsing APIs. Public includes supported
+constructors, properties, helpers and deprecated aliases; private implementation
+methods are excluded. Native references retain the platform's standard-library
+inherited API.
+
+Quickstart fences marked `<!-- example: filename -->` must match the corresponding
+source exactly. The build executes default, valid, invalid, help and schema cases
+against all nine implementations. Rust additionally runs its native doctests in
+the test suite. Generated folders are ignored and rebuilt, not committed.
+
+## Checks and package artifacts
+
+`pnpm docs:check` checks Python docstrings, Java/Bash public comments, Node exports
+using the TypeScript compiler, and Markdown example synchronization. The full
+build also validates TypeDoc references, rustdoc missing docs/links, Doxygen,
+Go public comments, Ruby public methods/RBS, and static HTML links.
+
+Installed-consumer checks pack all five Node packages and compile a TypeScript
+consumer against their exported declarations. Declaration maps must resolve to
+source files included in each tarball, so editor navigation works after installation.
+The Python wheel is installed
+into an isolated directory and checked with mypy; its `py.typed` marker is required.
+Java artifacts must contain sources and Javadocs. Ruby gems must include signatures.
+Ruby's existing runtime tests also run with RBS argument/result checking enabled.
+Registry READMEs provide the quickstart and link here; the full guides and API
+references live on the documentation site.
+
+## Deployment and versions
+
+The Docs workflow builds and checks pull requests, uploads a preview artifact,
+and deploys successful `main` builds to GitHub Pages. Generated output is stored
+on `docs-pages` so release snapshots survive future deployments and artifact expiry.
+In repository Settings →
+Pages, choose **GitHub Actions** as the source. No custom domain is required.
+Until Pages is configured, the workflow completes its checks and uploads the
+site artifact, then skips deployment. Enable Pages and run Docs again to publish.
+Allow `main` and release tags in the `github-pages` environment's deployment rules
+if that environment restricts branches/tags.
+
+Tag builds also retain an immutable copy at `versions/vX.Y.Z/`, and update a
+version index linked from the site. A release snapshot comes from its tag,
+including the package versions and source comments. Do not edit an existing tag
+to change old documentation. Use a new release for corrections to shipped docs.
+The root site follows `main`; the displayed package version can contain changes
+that have not yet been published to a registry.
+`tools/version.py set` also updates versioned install examples in the guides and
+the Java README. The static Markdown and its release artifacts stay in step.

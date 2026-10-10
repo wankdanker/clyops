@@ -109,3 +109,9 @@ request is handled statelessly with its own server instance.
 `first`). An option terminator is only emitted for positional values starting
 with `-`, which are always placed after the options. The Node API exposes this
 as `positionalsOrder`.
+
+## Documentation
+
+Read the [Node guide](https://wankdanker.github.io/clyops/node-tools.html) and
+[complete public API reference](https://wankdanker.github.io/clyops/reference/node/index.html).
+Type declarations and documentation comments are included in the package.

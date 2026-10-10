@@ -23,9 +23,13 @@ public final class Log {
         System.err.println(LocalDateTime.now().format(TIME) + " [" + tag + "] " + msg);
     }
 
+    /** Log an informational message to stderr using String.format arguments. */
     public static void info(String format, Object... args) { emit("info", String.format(format, args), false); }
+    /** Log a warning to stderr using String.format arguments. */
     public static void warn(String format, Object... args) { emit("warning", String.format(format, args), false); }
+    /** Log an error to stderr using String.format arguments. */
     public static void error(String format, Object... args) { emit("error", String.format(format, args), false); }
+    /** Log a success message to stderr using String.format arguments. */
     public static void success(String format, Object... args) { emit("success", String.format(format, args), false); }
 
     /** Log an error (never suppressed) and exit with {@code code}. */

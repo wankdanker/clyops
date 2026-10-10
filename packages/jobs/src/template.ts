@@ -1,4 +1,5 @@
 // `${dot.path}` and `{{dot.path}}` templates in config values.
+/** Values available to dotted-path template expressions. */
 export type TemplateContext = { [key: string]: unknown };
 
 /** A dot-path value from the context; unknown paths are errors, objects become JSON. */
@@ -14,6 +15,7 @@ export function lookupTemplateValue(context: TemplateContext, expression: string
   return typeof current === 'object' ? JSON.stringify(current) : String(current);
 }
 
+/** Replace dotted-path ${expression} and {{expression}} templates using the context. */
 export function renderTemplateString(value: string, context: TemplateContext): string {
   return String(value).replace(/\$\{\s*([A-Za-z0-9_.-]+)\s*\}|\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g, (_, dollar, brace) =>
     lookupTemplateValue(context, dollar || brace),

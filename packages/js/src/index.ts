@@ -4,8 +4,11 @@ import * as path from 'node:path';
 import { format } from 'node:util';
 import { COMPLETION_SCRIPTS } from './completions.js';
 
+/** A single resolved string, number, or boolean. */
 export type Scalar = string | number | boolean;
+/** A resolved scalar, scalar array, or null for an unset value. */
 export type Value = Scalar | Scalar[] | null;
+/** Where an option value came from, in precedence order: cli, config, env, default, unset. */
 export type Source = 'cli' | 'config' | 'env' | 'default' | 'unset';
 
 /**
@@ -24,16 +27,21 @@ const EFFECTS = ['read-only', 'idempotent', 'destructive', 'network'];
 
 /** A declared stdin or stdout (spec section 1.3). */
 export interface Stream {
+  /** Human-readable description shown in help and documentation. */
   description: string;
+  /** Declared MIME type, or an empty string when unspecified. */
   contentType: string;
 }
 
 /** An option relationship (spec section 1.6). */
 export interface Constraint {
+  /** Relationship checked after configuration and environment values resolve. */
   type: 'exclusive' | 'requires' | 'oneOf';
+  /** Long option names participating in this relationship. */
   options: string[];
 }
 
+/** Program identity, path bases, and environment used when constructing a CLI. */
 export interface CliOptions {
   /** Program name shown in usage. Defaults to the basename of process.argv[1]. */
   name?: string;
@@ -45,10 +53,20 @@ export interface CliOptions {
   env?: Record<string, string | undefined>;
 }
 
+/** The outcome of parsing without exiting: ok, help, or error. Values are available after ok. */
 export type ParseResult =
-  | { status: 'ok' }
-  | { status: 'help' }
-  | { status: 'error'; error: string; showUsage: boolean; detail?: string[] };
+  | { /** Parsing succeeded; read the CLI's resolved values. */ status: 'ok' }
+  | { /** Help was requested; display usage without executing the application. */ status: 'help' }
+  | {
+    /** Parsing failed. */
+    status: 'error';
+    /** Human-readable validation, configuration, or argument error. */
+    error: string;
+    /** Whether help should accompany the error. */
+    showUsage: boolean;
+    /** Additional failure details and installation hints. */
+    detail?: string[];
+  };
 
 interface OptionDef {
   varName: string;
@@ -105,9 +123,13 @@ function emit(level: string, msg: string, force = false): void {
   process.stderr.write(`${timestamp()} [${tag}] ${msg}\n`);
 }
 
+/** Write a timestamped informational message to stderr; supports printf-style arguments. */
 export function info(fmt: string, ...args: unknown[]): void { emit('info', format(fmt, ...args)); }
+/** Write a timestamped warning to stderr; supports printf-style arguments. */
 export function warn(fmt: string, ...args: unknown[]): void { emit('warning', format(fmt, ...args)); }
+/** Write a timestamped error to stderr; supports printf-style arguments. */
 export function error(fmt: string, ...args: unknown[]): void { emit('error', format(fmt, ...args)); }
+/** Write a timestamped success message to stderr; supports printf-style arguments. */
 export function success(fmt: string, ...args: unknown[]): void { emit('success', format(fmt, ...args)); }
 
 /** Print an error and exit with `code`. Never suppressed. */
@@ -154,6 +176,7 @@ function bounds(rule: string): [string, string] {
   return [range.slice(0, dash), range.slice(dash + 1)];
 }
 
+/** Whether a validation rule denotes a path, file, or directory. */
 export function isPathRule(rule: string): boolean {
   return rule === 'path' || rule.startsWith('file:') || rule.startsWith('dir:');
 }
@@ -359,9 +382,13 @@ function isBoolLike(opt: OptionDef): boolean {
 // Cli
 // ---------------------------------------------------------------------------
 
+/** A command-line interface. Register options and arguments before parsing. Registration errors indicate a programming mistake. */
 export class Cli {
+  /** Program name shown in help, schemas, and completion scripts. */
   readonly name: string;
+  /** Base directory for default and environment path values. */
   readonly root: string;
+  /** Working directory used to resolve command-line paths and execute tools. */
   readonly cwd: string;
   /** Resolved, typed values keyed by option var / argument name. */
   values: Record<string, Value> = Object.create(null);
@@ -392,6 +419,7 @@ export class Cli {
   private sources = new Map<string, Source>();
   private configValues = new Map<string, { value: string; dir: string }>();
 
+  /** Create an instance with the supplied configuration; omitted fields use the documented defaults. */
   constructor(opts: CliOptions = {}) {
     this.name = opts.name ?? path.basename(process.argv[1] || 'cli');
     this.cwd = opts.cwd ?? process.cwd();
@@ -399,7 +427,9 @@ export class Cli {
     this.env = opts.env ?? process.env;
   }
 
+  /** Set the description shown below the usage line; returns this CLI. */
   setDescription(text: string): this { this.description = text; return this; }
+  /** Set the text displayed after the help sections; returns this CLI. */
   setEpilog(text: string): this { this.epilog = text; return this; }
 
   /** What running the program does: read-only, idempotent, destructive, network. */
@@ -473,6 +503,7 @@ export class Cli {
     return this;
   }
 
+  /** Declare an external executable required at parse time; description and install hint explain a missing dependency. */
   requireCommand(command: string, description: string, installHint = ''): this {
     this.commands.push({ command, description, installHint });
     return this;
@@ -517,13 +548,21 @@ export class Cli {
     return this.addArg({ name, description, defaultValue: '', validation, variadic: true });
   }
 
-  /** @deprecated Use {@link Cli.opt}; kept for scripts written against `getOpt`. */
+  /** Register an option using the legacy method name.
+   * @deprecated Use {@link Cli.opt}; kept for scripts written against `getOpt`.
+   */
   getOpt(...args: Parameters<Cli['opt']>): this { return this.opt(...args); }
-  /** @deprecated Use {@link Cli.optArray}. */
+  /** Register a repeatable option using the legacy method name.
+   * @deprecated Use {@link Cli.optArray}.
+   */
   getOptArray(...args: Parameters<Cli['optArray']>): this { return this.optArray(...args); }
-  /** @deprecated Use {@link Cli.arg}. */
+  /** Register a positional argument using the legacy method name.
+   * @deprecated Use {@link Cli.arg}.
+   */
   getArg(...args: Parameters<Cli['arg']>): this { return this.arg(...args); }
-  /** @deprecated Use {@link Cli.argVariadic}. */
+  /** Register a variadic argument using the legacy method name.
+   * @deprecated Use {@link Cli.argVariadic}.
+   */
   getArgVariadic(...args: Parameters<Cli['argVariadic']>): this { return this.argVariadic(...args); }
 
   private addOption(opt: OptionDef): this {
@@ -871,6 +910,7 @@ export class Cli {
   // Accessors
   // -------------------------------------------------------------------------
 
+  /** Look up a resolved value by option variable name or positional argument name. */
   get(name: string): Value {
     return this.values[name] ?? null;
   }
@@ -880,8 +920,10 @@ export class Cli {
     return this.sources.get(long.replace(/^--/, '')) ?? 'unset';
   }
 
+  /** Whether an option was explicitly supplied on the command line. */
   isSet(long: string): boolean { return this.source(long) === 'cli'; }
 
+  /** Whether an option came from CLI, config, or environment rather than a default. */
   isExplicitlySet(long: string): boolean { return ['cli', 'config', 'env'].includes(this.source(long)); }
 
   /** Resolved values as JSON (spec section 10). */

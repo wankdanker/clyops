@@ -8,14 +8,17 @@ import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult } fr
 import { InputError, isTextType, runTool, tail, toJsonSchema, type AuditEntry, type JsonSchema, type Tool, type ToolResult } from 'clyops-tools';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
+/** Server identity, discovered tools, authorization boundaries, and execution limits for MCP. */
 export interface McpOptions {
   /** Positionals before or after options (default: first). */
   positionalsOrder?: 'first' | 'last';
   /** Server name shown to clients (e.g. the tools directory's name). */
   name: string;
+  /** Server version advertised to clients. */
   version?: string;
   /** Instructions for the agent, e.g. the tools directory's description. */
   instructions?: string;
+  /** Discovered, schema-loaded tools offered by the server. */
   tools: Tool[];
   /** Working directory tools run in (default: the server's). */
   cwd?: string;
@@ -152,7 +155,7 @@ export function createMcpServer(opts: McpOptions): Server {
  * which it answers with 405) at a path such as `/mcp`, after a JSON body parser.
  * Pass a function to serve whatever it returns for each request (given the request, e.g. to serve per-caller tools).
  */
-export function mcpHttpHandler<R extends IncomingMessage & { body?: unknown }>(opts: McpOptions | ((req: R) => McpOptions)) {
+export function mcpHttpHandler<R extends IncomingMessage & { /** Parsed HTTP request body when installed by the host middleware. */ body?: unknown }>(opts: McpOptions | ((req: R) => McpOptions)) {
   return async (req: R, res: ServerResponse): Promise<void> => {
     const server = createMcpServer(typeof opts === 'function' ? opts(req) : opts);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });

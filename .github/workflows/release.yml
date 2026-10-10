@@ -238,7 +238,7 @@ jobs:
         with: { ruby-version: "3.3" }
       - name: Java jar
         working-directory: packages/java
-        run: mvn -B -q package -DskipTests && cp "target/clyops-$VERSION.jar" ../../out/
+        run: mvn -B -q package -DskipTests && cp target/clyops-"$VERSION"*.jar ../../out/
       - name: Ruby gem
         working-directory: packages/ruby
         run: gem build clyops.gemspec && mv "clyops-$VERSION.gem" ../../out/

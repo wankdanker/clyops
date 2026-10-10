@@ -27,15 +27,22 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// A resolved, typed value.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
+    /// No value was supplied.
     Null,
+    /// Boolean flag or bool-rule value.
     Bool(bool),
+    /// Signed integer produced by int or port validation.
     Int(i64),
+    /// Floating-point value.
     Float(f64),
+    /// String value.
     Str(String),
+    /// Values of an array option or variadic argument.
     List(Vec<Value>),
 }
 
 impl Value {
+    /// Return the string, or None for another variant.
     pub fn as_str(&self) -> Option<&str> {
         if let Value::Str(s) = self {
             Some(s)
@@ -43,6 +50,7 @@ impl Value {
             None
         }
     }
+    /// Return the integer, or None for another variant.
     pub fn as_int(&self) -> Option<i64> {
         if let Value::Int(n) = self {
             Some(*n)
@@ -50,6 +58,7 @@ impl Value {
             None
         }
     }
+    /// Return a float, converting Int values; None for nonnumeric variants.
     pub fn as_float(&self) -> Option<f64> {
         match self {
             Value::Float(f) => Some(*f),
@@ -57,6 +66,7 @@ impl Value {
             _ => None,
         }
     }
+    /// Return the boolean, or None for another variant.
     pub fn as_bool(&self) -> Option<bool> {
         if let Value::Bool(b) = self {
             Some(*b)
@@ -64,6 +74,7 @@ impl Value {
             None
         }
     }
+    /// Return list elements, or an empty slice for another variant.
     pub fn as_list(&self) -> &[Value] {
         if let Value::List(l) = self {
             l
@@ -71,6 +82,7 @@ impl Value {
             &[]
         }
     }
+    /// Whether this is an unset value.
     pub fn is_null(&self) -> bool {
         matches!(self, Value::Null)
     }
@@ -107,6 +119,7 @@ impl Values {
     pub fn strs(&self, name: &str) -> Vec<&str> {
         self.get(name).as_list().iter().filter_map(Value::as_str).collect()
     }
+    /// Iterate over resolved name/value pairs in registration order.
     pub fn iter(&self) -> impl Iterator<Item = (&str, &Value)> {
         self.0.iter().map(|(k, v)| (k.as_str(), v))
     }
@@ -284,15 +297,19 @@ fn emit(level: &str, msg: &str, force: bool) {
     let _ = writeln!(std::io::stderr(), "{} [{}] {}", timestamp(), tag, msg);
 }
 
+/// Write an informational message to stderr unless silent.
 pub fn info(msg: &str) {
     emit("info", msg, false)
 }
+/// Write a warning to stderr unless silent.
 pub fn warn(msg: &str) {
     emit("warning", msg, false)
 }
+/// Write an error message to stderr unless silent.
 pub fn error(msg: &str) {
     emit("error", msg, false)
 }
+/// Write a success message to stderr unless silent.
 pub fn success(msg: &str) {
     emit("success", msg, false)
 }
@@ -714,9 +731,19 @@ enum Raw {
 /// Outcome of [`Cli::parse`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum Parsed {
+    /// Parsing succeeded; read resolved values from the CLI.
     Ok,
+    /// Help was requested; the caller decides how to display it.
     Help,
-    Error { message: String, show_usage: bool, detail: Vec<String> },
+    /// Parsing failed; contains the message and help-display policy.
+    Error {
+        /// Human-readable failure message.
+        message: String,
+        /// Whether usage should accompany the error.
+        show_usage: bool,
+        /// Extra details, such as installation hints for missing commands.
+        detail: Vec<String>,
+    },
 }
 
 impl Parsed {
@@ -762,6 +789,7 @@ pub struct ArgRef<'a> {
 }
 
 impl<'a> ArgRef<'a> {
+    /// Set a positional validation rule. Panics if the rule is unknown; returns this argument handle.
     pub fn rule(self, rule: &str) -> Self {
         let name = self.cli.args[self.index].name.clone();
         if !known_rule(rule) {
@@ -773,6 +801,7 @@ impl<'a> ArgRef<'a> {
 }
 
 #[derive(Debug, Clone)]
+/// A program CLI. Register options and arguments before parsing; registration errors panic.
 pub struct Cli {
     name: String,
     root: String,
@@ -809,7 +838,7 @@ impl Default for Cli {
 }
 
 impl Cli {
-    /// A CLI named after argv[0], rooted at the current directory, reading the process environment.
+    /// A CLI named after `argv[0]`, rooted at the current directory, reading the process environment.
     pub fn new() -> Cli {
         let name = std::env::args().next().map(|a| a.rsplit('/').next().unwrap_or("").to_string()).unwrap_or_default();
         let cwd = std::env::current_dir().map(|p| p.to_string_lossy().into_owned()).unwrap_or_else(|_| "/".into());
@@ -861,10 +890,12 @@ impl Cli {
         self.env = env.into_iter().collect();
         self
     }
+    /// Set the description below the usage line and return this CLI.
     pub fn description(&mut self, text: &str) -> &mut Self {
         self.description = text.into();
         self
     }
+    /// Set the final help text and return this CLI.
     pub fn epilog(&mut self, text: &str) -> &mut Self {
         self.epilog = text.into();
         self
@@ -975,6 +1006,7 @@ impl Cli {
         self
     }
 
+    /// Require an executable on PATH when parsing, with a description and optional installation hint.
     pub fn require_command(&mut self, command: &str, description: &str, install_hint: &str) -> &mut Self {
         self.commands.push((command.into(), description.into(), install_hint.into()));
         self
@@ -1512,6 +1544,7 @@ impl Cli {
 
     // -- accessors ------------------------------------------------------------
 
+    /// Read resolved values from the last successful parse.
     pub fn values(&self) -> &Values {
         &self.values
     }
@@ -1521,10 +1554,12 @@ impl Cli {
         self.sources.get(long.strip_prefix("--").unwrap_or(long)).copied().unwrap_or("unset")
     }
 
+    /// Whether an option came from the command line.
     pub fn is_set(&self, long: &str) -> bool {
         self.source(long) == "cli"
     }
 
+    /// Whether an option came from CLI, config, or environment rather than a default.
     pub fn is_explicitly_set(&self, long: &str) -> bool {
         matches!(self.source(long), "cli" | "config" | "env")
     }

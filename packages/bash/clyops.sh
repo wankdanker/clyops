@@ -81,9 +81,13 @@ _clyops_log() {
     printf '%(%Y-%m-%d %H:%M:%S)T [%s%s%s] %s\n' -1 "$color" "$level" "$reset" "$msg" >&2
 }
 
+# Usage: info <message...>. Log an informational message to stderr.
 info()    { _clyops_log info "$*"; }
+# Usage: warn <message...>. Log a warning to stderr.
 warn()    { _clyops_log warning "$*"; }
+# Usage: error <message...>. Log an error to stderr.
 error()   { _clyops_log error "$*"; }
+# Usage: success <message...>. Log a success message to stderr.
 success() { _clyops_log success "$*"; }
 # Usage: die <exit_code> <message>
 die()     { local code="$1"; shift; _clyops_log error "$*" force; exit "$code"; }
@@ -94,9 +98,13 @@ _clyops_fatal() { _clyops_log error "$1" force; exit 2; }
 # Registration
 # ---------------------------------------------------------------------------
 
+# Usage: clyops_name <name>. Set the program name for help and completion.
 clyops_name()        { _CLYOPS_NAME="$1"; }
+# Usage: clyops_root <directory>. Set the base for default and environment paths.
 clyops_root()        { _CLYOPS_ROOT="$1"; }
+# Usage: clyops_description <text>. Set the description below the usage line.
 clyops_description() { _clyops_record clyops_description "$@" || _CLYOPS_DESCRIPTION="$1"; }
+# Usage: clyops_epilog <text>. Set the final help text.
 clyops_epilog()      { _clyops_record clyops_epilog "$@" || _CLYOPS_EPILOG="$1"; }
 
 # Inside a command, record a registration instead of making it (returns 0).
@@ -134,11 +142,14 @@ clyops_effects() {
 
 # Usage: clyops_stdin <description> [content-type]   /   clyops_stdout <description> [content-type]
 clyops_stdin()  { _clyops_record clyops_stdin "$@" || _CLYOPS_STDIN=("$1" "${2:-}"); }
+# Usage: clyops_stdout <description> [content-type]. Declare output metadata.
 clyops_stdout() { _clyops_record clyops_stdout "$@" || _CLYOPS_STDOUT=("$1" "${2:-}"); }
 
 # Usage: clyops_exclusive <long>...  /  clyops_requires <long> <long>...  /  clyops_one_of <long>...
 clyops_exclusive() { _clyops_record clyops_exclusive "$@" || _clyops_constraint exclusive "$@"; }
+# Usage: clyops_requires <long> <long...>. The first option requires the others.
 clyops_requires()  { _clyops_record clyops_requires "$@" || _clyops_constraint requires "$@"; }
+# Usage: clyops_one_of <long...>. Require at least one listed option.
 clyops_one_of()    { _clyops_record clyops_one_of "$@" || _clyops_constraint oneOf "$@"; }
 
 _clyops_constraint() {
@@ -870,7 +881,9 @@ clyops_run() {
 
 # Print where an option's value came from: cli, config, env, default or unset.
 clyops_source() { local long="${1#--}"; echo "${_CLYOPS_SRC[$long]:-unset}"; }
+# Usage: clyops_is_set <long>. Return zero if the option came from CLI, else one.
 clyops_is_set() { [[ "${_CLYOPS_SRC[${1#--}]:-}" == cli ]]; }
+# Usage: clyops_is_explicitly_set <long>. Return zero for CLI/config/env, else one.
 clyops_is_explicitly_set() { case "${_CLYOPS_SRC[${1#--}]:-}" in cli|config|env) return 0 ;; esac; return 1; }
 
 # ---------------------------------------------------------------------------

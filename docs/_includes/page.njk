@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} · clyops</title>
+  <link rel="stylesheet" href="{{ '/assets/docs.css' | url }}">
+  <script defer src="{{ '/assets/search.js' | url }}"></script>
+</head>
+<body data-search-index="{{ '/search-index.json' | url }}">
+  <a class="skip" href="#content">Skip to content</a>
+  <header><a href="{{ '/' | url }}"><strong>clyops</strong></a><span>Documentation · {{ '' | version }}</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <div class="shell">
+    <nav aria-label="Documentation">
+      <a href="{{ '/guide.html' | url }}">Concepts and behavior</a>
+      <a href="{{ '/reference.html' | url }}">API references</a>
+      <h2>Languages</h2>
+      {% for slug, name in languages %}<a href="{{ ('/languages/' + slug + '.html') | url }}">{{ name }}</a>{% endfor %}
+      <h2>Tools and servers</h2>
+      <a href="{{ '/node-tools.html' | url }}">Node tools, jobs, API and MCP</a>
+      <a href="{{ '/applications.html' | url }}">Dispatcher and desktop runner</a>
+      <a href="{{ '/maintaining.html' | url }}">Maintaining the docs</a>
+      <a href="{{ '/versions.html' | url }}">Release documentation</a>
+      <form action="{{ '/search.html' | url }}" role="search"><label for="search">Search guides</label><input id="search" name="q" type="search"><button>Search</button></form>
+    </nav>
+    <main id="content">{{ content | safe }}</main>
+  </div>
+  <footer>Guides are Markdown. API references come from the published source interfaces.</footer>
+</body>
+</html>

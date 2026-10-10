@@ -4,8 +4,11 @@ import { availableParallelism } from 'node:os';
 import { newJobId, newJobRecord, transitionJobRecord, type JobRecord } from './records.js';
 import { timestampIso } from './util.js';
 
+/** A queued task, its current record, completion promise, optional result, and cancellation method. */
 export interface Job<R> {
+  /** Current serializable job state, updated as the task progresses. */
   record: JobRecord;
+  /** Task result or configured result templates, according to the containing interface. */
   result?: R;
   /** Resolves with the result when the job is done (rejects when it fails). */
   done: Promise<R>;
@@ -13,6 +16,7 @@ export interface Job<R> {
   cancel(): void;
 }
 
+/** Concurrency, retention, ID prefix, and lifecycle callbacks for the in-memory queue. */
 export interface QueueOptions {
   /** Jobs run at the same time (default: the number of CPUs). */
   concurrency?: number;
@@ -26,19 +30,21 @@ export interface QueueOptions {
   onDrop?: (record: JobRecord) => void;
 }
 
+/** An in-memory queue with bounded concurrency and retention. Await each job.done to observe its result. */
 export class JobQueue<R = unknown> {
   private jobs = new Map<string, Job<R>>();
   private waiting: (() => void)[] = [];
   private running = 0;
   private finished: string[] = [];
 
+  /** Create an instance with the supplied configuration; omitted fields use the documented defaults. */
   constructor(private opts: QueueOptions = {}) {}
 
   /**
    * Queue `task` as a job of `functionName`. The task gets an AbortSignal and
    * a `stage` setter for progress; its return value is the job's result.
    */
-  add(functionName: string, task: (ctx: { signal: AbortSignal; stage: (stage: string) => void }) => Promise<R>, fields: Record<string, unknown> = {}): Job<R> {
+  add(functionName: string, task: (ctx: { /** Termination signal, or null for an ordinary exit. RunOptions uses an AbortSignal for cancellation. */ signal: AbortSignal; /** Current progress stage, or null when unspecified. */ stage: (stage: string) => void }) => Promise<R>, fields: Record<string, unknown> = {}): Job<R> {
     const id = newJobId(functionName, this.opts.prefix ?? 'job');
     const abort = new AbortController();
     const job = { record: newJobRecord({ jobId: id, functionName, fields }) } as Job<R>;
@@ -71,10 +77,12 @@ export class JobQueue<R = unknown> {
     return job;
   }
 
+  /** Look up a retained job by ID; returns undefined when unknown or dropped. */
   get(id: string): Job<R> | undefined {
     return this.jobs.get(id);
   }
 
+  /** Return the current records for all retained jobs, including pending and finished jobs. */
   list(): JobRecord[] {
     return [...this.jobs.values()].map((j) => j.record);
   }

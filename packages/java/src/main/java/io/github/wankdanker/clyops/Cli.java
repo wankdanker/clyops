@@ -389,11 +389,13 @@ public class Cli {
         return this;
     }
 
+    /** Set the help description and return this CLI. */
     public Cli setDescription(String text) {
         this.description = text;
         return this;
     }
 
+    /** Set the final help text and return this CLI. */
     public Cli setEpilog(String text) {
         this.epilog = text;
         return this;
@@ -964,18 +966,22 @@ public class Cli {
     // Accessors
     // -----------------------------------------------------------------------
 
+    /** The program name shown in help and completion. */
     public String name() { return name; }
 
     /** The resolved values from the last parse. */
     public Values values() { return values; }
 
+    /** Look up a resolved value by option variable or positional name; null when absent. */
     public Object get(String name) { return values.get(name); }
 
     /** Where an option's value came from: cli, config, env, default or unset. */
     public String source(String lng) { return sources.getOrDefault(lng.startsWith("--") ? lng.substring(2) : lng, "unset"); }
 
+    /** Whether the option came from the command line. */
     public boolean isSet(String lng) { return source(lng).equals("cli"); }
 
+    /** Whether the option came from CLI, config, or environment rather than a default. */
     public boolean isExplicitlySet(String lng) { return List.of("cli", "config", "env").contains(source(lng)); }
 
     /** Resolved values as JSON (spec section 10), in registration order. */

@@ -5,19 +5,31 @@
 import { createHash } from 'node:crypto';
 import { timestampIso } from './util.js';
 
+/** Job lifecycle: pending, processing, done, or error. */
 export type JobStatus = 'pending' | 'processing' | 'done' | 'error';
 
+/** A serializable job state with lifecycle timestamps, error information, and history. */
 export interface JobRecord {
+  /** Unique identifier for the job. */
   job_id: string;
+  /** Configured function associated with the job. */
   function: string;
+  /** Lifecycle state or HTTP input-error status, according to the containing type. */
   status: JobStatus;
+  /** Current progress stage, or null when unspecified. */
   stage: string | null;
+  /** ISO timestamp when the record was created. */
   started_at: string;
+  /** ISO timestamp of the last transition. */
   updated_at: string;
+  /** ISO timestamp when execution finished, or null while unfinished. */
   completed_at: string | null;
+  /** Failure message, or null while no error has been recorded. */
   error: string | null;
+  /** Storage key of the result, or null when absent. */
   result_key: string | null;
-  history: { status: JobStatus; stage: string | null; updated_at: string }[];
+  /** Earlier job states, newest first. */
+  history: { /** Lifecycle state or HTTP input-error status, according to the containing type. */ status: JobStatus; /** Current progress stage, or null when unspecified. */ stage: string | null; /** ISO timestamp of the last transition. */ updated_at: string }[];
   [field: string]: unknown;
 }
 
@@ -28,7 +40,7 @@ export function newJobId(seed: string, prefix = 'job'): string {
 }
 
 /** A new record in the `pending` state; `fields` are flattened onto it. */
-export function newJobRecord(p: { jobId: string; functionName: string; fields?: Record<string, unknown>; now?: string }): JobRecord {
+export function newJobRecord(p: { jobId: string; /** Name of the configured function to invoke. */ functionName: string; fields?: Record<string, unknown>; now?: string }): JobRecord {
   const now = p.now ?? timestampIso();
   return {
     job_id: p.jobId,
@@ -48,7 +60,7 @@ export function newJobRecord(p: { jobId: string; functionName: string; fields?: 
 /** Move a record on, pushing its current state onto the front of `history`. Returns a new record. */
 export function transitionJobRecord(
   record: JobRecord,
-  change: { status: JobStatus; stage?: string | null; error?: string | null; resultKey?: string | null; completedAt?: string | null; now?: string; extra?: Record<string, unknown> },
+  change: { /** Lifecycle state or HTTP input-error status, according to the containing type. */ status: JobStatus; /** Current progress stage, or null when unspecified. */ stage?: string | null; /** Write a timestamped error to stderr; supports printf-style arguments. */ error?: string | null; resultKey?: string | null; completedAt?: string | null; now?: string; extra?: Record<string, unknown> },
 ): JobRecord {
   return {
     ...record,

@@ -50,5 +50,6 @@
     "@types/node": "^22.0.0",
     "typescript": "^5.6.0",
     "express": "^5.2.1"
-  }
+  },
+  "homepage": "https://wankdanker.github.io/clyops/node-tools.html"
 }

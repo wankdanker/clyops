@@ -5,7 +5,9 @@ import { redactArgv, toArgv, type Input } from './argv.js';
 import { start, type RunOptions, type RunResult, type Started } from './run.js';
 import { loadSchema, type Schema, type SchemaBody } from './schema.js';
 
+/** A probed executable or leaf command, with its effective inherited schema. */
 export interface Tool extends Command {
+  /** Effective schema returned by the executable and inherited command options. */
   schema: Schema;
   /** The first line of its description. */
   description: string;
@@ -17,7 +19,9 @@ export interface Tool extends Command {
   subcommand?: string[];
 }
 
+/** Tool execution outcome, including success and parsed JSON output when available. */
 export interface ToolResult extends RunResult {
+  /** Whether the tool finished without timeout, signal, or a nonzero exit code. */
   ok: boolean;
   /** stdout parsed as JSON, when it is JSON. */
   json?: unknown;
@@ -39,7 +43,7 @@ function globRegex(pattern: string): RegExp {
 }
 
 /** Whether `filter` lets `tool` through. */
-export function allowed(tool: { words: string[]; schema: SchemaBody }, filter: ToolFilter): boolean {
+export function allowed(tool: { /** Command words relative to the discovered root. */ words: string[]; /** Effective schema returned by the executable and inherited command options. */ schema: SchemaBody }, filter: ToolFilter): boolean {
   const path = tool.words.join('/');
   if (filter.allow?.length && !filter.allow.some((p) => globRegex(p).test(path))) return false;
   if (filter.deny?.some((p) => globRegex(p).test(path))) return false;
@@ -98,8 +102,8 @@ export function expandCommands(cmd: Command, schema: Schema): Tool[] {
  */
 export async function loadTools(
   root: string,
-  opts: { name?: string; filter?: ToolFilter; onError?: (cmd: Command, err: Error) => void } = {},
-): Promise<{ tree: Group; tools: Tool[] }> {
+  opts: { /** Program, command, option, or argument name as declared in its containing type. */ name?: string; filter?: ToolFilter; onError?: (cmd: Command, err: Error) => void } = {},
+): Promise<{ /** Discovered directory tree. */ tree: Group; /** Discovered, schema-loaded tools offered by the server. */ tools: Tool[] }> {
   const tree = discover(root, { name: opts.name });
   const loaded = await Promise.all(
     commands(tree)
@@ -118,9 +122,11 @@ export async function loadTools(
   return { tree, tools };
 }
 
+/** A tools-directory watcher. Call close to stop watching and release filesystem handles. */
 export interface ToolsWatcher {
   /** The latest tree and tools. */
-  current(): { tree: Group; tools: Tool[] };
+  current(): { /** Discovered directory tree. */ tree: Group; /** Discovered, schema-loaded tools offered by the server. */ tools: Tool[] };
+  /** Stop watching directories and cancel the pending reload timer. */
   close(): void;
 }
 
@@ -134,10 +140,11 @@ export interface ToolsWatcher {
 export async function watchTools(
   root: string,
   opts: {
+    /** Program, command, option, or argument name as declared in its containing type. */
     name?: string;
     filter?: ToolFilter;
     debounceMs?: number;
-    onChange?: (loaded: { tree: Group; tools: Tool[] }) => void;
+    onChange?: (loaded: { /** Discovered directory tree. */ tree: Group; /** Discovered, schema-loaded tools offered by the server. */ tools: Tool[] }) => void;
     onError?: (cmd: Command | null, err: Error) => void;
   } = {},
 ): Promise<ToolsWatcher> {
@@ -173,6 +180,7 @@ export async function watchTools(
   };
 }
 
+/** Process execution options combined with JSON-to-argv mapping and path restrictions. */
 export interface ToolRunOptions extends RunOptions {
   /** Positionals before or after options (default: first). */
   positionalsOrder?: 'first' | 'last';
@@ -187,7 +195,7 @@ export interface ToolRunOptions extends RunOptions {
  * line with secrets shown as `***`. Throws an InputError for input `within`
  * rejects, and for an argument given without an earlier one.
  */
-export function startTool(tool: Tool, input: Input, opts: ToolRunOptions = {}): Started & { command: string[] } {
+export function startTool(tool: Tool, input: Input, opts: ToolRunOptions = {}): Started & { /** Executed command words, including executable and arguments. */ command: string[] } {
   const { argv, env } = toArgv(tool.schema, input, { within: opts.within, cwd: opts.cwd, secretEnv: opts.secretsInEnv !== false, positionals: opts.positionalsOrder });
   const full = [...(tool.subcommand ?? []), ...argv];
   const started = start(tool.file, full, { ...opts, env: Object.keys(env).length ? { ...(opts.env ?? process.env), ...env } : opts.env });

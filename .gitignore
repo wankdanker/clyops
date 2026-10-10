@@ -5,3 +5,9 @@ build/
 __pycache__/
 *.egg-info/
 .venv/
+.venv-docs/
+_site/
+docs/_native/
+docs/_generated/
+.docs-tools/
+.yardoc/

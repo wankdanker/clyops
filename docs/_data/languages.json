@@ -1,0 +1,10 @@
+{
+  "javascript": "JavaScript / TypeScript",
+  "python": "Python",
+  "rust": "Rust",
+  "go": "Go",
+  "java": "Java",
+  "ruby": "Ruby",
+  "c": "C",
+  "bash": "Bash"
+}

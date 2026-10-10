@@ -176,6 +176,7 @@ func DescribeRule(rule string) string {
 // ValidationError carries the spec's error text for a value that fails its rule.
 type ValidationError struct{ Message string }
 
+// Error returns the validation failure message, implementing error.
 func (e *ValidationError) Error() string { return e.Message }
 
 // Validate checks value against rule and returns its typed form: int for

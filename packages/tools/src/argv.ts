@@ -5,11 +5,14 @@ import type { Schema, SchemaArgument, SchemaOption } from './schema.js';
 
 /** Input the caller got wrong: an API answers it with `status` (400). */
 export class InputError extends Error {
+  /** HTTP status used by adapters to report invalid caller input. */
   status = 400;
 }
 
+/** JSON input keyed by option or argument name; null and undefined values are omitted. */
 export type Input = Record<string, unknown>;
 
+/** Controls path resolution, templates, positional order, secret transport, and allowed path boundaries. */
 export interface ArgvOptions {
   /** Directory that relative path values resolve against (default: leave them to the tool). */
   base?: string;
@@ -36,7 +39,9 @@ export interface ArgvOptions {
   cwd?: string;
 }
 
+/** Generated argv and secret environment, plus unknown and caller-controlled input keys. */
 export interface Argv {
+  /** Arguments to pass to the executable, excluding its filename. */
   argv: string[];
   /** Variables to add to the tool's environment (secrets, with `secretEnv`). */
   env: Record<string, string>;
@@ -63,6 +68,7 @@ export function isBareFlag(option: SchemaOption): boolean {
   return option.isFlag && choices !== 'false,true';
 }
 
+/** Whether a schema type or validation rule denotes a filesystem path. */
 export function isPathValued(validation: string, type?: string): boolean {
   return type === 'path' || validation === 'path' || validation.startsWith('file:') || validation.startsWith('dir:');
 }

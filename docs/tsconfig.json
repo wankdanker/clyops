@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "baseUrl": "..",
+    "paths": {
+      "clyops": ["packages/js/src/index.ts"],
+      "clyops-tools": ["packages/tools/src/index.ts"],
+      "clyops-jobs": ["packages/jobs/src/index.ts"],
+      "clyops-mcp": ["apps/mcp/src/index.ts"]
+    }
+  },
+  "include": ["../packages/*/src/**/*.ts", "../apps/api/src/**/*.ts", "../apps/mcp/src/**/*.ts"]
+}

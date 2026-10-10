@@ -102,7 +102,18 @@ function copyFileEnsuringDir(source, destination) {
 function pathParts(file) {
   const name = (0, import_node_path.basename)(file);
   const ext = (0, import_node_path.extname)(name);
-  return { path: file, dir: (0, import_node_path.dirname)(file), name, basename: ext ? name.slice(0, -ext.length) : name, ext: ext.replace(/^\./, "") };
+  return {
+    /** Resolved filesystem path or HTTP endpoint path, according to the containing type. */
+    path: file,
+    /** Directory represented by this group or specified in .clyops settings. */
+    dir: (0, import_node_path.dirname)(file),
+    /** Program, command, option, or argument name as declared in its containing type. */
+    name,
+    /** Filename without its extension. */
+    basename: ext ? name.slice(0, -ext.length) : name,
+    /** Filename extension including the leading dot. */
+    ext: ext.replace(/^\./, "")
+  };
 }
 function objectValue(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -196,6 +207,7 @@ function loadSchema(file, opts = {}) {
 var import_node_fs3 = require("node:fs");
 var import_node_path2 = require("node:path");
 var InputError = class extends Error {
+  /** HTTP status used by adapters to report invalid caller input. */
   status = 400;
 };
 function inputKey(name) {
@@ -724,6 +736,7 @@ function transitionJobRecord(record, change) {
 // packages/jobs/src/queue.ts
 var import_node_os = require("node:os");
 var JobQueue = class {
+  /** Create an instance with the supplied configuration; omitted fields use the documented defaults. */
   constructor(opts = {}) {
     this.opts = opts;
   }
@@ -768,9 +781,11 @@ var JobQueue = class {
     this.opts.onChange?.(job.record);
     return job;
   }
+  /** Look up a retained job by ID; returns undefined when unknown or dropped. */
   get(id) {
     return this.jobs.get(id);
   }
+  /** Return the current records for all retained jobs, including pending and finished jobs. */
   list() {
     return [...this.jobs.values()].map((j) => j.record);
   }

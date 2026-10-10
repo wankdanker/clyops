@@ -55,18 +55,22 @@ def _emit(level: str, msg: str, force: bool = False) -> None:
 
 
 def info(msg: str) -> None:
+    """Write a timestamped informational message to stderr."""
     _emit("info", msg)
 
 
 def warn(msg: str) -> None:
+    """Write a timestamped warning to stderr."""
     _emit("warning", msg)
 
 
 def error(msg: str) -> None:
+    """Write a timestamped error to stderr."""
     _emit("error", msg)
 
 
 def success(msg: str) -> None:
+    """Write a timestamped success message to stderr."""
     _emit("success", msg)
 
 
@@ -154,6 +158,7 @@ def describe_rule(rule: str) -> str:
 
 
 class ValidationError(ValueError):
+    """An invalid value reported with the validation rule and option or argument name."""
     pass
 
 
@@ -349,16 +354,18 @@ class _Arg:
 
 @dataclass
 class ParseResult:
+    """Non-exiting parse outcome. status is ok, help, or error; error/detail explain failures and show_usage controls help."""
     status: str  # ok | help | error
     error: str = ""
     show_usage: bool = True
     detail: List[str] = field(default_factory=list)
 
 
-class Values(dict):
+class Values(Dict[str, Value]):
     """Resolved values; keys are option vars and argument names, also readable as attributes."""
 
     def __getattr__(self, name: str) -> Value:
+        """Read a resolved key as an attribute; missing keys raise AttributeError."""
         try:
             return self[name]
         except KeyError:
@@ -370,8 +377,10 @@ class _ParseError(Exception):
 
 
 class Cli:
+    """A program CLI. Register options and arguments, then call run or parse. Resolved names are runtime keys."""
     def __init__(self, name: Optional[str] = None, root: Optional[str] = None, cwd: Optional[str] = None,
                  env: Optional[Mapping[str, str]] = None):
+        """Create a CLI. name defaults to argv[0], cwd to the working directory, root to cwd, and env to os.environ."""
         self.name = name or os.path.basename(sys.argv[0] or "cli")
         self.cwd = cwd or os.getcwd()
         self.root = os.path.normpath(os.path.join(self.cwd, root or "."))
@@ -403,10 +412,12 @@ class Cli:
     # -- registration ---------------------------------------------------------
 
     def set_description(self, text: str) -> "Cli":
+        """Set the help description and return this CLI."""
         self.description = text
         return self
 
     def set_epilog(self, text: str) -> "Cli":
+        """Set the final help text and return this CLI."""
         self.epilog = text
         return self
 
@@ -499,6 +510,7 @@ class Cli:
         return self
 
     def require_command(self, command: str, description: str, install_hint: str = "") -> "Cli":
+        """Require an executable on PATH when parsing; description and install_hint explain how to install it."""
         self._commands.append((command, description, install_hint))
         return self
 
@@ -892,6 +904,7 @@ class Cli:
     # -- accessors ------------------------------------------------------------
 
     def get(self, name: str) -> Value:
+        """Return the resolved value for a variable or argument name, or None when absent."""
         return self.values.get(name)
 
     def source(self, long: str) -> str:
@@ -899,9 +912,11 @@ class Cli:
         return self._sources.get(long[2:] if long.startswith("--") else long, "unset")
 
     def is_set(self, long: str) -> bool:
+        """Return whether the option was supplied on the command line (long name, optionally prefixed with --)."""
         return self.source(long) == "cli"
 
     def is_explicitly_set(self, long: str) -> bool:
+        """Return whether the option came from CLI, config, or environment rather than a default."""
         return self.source(long) in ("cli", "config", "env")
 
     def values_json(self) -> str:

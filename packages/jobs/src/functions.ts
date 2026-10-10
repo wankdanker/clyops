@@ -26,13 +26,17 @@ const LOGGER = {
  * arguments; `module` names the trigger in messages such as "--help is
  * controlled by media-dropoff".
  */
-export function configureLogging(opts: { module?: string; warn?: (...args: unknown[]) => void; verbose?: (...args: unknown[]) => void }): void {
+export function configureLogging(opts: { module?: string; /** Write a timestamped warning to stderr; supports printf-style arguments. */ warn?: (...args: unknown[]) => void; verbose?: (...args: unknown[]) => void }): void {
   Object.assign(LOGGER, Object.fromEntries(Object.entries(opts).filter(([, v]) => v)));
 }
 
+/** A configured binding to an executable, optional input/output files, artifacts, and result templates. */
 export interface FunctionDefinition {
+  /** Config key holding function options; defaults to the function name. */
   key?: string;
+  /** Executable path; configured paths are resolved against the script root. */
   script?: string;
+  /** Explicit positional templates; an empty array explicitly supplies no positionals. */
   positionals?: unknown[];
   /** Positionals before or after options (default: first). */
   positionals_order?: 'first' | 'last';
@@ -40,12 +44,16 @@ export interface FunctionDefinition {
   stdin?: string;
   /** A template for the file the tool's stdout is written to; it also counts as an artifact. */
   stdout?: string;
+  /** Artifact configuration consumed by the job engine after execution. */
   artifacts?: unknown;
+  /** Task result or configured result templates, according to the containing interface. */
   result?: unknown;
   [key: string]: unknown;
 }
 
+/** A configured function with resolved executable and merged defaults and overrides. */
 export interface ResolvedFunction {
+  /** Name of the configured function to invoke. */
   functionName: string;
   /** The config key holding its options (default: the function name). */
   key: string;
@@ -53,6 +61,7 @@ export interface ResolvedFunction {
   script: string;
   /** `deepMerge(defaults[key], config[key])`. */
   config: Json;
+  /** Original function binding, including positional, stream, artifact, and result templates. */
   definition: FunctionDefinition;
 }
 
@@ -70,9 +79,11 @@ export function resolveFunctionConfig(scriptRoot: string, routeConfig: Json, fun
   return { functionName, key, script: resolveScriptPath(scriptRoot, script), config, definition };
 }
 
+/** Path base, template context, and controlled arguments used when constructing a job command. */
 export interface CommandOptions {
   /** Directory relative path options resolve against. */
   configRoot: string;
+  /** Values available to dotted-path templates; null disables context-based rendering. */
   context?: TemplateContext | null;
   /** Options the trigger sets itself; config keys for them are ignored with a warning. Default: ['help']. */
   controlled?: string[];
@@ -115,6 +126,7 @@ export async function buildFunctionCommand(fn: ResolvedFunction, opts: CommandOp
   return [fn.script, ...argv];
 }
 
+/** The completed tool execution with a color-stripped stderr tail. */
 export interface FunctionRun extends RunResult {
   /** The last 40 lines of stderr without color codes. */
   stderrTail: string[];
@@ -134,7 +146,7 @@ function streamPath(template: string | undefined, opts: CommandOptions, base: st
  */
 export async function runScriptFunction(
   fn: ResolvedFunction,
-  opts: CommandOptions & { timeoutMs?: number; env?: NodeJS.ProcessEnv; cwd?: string; signal?: AbortSignal; onStderr?: (chunk: string) => void },
+  opts: CommandOptions & { timeoutMs?: number; /** Environment supplied to the process or read for option defaults. */ env?: NodeJS.ProcessEnv; /** Working directory used to resolve command-line paths and execute tools. */ cwd?: string; /** AbortSignal used to cancel execution and terminate the tool process tree. */ signal?: AbortSignal; /** Called for each decoded stderr chunk. */ onStderr?: (chunk: string) => void },
 ): Promise<FunctionRun> {
   const schema = await loadSchema(fn.script);
   const [file, ...argv] = await buildFunctionCommand(fn, opts, schema);
@@ -164,6 +176,7 @@ export function buildResultRecord(p: {
   fields?: Json;
   fn: ResolvedFunction;
   artifactKeys: string[];
+  /** Values available to dotted-path templates; null disables context-based rendering. */
   context: TemplateContext;
   now: string;
 }): Json {

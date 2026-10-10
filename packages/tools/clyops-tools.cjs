@@ -302,6 +302,7 @@ function commands(group) {
 var import_node_fs3 = require("node:fs");
 var import_node_path2 = require("node:path");
 var InputError = class extends Error {
+  /** HTTP status used by adapters to report invalid caller input. */
   status = 400;
 };
 function inputKey(name) {

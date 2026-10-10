@@ -7,6 +7,7 @@ import { copyFileEnsuringDir, isDirectoryPath, isFilePath, statFollowingSymlinks
 
 // A small glob subset as a regex: `*`, `?`, `**` and `**/` (which also matches no
 // directory), with `/` separators.
+/** Compile an artifact glob into an anchored regular expression. */
 export function globToRegex(pattern: string): RegExp {
   const source = String(pattern).replace(/\\/g, '/');
   let out = '^';
@@ -87,7 +88,9 @@ export function artifactRequirement(fn: ResolvedFunction): number {
   return artifacts.required === true || truthy(artifacts.required) ? 1 : 0;
 }
 
+/** An artifact copied to its destination, recording the original source path. */
 export interface CopiedArtifact {
+  /** Original source path of the copied artifact. */
   source: string;
   /** `<keyPrefix><artifacts dir name>/<file name>`. */
   key: string;

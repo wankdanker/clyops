@@ -8,9 +8,13 @@ shell completion. No dependencies, Java 17+. See the
 <dependency>
   <groupId>io.github.wankdanker</groupId>
   <artifactId>clyops</artifactId>
-  <version>0.1.0</version>
+  <version>0.3.0</version>
 </dependency>
 ```
+
+Maven Central publication is not configured yet. Install the release JAR locally
+with `mvn install:install-file` if using these coordinates. `mvn package` also builds matching source and
+Javadoc JARs for editor navigation and documentation; the next release will attach them.
 
 The jar is also attached to each [GitHub release](https://github.com/wankdanker/clyops/releases).
 
@@ -55,7 +59,7 @@ and `setSilent`. Registration mistakes (an unknown rule, a duplicate option) thr
 `IllegalArgumentException`.
 
 **Running it as a command.** Java programs usually ship as a jar with a small launcher script. Add
-a `# clyops-tool` comment to the launcher so [clyops-dispatch](../../apps/dispatch), the API and
+a `# clyops-tool` comment to the launcher so [clyops-dispatch](https://github.com/wankdanker/clyops/tree/main/apps/dispatch), the API and
 the MCP server recognize it (they can't see inside a jar):
 
 ```sh
@@ -82,4 +86,13 @@ cli.run(argv);                                             // cli.commandPath() 
 
 Commands share the program's options (accepted before or after the command words) and config file;
 each has its own help (`mytool db migrate --help`), schema and completion. See the
-[spec](../../spec/SPEC.md) sections 1.3 to 1.7.
+[spec](https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md) sections 1.3 to 1.7.
+
+## Documentation
+
+Read the [language guide](https://wankdanker.github.io/clyops/languages/java.html)
+for installation, examples and editor setup, and the
+[complete API reference](https://wankdanker.github.io/clyops/reference.html)
+for public signatures, return values and errors. The
+[Markdown sources](https://github.com/wankdanker/clyops/tree/main/docs/languages)
+are also readable on GitHub.

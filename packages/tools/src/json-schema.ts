@@ -3,6 +3,7 @@
 import { inputKey, isBareFlag } from './argv.js';
 import type { Schema, SchemaArgument, SchemaOption } from './schema.js';
 
+/** A JSON Schema object describing accepted tool input. */
 export type JsonSchema = { [key: string]: unknown };
 
 // The exact patterns from spec section 5.

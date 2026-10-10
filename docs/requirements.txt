@@ -1,0 +1,5 @@
+pdoc==16.0.0
+build>=1.2,<2
+mypy>=1.15,<3
+setuptools>=69
+wheel>=0.45,<1

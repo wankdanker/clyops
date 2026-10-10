@@ -43,4 +43,13 @@ let args = cli.run();                                      // args.strs("command
 
 `cli.command_path()` is the selected command words. Commands share the program's options (accepted before or after the command words) and config file;
 each has its own help (`mytool db migrate --help`), schema and completion. See the
-[spec](../../spec/SPEC.md) sections 1.3 to 1.7.
+[spec](https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md) sections 1.3 to 1.7.
+
+## Documentation
+
+Read the [language guide](https://wankdanker.github.io/clyops/languages/rust.html)
+for installation, examples and editor setup, and the
+[complete API reference](https://wankdanker.github.io/clyops/reference.html)
+for public signatures, return values and errors. The
+[Markdown sources](https://github.com/wankdanker/clyops/tree/main/docs/languages)
+are also readable on GitHub.

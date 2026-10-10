@@ -46,7 +46,7 @@ logging helpers `Info`, `Warn`, `Error`, `Success`, `Die` and `SetSilent`. Regis
 option (unknown rule, duplicate name) panics, since it is a programming error.
 
 Shell completion: `eval "$(mytool --completion bash)"` (or `zsh`, `fish`). Go binaries are
-recognized as clyops tools by [clyops-dispatch](../../apps/dispatch), the API and the MCP server
+recognized as clyops tools by [clyops-dispatch](https://github.com/wankdanker/clyops/tree/main/apps/dispatch), the API and the MCP server
 with no extra steps.
 
 Versions are tagged `packages/go/vX.Y.Z` alongside each clyops release.
@@ -66,4 +66,13 @@ v := cli.Run()                                           // cli.CommandPath() ==
 
 Commands share the program's options (accepted before or after the command words) and config file;
 each has its own help (`mytool db migrate --help`), schema and completion. See the
-[spec](../../spec/SPEC.md) sections 1.3 to 1.7.
+[spec](https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md) sections 1.3 to 1.7.
+
+## Documentation
+
+Read the [language guide](https://wankdanker.github.io/clyops/languages/go.html)
+for installation, examples and editor setup, and the
+[complete API reference](https://wankdanker.github.io/clyops/reference.html)
+for public signatures, return values and errors. The
+[Markdown sources](https://github.com/wankdanker/clyops/tree/main/docs/languages)
+are also readable on GitHub.

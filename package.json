@@ -3,16 +3,26 @@
   "private": true,
   "description": "pnpm workspace for the JavaScript/TypeScript packages and apps.",
   "packageManager": "pnpm@10.34.6",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "pnpm --filter \"!clyops-runner\" -r run build",
     "test": "pnpm --filter \"!clyops-runner\" -r run test",
     "typecheck": "pnpm --filter \"!clyops-runner\" -r run typecheck",
     "build:runner": "pnpm --filter clyops-runner run build",
     "test:runner": "pnpm --filter clyops run build && pnpm --filter clyops-runner run test",
-    "bundles": "node tools/bundle-js.mjs"
+    "bundles": "node tools/bundle-js.mjs",
+    "docs:build": "pnpm build && python3 tools/build-docs.py",
+    "docs:check": "python3 tools/check-docs.py",
+    "docs:serve": "pnpm exec eleventy --config=eleventy.config.mjs --serve",
+    "docs:types": "pnpm exec tsc -p docs/tsconfig.examples.json --noEmit"
   },
   "devDependencies": {
-    "esbuild": "0.28.2"
+    "@11ty/eleventy": "3.1.6",
+    "@types/node": "22.20.5",
+    "esbuild": "0.28.2",
+    "typedoc": "0.28.20",
+    "typescript": "5.9.3"
   }
 }

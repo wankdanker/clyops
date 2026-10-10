@@ -1,0 +1,99 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
+    outputs:
+      pages_ready: ${{ steps.pages.outputs.enabled }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-go@v5
+        with: { go-version: stable, cache-dependency-path: packages/go/go.mod }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21, cache: maven }
+      - uses: ruby/setup-ruby@v1
+        with: { ruby-version: "3.3" }
+      - run: sudo apt-get update -q && sudo apt-get install -y -q doxygen
+      - run: pnpm install --frozen-lockfile
+      - run: pip install -r docs/requirements.txt
+      - run: gem install yard -v 0.9.38 --no-document && gem install rbs -v 3.4.0 --no-document
+      - name: Build guides, references and installed-consumer examples
+        env:
+          PROJECT_PREFIX: "/${{ github.event.repository.name }}/"
+        run: |
+          export DOCS_PATH_PREFIX="$PROJECT_PREFIX"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            python3 tools/version.py --tag "$GITHUB_REF_NAME"
+            export DOCS_PATH_PREFIX="${PROJECT_PREFIX}versions/$GITHUB_REF_NAME/"
+          fi
+          pnpm docs:build
+          python3 tools/test-doc-publishing.py
+          cargo test --locked --manifest-path packages/rust/Cargo.toml --doc
+          RBS_TEST_TARGET='Clyops::Cli' RBS_TEST_OPT='-I packages/ruby/sig' ruby -Ipackages/ruby/lib -rrbs/test/setup packages/ruby/test/test_clyops.rb
+      - uses: actions/upload-artifact@v4
+        with: { name: docs-site, path: _site, include-hidden-files: true }
+      - id: pages
+        name: Check Pages configuration
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if mode=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq .build_type 2>pages-error.txt); then
+            if [[ "$mode" == workflow ]]; then echo 'enabled=true' >> "$GITHUB_OUTPUT"; fi
+          elif ! rg -q 'HTTP 404' pages-error.txt; then
+            cat pages-error.txt
+            exit 1
+          fi
+          if [[ "${mode:-}" != workflow ]]; then
+            echo 'Docs built successfully. To deploy, choose GitHub Actions in Settings → Pages, then run Docs again.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.pages_ready == 'true' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    concurrency:
+      group: docs-pages-publish
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: docs-site, path: built-site }
+      - uses: actions/configure-pages@v5
+      - name: Preserve release snapshots and publish the checked site
+        env:
+          PROJECT_PREFIX: "/${{ github.event.repository.name }}/"
+        run: |
+          args=()
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then args=(--tag "$GITHUB_REF_NAME"); fi
+          python3 tools/publish-docs.py built-site deploy-site --prefix "$PROJECT_PREFIX" "${args[@]}" --push
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: deploy-site }
+      - id: deployment
+        uses: actions/deploy-pages@v4

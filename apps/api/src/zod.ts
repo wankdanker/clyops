@@ -20,6 +20,7 @@ function given(value: unknown, shape: { const?: unknown; type?: string; minItems
   return true;
 }
 
+/** Convert a tool input JSON Schema to a Zod validator used by HTTP routes. */
 export function toZod(schema: Js): z.ZodType {
   let out: z.ZodType;
   switch (schema.type) {

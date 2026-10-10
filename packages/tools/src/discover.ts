@@ -4,32 +4,49 @@ import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { classify, type Kind } from './schema.js';
 
+/** An executable discovered in a tool tree; discovery alone does not execute it. */
 export interface Command {
+  /** Program, command, option, or argument name as declared in its containing type. */
   name: string;
   /** Words from the root to this command, e.g. ['media', 'to-pcm']. */
   words: string[];
+  /** Absolute executable path. */
   file: string;
+  /** Source classification: tool, dispatcher, or other. */
   kind: Kind;
 }
 
+/** A directory group containing nested groups and executable commands. */
 export interface Group {
+  /** Program, command, option, or argument name as declared in its containing type. */
   name: string;
+  /** Command words relative to the discovered root. */
   words: string[];
+  /** Directory represented by this group or specified in .clyops settings. */
   dir: string;
+  /** Human-readable description shown in help and documentation. */
   description: string;
+  /** Nested directory groups. */
   groups: Group[];
+  /** Direct executable commands or declared subcommands. */
   commands: Command[];
   /** From the root's settings: which tools a server exposes (see `allowed`). */
   allow?: string[];
+  /** Denied tool globs; a deny match takes precedence over allow. */
   deny?: string[];
 }
 
+/** Parsed .clyops settings; relative directories are resolved during discovery. */
 export interface Settings {
+  /** Human-readable description shown in help and documentation. */
   description: string;
+  /** Directory represented by this group or specified in .clyops settings. */
   dir?: string;
+  /** Ignored file and directory patterns from .clyops settings. */
   ignore: string[];
   /** Tool patterns a server exposes / leaves out (`media/*`); ignored by the dispatcher. */
   allow?: string[];
+  /** Denied tool globs; a deny match takes precedence over allow. */
   deny?: string[];
 }
 
@@ -72,7 +89,7 @@ export function commandName(fileName: string): string {
  * file, whose `dir` and settings are used. Nested dispatchers become groups,
  * so the whole tree is visible in one place.
  */
-export function discover(root: string, opts: { name?: string } = {}): Group {
+export function discover(root: string, opts: { /** Program, command, option, or argument name as declared in its containing type. */ name?: string } = {}): Group {
   const real = realpathSync(resolve(root));
   if (statSync(real).isFile()) {
     const settings = readSettings(real, true);

@@ -3,14 +3,19 @@ import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { Readable } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
 
+/** Environment, working directory, input/output handling, timeout, and cancellation for an executable. */
 export interface RunOptions {
+  /** Working directory used to resolve command-line paths and execute tools. */
   cwd?: string;
+  /** Environment supplied to the process or read for option defaults. */
   env?: NodeJS.ProcessEnv;
   /** Kill the tool and its process tree after this long; 0 or unset waits forever. */
   timeoutMs?: number;
   /** Abort the process tree (SIGTERM, then SIGKILL after a short grace period). */
   signal?: AbortSignal;
+  /** Called for each decoded stdout chunk. */
   onStdout?: (chunk: string) => void;
+  /** Called for each decoded stderr chunk. */
   onStderr?: (chunk: string) => void;
   /** Fed to the tool's stdin, which is closed otherwise. */
   stdin?: Readable | string | Buffer;
@@ -24,24 +29,35 @@ export interface RunOptions {
   maxOutput?: number;
 }
 
+/** Captured process outcome. Nonzero exit codes are returned; spawn and stream errors reject the promise. */
 export interface RunResult {
+  /** Executed command words, including executable and arguments. */
   command: string[];
+  /** Process exit code, or null when terminated by a signal or not started. */
   exitCode: number | null;
+  /** Termination signal, or null for an ordinary exit. */
   signal: string | null;
+  /** Whether the execution deadline was reached. */
   timedOut: boolean;
+  /** Captured stdout as text; binary and streaming modes have separate outputs. */
   stdout: string;
   /** stdout as bytes, with `stdout: 'buffer'`. */
   stdoutBuffer?: Buffer;
+  /** Captured stderr as text. */
   stderr: string;
   /** Output beyond `maxOutput` was dropped. */
   truncated?: boolean;
+  /** Elapsed execution time in milliseconds. */
   durationMs: number;
 }
 
+/** A running child, its readable stdout, and a promise for the completed process outcome. */
 export interface Started {
+  /** The spawned child process; the result promise owns its stream cleanup. */
   child: ChildProcess;
   /** The tool's stdout, to pipe (with `stdout: 'stream'`). */
   stdout: Readable;
+  /** Task result or configured result templates, according to the containing interface. */
   result: Promise<RunResult>;
 }
 

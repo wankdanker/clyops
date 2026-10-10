@@ -403,6 +403,14 @@ Write the library, write `examples/demo.*` and `examples/tasks.*` registering th
 described in [spec/conformance/README.md](spec/conformance/README.md), add the demo's command to
 [impls.json](spec/conformance/impls.json) (the tasks demo is found next to it), and add a CI job.
 
+## Documentation
+
+The [documentation site](https://wankdanker.github.io/clyops/) has a guide for every
+language, runnable examples, editor setup, shared recipes, and complete generated
+API references. The [Markdown guides](docs/index.md) are readable in this repository.
+See [maintaining the docs](docs/maintaining.md) for the native toolchain, checks,
+local preview and GitHub Pages deployment.
+
 ## Releases
 
 Everything in the repo shares one version, and one tag releases it all:

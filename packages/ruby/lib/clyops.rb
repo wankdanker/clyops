@@ -16,13 +16,17 @@ require "json"
 require "pathname"
 require_relative "clyops/completions"
 
+# Declarative CLI registration, parsing, validation, completion and logging.
+# See Cli for program configuration and Values for resolved runtime keys.
 module Clyops
+  # Release version of this library.
   VERSION = "0.3.0"
 
   # -------------------------------------------------------------------------
   # Logging
   # -------------------------------------------------------------------------
 
+  # @private
   COLORS = { "info" => "\e[1;37m", "warning" => "\e[0;33m", "error" => "\e[0;31m", "success" => "\e[0;32m" }.freeze
   @silent = ENV["CLYOPS_SILENT"] == "true"
 
@@ -30,6 +34,11 @@ module Clyops
     # Suppress info/warn/error/success output (die and parse errors still print).
     attr_writer :silent
 
+    # Write a timestamped log message; force bypasses the silent setting.
+    # @param level [String] The level value.
+    # @param msg [String] The msg value.
+    # @param force [Boolean] The force value.
+    # @return [Integer, nil] bytes written, or nil when suppressed.
     def emit(level, msg, force: false)
       return if @silent && !force
 
@@ -37,12 +46,27 @@ module Clyops
       $stderr.write("#{Time.now.strftime('%Y-%m-%d %H:%M:%S')} [#{tag}] #{msg}\n")
     end
 
+    # Write an informational message to stderr.
+    # @param msg [String] The msg value.
+    # @return [Integer, nil] bytes written, or nil when suppressed.
     def info(msg) = emit("info", msg)
+    # Write a warning to stderr.
+    # @param msg [String] The msg value.
+    # @return [Integer, nil] bytes written, or nil when suppressed.
     def warn(msg) = emit("warning", msg)
+    # Write an error to stderr.
+    # @param msg [String] The msg value.
+    # @return [Integer, nil] bytes written, or nil when suppressed.
     def error(msg) = emit("error", msg)
+    # Write a success message to stderr.
+    # @param msg [String] The msg value.
+    # @return [Integer, nil] bytes written, or nil when suppressed.
     def success(msg) = emit("success", msg)
 
     # Print an error and exit with `code`. Never suppressed.
+    # @param code [Integer] The code value.
+    # @param msg [String] The msg value.
+    # @return [void] the documented result.
     def die(code, msg)
       emit("error", msg, force: true)
       exit(code)
@@ -53,6 +77,7 @@ module Clyops
   # Rules
   # -------------------------------------------------------------------------
 
+  # @private
   FIXED_RULES = {
     "int" => "integer", "float" => "number", "string" => "text", "path" => "path", "ip" => "IP address",
     "hostname" => "hostname", "url" => "URL", "port" => "port: 1-65535", "email" => "email address", "uuid" => "UUID",
@@ -60,7 +85,9 @@ module Clyops
     "file:exists" => "existing file", "file:readable" => "readable file", "file:writable" => "writable file",
     "dir:exists" => "existing directory", "dir:writable" => "writable directory"
   }.freeze
+  # @private
   EFFECTS = %w[read-only idempotent destructive network].freeze
+  # @private
   HOSTNAME = /\A[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\z/
 
   # A ValueError-like error carrying the spec's message for a value that fails its rule.
@@ -71,6 +98,9 @@ module Clyops
 
   module_function
 
+  # Convert a supported boolean word, or return nil when unknown.
+  # @param value [Object] The value value.
+  # @return [Boolean, nil] the documented result.
   def bool_word(value)
     case value.downcase
     when "true", "yes", "1", "on" then true
@@ -78,6 +108,9 @@ module Clyops
     end
   end
 
+  # Whether the validation rule is supported.
+  # @param rule [String] Validation rule.
+  # @return [Boolean] the documented result.
   def known_rule?(rule)
     return true if rule.empty? || FIXED_RULES.key?(rule)
     return true if rule.match?(/\Aint:(\d+-\d*|-\d+)\z/) || rule.match?(/\Afloat:(\d*\.?\d+-(\d*\.?\d+)?|-\d*\.?\d+)\z/)
@@ -94,16 +127,24 @@ module Clyops
     false
   end
 
+  # Split a parameterized range rule into lower and upper text bounds.
+  # @param rule [String] Validation rule.
+  # @return [Array<String>] the documented result.
   def bounds(rule)
     lo, _, hi = rule.split(":", 2)[1].partition("-")
     [lo, hi]
   end
 
+  # Whether the rule denotes a path, file, or directory.
+  # @param rule [String] Validation rule.
+  # @return [Boolean] the documented result.
   def path_rule?(rule)
     rule == "path" || rule.start_with?("file:", "dir:")
   end
 
   # Help text for a validation rule (spec section 5).
+  # @param rule [String] Validation rule.
+  # @return [String] the documented result.
   def describe_rule(rule)
     return FIXED_RULES[rule] if FIXED_RULES.key?(rule)
 
@@ -123,6 +164,10 @@ module Clyops
 
   # Validate `value` against `rule` and return its typed form; raises
   # ValidationError with the spec's error text.
+  # @param value [Object] The value value.
+  # @param rule [String] Validation rule.
+  # @param name [String] Name identifying the value, command, or program.
+  # @return [String, Integer, Float, Boolean] the documented result.
   def validate(value, rule, name)
     fail_with = ->(msg) { raise ValidationError, "#{name} #{msg}" }
     check_bounds = lambda do |num|
@@ -211,11 +256,18 @@ module Clyops
 
   # Join and normalize like Python's os.path.normpath(os.path.join(...)): an
   # absolute `value` replaces `base`.
+  # @param base [String] The base value.
+  # @param value [Object] The value value.
+  # @return [String] the documented result.
   def normpath(base, value)
     Pathname.new(base).join(value).cleanpath.to_s
   end
 
   # Resolve a path value against `base` (spec section 6).
+  # @param value [Object] The value value.
+  # @param base [String] The base value.
+  # @param search_dirs [Array<String>] The search dirs value.
+  # @return [String] the documented result.
   def resolve_path(value, base, search_dirs = [])
     return value if value.empty? || %w[- disabled optional].include?(value)
     return value if value.start_with?("/") || value.match?(/\A[A-Za-z][A-Za-z0-9+.-]+:/)
@@ -231,6 +283,9 @@ module Clyops
   end
 
   # Greedy word wrap that keeps existing line breaks (spec section 7).
+  # @param text [String] The text value.
+  # @param width [Integer] The width value.
+  # @return [Array<String>] the documented result.
   def wrap_text(text, width)
     text.split(/\r?\n/, -1).flat_map do |original|
       words = original.split
@@ -255,10 +310,16 @@ module Clyops
   # JSON with two-space indents and empty arrays and objects written as
   # [] and {}, whatever the json gem version. A raw newline only appears
   # between JSON tokens (in strings it is escaped), so this can't touch values.
+  # @param value [Object] The value value.
+  # @return [String] the documented result.
   def pretty_json(value)
     JSON.pretty_generate(value).gsub(/\[\n\s*\]/, "[]").gsub(/\{\n\s*\}/, "{}")
   end
 
+  # Return completion kind and values for the validation rule.
+  # @param rule [String] Validation rule.
+  # @param search_dirs [Array<String>] The search dirs value.
+  # @return [Array<String>] the documented result.
   def completion_kind(rule, search_dirs)
     return ["file", search_dirs.join(":")] if rule == "path" || rule.start_with?("file:")
     return ["dir", search_dirs.join(":")] if rule.start_with?("dir:")
@@ -273,6 +334,7 @@ module Clyops
   # Cli
   # -------------------------------------------------------------------------
 
+  # @private
   Option = Struct.new(:var, :long, :short, :kind, :default, :required, :description, :group, :rule, :search_dirs,
                       :secret) do
     def label
@@ -285,15 +347,23 @@ module Clyops
     end
   end
 
+  # @private
   Arg = Struct.new(:name, :description, :default, :rule, :variadic)
 
   # status is "ok", "help" or "error".
   ParseResult = Struct.new(:status, :error, :show_usage, :detail) do
+    # Create a non-exiting parse outcome.
+    # @param status [String] ok, help, or error.
+    # @param error [String] failure message.
+    # @param show_usage [Boolean] whether help should accompany the error.
+    # @param detail [Array<String>] extra failure details.
     def initialize(status, error = "", show_usage = true, detail = []) = super
   end
 
   # Resolved values: keys are option vars and argument names, also readable as methods (args.PORT).
   class Values < Hash
+    # Read a resolved key as a method; unknown names raise NoMethodError.
+    # @return [String, Integer, Float, Boolean, Array, nil]
     def method_missing(name, *args)
       key = name.to_s
       return self[key] if args.empty? && key?(key)
@@ -301,17 +371,39 @@ module Clyops
       super
     end
 
+    # Whether the requested name is a resolved key or an inherited method.
+    # @return [Boolean]
     def respond_to_missing?(name, include_private = false) = key?(name.to_s) || super
   end
 
+  # @private
   class ParseError < StandardError; end
   private_constant :ParseError
 
   # A program's command-line interface. Register options and arguments, then call run (or parse).
   class Cli
+    # Program name shown in help and completion.
+    # @return [String]
     attr_accessor :name
-    attr_reader :values, :cwd, :root, :env
+    # Resolved runtime values.
+    # @return [Clyops::Values]
+    attr_reader :values
+    # Working directory for CLI paths.
+    # @return [String]
+    attr_reader :cwd
+    # Base directory for default and environment paths.
+    # @return [String]
+    attr_reader :root
+    # Environment used during parsing.
+    # @return [Hash{String => String}]
+    attr_reader :env
 
+    # Create a CLI from the supplied name, root, working directory and environment; nil uses process defaults.
+    # @param name [String] Name identifying the value, command, or program.
+    # @param root [String, nil] The root value.
+    # @param cwd [String, nil] The cwd value.
+    # @param env [Hash{String => String}, nil] The env value.
+    # @return [Clyops::Cli] this CLI or the new child command.
     def initialize(name: nil, root: nil, cwd: nil, env: nil)
       @name = name || File.basename($PROGRAM_NAME || "cli")
       @cwd = cwd || Dir.pwd
@@ -344,10 +436,18 @@ module Clyops
 
     # -- registration -------------------------------------------------------
 
+    # Set the help description and return this CLI.
+    # @param text [String] The text value.
+    # @return [Clyops::Cli] this CLI or the new child command.
     def set_description(text) = tap { @description = text }
+    # Set the final help text and return this CLI.
+    # @param text [String] The text value.
+    # @return [Clyops::Cli] this CLI or the new child command.
     def set_epilog(text) = tap { @epilog = text }
 
     # What running the program does: read-only, idempotent, destructive, network.
+    # @param effects [Array<String>] The effects value.
+    # @return [Clyops::Cli] this CLI or the new child command.
     def set_effects(*effects)
       effects.each { |e| raise DefinitionError, "Unknown effect '#{e}'" unless EFFECTS.include?(e) }
       @effects = effects
@@ -355,18 +455,34 @@ module Clyops
     end
 
     # What the program reads on stdin; `content_type` is a MIME type or a comma-separated list.
+    # @param description [String] The description value.
+    # @param content_type [String] The content type value.
+    # @return [Clyops::Cli] this CLI or the new child command.
     def set_stdin(description, content_type = "") = tap { @stdin = { "description" => description, "contentType" => content_type } }
     # What the program writes on stdout; undeclared means text.
+    # @param description [String] The description value.
+    # @param content_type [String] The content type value.
+    # @return [Clyops::Cli] this CLI or the new child command.
     def set_stdout(description, content_type = "") = tap { @stdout = { "description" => description, "contentType" => content_type } }
 
     # At most one of these options may be given.
+    # @param longs [Array<String>] The longs value.
+    # @return [Clyops::Cli] this CLI or the new child command.
     def exclusive(*longs) = add_constraint("exclusive", longs)
     # When the first option is given, the others must be too.
+    # @param long [String] Long option name without --.
+    # @param longs [Array<String>] The longs value.
+    # @return [Clyops::Cli] this CLI or the new child command.
     def requires(long, *longs) = add_constraint("requires", [long, *longs])
     # At least one of these options must be given.
+    # @param longs [Array<String>] The longs value.
+    # @return [Clyops::Cli] this CLI or the new child command.
     def one_of(*longs) = add_constraint("oneOf", longs)
 
     # Register a command (spec section 1.7) and return it, to register its options and arguments on.
+    # @param name [String] Name identifying the value, command, or program.
+    # @param description [String] The description value.
+    # @return [Clyops::Cli] this CLI or the new child command.
     def command(name, description = "")
       raise DefinitionError, "Cannot mix commands and positional arguments" unless @args.empty?
       raise DefinitionError, "Duplicate command #{name}" if @children.any? { |c| c.word == name }
@@ -378,6 +494,7 @@ module Clyops
     end
 
     # The command words selected by the last parse, e.g. ["db", "migrate"].
+    # @return [Array<String>] the documented result.
     def command_path
       words = []
       node = @selected
@@ -389,18 +506,29 @@ module Clyops
     end
 
     # `option` holds the config file path; `prefixes` is comma-separated.
+    # @param option [String] The option value.
+    # @param prefixes [String] The prefixes value.
+    # @return [Clyops::Cli] this CLI or the new child command.
     def set_config(option, prefixes)
       @config_option = option
       @config_prefixes = prefixes.split(",").map(&:strip).reject(&:empty?)
       self
     end
 
+    # Require a command on PATH; description and install_hint explain a missing executable.
+    # @param command [String] The command value.
+    # @param description [String] The description value.
+    # @param install_hint [String] The install hint value.
+    # @return [Clyops::Cli] this CLI or the new child command.
     def require_command(command, description, install_hint = "")
       @commands << [command, description, install_hint]
       self
     end
 
     # Fallback dirs (colon-separated, relative to root) for bare relative values of a path option.
+    # @param long [String] Long option name without --.
+    # @param dirs [String, Array<String>] The dirs value.
+    # @return [Clyops::Cli] this CLI or the new child command.
     def set_path_search(long, dirs)
       opt = @by_long.fetch(long)
       items = dirs.is_a?(String) ? dirs.split(":") : dirs
@@ -410,6 +538,14 @@ module Clyops
     end
 
     # Register an option. `default` is a value, "flag", "optional", or "" (required).
+    # @param var [String] Variable and environment key.
+    # @param long [String] Long option name without --.
+    # @param short [String] The short value.
+    # @param default [String] Default text, flag, optional, or empty for required.
+    # @param description [String] The description value.
+    # @param group [String] The group value.
+    # @param rule [String] Validation rule.
+    # @return [Clyops::Cli] this CLI or the new child command.
     def opt(var, long, short = "", default = "", description = "", group = "Options", rule = "")
       kind = default == "flag" ? "flag" : "value"
       value = %w[flag optional].include?(default) ? "" : default
@@ -417,16 +553,32 @@ module Clyops
     end
 
     # Register a repeatable option whose values accumulate into a list.
+    # @param var [String] Variable and environment key.
+    # @param long [String] Long option name without --.
+    # @param short [String] The short value.
+    # @param description [String] The description value.
+    # @param group [String] The group value.
+    # @param rule [String] Validation rule.
+    # @return [Clyops::Cli] this CLI or the new child command.
     def opt_array(var, long, short = "", description = "", group = "Options", rule = "")
       add(Option.new(var, long, short, "array", "", false, description, group, rule, [], false))
     end
 
     # Register a positional argument. An empty default makes it required.
+    # @param name [String] Name identifying the value, command, or program.
+    # @param description [String] The description value.
+    # @param default [String] Default text, flag, optional, or empty for required.
+    # @param rule [String] Validation rule.
+    # @return [Clyops::Cli] this CLI or the new child command.
     def arg(name, description = "", default = "", rule = "")
       add_arg(Arg.new(name, description, default, rule, false))
     end
 
     # Register a final positional argument that collects all remaining tokens.
+    # @param name [String] Name identifying the value, command, or program.
+    # @param description [String] The description value.
+    # @param rule [String] Validation rule.
+    # @return [Clyops::Cli] this CLI or the new child command.
     def arg_variadic(name, description = "", rule = "")
       add_arg(Arg.new(name, description, "", rule, true))
     end
@@ -434,6 +586,8 @@ module Clyops
     # -- parsing ------------------------------------------------------------
 
     # Parse without exiting. Values are in `values` when status is "ok".
+    # @param argv [Array<String>] Arguments excluding the executable name.
+    # @return [Clyops::ParseResult] the documented result.
     def parse(argv = ARGV)
       @raw = {}
       @arg_raw = {}
@@ -478,6 +632,8 @@ module Clyops
 
     # Parse like a CLI: handles --help, --help-json-schema, --completion and
     # --bash-completion, prints errors and exits on failure. Returns the values.
+    # @param argv [Array<String>] Arguments excluding the executable name.
+    # @return [Clyops::Values] the documented result.
     def run(argv = ARGV)
       argv = argv.to_a
       head = argv.include?("--") ? argv[0...argv.index("--")] : argv
@@ -513,14 +669,26 @@ module Clyops
 
     # -- accessors ----------------------------------------------------------
 
+    # Return a resolved variable or argument value, or nil when absent.
+    # @param name [String] Name identifying the value, command, or program.
+    # @return [String, Integer, Float, Boolean, Array, nil] the documented result.
     def get(name) = @values[name]
 
     # Where an option's value came from: cli, config, env, default or unset.
+    # @param long [String] Long option name without --.
+    # @return [String] the documented result.
     def source(long) = @sources.fetch(long.delete_prefix("--"), "unset")
+    # Whether the option came from the command line.
+    # @param long [String] Long option name without --.
+    # @return [Boolean] the documented result.
     def set?(long) = source(long) == "cli"
+    # Whether the option came from CLI, config, or environment rather than a default.
+    # @param long [String] Long option name without --.
+    # @return [Boolean] the documented result.
     def explicitly_set?(long) = %w[cli config env].include?(source(long))
 
     # Resolved values as JSON (spec section 10).
+    # @return [String] the documented result.
     def values_json
       out = {}
       chain_options.each do |o|
@@ -535,6 +703,7 @@ module Clyops
     # -- output -------------------------------------------------------------
 
     # Help text (spec section 7), for the selected command.
+    # @return [String] the documented result.
     def usage
       ensure_help
       node = @selected
@@ -629,6 +798,7 @@ module Clyops
     end
 
     # JSON description of the CLI (spec section 8).
+    # @return [String] the documented result.
     def json_schema
       ensure_help
       Clyops.pretty_json({ "clyops" => 1, "script" => @name }.merge(schema_node))
@@ -636,6 +806,8 @@ module Clyops
 
     # Shell script that enables completion for this program (spec section 9):
     # eval "$(prog --completion bash)". nil for an unknown shell.
+    # @param shell [Object] The shell value.
+    # @return [String, nil] the script, or nil for an unsupported shell.
     def completion_script(shell)
       template = COMPLETION_SCRIPTS[shell]
       return nil if template.nil?
@@ -645,6 +817,8 @@ module Clyops
 
     # Tab-separated completion records (spec section 9). `words` are the words
     # typed after the program name; a program with commands follows them.
+    # @param words [Array<String>] Words entered after the executable name.
+    # @return [String] the documented result.
     def completion_data(words = [])
       ensure_help
       clean = ->(s) { s.tr("\t\n", "  ") }

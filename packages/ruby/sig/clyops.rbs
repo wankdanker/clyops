@@ -1,0 +1,80 @@
+module Clyops
+  type scalar = String | Integer | Float | bool
+  type value = scalar | Array[scalar] | nil
+
+  VERSION: String
+  class ValidationError < StandardError
+  end
+  class DefinitionError < StandardError
+  end
+
+  def self.silent=: (bool) -> bool
+  def self.info: (String msg) -> Integer?
+  def self.warn: (String msg) -> Integer?
+  def self.error: (String msg) -> Integer?
+  def self.success: (String msg) -> Integer?
+  def self.die: (Integer code, String msg) -> bot
+  def self.emit: (String level, String msg, ?force: bool) -> Integer?
+  def self.bool_word: (String value) -> bool?
+  def self.known_rule?: (String rule) -> bool
+  def self.bounds: (String rule) -> [String, String]
+  def self.path_rule?: (String rule) -> bool
+  def self.describe_rule: (String rule) -> String
+  def self.validate: (String value, String rule, String name) -> scalar
+  def self.normpath: (String base, String value) -> String
+  def self.resolve_path: (String value, String base, ?Array[String] search_dirs) -> String
+  def self.wrap_text: (String text, Integer width) -> Array[String]
+  def self.pretty_json: (untyped value) -> String
+  def self.completion_kind: (String rule, Array[String] search_dirs) -> [String, String]
+
+  class ParseResult < Struct[untyped]
+    attr_accessor status: String
+    attr_accessor error: String
+    attr_accessor show_usage: bool
+    attr_accessor detail: Array[String]
+    def initialize: (String status, ?String error, ?bool show_usage, ?Array[String] detail) -> void
+  end
+
+  class Values < Hash[String, value]
+    def method_missing: (Symbol name, *untyped args) -> value
+    def respond_to_missing?: (Symbol name, ?bool include_private) -> bool
+  end
+
+  class Cli
+    attr_accessor name: String
+    attr_reader values: Values
+    attr_reader cwd: String
+    attr_reader root: String
+    attr_reader env: Hash[String, String]
+
+    def initialize: (?name: String?, ?root: String?, ?cwd: String?, ?env: Hash[String, String]?) -> void
+    def set_description: (String text) -> Cli
+    def set_epilog: (String text) -> Cli
+    def set_effects: (*String effects) -> Cli
+    def set_stdin: (String description, ?String content_type) -> Cli
+    def set_stdout: (String description, ?String content_type) -> Cli
+    def exclusive: (*String longs) -> Cli
+    def requires: (String long, *String longs) -> Cli
+    def one_of: (*String longs) -> Cli
+    def command: (String name, ?String description) -> Cli
+    def command_path: () -> Array[String]
+    def set_config: (String option, String prefixes) -> Cli
+    def require_command: (String command, String description, ?String install_hint) -> Cli
+    def set_path_search: (String long, String | Array[String] dirs) -> Cli
+    def opt: (String var, String long, ?String short, ?String default, ?String description, ?String group, ?String rule) -> Cli
+    def opt_array: (String var, String long, ?String short, ?String description, ?String group, ?String rule) -> Cli
+    def arg: (String name, ?String description, ?String default, ?String rule) -> Cli
+    def arg_variadic: (String name, ?String description, ?String rule) -> Cli
+    def parse: (?Array[String] argv) -> ParseResult
+    def run: (?Array[String] argv) -> Values
+    def get: (String name) -> value
+    def source: (String long) -> String
+    def set?: (String long) -> bool
+    def explicitly_set?: (String long) -> bool
+    def values_json: () -> String
+    def usage: () -> String
+    def json_schema: () -> String
+    def completion_script: (String shell) -> String?
+    def completion_data: (?Array[String] words) -> String
+  end
+end

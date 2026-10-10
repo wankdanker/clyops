@@ -39,6 +39,10 @@ FILES = [
     ("apps/dispatch/Cargo.toml", r'clyops = \{ path = "../../packages/rust", version = "([^"]+)" \}'),
     ("apps/dispatch/Cargo.lock", r'name = "clyops-dispatch"\nversion = "([^"]+)"'),
     ("apps/dispatch/Cargo.lock", r'name = "clyops"\nversion = "([^"]+)"'),
+    ("packages/java/README.md", r'<version>([^<]+)</version>'),
+    ("docs/languages/java.md", r'clyops-(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)\.jar'),
+    ("docs/languages/go.md", r'packages/go@v([0-9A-Za-z.-]+)'),
+    ("docs/languages/bash.md", r'/clyops/v([0-9A-Za-z.-]+)/'),
 ]
 
 
@@ -56,8 +60,10 @@ PNPM_PIN = r'(?m)^      clyops(?:-[a-z]+)?:\n        specifier: (\d[^\n]*)'
 def current():
     found = []
     for rel, pattern in FILES:
-        m = re.search(pattern, read(rel))
-        found.append((rel, m.group(1) if m else None))
+        matches = list(re.finditer(pattern, read(rel)))
+        found.extend((rel, m.group(1)) for m in matches)
+        if not matches:
+            found.append((rel, None))
     for rel in PINNED:
         found += [(rel, m.group(1)) for m in re.finditer(JS_PIN, read(rel))]
     found += [("pnpm-lock.yaml", m.group(1)) for m in re.finditer(PNPM_PIN, read("pnpm-lock.yaml"))]
@@ -67,9 +73,9 @@ def current():
 def set_version(version):
     for rel, pattern in FILES:
         text = read(rel)
-        m = re.search(pattern, text)
         with open(os.path.join(ROOT, rel), "w") as fh:
-            fh.write(text[:m.start(1)] + version + text[m.end(1):])
+            fh.write(re.sub(pattern, lambda m: m.group(0)[:m.start(1)-m.start()] + version
+                            + m.group(0)[m.end(1)-m.start():], text))
     for rel in PINNED:
         text = re.sub(JS_PIN, lambda m: m.group(0).replace(m.group(1), version), read(rel))
         with open(os.path.join(ROOT, rel), "w") as fh:

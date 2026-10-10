@@ -6,6 +6,7 @@
     "strict": true,
     "skipLibCheck": true,
     "declaration": true,
+    "declarationMap": true,
     "types": ["node"],
     "rootDir": "src",
     "outDir": "dist"

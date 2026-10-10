@@ -6,6 +6,7 @@ rust-version = "1.70"
 description = "Declarative one-line-per-option CLI parsing: validation, help text, JSON schema, config files and completion."
 license = "MIT"
 repository = "https://github.com/wankdanker/clyops"
+documentation = "https://docs.rs/clyops"
 keywords = ["cli", "argv", "options", "parser", "completion"]
 categories = ["command-line-interface"]
 readme = "README.md"
