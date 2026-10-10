@@ -3,21 +3,20 @@
 # Script Runner Development Starter
 # This script helps you get started with the Script Runner UI
 
+set -euo pipefail
+
+# Work from the runner directory, including when called from the repo root.
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
+
 echo "🚀 Script Runner - Development Setup"
 echo "======================================"
 echo ""
 
-# Check if node_modules exists
-if [ ! -d "node_modules" ]; then
-    echo "📦 Installing dependencies..."
-    npm install
-    if [ $? -ne 0 ]; then
-        echo "❌ Failed to install dependencies"
-        exit 1
-    fi
-    echo "✅ Dependencies installed"
-    echo ""
-fi
+# Refresh links from the root workspace lockfile even after a branch switch.
+echo "📦 Installing dependencies..."
+pnpm install --frozen-lockfile
+echo "✅ Dependencies installed"
+echo ""
 
 # Check if Rust/Cargo is available
 if ! command -v cargo &> /dev/null; then
@@ -27,8 +26,7 @@ fi
 
 echo "🔧 Building Tauri backend..."
 cd src-tauri
-cargo build
-if [ $? -ne 0 ]; then
+if ! cargo build; then
     echo "❌ Failed to build Tauri backend"
     exit 1
 fi
@@ -43,4 +41,4 @@ echo ""
 echo "Press Ctrl+C to stop the development server"
 echo ""
 
-npm run tauri dev
+pnpm run tauri dev

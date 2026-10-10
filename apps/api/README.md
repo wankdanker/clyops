@@ -7,7 +7,7 @@ becomes a `POST` endpoint whose JSON body is validated against the tool's own
 return a job to poll.
 
 ```sh
-npm install -g clyops-api
+pnpm add --global clyops-api
 clyops-api --root ~/mytool/scripts            # http://127.0.0.1:8080
 ```
 

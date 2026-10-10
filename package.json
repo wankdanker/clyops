@@ -1,8 +1,17 @@
 {
   "name": "clyops-monorepo",
   "private": true,
-  "description": "npm workspace for the JavaScript/TypeScript packages and apps.",
-  "workspaces": ["packages/js", "packages/tools", "packages/jobs", "apps/mcp", "apps/api"],
+  "description": "pnpm workspace for the JavaScript/TypeScript packages and apps.",
+  "packageManager": "pnpm@10.34.6",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "pnpm --filter \"!clyops-runner\" -r run build",
+    "test": "pnpm --filter \"!clyops-runner\" -r run test",
+    "typecheck": "pnpm --filter \"!clyops-runner\" -r run typecheck",
+    "build:runner": "pnpm --filter clyops-runner run build",
+    "test:runner": "pnpm --filter clyops run build && pnpm --filter clyops-runner run test",
+    "bundles": "node tools/bundle-js.mjs"
+  },
   "devDependencies": {
     "esbuild": "0.28.2"
   }

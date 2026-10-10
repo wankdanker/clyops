@@ -5,6 +5,11 @@ section here.
 
 ## [Unreleased]
 
+- **pnpm workspaces** for all Node packages and the desktop frontend, pinned to
+  pnpm 10.34.6 with one root lockfile. Development, CI, release packing and
+  publishing use pnpm; version bumps update workspace dependency pins in the
+  lockfile. The runner has its own build/test commands and CI coverage.
+
 - **Single-file CommonJS bundles** of the Node packages, committed and published: `clyops.cjs`,
   `clyops-tools.cjs` and `clyops-jobs.cjs` (which includes clyops-tools). Link or copy one file and
   `require()` it on Node 20+, with no build step or `node_modules`, the way `clyops.sh` is used.

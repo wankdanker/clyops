@@ -7,7 +7,7 @@ import {
 import { JobQueue, type JobRecord } from 'clyops-jobs';
 import { mcpHttpHandler } from 'clyops-mcp';
 import busboy from 'busboy';
-import express, { type NextFunction, type Request, type Response } from 'express';
+import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import { createReadStream, createWriteStream, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
@@ -244,7 +244,7 @@ export async function createApi(opts: ApiOptions) {
     : undefined;
   swap(watcher ? watcher.current() : await loadTools(opts.root, { name: opts.name, filter: opts.filter, onError }));
 
-  const app = express();
+  const app: Express = express();
   app.use(express.json({ limit: maxBody }));
   const keys = Object.entries(opts.keys ?? {});
   if (opts.apiKey || keys.length) {

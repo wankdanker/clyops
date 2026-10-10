@@ -6,7 +6,7 @@ its description and input schema come from its own `--help-json-schema`, so the 
 options, types, choices and ranges the tool validates, and nothing needs to be written per tool.
 
 ```sh
-npm install -g clyops-mcp
+pnpm add --global clyops-mcp
 ```
 
 ## Local agent (stdio)

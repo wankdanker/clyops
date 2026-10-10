@@ -8,7 +8,7 @@
 #   make check           all of the above
 #   make <lang>          build + unit tests + conformance for one package (js bash python rust c go ruby java)
 #   make dispatch        build + test clyops-dispatch
-#   (js builds and tests every npm workspace)
+#   (js builds and tests the JS/TS library and server workspaces)
 
 IMPLS := js ts cjs-bundle bash python rust c go ruby java
 
@@ -20,11 +20,12 @@ all: build
 
 build: build-js build-rust build-c build-go build-java build-dispatch
 
-node_modules:
-	npm ci
+node_modules/.pnpm/lock.yaml: pnpm-lock.yaml pnpm-workspace.yaml package.json $(wildcard packages/*/package.json apps/*/package.json)
+	pnpm install --frozen-lockfile
+	@touch $@
 
-build-js: node_modules
-	npm run build --workspaces
+build-js: node_modules/.pnpm/lock.yaml
+	pnpm build
 
 build-rust:
 	cd packages/rust && cargo build --examples
@@ -45,7 +46,8 @@ build-dispatch:
 test: test-js test-bash test-python test-rust test-c test-go test-ruby test-java test-dispatch
 
 test-js: build-js
-	npm test --workspaces
+	pnpm test
+	python3 tools/test-version.py
 
 test-bash:
 	bash packages/bash/test/test.sh
@@ -79,14 +81,14 @@ completions: build
 	@for impl in $(IMPLS); do tools/test-completions.sh $$impl || exit 1; done
 
 # Rebuild the committed single-file CommonJS bundles (packages/*/clyops*.cjs).
-bundles: node_modules
+bundles: node_modules/.pnpm/lock.yaml
 	node tools/bundle-js.mjs
 
 lint: build-js
 	python3 tools/sync-completions.py --check
 	node tools/bundle-js.mjs --check
 	python3 tools/check-schema.py
-	npm run typecheck --workspaces
+	pnpm typecheck
 	cd packages/python && ruff check src tests examples && mypy src
 	cd packages/rust && cargo fmt --check && cargo clippy --all-targets -- -D warnings
 	cd apps/dispatch && cargo fmt --check && cargo clippy --all-targets -- -D warnings

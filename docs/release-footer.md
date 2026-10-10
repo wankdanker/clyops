@@ -7,7 +7,7 @@
 | **clyops-dispatch** | `clyops-dispatch-<version>-<platform>.tar.gz` (Linux x64/arm64, macOS universal) or `-windows-x64.zip` |
 | **C** | `libclyops-<version>-<platform>.tar.gz` (static library + header) or `-src.tar.gz` |
 | **Bash** | `clyops.sh` |
-| **JavaScript / TypeScript** | `clyops-<version>.tgz` (`npm install ./clyops-<version>.tgz`) |
+| **JavaScript / TypeScript** | `clyops-<version>.tgz` (`pnpm add ./clyops-<version>.tgz`) |
 | **Python** | `clyops-<version>-py3-none-any.whl` or the sdist |
 | **Rust** | `clyops-<version>.crate` |
 | **Ruby** | `clyops-<version>.gem` (`gem install ./clyops-<version>.gem`) |

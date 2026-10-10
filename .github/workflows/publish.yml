@@ -3,7 +3,7 @@ name: Publish
 # Publishes a released version to the package registries. Run it by hand after
 # the GitHub release exists (Actions → Publish → Run workflow).
 #
-# Needs: npm trusted publishing configured for every npm workspace package,
+# Needs: npm trusted publishing configured for every public JS/TS package,
 # secret CARGO_REGISTRY_TOKEN (crates.io), secret RUBYGEMS_API_KEY (rubygems.org),
 # and PyPI trusted publishing configured for this workflow with environment
 # "pypi". The Go module needs no publishing (the release tags it), and the Java
@@ -43,17 +43,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { ref: "${{ inputs.tag }}" }
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with: { node-version: 24, registry-url: "https://registry.npmjs.org" }
       # Trusted publishing requires npm >=11.5.1; don't rely on bundled npm.
-      - run: npm install --global npm@11
+      - run: pnpm add --global npm@11
       - name: Show publishing tool versions
         run: |
           node --version
-          npm --version
-      - run: npm ci && npm run build --workspaces && npm test --workspaces
-      # Every workspace, in dependency order (npm follows the workspaces list).
-      - run: npm publish --workspaces --provenance --access public
+          pnpm --version
+          pnpm exec "$PNPM_HOME/npm" --version
+      - run: pnpm install --frozen-lockfile && pnpm build && pnpm test
+      - name: Validate the release tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: python3 tools/version.py --tag "$RELEASE_TAG"
+      # pnpm 10 packs and orders the workspaces, then delegates registry upload
+      # to npm 11 for OIDC. Checkout is detached at the validated release tag.
+      - name: Publish public workspaces
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
+        run: pnpm --filter '!clyops-runner' -r publish --no-git-checks --access public --npm-path "$PNPM_HOME/npm"
 
   pypi:
     if: inputs.pypi

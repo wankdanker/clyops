@@ -5,9 +5,9 @@ name: Runner
 on:
   push:
     branches: [main]
-    paths: ["apps/runner/**", "spec/**", "packages/c/**", ".github/workflows/runner.yml"]
+    paths: ["pnpm-lock.yaml", "pnpm-workspace.yaml", "package.json", "apps/runner/**", "apps/dispatch/src/detection.rs", "packages/js/**", "tools/bundle-js.mjs", "spec/**", "packages/c/**", ".github/workflows/runner.yml"]
   pull_request:
-    paths: ["apps/runner/**", "spec/**", "packages/c/**", ".github/workflows/runner.yml"]
+    paths: ["pnpm-lock.yaml", "pnpm-workspace.yaml", "package.json", "apps/runner/**", "apps/dispatch/src/detection.rs", "packages/js/**", "tools/bundle-js.mjs", "spec/**", "packages/c/**", ".github/workflows/runner.yml"]
   workflow_dispatch:
 
 concurrency:
@@ -19,18 +19,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: apps/runner/package-lock.json
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with: { workspaces: apps/runner/src-tauri }
       - run: sudo apt-get update -q && sudo apt-get install -y -q libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
       - name: Frontend typecheck and build
         working-directory: apps/runner
-        run: npm ci && npm run build
+        run: pnpm install --frozen-lockfile && pnpm run build
+      - name: Frontend tests
+        run: pnpm test:runner
       - name: Build the C demo the runner tests load
         run: make -C packages/c
       - name: Backend tests

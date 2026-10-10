@@ -5,7 +5,7 @@ read their schemas, turn a JSON object into a command line, and run them. It is 
 the clyops API server, MCP server and job engine, and has no dependencies.
 
 ```sh
-npm install clyops-tools
+pnpm add clyops-tools
 ```
 
 **Single file.** `clyops-tools.cjs` (in this package, and on npm) is the whole library as one dependency-free

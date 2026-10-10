@@ -348,6 +348,31 @@ tools/
 
 ## Development
 
+The JS/TS libraries, servers, and desktop frontend use pnpm 10 with one root
+`pnpm-lock.yaml`. [Install pnpm](https://pnpm.io/installation) or activate the
+pinned version with Corepack:
+
+```sh
+corepack enable
+corepack prepare pnpm@10.34.6 --activate
+```
+
+Then from the repo root:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm build          # libraries and servers, in dependency order
+pnpm test
+pnpm typecheck
+pnpm build:runner   # desktop frontend
+pnpm test:runner    # build the test dependency, then test the frontend
+pnpm --filter clyops-runner tauri dev
+```
+
+The root `packageManager` field pins pnpm for local tools and CI.
+`pnpm-workspace.yaml` includes all six packages and apps; the private desktop
+frontend is built separately and excluded from release packing and publishing.
+
 ```sh
 make build          # build every package
 make test           # unit tests for every package
@@ -405,7 +430,10 @@ It needs the `CARGO_REGISTRY_TOKEN` and `RUBYGEMS_API_KEY` secrets, plus PyPI tr
 `publish.yml` with environment `pypi`. npm uses trusted publishing without an `NPM_TOKEN` secret:
 configure `wankdanker/clyops`, workflow `publish.yml`, no environment, and allow direct publishing
 on each npm package (`clyops`, `clyops-tools`, `clyops-jobs`, `clyops-mcp`, and `clyops-api`).
-The npm job installs npm 11 on Node 24 so it supports OIDC authentication.
+The registry job installs, builds, tests, and publishes through pnpm on Node 24.
+pnpm 10 delegates registry uploads to npm, so CI installs npm 11 through pnpm
+for OIDC authentication. Publishing runs in workspace dependency order, excludes
+the private desktop app, and validates the selected release tag first.
 
 ## License
 

@@ -29,13 +29,14 @@ first time, and on Windows choose **More info → Run anyway**.
 
 ## Development
 
-Requirements: Node 20+, Rust stable, and the [Tauri system dependencies](https://tauri.app/start/prerequisites/)
+Requirements: Node 20+, pnpm 10 (pinned in the root `package.json`), Rust stable, and the [Tauri system dependencies](https://tauri.app/start/prerequisites/)
 (on Debian/Ubuntu: `libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev`).
 
 ```sh
-npm install
-npm run tauri dev      # dev server + app window
-npm run tauri build    # installers in src-tauri/target/release/bundle/
+cd apps/runner          # from the repository root
+pnpm install --frozen-lockfile
+pnpm run tauri dev      # dev server + app window
+pnpm run tauri build    # installers in src-tauri/target/release/bundle/
 ```
 
 Tests (`src-tauri`): `cargo test` checks that the runner reads the conformance golden schema and

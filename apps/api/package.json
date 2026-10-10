@@ -39,7 +39,7 @@
     "build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test test/*.test.mjs",
-    "prepublishOnly": "npm run build && npm test"
+    "prepublishOnly": "pnpm run build && pnpm test"
   },
   "dependencies": {
     "busboy": "^1.6.0",

@@ -1,0 +1,14 @@
+packages:
+  - packages/js
+  - packages/tools
+  - packages/jobs
+  - apps/mcp
+  - apps/api
+  - apps/runner
+
+# Resolve matching workspace dependencies locally, retaining exact versions
+# in manifests so release tarballs also work outside this workspace.
+linkWorkspacePackages: true
+
+onlyBuiltDependencies:
+  - esbuild

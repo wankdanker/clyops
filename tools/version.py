@@ -17,12 +17,10 @@ from clyops import Cli  # noqa: E402
 # (file, regex whose group 1 is the version). Edits replace only that span, so
 # every file keeps its formatting.
 TOP = r'(?m)^  "version": "([^"]+)"'
-LOCK_ROOT = r'"packages": \{\n    "": \{\n      "name": "[^"]+",\n      "version": "([^"]+)"'
-# npm workspaces: their versions live in their package.json and the root lockfile.
-NPM_WORKSPACES = ["packages/js", "packages/tools", "packages/jobs", "apps/mcp", "apps/api"]
-LOCK_WS = r'"{}": \{{\n      "name": "[^"]+",\n      "version": "([^"]+)"'
+# JS/TS workspace versions live in their package.json; pnpm links local packages.
+PUBLIC_WORKSPACES = ["packages/js", "packages/tools", "packages/jobs", "apps/mcp", "apps/api"]
 FILES = [
-    *[f for ws in NPM_WORKSPACES for f in ((f"{ws}/package.json", TOP), ("package-lock.json", LOCK_WS.format(ws)))],
+    *[(f"{ws}/package.json", TOP) for ws in PUBLIC_WORKSPACES],
     ("packages/python/pyproject.toml", r'(?m)^version = "([^"]+)"'),
     ("packages/python/src/clyops/__init__.py", r'(?m)^__version__ = "([^"]+)"'),
     ("packages/rust/Cargo.toml", r'(?m)^version = "([^"]+)"'),
@@ -34,8 +32,6 @@ FILES = [
     ("packages/java/pom.xml", r'<artifactId>clyops</artifactId>\s*<version>([^<]+)</version>'),
     ("packages/java/src/main/java/io/github/wankdanker/clyops/Cli.java", r'VERSION = "([^"]+)"'),
     ("apps/runner/package.json", TOP),
-    ("apps/runner/package-lock.json", TOP),
-    ("apps/runner/package-lock.json", LOCK_ROOT),
     ("apps/runner/src-tauri/tauri.conf.json", TOP),
     ("apps/runner/src-tauri/Cargo.toml", r'(?m)^version = "([^"]+)"'),
     ("apps/runner/src-tauri/Cargo.lock", r'name = "clyops-runner"\nversion = "([^"]+)"'),
@@ -52,8 +48,9 @@ def read(rel):
 
 
 # Workspaces pin each other exactly; every such pin is checked and rewritten.
-NPM_PIN = r'"clyops(?:-[a-z]+)?": "(\d[^"]*)"'
-PINNED = ["package-lock.json"] + [f"{ws}/package.json" for ws in NPM_WORKSPACES]
+JS_PIN = r'"clyops(?:-[a-z]+)?": "(\d[^"]*)"'
+PINNED = [f"{ws}/package.json" for ws in PUBLIC_WORKSPACES]
+PNPM_PIN = r'(?m)^      clyops(?:-[a-z]+)?:\n        specifier: (\d[^\n]*)'
 
 
 def current():
@@ -62,7 +59,8 @@ def current():
         m = re.search(pattern, read(rel))
         found.append((rel, m.group(1) if m else None))
     for rel in PINNED:
-        found += [(rel, m.group(1)) for m in re.finditer(NPM_PIN, read(rel))]
+        found += [(rel, m.group(1)) for m in re.finditer(JS_PIN, read(rel))]
+    found += [("pnpm-lock.yaml", m.group(1)) for m in re.finditer(PNPM_PIN, read("pnpm-lock.yaml"))]
     return found
 
 
@@ -73,9 +71,12 @@ def set_version(version):
         with open(os.path.join(ROOT, rel), "w") as fh:
             fh.write(text[:m.start(1)] + version + text[m.end(1):])
     for rel in PINNED:
-        text = re.sub(NPM_PIN, lambda m: m.group(0).replace(m.group(1), version), read(rel))
+        text = re.sub(JS_PIN, lambda m: m.group(0).replace(m.group(1), version), read(rel))
         with open(os.path.join(ROOT, rel), "w") as fh:
             fh.write(text)
+    text = re.sub(PNPM_PIN, lambda m: m.group(0).replace(m.group(1), version), read("pnpm-lock.yaml"))
+    with open(os.path.join(ROOT, "pnpm-lock.yaml"), "w") as fh:
+        fh.write(text)
 
 
 def main():

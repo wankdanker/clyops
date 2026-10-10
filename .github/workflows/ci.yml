@@ -19,6 +19,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.13" }
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - uses: dtolnay/rust-toolchain@stable
@@ -47,15 +48,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
-      # Every npm workspace: clyops (packages/js) and the Node tooling built on it.
-      - run: npm ci
-      # Builds type-check too, in workspace order so each package sees the types it depends on.
-      - run: npm run build --workspaces
-      - run: npm test --workspaces
+          cache: pnpm
+      # JS/TS libraries and servers; the desktop frontend has its own job.
+      - run: pnpm install --frozen-lockfile
+      # Build dependencies first so each package sees the types it depends on.
+      - run: pnpm build
+      - run: pnpm test
+      - run: python3 tools/test-version.py
       # The committed single-file CommonJS bundles match the sources.
       - run: node tools/bundle-js.mjs --check
       - run: python3 tools/conformance.py js ts cjs-bundle

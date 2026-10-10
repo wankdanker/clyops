@@ -6,7 +6,7 @@ artifacts, and each run gets a job record. A small in-memory queue runs jobs wit
 limit, for servers that hand out job ids. Built on [clyops-tools](../tools).
 
 ```sh
-npm install clyops-jobs
+pnpm add clyops-jobs
 ```
 
 **Single file.** `clyops-jobs.cjs` (in this package, and on npm) is the whole library as one dependency-free
