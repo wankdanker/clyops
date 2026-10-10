@@ -65,7 +65,7 @@ test('runs a tool and waits for it', async () => {
   const v = body.json.values;
   assert.deepEqual([v.mode, v.COUNT, v.TAG, v.VERBOSE], ['slow', 4, ['a', 'b'], true]);
   assert.match(v.input, /in\.txt$/);
-  assert.equal(body.command.at(-2), 'in.txt');
+  assert.equal(body.command[1], 'in.txt');
 });
 
 test('a tool that fails reports ok: false', async () => {
@@ -437,5 +437,26 @@ test('OpenAPI documents stdin, multipart, binary output and effects', async () =
     assert.ok(doc.paths['/jobs/{id}/stdout'].get);
   } finally {
     s.close();
+  }
+});
+
+test('API and embedded MCP honor positional order', async () => {
+  const root = tree();
+  const entries = [];
+  const { app, close } = await createApi({ root, cwd: root, positionalsOrder: 'last', audit: (entry) => entries.push(entry) });
+  const server = app.listen(0);
+  const url = `http://127.0.0.1:${server.address().port}`;
+  const client = new Client({ name: 'order', version: '1' });
+  try {
+    const response = await fetch(`${url}/tools/media/demo`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input: 'in.txt', count: 4 }) });
+    const result = await response.json();
+    assert.equal(result.ok, true, result.stderr);
+    assert.deepEqual(result.command.slice(1), ['--count', '4', 'in.txt']);
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${url}/mcp`)));
+    const mcp = await client.callTool({ name: 'media_demo', arguments: { input: 'in.txt', count: 4 } });
+    assert.equal(mcp.isError, false);
+    assert.deepEqual(entries.at(-1).command.slice(1), ['--count', '4', 'in.txt']);
+  } finally {
+    await client.close(); close(); server.closeAllConnections(); server.close();
   }
 });

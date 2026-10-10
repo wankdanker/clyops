@@ -104,3 +104,8 @@ app.listen(8080);
 
 `createMcpServer({name, tools, ...})` returns the SDK `Server` for any other transport. Each HTTP
 request is handled statelessly with its own server instance.
+
+`--positionals-order first|last` controls generated argument order (default:
+`first`). An option terminator is only emitted for positional values starting
+with `-`, which are always placed after the options. The Node API exposes this
+as `positionalsOrder`.

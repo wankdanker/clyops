@@ -361,8 +361,11 @@ function toArgv(schema, input, opts = {}) {
       out.argv.push(`--${option.name}`, text(item, isPathValued(option.validation, option.type), `--${option.name}`));
     }
   }
-  const positionals = [...opts.positionals ?? []];
-  if (!opts.positionals) {
+  const explicit = Array.isArray(opts.positionals) ? opts.positionals : void 0;
+  const order = typeof opts.positionals === "string" ? opts.positionals : opts.positionalsOrder ?? "first";
+  if (order !== "first" && order !== "last") throw new InputError("positionals order must be first or last");
+  const positionals = [...explicit ?? []];
+  if (!explicit) {
     let skipped = [];
     for (const argument of schema.arguments) {
       const found = pick(argument);
@@ -379,7 +382,9 @@ function toArgv(schema, input, opts = {}) {
       positionals.push(...values.map((v) => text(v, isPathValued(argument.validation), argument.name)));
     }
   }
-  if (positionals.length) out.argv.push("--", ...positionals);
+  if (positionals.some((p) => p.startsWith("-"))) out.argv.push("--", ...positionals);
+  else if (order === "last") out.argv.push(...positionals);
+  else out.argv.unshift(...positionals);
   out.unknown = Object.keys(input).filter((k) => !used.has(k));
   return out;
 }
@@ -678,7 +683,7 @@ async function watchTools(root, opts = {}) {
   };
 }
 function startTool(tool, input, opts = {}) {
-  const { argv, env } = toArgv(tool.schema, input, { within: opts.within, cwd: opts.cwd, secretEnv: opts.secretsInEnv !== false });
+  const { argv, env } = toArgv(tool.schema, input, { within: opts.within, cwd: opts.cwd, secretEnv: opts.secretsInEnv !== false, positionals: opts.positionalsOrder });
   const full = [...tool.subcommand ?? [], ...argv];
   const started = start(tool.file, full, { ...opts, env: Object.keys(env).length ? { ...opts.env ?? process.env, ...env } : opts.env });
   const command = [tool.file, ...redactArgv(tool.schema, full)];

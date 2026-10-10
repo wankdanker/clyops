@@ -131,11 +131,13 @@ export function parseCommandLine(cmdLine: string, schema: any): Record<string, a
     i = 1;
   }
 
+  let positionalOnly = false;
   while (i < tokens.length) {
     const token = tokens[i];
+    if (token === '--' && !positionalOnly) { positionalOnly = true; i++; continue; }
 
     // Handle --option=value format
-    if (token.startsWith('--') && token.includes('=')) {
+    if (!positionalOnly && token.startsWith('--') && token.includes('=')) {
       const eqIndex = token.indexOf('=');
       const optName = token.substring(2, eqIndex);
       const optValue = token.substring(eqIndex + 1);
@@ -154,7 +156,7 @@ export function parseCommandLine(cmdLine: string, schema: any): Record<string, a
     }
 
     // Handle --option or --option value
-    if (token.startsWith('--')) {
+    if (!positionalOnly && token.startsWith('--')) {
       const optName = token.substring(2);
       const opt = optionByName.get(optName);
 
@@ -183,7 +185,7 @@ export function parseCommandLine(cmdLine: string, schema: any): Record<string, a
     }
 
     // Handle -o or -o value (short options)
-    if (token.startsWith('-') && token.length >= 2 && !token.startsWith('--')) {
+    if (!positionalOnly && token.startsWith('-') && token.length >= 2 && !token.startsWith('--')) {
       const shortName = token.substring(1);
       const opt = optionByShort.get(shortName);
 
@@ -255,6 +257,8 @@ export function buildCommandArgs(
     }
   });
 
+  const positionals = args.splice(0);
+
   // Add options
   schema.options?.forEach((opt: any) => {
     const value = values[opt.name];
@@ -274,7 +278,9 @@ export function buildCommandArgs(
     }
   });
 
-  return args;
+  return positionals.some((v) => v.startsWith('-'))
+    ? [...args, '--', ...positionals]
+    : [...positionals, ...args];
 }
 
 /** Whether output of `contentType` is text (undeclared output is). */

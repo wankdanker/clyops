@@ -23,7 +23,7 @@ for (const cmd of commands(tree).filter((c) => c.kind === 'tool')) {
 
 const schema = await loadSchema('./scripts/media/to-pcm.sh');
 const { argv, unknown } = toArgv(schema, { input: 'in.wav', rate: 16000, verbose: true });
-// argv: ['--rate', '16000', '--verbose', '--', 'in.wav']
+// argv: ['in.wav', '--rate', '16000', '--verbose']
 const result = await run('./scripts/media/to-pcm.sh', argv, { timeoutMs: 60_000 });
 // { exitCode, signal, timedOut, stdout, stderr, durationMs, command }
 ```
@@ -40,7 +40,7 @@ const result = await run('./scripts/media/to-pcm.sh', argv, { timeoutMs: 60_000 
 | `commands(group)` | Every command in a tree. |
 | `classify(file)` | `tool`, `dispatcher` or `other`. Only `tool`s should be run for their schema. |
 | `loadSchema(file, {cwd?, timeoutMs?})` | The tool's `--help-json-schema` output, cached by file modification time and size. |
-| `toArgv(schema, input, {base?, render?, controlled?, positionals?, secretEnv?, within?, cwd?})` | JSON input → argv ([spec §13](../../spec/SPEC.md#13-json-input-toargv)). Returns `{argv, env, unknown, controlled}`; with `secretEnv` secrets are in `env`. With `within`, a path input outside those directories throws an `InputError` (`status` 400). |
+| `toArgv(schema, input, {base?, render?, controlled?, positionals?, positionalsOrder?, secretEnv?, within?, cwd?})` | JSON input → argv ([spec §13](../../spec/SPEC.md#13-json-input-toargv)). Returns `{argv, env, unknown, controlled}`; with `secretEnv` secrets are in `env`. With `within`, a path input outside those directories throws an `InputError` (`status` 400). |
 | `toJsonSchema(schema)` | The JSON Schema of that input: secrets `writeOnly`, exclusive options as `allOf`/`not`. |
 | `run(file, argv, {cwd?, env?, timeoutMs?, signal?, onStdout?, onStderr?, stdin?, stdout?, maxOutput?})` | Run a tool and collect its output. `stdin` is a string, Buffer or stream; `stdout: 'buffer'` keeps binary output in `stdoutBuffer`; `maxOutput` caps what is kept (`truncated`). |
 | `start(file, argv, options)` | `run`, started: `{child, stdout, result}`; with `stdout: 'stream'` read stdout as it comes. |
@@ -49,3 +49,7 @@ const result = await run('./scripts/media/to-pcm.sh', argv, { timeoutMs: 60_000 
 | `tail(text, lines?)`, `shellQuote(argv)` | Helpers for error messages and logs. |
 
 ESM only, Node 20+.
+
+Positionals come first by default. Set `{ positionals: 'last' }` to put them
+after options. `--` is emitted only when a positional starts with `-`; then all
+positionals follow it. Explicit positional arrays also accept `positionalsOrder`.

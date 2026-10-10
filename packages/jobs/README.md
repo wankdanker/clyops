@@ -31,6 +31,7 @@ and no `node_modules`. It includes clyops-tools. `require('clyops-jobs')` loads 
 - `key` names the options block (default: the function name). Options are
   `deepMerge(defaults[key], config[key])`, keyed like the tool's options (`out_dir`, `out-dir`)
   and mapped onto its command line through `--help-json-schema` ([spec §13](../../spec/SPEC.md#13-json-input-toargv)).
+- `positionals_order` (optional) is `first` (default) or `last`, for wrappers needing a specific order. `--` is only emitted for positional values starting with `-`.
 - `positionals` (optional) lists the tool's positional arguments explicitly; otherwise they're
   options keyed by argument name.
 - String values may use `${dot.path}` or `{{dot.path}}` templates against a context you build

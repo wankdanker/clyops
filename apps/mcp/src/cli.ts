@@ -22,6 +22,7 @@ cli.opt('CLYOPS_MCP_READ_ONLY',         'read-only',    '',  'flag',      'Serve
 cli.optArray('CLYOPS_MCP_PATHS_WITHIN', 'paths-within', '',               'Path arguments must resolve inside this directory', 'Security', 'dir:exists');
 cli.opt('CLYOPS_MCP_MAX_OUTPUT',        'max-output',   '',  '16777216',  'Keep at most this many bytes of a tool\'s stdout and stderr (0: all)', 'Security', 'int:0-');
 cli.opt('CLYOPS_MCP_AUDIT',             'audit',        '',  'optional',  'Append a JSON line per run to this file (-: stderr)', 'Security', 'path');
+cli.opt('CLYOPS_MCP_POSITIONALS_ORDER', 'positionals-order', '', 'first', 'Positionals before or after options', 'Tools', 'choice:first,last');
 const args = cli.run();
 
 // stdout is the MCP channel; clyops logs to stderr.
@@ -46,6 +47,7 @@ const mcp = {
   instructions: tree.description || undefined,
   tools,
   cwd: (args.CLYOPS_MCP_CWD as string | null) ?? undefined,
+  positionalsOrder: args.CLYOPS_MCP_POSITIONALS_ORDER as 'first' | 'last',
   timeoutMs: (args.CLYOPS_MCP_TIMEOUT as number) * 1000,
   within: within.length ? within : undefined,
   maxOutput: args.CLYOPS_MCP_MAX_OUTPUT as number,

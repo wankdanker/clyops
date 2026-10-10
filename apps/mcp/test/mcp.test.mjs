@@ -192,3 +192,15 @@ test('read-only and allow/deny limit the tools served', { timeout: 60_000 }, asy
   assert.deepEqual(await names('--read-only'), ['tasks_db_status']);
   assert.deepEqual(await names('--allow', 'tasks/**', '--deny', 'tasks/db/migrate'), ['tasks_db_status', 'tasks_send']);
 });
+
+test('stdio positional-order option reaches tool execution', async () => {
+  const root = tree();
+  const audit = join(root, 'order.log');
+  const client = new Client({ name: 'order', version: '1' });
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [cli, '--root', root, '--no-watch', '--positionals-order', 'last', '--audit', audit], env, stderr: 'pipe' }));
+  try {
+    const result = await client.callTool({ name: 'media_demo', arguments: { input: 'in.txt', count: 4 } });
+    assert.equal(result.isError, false);
+    assert.deepEqual(JSON.parse(readFileSync(audit, 'utf8')).command.slice(1), ['--count', '4', 'in.txt']);
+  } finally { await client.close(); }
+});

@@ -9,6 +9,8 @@ import { InputError, isTextType, runTool, tail, toJsonSchema, type AuditEntry, t
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 export interface McpOptions {
+  /** Positionals before or after options (default: first). */
+  positionalsOrder?: 'first' | 'last';
   /** Server name shown to clients (e.g. the tools directory's name). */
   name: string;
   version?: string;
@@ -127,7 +129,7 @@ export function createMcpServer(opts: McpOptions): Server {
     let result: ToolResult;
     try {
       result = await runTool(tool, declared ? input : checked.data, {
-        cwd: opts.cwd, timeoutMs: opts.timeoutMs, signal: extra.signal, within: opts.within, maxOutput: opts.maxOutput,
+        cwd: opts.cwd, timeoutMs: opts.timeoutMs, positionalsOrder: opts.positionalsOrder, signal: extra.signal, within: opts.within, maxOutput: opts.maxOutput,
         stdin: stdinData, stdout: binaryStdout(tool) ? 'buffer' : 'text',
       });
     } catch (err) {

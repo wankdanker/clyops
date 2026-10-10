@@ -638,7 +638,7 @@ and, for options, its `variableName` in lower case (`dry_run`). Keys that
 match nothing are reported back to the caller, which decides whether that is
 an error. A `null` value is the same as leaving the key out.
 
-**Options** come first, in schema order:
+**Options** keep schema order:
 
 * a flag (`isFlag`, unless its choices are `true,false`) becomes `--name` when
   the value is `true` or one of `true 1 yes on` (any case), and `--no-name`
@@ -648,8 +648,16 @@ an error. A `null` value is the same as leaving the key out.
 * values are strings as given, numbers and booleans in their JSON spelling,
   objects as JSON text.
 
-**Positionals** follow a `--` (only when there are any), so a value starting
-with `-` is never read as an option. Arguments are filled in schema order;
+**Positionals** come first by default, without an option terminator, so
+legacy wrappers taking their input as `$1` work too. When any positional
+starts with `-`, all positionals instead follow the options and `--`, so
+none can be read as an option. A caller can request positionals last with
+`toArgv(schema, input, { positionals: 'last' })`; it emits `--` only for dash
+values in that order too. Explicit positional arrays remain supported, with
+`positionalsOrder: 'first' | 'last'` to set their order. Jobs configure this
+with a function's `positionals_order`, and API/MCP servers expose
+`--positionals-order` (or `positionalsOrder` in their Node API).
+Arguments are filled in schema order;
 an array fills a variadic. An argument left out before one that is given takes
 its `default`; without one, the input is an error
 (`ARG is given, so EARLIER must be too`).

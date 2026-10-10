@@ -24,6 +24,8 @@ export interface ApiKey {
 }
 
 export interface ApiOptions {
+  /** Positionals before or after options (default: first). */
+  positionalsOrder?: 'first' | 'last';
   /** Tools directory or dispatcher definition file. */
   root: string;
   /** API title (default: the root's name). */
@@ -285,7 +287,7 @@ export async function createApi(opts: ApiOptions) {
         instructions: api.tree.description || undefined,
         tools: caller?.filter ? api.tools.filter((t) => allowed(t, caller.filter as ToolFilter)) : api.tools,
         cwd: opts.cwd,
-        timeoutMs: opts.timeoutMs,
+        timeoutMs: opts.timeoutMs, positionalsOrder: opts.positionalsOrder,
         within: opts.within,
         maxOutput: opts.maxOutput,
         audit: opts.audit && ((entry) => opts.audit?.({ ...entry, key: caller?.name })),
@@ -344,7 +346,7 @@ async function runBody(opts: ApiOptions, ctx: Ctx, tool: ApiTool, req: Request, 
 async function respond(opts: ApiOptions, ctx: Ctx, tool: ApiTool, input: Record<string, unknown>, req: Request, res: Response,
   stdin?: string | Readable, dir?: string): Promise<void> {
   const caller = res.locals.caller as Caller | undefined;
-  const base: ToolRunOptions = { cwd: opts.cwd, timeoutMs: opts.timeoutMs, within: opts.within, maxOutput: opts.maxOutput };
+  const base: ToolRunOptions = { cwd: opts.cwd, timeoutMs: opts.timeoutMs, positionalsOrder: opts.positionalsOrder, within: opts.within, maxOutput: opts.maxOutput };
   const open = () => (typeof stdin === 'string' ? createReadStream(stdin) : stdin);
   const audit = (result: RunResult) => opts.audit?.({
     key: caller?.name, tool: tool.words.join(' '), command: result.command, exitCode: result.exitCode, signal: result.signal,

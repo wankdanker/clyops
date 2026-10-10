@@ -28,6 +28,7 @@ cli.optArray('CLYOPS_API_PATHS_WITHIN', 'paths-within', '',               'Path 
 cli.opt('CLYOPS_API_MAX_BODY',          'max-body',     '',  '10485760',  'Largest request body in bytes: JSON, multipart or spooled for an async job', 'Security', 'int:1-');
 cli.opt('CLYOPS_API_MAX_OUTPUT',        'max-output',   '',  '16777216',  'Keep at most this many bytes of a tool\'s stdout and stderr (0: all)', 'Security', 'int:0-');
 cli.opt('CLYOPS_API_AUDIT',             'audit',        '',  'optional',  'Append a JSON line per run to this file (-: stderr)', 'Security', 'path');
+cli.opt('CLYOPS_API_POSITIONALS_ORDER', 'positionals-order', '', 'first', 'Positionals before or after options', 'Tools', 'choice:first,last');
 const args = cli.run();
 
 let keys: Record<string, ApiKey> | undefined;
@@ -44,6 +45,7 @@ const { app, current } = await createApi({
   root: args.CLYOPS_API_ROOT as string,
   name: (args.CLYOPS_API_NAME as string | null) ?? undefined,
   cwd: (args.CLYOPS_API_CWD as string | null) ?? undefined,
+  positionalsOrder: args.CLYOPS_API_POSITIONALS_ORDER as 'first' | 'last',
   timeoutMs: (args.CLYOPS_API_TIMEOUT as number) * 1000,
   concurrency: (args.CLYOPS_API_CONCURRENCY as number | null) ?? undefined,
   apiKey: (args.CLYOPS_API_API_KEY as string | null) ?? undefined,

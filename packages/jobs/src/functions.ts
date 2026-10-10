@@ -34,6 +34,8 @@ export interface FunctionDefinition {
   key?: string;
   script?: string;
   positionals?: unknown[];
+  /** Positionals before or after options (default: first). */
+  positionals_order?: 'first' | 'last';
   /** A template for a file fed to the tool's stdin, e.g. '${media.path}'. */
   stdin?: string;
   /** A template for the file the tool's stdout is written to; it also counts as an artifact. */
@@ -105,6 +107,7 @@ export async function buildFunctionCommand(fn: ResolvedFunction, opts: CommandOp
     controlled: opts.controlled ?? ['help'],
     render: context ? (s) => renderTemplateString(s, context) : undefined,
     positionals: explicitPositionals(fn, context),
+    positionalsOrder: fn.definition.positionals_order,
   });
   const name = basename(fn.script);
   for (const key of controlled) LOGGER.warn('[%s] ignoring config key %s; it is controlled by %s', name, key, LOGGER.module);

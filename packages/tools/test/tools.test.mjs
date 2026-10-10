@@ -121,10 +121,10 @@ test('toArgv fills skipped positionals with defaults, resolves paths and renders
   const render = (s) => s.replace('${name}', 'world');
   assert.deepEqual(
     toArgv(golden, { input: 'in-${name}.txt', rest: ['r'], out: 'o.txt', config: '-', include: ['a', '/abs', 'http://x/y'] }, { base, render }).argv,
-    ['--config', '-', '--out', '/base/o.txt', '--include', '/base/a', '--include', '/abs', '--include', 'http://x/y', '--', '/base/in-world.txt', 'fast', 'r'],
+    ['/base/in-world.txt', 'fast', 'r', '--config', '-', '--out', '/base/o.txt', '--include', '/base/a', '--include', '/abs', '--include', 'http://x/y'],
   );
   assert.throws(() => toArgv(golden, { mode: 'slow' }), /mode is given, so input must be too/);
-  assert.deepEqual(toArgv(golden, { input: 'ignored', verbose: true }, { positionals: ['p1'] }).argv, ['--verbose', '--', 'p1']);
+  assert.deepEqual(toArgv(golden, { input: 'ignored', verbose: true }, { positionals: ['p1'] }).argv, ['p1', '--verbose']);
 });
 
 test('toArgv output is what the tool resolves', async () => {
@@ -266,13 +266,13 @@ test('runTool runs a command of a program', async () => {
   const result = await runTool(migrate, { target: '7', dry_run: true, verbose: true }, { cwd: root });
   assert.equal(result.exitCode, 0, result.stderr);
   assert.deepEqual(result.json.values, { DRY_RUN: true, DB_URL: 'sqlite:app.db', VERBOSE: true, HELP: false, target: '7', command: ['db', 'migrate'] });
-  assert.deepEqual(result.command.slice(1), ['db', 'migrate', '--dry-run', '--verbose', '--', '7']);
+  assert.deepEqual(result.command.slice(1), ['db', 'migrate', '7', '--dry-run', '--verbose']);
 });
 
 test('secrets: redacted in the command, passed in the environment', async () => {
   assert.deepEqual(redactArgv(golden, ['--key', 's3cret', '--key=x', '--host', 'h', '--', '--key']), ['--key', '***', '--key=***', '--host', 'h', '--', '--key']);
   const { argv, env } = toArgv(golden, { input: 'in.txt', key: 's3cret' }, { secretEnv: true });
-  assert.deepEqual([argv, env], [['--', 'in.txt'], { KEY: 's3cret' }]);
+  assert.deepEqual([argv, env], [['in.txt'], { KEY: 's3cret' }]);
   assert.deepEqual(toArgv(golden, { key: 's3cret' }).argv, ['--key', 's3cret']);
 
   const root = tree();
@@ -284,7 +284,7 @@ test('secrets: redacted in the command, passed in the environment', async () => 
   assert.ok(!viaEnv.command.includes('s3cret'));
   const viaArgv = await runTool(tool, { input: 'in.txt', key: 's3cret' }, { cwd: root, env: envOnly, secretsInEnv: false });
   assert.equal(viaArgv.json.sources.key, 'cli');
-  assert.deepEqual(viaArgv.command.slice(-4), ['--key', '***', '--', 'in.txt']);
+  assert.deepEqual(viaArgv.command.slice(1), ['in.txt', '--key', '***']);
 });
 
 test('toJsonSchema marks secrets and exclusive options', () => {
@@ -307,7 +307,7 @@ test('within confines path inputs', () => {
   assert.throws(() => checkWithin('--src', 'escape/secret', [root], root), /outside/, 'symlinks are followed');
   assert.throws(() => checkWithin('--src', 'file:///etc/passwd', [root], root), /not a path/);
   assert.throws(() => toArgv(golden, { input: '/etc/passwd' }, { within: [root], cwd: root }), /input: \/etc\/passwd is outside/);
-  assert.deepEqual(toArgv(golden, { input: 'in.txt', src: 'a' }, { within: [root], cwd: root }).argv, ['--src', 'a', '--', 'in.txt']);
+  assert.deepEqual(toArgv(golden, { input: 'in.txt', src: 'a' }, { within: [root], cwd: root }).argv, ['in.txt', '--src', 'a']);
 });
 
 test('run feeds stdin, keeps binary stdout and caps output', async () => {
@@ -371,4 +371,18 @@ test('hot reload does not re-probe unchanged files', async () => {
     await Promise.race([changed, new Promise((_, reject) => setTimeout(() => reject(new Error('reload did not finish')), 5000).unref())]);
     assert.equal(readFileSync(counter, 'utf8'), 'probe\n');
   } finally { watcher.close(); }
+});
+
+test('toArgv supports both orders, with -- only for dash positionals', () => {
+  for (const order of ['first', 'last']) {
+    const options = { positionals: order };
+    assert.deepEqual(toArgv(golden, { input: 'in.txt', verbose: true }, options).argv,
+      order === 'first' ? ['in.txt', '--verbose'] : ['--verbose', 'in.txt']);
+    for (const value of ['-clip.wav', '--', '--verbose']) {
+      assert.deepEqual(toArgv(golden, { input: value, verbose: true }, options).argv, ['--verbose', '--', value]);
+    }
+    assert.deepEqual(toArgv(golden, { verbose: true }, options).argv, ['--verbose']);
+  }
+  assert.deepEqual(toArgv(golden, { verbose: true }, { positionals: ['p'], positionalsOrder: 'last' }).argv, ['--verbose', 'p']);
+  assert.throws(() => toArgv(golden, {}, { positionals: 'sideways' }), /order must be first or last/);
 });

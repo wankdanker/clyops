@@ -68,7 +68,7 @@ test('buildFunctionCommand maps config through the schema', async () => {
   warnings.length = 0;
   const context = { job: { id: 'j9' }, media: { path: '/drop/a.wav' } };
   const cmd = await buildFunctionCommand(fn, { configRoot: '/cfg', context, defaultPositional: '${media.path}' });
-  assert.deepEqual(cmd, [fn.script, '--verbose', '--no-quiet', '--out', '/cfg/results/j9.txt', '--tag', 'j9', '--', '/drop/a.wav']);
+  assert.deepEqual(cmd, [fn.script, '/drop/a.wav', '--verbose', '--no-quiet', '--out', '/cfg/results/j9.txt', '--tag', 'j9']);
   assert.deepEqual(warnings, [
     '[%s] ignoring config key %s; it is controlled by %s demo.sh help test',
     '[%s] ignoring config key %s; no matching CLI option in schema demo.sh nope',
@@ -76,7 +76,7 @@ test('buildFunctionCommand maps config through the schema', async () => {
 
   // Explicit positionals win; [] means none.
   fn.definition.positionals = ['${job.id}', ''];
-  assert.deepEqual((await buildFunctionCommand(fn, { configRoot: '/cfg', context, controlled: [] })).slice(-2), ['--', 'j9']);
+  assert.deepEqual((await buildFunctionCommand(fn, { configRoot: '/cfg', context, controlled: [] })).slice(0, 2), [fn.script, 'j9']);
   fn.definition.positionals = [];
   assert.equal((await buildFunctionCommand(fn, { configRoot: '/cfg', context, defaultPositional: '${media.path}' })).includes('--'), false);
 });
@@ -194,4 +194,24 @@ process.stdin.on("data", (d) => process.stdout.write(String(d).toUpperCase()));
   assert.equal(result.stdout, '');
   assert.ok(result.command.includes('***') && !result.command.includes('s3cret'));
   assert.deepEqual(copyConfiguredArtifacts(fn, context).map((a) => a.key), ['done/j1.txt']);
+});
+
+test('function positional order is configurable and supports legacy wrappers', async () => {
+  const root = workspace();
+  const script = join(root, 'scripts/legacy.sh');
+  const schema = { clyops: 1, description: '', arguments: [{ name: 'input', default: '', validation: '' }], options: [{ name: 'count', variableName: 'COUNT', choices: [], isFlag: false, validation: '' }] };
+  writeFileSync(script, '#!/bin/sh\nprintf "%s\\n" "$1"\n');
+  chmodSync(script, 0o755);
+  const fn = { functionName: 'legacy', key: 'legacy', script, config: { input: 'clip.wav', count: 2 }, definition: {} };
+  const opts = { configRoot: root };
+  const first = await buildFunctionCommand(fn, opts, schema);
+  assert.deepEqual(first.slice(1), ['clip.wav', '--count', '2']);
+  const { run } = await import('../../tools/dist/index.js');
+  assert.equal((await run(script, first.slice(1))).stdout.trim(), 'clip.wav');
+  fn.definition.positionals_order = 'last';
+  assert.deepEqual((await buildFunctionCommand(fn, opts, schema)).slice(1), ['--count', '2', 'clip.wav']);
+  fn.config.input = '-clip.wav';
+  assert.deepEqual((await buildFunctionCommand(fn, opts, schema)).slice(1), ['--count', '2', '--', '-clip.wav']);
+  fn.definition.positionals_order = 'sideways';
+  await assert.rejects(buildFunctionCommand(fn, opts, schema), /order must be first or last/);
 });

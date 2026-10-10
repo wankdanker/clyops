@@ -174,6 +174,8 @@ export async function watchTools(
 }
 
 export interface ToolRunOptions extends RunOptions {
+  /** Positionals before or after options (default: first). */
+  positionalsOrder?: 'first' | 'last';
   /** Path-valued inputs must resolve inside these directories (see toArgv's `within`). */
   within?: string[];
   /** Pass secret inputs in the environment instead of on the command line (default: true). */
@@ -186,7 +188,7 @@ export interface ToolRunOptions extends RunOptions {
  * rejects, and for an argument given without an earlier one.
  */
 export function startTool(tool: Tool, input: Input, opts: ToolRunOptions = {}): Started & { command: string[] } {
-  const { argv, env } = toArgv(tool.schema, input, { within: opts.within, cwd: opts.cwd, secretEnv: opts.secretsInEnv !== false });
+  const { argv, env } = toArgv(tool.schema, input, { within: opts.within, cwd: opts.cwd, secretEnv: opts.secretsInEnv !== false, positionals: opts.positionalsOrder });
   const full = [...(tool.subcommand ?? []), ...argv];
   const started = start(tool.file, full, { ...opts, env: Object.keys(env).length ? { ...(opts.env ?? process.env), ...env } : opts.env });
   const command = [tool.file, ...redactArgv(tool.schema, full)];

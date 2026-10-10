@@ -17,8 +17,10 @@ export interface ArgvOptions {
   controlled?: string[];
   /** Applied to every string value before it is used (templating). */
   render?: (value: string) => string;
-  /** Use these positionals instead of mapping the schema's arguments from the input. */
-  positionals?: string[];
+  /** Explicit positional values, or their order (default: 'first'). */
+  positionals?: string[] | 'first' | 'last';
+  /** Order when also supplying explicit positional values. */
+  positionalsOrder?: 'first' | 'last';
   /**
    * Pass secret options (spec section 1.5) in the environment, under their
    * variable names, instead of on the command line where `ps` shows them.
@@ -68,8 +70,8 @@ export function isPathValued(validation: string, type?: string): boolean {
 const TRUE = /^(true|1|yes|on)$/i;
 
 /**
- * Map `input` onto `schema`. Options come first, then `--` and the positionals,
- * so a positional that starts with `-` is never taken for an option.
+ * Map `input` onto `schema`. Positionals come first unless configured otherwise
+ * or a leading dash requires placing them after the options and `--`.
  */
 export function toArgv(schema: Schema, input: Input, opts: ArgvOptions = {}): Argv {
   const used = new Set<string>();
@@ -119,8 +121,11 @@ export function toArgv(schema: Schema, input: Input, opts: ArgvOptions = {}): Ar
     }
   }
 
-  const positionals = [...(opts.positionals ?? [])];
-  if (!opts.positionals) {
+  const explicit = Array.isArray(opts.positionals) ? opts.positionals : undefined;
+  const order = typeof opts.positionals === 'string' ? opts.positionals : opts.positionalsOrder ?? 'first';
+  if (order !== 'first' && order !== 'last') throw new InputError("positionals order must be first or last");
+  const positionals = [...(explicit ?? [])];
+  if (!explicit) {
     // Positionals are assigned in order, so an argument left out before one
     // that is given takes its default.
     let skipped: SchemaArgument[] = [];
@@ -139,7 +144,9 @@ export function toArgv(schema: Schema, input: Input, opts: ArgvOptions = {}): Ar
       positionals.push(...values.map((v) => text(v, isPathValued(argument.validation), argument.name)));
     }
   }
-  if (positionals.length) out.argv.push('--', ...positionals);
+  if (positionals.some((p) => p.startsWith('-'))) out.argv.push('--', ...positionals);
+  else if (order === 'last') out.argv.push(...positionals);
+  else out.argv.unshift(...positionals);
 
   out.unknown = Object.keys(input).filter((k) => !used.has(k));
   return out;

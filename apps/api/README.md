@@ -161,3 +161,8 @@ Watching is off by default in the library (`watch: true` turns it on, `onReload`
 new set) and on by default in the `clyops-api` command.
 
 `loadTools(root)` and `runTool(tool, input)` are exported for other servers.
+
+`--positionals-order first|last` controls generated argument order (default:
+`first`). An option terminator is only emitted for positional values starting
+with `-`, which are always placed after the options. The Node API exposes this
+as `positionalsOrder`.
