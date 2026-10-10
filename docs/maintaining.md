@@ -8,7 +8,7 @@ title: Maintaining the documentation
 The full site build runs on Linux or macOS and uses Markdown guides and native
 API references. Install Node 20+,
 pnpm (the version pinned in `package.json`), Python 3.10+, Rust, Go 1.21+,
-Java 17+/Maven, Ruby 3.3+ and Doxygen. These are documentation build requirements;
+Java 17+/Maven, Ruby 3.3+, Doxygen and Graphviz (`dot`). These are documentation build requirements;
 the supported library runtime versions remain those in each language guide.
 
 ```sh

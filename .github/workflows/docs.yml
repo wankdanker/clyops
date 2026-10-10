@@ -32,7 +32,7 @@ jobs:
         with: { distribution: temurin, java-version: 21, cache: maven }
       - uses: ruby/setup-ruby@v1
         with: { ruby-version: "3.3" }
-      - run: sudo apt-get update -q && sudo apt-get install -y -q doxygen
+      - run: sudo apt-get update -q && sudo apt-get install -y -q doxygen graphviz
       - run: pnpm install --frozen-lockfile
       - run: pip install -r docs/requirements.txt
       - run: gem install yard -v 0.9.38 --no-document && gem install rbs -v 3.4.0 --no-document
