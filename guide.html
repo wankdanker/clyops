@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Concepts and behavior · clyops</title>
+  <link rel="stylesheet" href="/clyops/assets/docs.css">
+  <script defer src="/clyops/assets/search.js"></script>
+</head>
+<body data-search-index="/clyops/search-index.json">
+  <a class="skip" href="#content">Skip to content</a>
+  <header><a href="/clyops/"><strong>clyops</strong></a><span>Documentation · 0.3.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <div class="shell">
+    <nav aria-label="Documentation">
+      <a href="/clyops/guide.html">Concepts and behavior</a>
+      <a href="/clyops/reference.html">API references</a>
+      <h2>Languages</h2>
+      <a href="/clyops/languages/javascript.html">JavaScript / TypeScript</a><a href="/clyops/languages/python.html">Python</a><a href="/clyops/languages/rust.html">Rust</a><a href="/clyops/languages/go.html">Go</a><a href="/clyops/languages/java.html">Java</a><a href="/clyops/languages/ruby.html">Ruby</a><a href="/clyops/languages/c.html">C</a><a href="/clyops/languages/bash.html">Bash</a>
+      <h2>Tools and servers</h2>
+      <a href="/clyops/node-tools.html">Node tools, jobs, API and MCP</a>
+      <a href="/clyops/applications.html">Dispatcher and desktop runner</a>
+      <a href="/clyops/maintaining.html">Maintaining the docs</a>
+      <a href="/clyops/versions.html">Release documentation</a>
+      <form action="/clyops/search.html" role="search"><label for="search">Search guides</label><input id="search" name="q" type="search"><button>Search</button></form>
+    </nav>
+    <main id="content"><h1 id="concepts-and-behavior">Concepts and behavior</h1>
+<p>The APIs use native naming conventions, with the same underlying behavior.
+The <a href="/clyops/reference.html">language guides</a> show their signatures and runnable programs.
+This guide uses JavaScript spelling for recipes; register everything before <code>run()</code>.</p>
+<h2 id="register-options-and-arguments">Register options and arguments</h2>
+<pre><code class="language-javascript">cli.opt('PORT', 'port', 'p', '8080', 'Server port', 'Network', 'port');
+cli.opt('VERBOSE', 'verbose', 'v', 'flag', 'Verbose output');
+cli.opt('TOKEN', 'token', '', '', 'Required token', 'Auth', 'secret');
+cli.optArray('TAG', 'tag', 't', 'Repeatable tags');
+cli.arg('INPUT', 'Input file', '', 'file:exists');
+cli.argVariadic('EXTRA', 'Additional input files', 'file:exists');
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>variable</td>
+<td>Key in resolved values and the environment variable name, e.g. <code>PORT</code></td>
+</tr>
+<tr>
+<td>long</td>
+<td>Long option without <code>--</code>, e.g. <code>port</code></td>
+</tr>
+<tr>
+<td>short</td>
+<td>Single-character alias without <code>-</code>; empty means no alias</td>
+</tr>
+<tr>
+<td>default</td>
+<td>Literal default, <code>flag</code>, <code>optional</code>, or empty for a required option</td>
+</tr>
+<tr>
+<td>description</td>
+<td>Text shown in help and the schema</td>
+</tr>
+<tr>
+<td>group</td>
+<td>Help section; defaults to <code>Options</code></td>
+</tr>
+<tr>
+<td>rule</td>
+<td>Validation rule; empty means text</td>
+</tr>
+</tbody>
+</table>
+<p>Repeatable options accumulate CLI values; positional arguments are assigned in
+registration order. A variadic must be last. An empty positional default makes
+it required. A CLI level contains positionals or subcommands, not both.</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>JS / Java</th>
+<th>Python / Ruby</th>
+<th>Rust</th>
+<th>Go</th>
+<th>Bash / C</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Option</td>
+<td><code>opt</code></td>
+<td><code>opt</code></td>
+<td><code>opt</code></td>
+<td><code>Opt</code></td>
+<td><code>clyops_opt</code></td>
+</tr>
+<tr>
+<td>Repeatable option</td>
+<td><code>optArray</code></td>
+<td><code>opt_array</code></td>
+<td><code>opt_array</code></td>
+<td><code>OptArray</code></td>
+<td><code>clyops_opt_array</code></td>
+</tr>
+<tr>
+<td>Argument</td>
+<td><code>arg</code></td>
+<td><code>arg</code></td>
+<td><code>arg</code></td>
+<td><code>Arg</code></td>
+<td><code>clyops_arg</code></td>
+</tr>
+<tr>
+<td>Variadic</td>
+<td><code>argVariadic</code></td>
+<td><code>arg_variadic</code></td>
+<td><code>arg_variadic</code></td>
+<td><code>ArgVariadic</code></td>
+<td><code>clyops_arg_variadic</code></td>
+</tr>
+</tbody>
+</table>
+<p>Rust puts option <code>group</code> and <code>rule</code> on the returned registration handle; C uses
+designated metadata fields. See each native reference before translating a recipe.</p>
+<h2 id="values-precedence-and-flags">Values, precedence and flags</h2>
+<p>Precedence is <strong>command line → config → environment → default</strong>. Integer, float,
+boolean and flag rules produce native typed values; arrays contain typed elements.
+Unset optional values are null/nil/None or the language's documented empty value.</p>
+<p><code>--verbose</code> enables a flag; <code>--no-verbose</code> explicitly disables it and overrides an
+enabled environment/config value. <code>--verbose=false</code> is also supported. Boolean
+words are case insensitive: true/false, yes/no, 1/0, on/off.</p>
+<p><code>source('port')</code> reports <code>cli</code>, <code>config</code>, <code>env</code>, <code>default</code> or <code>unset</code>.
+<code>isSet</code> asks whether it came from CLI; <code>isExplicitlySet</code> includes config and env.
+Ruby uses <code>set?</code> and <code>explicitly_set?</code>; Bash/C use the <code>clyops_</code> forms.
+Typed getters may return a default for the wrong type; check presence/type when
+that difference matters. Runtime registration does not infer application-specific
+field types in TypeScript, Python or Ruby.</p>
+<h2 id="validation">Validation</h2>
+<p>Rules include <code>int</code>, <code>float</code>, <code>bool</code>, <code>port</code>, <code>ip</code>, <code>hostname</code>, <code>url</code>, <code>email</code>,
+<code>uuid</code>, <code>date:YYYY-MM-DD</code>, <code>path</code>, <code>file:exists</code>, <code>file:readable</code>, <code>file:writable</code>,
+<code>dir:exists</code> and <code>dir:writable</code>. Parameterized rules include <code>int:1-10</code>,
+<code>float:0-1</code>, <code>string:1-100</code>, <code>choice:red,green,blue</code> and <code>regex:PATTERN</code>.
+See <a href="https://github.com/wankdanker/clyops/blob/e3d13d8ad99f90bfeda9876fef1c6c2aaa4469d6/spec/SPEC.md#5-validation-rules">spec section 5</a> for ranges and exact behavior.</p>
+<p>Standalone <code>validate</code> helpers return a typed value or the native validation
+error/result. Unknown registration rules and duplicate names are programming
+errors. Bad CLI values are parse errors. These are separate error paths.</p>
+<h2 id="parse-without-exiting">Parse without exiting</h2>
+<pre><code class="language-javascript">const result = cli.parse(['input.txt', '--port', '443']);
+if (result.status === 'ok') console.log(cli.values.PORT);
+else if (result.status === 'help') console.log(cli.usage());
+else console.error(result.error);
+</code></pre>
+<p><code>run()</code> handles help, schema, completion and process exit; <code>parse()</code> returns a
+native outcome. Read values after success. Parsing resets prior invocation state.
+Python/Ruby expose <code>values</code>; Rust has <code>values()</code>; Go has <code>Values</code>; Java has
+<code>values()</code>. C returns <code>CLYOPS_OK/HELP/ERROR</code> and exposes <code>clyops_error</code>.
+Bash returns zero on success and uses <code>_CLYOPS_HELP</code> or <code>_CLYOPS_ERROR</code> on failure;
+call <code>clyops_parse</code> in an <code>if</code> when using <code>set -e</code>.</p>
+<h2 id="config-files-and-paths">Config files and paths</h2>
+<pre><code class="language-javascript">cli.opt('CONFIG', 'config', 'c', 'optional', 'Config file', 'Config', 'path');
+cli.setConfig('config', 'send:');
+cli.setPathSearch('input', ['assets', 'fixtures']);
+</code></pre>
+<p>The last line requires an option named <code>input</code> to have been registered. Config is
+line-oriented: <code>send:port=443</code>, with <code>@include relative-file</code> for includes. Prefixes
+select the program's keys; unknown keys are errors.</p>
+<p>CLI paths resolve against the working directory; config paths resolve against
+the config file containing the value; default/environment paths resolve against
+the CLI root. Paths are normalized after precedence. <code>-</code> denotes stdin where the
+application supports it. Path validation does not itself open/read files for the
+application. See <a href="https://github.com/wankdanker/clyops/blob/e3d13d8ad99f90bfeda9876fef1c6c2aaa4469d6/spec/SPEC.md#6-paths">spec section 6</a>.</p>
+<h2 id="nested-commands-and-constraints">Nested commands and constraints</h2>
+<pre><code class="language-javascript">const db = cli.command('db', 'Database tasks');
+const migrate = db.command('migrate', 'Apply migrations');
+migrate.opt('TO', 'to', '', 'optional', 'Target version', 'Options', 'int');
+migrate.setEffects('destructive');
+cli.opt('JSON', 'json', '', 'flag', 'JSON output');
+cli.opt('QUIET', 'quiet', '', 'flag', 'Quiet output');
+cli.exclusive('json', 'quiet');
+</code></pre>
+<p>Use this recipe on a CLI with no root positionals. Parent options are accepted
+before or after command words. <code>commandPath</code> gives the selected words, e.g.
+<code>['db', 'migrate']</code>; use the native accessor listed in the reference.
+<code>exclusive</code> permits at most one listed option, <code>requires(a, b...)</code> means a given
+<code>a</code> needs the others, and <code>oneOf</code> requires at least one. Register referenced
+options first. Explicitly false flags do not count as given for relationships.</p>
+<h2 id="secrets-effects-and-streams">Secrets, effects and streams</h2>
+<pre><code class="language-javascript">cli.opt('TOKEN', 'token', '', '', 'API token', 'Auth', 'secret');
+cli.setEffects('network', 'idempotent');
+cli.setStdin('Input document', 'application/json');
+cli.setStdout('Result document', 'application/json');
+</code></pre>
+<p><code>secret</code> and <code>secret:RULE</code> mask help/config previews and <code>valuesJson()</code>; the
+application still receives the real value. Avoid printing it yourself.
+Effects are <code>read-only</code>, <code>idempotent</code>, <code>destructive</code> and <code>network</code>.
+stdin/stdout declarations describe your program; your code performs the actual
+I/O. Schemas carry these declarations for API/MCP/desktop consumers.</p>
+<h2 id="help-schema-and-shell-completion">Help, schema and shell completion</h2>
+<p>Every standalone program supports <code>--help</code>, <code>--help-json-schema</code>, and
+<code>--completion bash|zsh|fish</code>. For example:</p>
+<pre><code class="language-sh">eval &quot;$(mytool --completion bash)&quot;
+</code></pre>
+<p>Use <code>usage</code>, <code>jsonSchema</code>, <code>completionScript</code> and <code>completionData</code> when embedding
+the library. The schema format discriminator is <code>clyops: 1</code>. Completion follows
+commands and their inherited options. <code>valuesJson</code> is a separate resolved-values
+document, with secrets masked.</p>
+<h2 id="logging-and-helper-functions">Logging and helper functions</h2>
+<p><code>info</code>, <code>warn</code>, <code>error</code> and <code>success</code> write timestamped messages to stderr. <code>die</code>
+logs and exits with the supplied code. <code>CLYOPS_SILENT=true</code> or the native silent
+setter suppresses ordinary logging; parse errors and <code>die</code> still print.
+<code>NO_COLOR</code> disables colors. The Node, Go, Java and C helpers support their native
+format arguments; Python/Ruby/Rust/Bash receive a rendered message.</p>
+<p>Native references also cover rule descriptions, validation, path resolution,
+text wrapping and value accessors where those helpers are public.</p>
+</main>
+  </div>
+  <footer>Guides are Markdown. API references come from the published source interfaces.</footer>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dispatcher and desktop runner · clyops</title>
+  <link rel="stylesheet" href="/clyops/assets/docs.css">
+  <script defer src="/clyops/assets/search.js"></script>
+</head>
+<body data-search-index="/clyops/search-index.json">
+  <a class="skip" href="#content">Skip to content</a>
+  <header><a href="/clyops/"><strong>clyops</strong></a><span>Documentation · 0.3.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <div class="shell">
+    <nav aria-label="Documentation">
+      <a href="/clyops/guide.html">Concepts and behavior</a>
+      <a href="/clyops/reference.html">API references</a>
+      <h2>Languages</h2>
+      <a href="/clyops/languages/javascript.html">JavaScript / TypeScript</a><a href="/clyops/languages/python.html">Python</a><a href="/clyops/languages/rust.html">Rust</a><a href="/clyops/languages/go.html">Go</a><a href="/clyops/languages/java.html">Java</a><a href="/clyops/languages/ruby.html">Ruby</a><a href="/clyops/languages/c.html">C</a><a href="/clyops/languages/bash.html">Bash</a>
+      <h2>Tools and servers</h2>
+      <a href="/clyops/node-tools.html">Node tools, jobs, API and MCP</a>
+      <a href="/clyops/applications.html">Dispatcher and desktop runner</a>
+      <a href="/clyops/maintaining.html">Maintaining the docs</a>
+      <a href="/clyops/versions.html">Release documentation</a>
+      <form action="/clyops/search.html" role="search"><label for="search">Search guides</label><input id="search" name="q" type="search"><button>Search</button></form>
+    </nav>
+    <main id="content"><h1 id="dispatcher-and-desktop-runner">Dispatcher and desktop runner</h1>
+<h2 id="dispatcher">Dispatcher</h2>
+<p><code>clyops-dispatch</code> turns a directory into nested subcommands. Download a binary
+from the <a href="https://github.com/wankdanker/clyops/releases">release</a>, then:</p>
+<pre><code class="language-sh">clyops-dispatch --root ./tools --name mytools --help
+clyops-dispatch --root ./tools --name mytools media convert --help
+</code></pre>
+<p>A <code>.clyops</code> file controls descriptions, directories, ignored entries and allowed
+or denied tools. Source detection requires a supported import/source statement
+or an explicit <code># clyops-tool</code> / <code>// clyops-tool</code> header marker for wrappers.
+Binary completion markers and nested dispatcher shebangs are also supported.
+Schemas are cached by file stamp; probes have a timeout.</p>
+<p>The <a href="https://github.com/wankdanker/clyops/blob/e3d13d8ad99f90bfeda9876fef1c6c2aaa4469d6/apps/dispatch/README.md">dispatcher guide</a> covers definition files,
+aliases, completion, caching and filesystem behavior. This application exposes
+a command-line interface, rather than an installed library API.</p>
+<h2 id="desktop-runner">Desktop runner</h2>
+<p>The runner lists tools and generates forms from their schemas, including commands,
+secrets, constraints, effect badges and declared stdin/stdout. Unchecked flags
+explicitly override enabled config/environment values. Templates preserve false
+and zero values and omit secrets. Destructive tools require confirmation.</p>
+<p>See the <a href="https://github.com/wankdanker/clyops/blob/e3d13d8ad99f90bfeda9876fef1c6c2aaa4469d6/apps/runner/README.md">runner guide</a> for installation, usage, templates
+and frontend/native development. Its internal UI helpers are not a public package API.</p>
+</main>
+  </div>
+  <footer>Guides are Markdown. API references come from the published source interfaces.</footer>
+</body>
+</html>
