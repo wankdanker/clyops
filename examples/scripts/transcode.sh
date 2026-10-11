@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # clyops-tool
-source "$(dirname "${BASH_SOURCE[0]}")/../../packages/bash/clyops.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../packages/bash/clyops.sh" || exit 1
 
 clyops_name transcode.sh
 clyops_description "Preview an H.264/AAC conversion. Add --execute to write the output with FFmpeg."

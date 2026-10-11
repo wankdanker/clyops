@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # clyops-tool
-source "$(dirname "${BASH_SOURCE[0]}")/../../packages/bash/clyops.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../packages/bash/clyops.sh" || exit 1
 
 clyops_name media-info.sh
 clyops_description "Inspect a media file with ffprobe. Install FFmpeg to run; help works without it."

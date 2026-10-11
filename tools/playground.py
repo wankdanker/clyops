@@ -9,6 +9,7 @@ import sys
 
 ROOT = Path.cwd()
 TOOLS = ("plan.py", "report.py", "json-format.py")
+BASH_TOOLS = ("media-info.sh", "transcode.sh", "upload.sh")
 HELP = """Python playground — real clyops scripts, running in this browser.
 Commands: plan.py, report.py, json-format.py, ls, cat PATH, pwd, help, clear
 Also accepts: python examples/scripts/plan.py --help
@@ -31,6 +32,14 @@ def _invoke(words, stdin):
         words = words[1:]
     if not words:
         raise ValueError("Choose a Python example, e.g. plan.py --help")
+    if words[0] == "bash" or Path(words[0]).name in BASH_TOOLS:
+        name = Path(words[1]).name if words[0] == "bash" and len(words) > 1 else Path(words[0]).name
+        example = name if name in BASH_TOOLS else "upload.sh"
+        raise ValueError(
+            "Bash is not loaded in this Python playground. These Bash examples run locally.\n"
+            f"View source: cat examples/scripts/{example}\n"
+            f"From a cloned checkout: ./examples/scripts/{example} --help"
+        )
     name = Path(words[0]).name
     if name not in TOOLS or words[0] not in (name, "./" + name, "examples/scripts/" + name, "./examples/scripts/" + name):
         raise ValueError("Available Python tools: " + ", ".join(TOOLS))
@@ -68,7 +77,11 @@ def execute(command, stdin=""):
             return {"stdout": "", "stderr": "", "code": 0, "clear": True}
         elif words[0] == "ls" and len(words) <= 2:
             path = _path(words[1]) if len(words) == 2 else ROOT / "examples/scripts"
-            output = "\n".join(item.name + ("/" if item.is_dir() else "") for item in sorted(path.iterdir())) + "\n"
+            output = "\n".join(
+                item.name + ("/" if item.is_dir() else "")
+                + ("  [Bash source; run locally]" if item.name in BASH_TOOLS else "")
+                for item in sorted(path.iterdir())
+            ) + "\n"
         elif words[0] == "cat" and len(words) == 2:
             output = _path(words[1]).read_text()[:60000]
         else:

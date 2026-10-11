@@ -36,6 +36,13 @@ test('homepage runs real Python examples, validates input, completes and accepts
   await command.fill('cat examples/scripts/plan.py'); await command.press('Enter');
   await expect(output).toContainText('cli.set_description');
   await expect(command).toBeEnabled();
+  await command.fill('ls'); await command.press('Enter');
+  await expect(output).toContainText('upload.sh  [Bash source; run locally]');
+  await expect(command).toBeEnabled();
+  await command.fill('upload.sh'); await command.press('Enter');
+  await expect(output).toContainText('Bash is not loaded in this Python playground');
+  await expect(output).toContainText('cat examples/scripts/upload.sh');
+  await expect(command).toBeEnabled();
   await command.fill('clear'); await command.press('Enter'); await expect(output).toHaveText('');
   await page.getByRole('button', {name:'Reset', exact:true}).click();
   await expect(command).toBeDisabled();

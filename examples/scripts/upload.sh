@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # clyops-tool
-source "$(dirname "${BASH_SOURCE[0]}")/../../packages/bash/clyops.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../packages/bash/clyops.sh" || exit 1
 
 clyops_name upload.sh
 clyops_description "Preview an HTTP PUT upload. Add --execute to send the file with curl."

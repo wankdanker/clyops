@@ -71,6 +71,8 @@ Try `plan.py --help`, `plan.py --replicas 99`, `report.py --format table`, or
 Tab completes commands/options/choices from the actual completion protocol;
 Up/Down recall commands. The stdin panel supplies input for `json-format.py`.
 Reset terminates the worker and restores the workspace when you start again.
+`ls` labels the Bash files as source examples to run locally; `cat` lets you
+read them here, and attempting to run one explains which runtime is needed.
 
 This is a Python command playground, with `help`, `ls`, `cat`, `pwd` and `clear`.
 It has no host shell, Bash, FFmpeg, curl, pipes or live agent connection. Run the

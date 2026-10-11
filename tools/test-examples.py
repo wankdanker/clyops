@@ -101,6 +101,10 @@ class Examples(unittest.TestCase):
         self.assertIn("set_description", playground.execute("cat examples/scripts/plan.py")["stdout"])
         self.assertEqual(playground.execute("cat ../outside")["code"], 1)
         self.assertEqual(playground.execute("bash transcode.sh")["code"], 1)
+        listing = playground.execute("ls")["stdout"]
+        self.assertIn("upload.sh  [Bash source; run locally]", listing)
+        for command in ("media-info.sh", "upload.sh", "bash transcode.sh"):
+            self.assertIn("Bash is not loaded", playground.execute(command)["stderr"])
         self.assertTrue(playground.execute("clear")["clear"])
 
 

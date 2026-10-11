@@ -5,6 +5,9 @@ section here.
 
 ## [Unreleased]
 
+- The browser playground labels Bash files as source-only and explains how to
+  run them locally instead of reporting an ambiguous Python-tools error.
+  Example wrappers stop immediately if their Bash library cannot initialize.
 - Clone-and-run Bash/Python example tools with bundled sample data, FFmpeg/curl
   wrappers that preview by default, and API/MCP/dispatcher walkthroughs.
 - A real Python browser playground on the static homepage, with help, validation,
