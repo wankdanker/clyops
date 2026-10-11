@@ -1,0 +1,24 @@
+# Real Bash initialization and completion from the actual scripts.
+export PS1='\[\e[38;5;151m\]lab\[\e[0m\]:\w\$ '
+export HISTFILE=/tmp/.bash_history
+_lab_prompt() {
+    local columns rows
+    if [[ -r /root/.lab-size ]] && read -r columns rows </root/.lab-size; then
+        stty cols "$columns" rows "$rows" 2>/dev/null
+        export COLUMNS="$columns" LINES="$rows"
+    fi
+}
+PROMPT_COMMAND=_lab_prompt
+lab-download() { sync; printf '\033]777;lab-download-ready\007'; }
+for tool in /workspace/examples/scripts/*; do
+    [[ -x "$tool" ]] && eval "$("$tool" --completion bash)"
+done
+for ((attempt = 0; attempt < 100; attempt++)); do
+    [[ -e /run/clyops-upload-ready ]] && break
+    sleep .1
+done
+printf '\nClyops Linux lab ready.\n'
+printf 'Bash · Python · FFmpeg · curl · real pipes and Tab completion\n'
+printf 'Scripts: /workspace/examples/scripts\n'
+printf 'Upload endpoint: http://127.0.0.1:9000/upload (inside this guest)\n'
+printf 'Try: media-info.sh examples/data/tone.wav\n\n'

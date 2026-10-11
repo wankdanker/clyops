@@ -3,3 +3,4 @@ build>=1.2,<2
 mypy>=1.15,<3
 setuptools>=69
 wheel>=0.45,<1
+zstandard==0.25.0

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Linux lab · clyops</title>
+  <meta name="description" content="Run real Bash, Python, FFmpeg and curl examples in a Linux virtual machine inside your browser.">
+  <link rel="stylesheet" href="{{ '/assets/home.css' | url }}">
+  <link rel="stylesheet" href="{{ '/assets/linux-lab/lab.css' | url }}">
+  <link rel="stylesheet" href="{{ '/assets/linux-lab.css' | url }}">
+  <script type="module" src="{{ '/assets/linux-lab/lab.js' | url }}"></script>
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <header class="site-header wrap"><a class="brand" href="{{ '/' | url }}">[c] clyops</a><nav aria-label="Main navigation"><a href="{{ '/examples.html' | url }}">Examples</a><a href="{{ '/completion.html' | url }}">Completion</a><a href="https://github.com/wankdanker/clyops">GitHub ↗︎</a></nav></header>
+  <main class="wrap lab-page" id="content">
+    <div class="section-heading"><p class="eyebrow">LINUX / IN YOUR BROWSER</p><h1>Real shell.<br><span>Real tools.</span></h1><p class="lab-lead">Bash, Python, FFmpeg and curl. The same scripts you can run from a cloned checkout, executing in a Linux guest inside this tab.</p></div>
+    <section id="linux-lab" class="playground-card" data-assets="{{ '/assets/linux-lab/' | url }}" data-runtime="{{ '/linux-runtime/' | labRuntimeUrl }}" aria-label="Linux terminal">
+      <div class="playground-toolbar"><span>ALPINE LINUX / v86</span><div><button type="button" id="lab-start">Start Linux</button><button type="button" id="lab-reset" disabled>Stop &amp; reset</button></div></div>
+      <div id="lab-terminal" aria-label="Interactive Linux terminal"><p class="lab-placeholder">Press Start to boot Linux. Then type commands, use Tab completion, or try the examples below.</p></div>
+      <p id="lab-status" role="status">Linux loads only when you start. The filesystem downloads on demand.</p>
+    </section>
+    <div class="lab-actions" aria-label="Example commands">
+      <button type="button" data-lab-command="plan.py --help" disabled>Python help</button>
+      <button type="button" data-lab-command="media-info.sh examples/data/tone.wav" disabled>Inspect media</button>
+      <button type="button" data-lab-command="transcode.sh examples/data/tone.wav /tmp/tone.m4a --execute" disabled>Transcode audio</button>
+      <button type="button" data-lab-command="upload.sh /tmp/tone.m4a --url http://127.0.0.1:9000/upload --execute" disabled>Upload inside Linux</button>
+      <button type="button" data-lab-command="plan.py --env production --replicas 3 | json-format.py --sort" disabled>Pipe two tools</button>
+    </div>
+    <section class="lab-files" aria-label="Guest files"><div><label for="lab-upload">Add a file to the guest · up to 8 MiB</label><input id="lab-upload" type="file" disabled></div><button type="button" id="lab-download" disabled>Download /tmp/tone.m4a ↓</button><p id="lab-transfer-status" role="status">Files and commands stay in the guest workspace. Reset discards its changes.</p></section>
+    <div class="lab-guide">{{ content | safe }}</div>
+    <noscript><p>Enable JavaScript for the Linux lab, or <a href="{{ '/examples.html' | url }}">run the examples locally</a>.</p></noscript>
+  </main>
+  <footer class="site-footer wrap"><span>clyops · MIT</span><a href="{{ '/examples.html' | url }}">Clone-and-run examples</a><a href="{{ '/' | url }}">Project homepage</a></footer>
+</body>
+</html>

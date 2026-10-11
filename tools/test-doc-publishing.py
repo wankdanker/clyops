@@ -13,6 +13,38 @@ spec.loader.exec_module(publish)
 
 
 class PublishingTests(unittest.TestCase):
+    def test_linux_assets_are_shared_and_preserved_for_releases(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, target = root / "source", root / "published"
+            runtime = source / "linux-runtime"
+            runtime.mkdir(parents=True)
+            (source / "index.html").write_text("release")
+            (runtime / "old.bin.zst").write_bytes(b"old guest file")
+            publish.merge(source, target, "v0.4.1", "/clyops/")
+            self.assertFalse((target / "versions/v0.4.1/linux-runtime").exists())
+            (runtime / "old.bin.zst").unlink()
+            (runtime / "new.bin.zst").write_bytes(b"new guest file")
+            publish.merge(source, target, "", "/clyops/")
+            self.assertEqual((target / "linux-runtime/old.bin.zst").read_bytes(), b"old guest file")
+            self.assertEqual((target / "linux-runtime/new.bin.zst").read_bytes(), b"new guest file")
+            (runtime / "new.bin.zst").write_bytes(b"changed")
+            with self.assertRaisesRegex(ValueError, "Immutable Linux asset changed"):
+                publish.merge(source, target, "", "/clyops/")
+            self.assertEqual((target / "linux-runtime/new.bin.zst").read_bytes(), b"new guest file")
+
+    def test_rejected_release_does_not_add_runtime_assets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, target = root / "source", root / "published"
+            source.mkdir()
+            publish.merge(source, target, "v0.4.1", "/")
+            (source / "linux-runtime").mkdir()
+            (source / "linux-runtime/new.wasm").write_bytes(b"new")
+            with self.assertRaisesRegex(ValueError, "refusing to overwrite"):
+                publish.merge(source, target, "v0.4.1", "/")
+            self.assertFalse((target / "linux-runtime").exists())
+
     def test_git_publication_preserves_source_branch_and_snapshot_history(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

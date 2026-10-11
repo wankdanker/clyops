@@ -60,6 +60,12 @@ See the [example directory README](../examples/README.md) for the full commands.
 
 ## Browser playground
 
+The [Linux lab](linux-lab.md) runs all six scripts in a real Bash shell with
+FFmpeg, curl, Python, pipes and completion. Transcode the bundled audio, upload
+it to the guest's HTTP server, and download the result. You can add your own
+small files; the workspace resets when you stop the lab. All execution stays
+inside the browser, with no external network relay.
+
 The [homepage playground](/#playground) executes the real Python library and
 `plan.py`, `report.py`, and `json-format.py` sources using
 [Pyodide](https://pyodide.org/en/stable/usage/webworker.html). It loads Python only
@@ -76,5 +82,5 @@ read them here, and attempting to run one explains which runtime is needed.
 
 This is a Python command playground, with `help`, `ls`, `cat`, `pwd` and `clear`.
 It has no host shell, Bash, FFmpeg, curl, pipes or live agent connection. Run the
-local scripts or API for those workflows. The animated hero remains an
+[Linux lab](linux-lab.md), local scripts or API for those workflows. The animated hero remains an
 [illustrative walkthrough](demo.md); the playground performs real executions.

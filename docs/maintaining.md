@@ -8,7 +8,9 @@ title: Maintaining the documentation
 The full site build runs on Linux or macOS and uses Markdown guides and native
 API references. Install Node 20.19+ (22.12+ for Node 22),
 pnpm (the version pinned in `package.json`), Python 3.10+, Rust, Go 1.21+,
-Java 17+/Maven, Ruby 3.3+, Doxygen and Graphviz (`dot`). These are documentation build requirements;
+Java 17+/Maven, Ruby 3.3+, Doxygen and Graphviz (`dot`). The Linux lab guest also
+requires Docker with Linux/386 image support (native on Linux x86; Docker Desktop
+needs its x86 emulation support on ARM). These are documentation build requirements;
 the supported library runtime versions remain those in each language guide.
 
 ```sh
@@ -63,6 +65,26 @@ wrapper previews and argument handling with fake FFmpeg/curl commands.
 completion, reset and mobile layout. Run it after generating the static site;
 use `PLAYWRIGHT_CHANNEL=chrome` for an installed Chrome. It needs network access
 to the Pyodide CDN and leaves no server running after completion.
+
+The [Linux lab](linux-lab.md) runs Alpine Linux in a v86 Web Worker with 256 MiB
+of guest RAM. It boots only on Start and is terminated on reset or page exit.
+`tools/linux-lab` builds ordinary Bash/Python/FFmpeg/curl binaries and a loopback
+upload server into a Docker image. `tools/build-linux-lab.py` exports that image,
+adds the checkout's examples and libraries, and generates a lazy 9p filesystem.
+`tools/build-linux-lab.mjs` bundles xterm and the worker. The full docs build runs
+both; for frontend edits, use `pnpm docs:lab:build` followed by `pnpm docs:serve`.
+Activate the docs Python environment first. Docker is needed only when the guest
+recipe changes; exported guests and verified BIOS files are cached under
+`.docs-tools/linux-lab`, including in CI. Rebuilds always inject current example
+sources. Generated assets are ignored by Git.
+
+Guest files are compressed and addressed by their SHA-256. Publishing merges
+them into a shared `linux-runtime/` store at the Pages root so release snapshots
+retain their dependencies without duplicating the entire guest. Browser bundles
+and filesystem manifests remain specific to each snapshot. The lab configures
+no external network relay; its real HTTP upload stays inside the guest. Browser
+tests run one at a time and exercise Bash, FFprobe, FFmpeg, curl, pipes, file
+transfers, reset, lazy loading and startup failures.
 
 When adding or changing a public method, document its behavior, parameters,
 return value, errors and an example where useful. Include ownership/lifetime

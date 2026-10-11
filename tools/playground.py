@@ -15,7 +15,7 @@ Commands: plan.py, report.py, json-format.py, ls, cat PATH, pwd, help, clear
 Also accepts: python examples/scripts/plan.py --help
 Tab completes commands, options and choices. ↑/↓ recall commands.
 The stdin panel supplies input to json-format.py when --input is omitted.
-Bash, FFmpeg, curl, pipes and a host shell are available in the local examples,
+Bash, FFmpeg, curl and pipes are available in the Linux lab or local examples,
 not this Python playground. Use Reset to stop execution and unload the runtime.
 """
 
@@ -36,7 +36,8 @@ def _invoke(words, stdin):
         name = Path(words[1]).name if words[0] == "bash" and len(words) > 1 else Path(words[0]).name
         example = name if name in BASH_TOOLS else "upload.sh"
         raise ValueError(
-            "Bash is not loaded in this Python playground. These Bash examples run locally.\n"
+            "Bash is not loaded in this Python playground. Use the Linux lab or run locally.\n"
+            "Linux lab: linux-lab.html\n"
             f"View source: cat examples/scripts/{example}\n"
             f"From a cloned checkout: ./examples/scripts/{example} --help"
         )

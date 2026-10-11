@@ -37,6 +37,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pip install -r docs/requirements.txt
       - run: gem install yard -v 0.9.38 --no-document && gem install rbs -v 3.4.0 --no-document
+      - name: Cache the Linux lab guest
+        uses: actions/cache@v4
+        with:
+          path: .docs-tools/linux-lab
+          key: linux-lab-v1-${{ runner.os }}-${{ hashFiles('tools/linux-lab/**', 'tools/build-linux-lab.py') }}
       - id: pages
         name: Read Pages configuration and base path
         if: github.event_name != 'pull_request'
@@ -69,7 +74,7 @@ jobs:
           python3 tools/test-doc-publishing.py
           cargo test --locked --manifest-path packages/rust/Cargo.toml --doc
           RBS_TEST_TARGET='Clyops::Cli' RBS_TEST_OPT='-I packages/ruby/sig' ruby -Ipackages/ruby/lib -rrbs/test/setup packages/ruby/test/test_clyops.rb
-      - name: Verify the real browser playground
+      - name: Verify the Python playground and Linux lab
         env:
           PROJECT_PREFIX: ${{ steps.pages.outputs.base_prefix || format('/{0}/', github.event.repository.name) }}
         run: |

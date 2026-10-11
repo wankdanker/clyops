@@ -53,6 +53,8 @@ def main():
     run(sys.executable, "tools/test-examples.py")
     run("node", "tools/check-example-adapters.mjs")
     run("node", "tools/build-playground.mjs")
+    run(sys.executable, "tools/build-linux-lab.py")
+    run("node", "tools/build-linux-lab.mjs")
     shutil.rmtree(ROOT / "_site", ignore_errors=True)
     run("pnpm", "exec", "eleventy", "--config=eleventy.config.mjs")
     run(sys.executable, "tools/check-doc-links.py", "_site")

@@ -17,24 +17,40 @@ from pathlib import Path
 
 
 def merge(source, destination, tag, prefix):
-    versions = destination / "versions"
-    versions.mkdir(parents=True, exist_ok=True)
     if tag:
         if not re.fullmatch(r"v\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?", tag):
             raise ValueError("Invalid documentation release tag")
-        snapshot = versions / tag
-        if snapshot.exists():
+        if (destination / "versions" / tag).exists():
             raise ValueError(f"Documentation snapshot {tag} already exists; refusing to overwrite it")
-        shutil.copytree(source, snapshot)
+    versions = destination / "versions"
+    versions.mkdir(parents=True, exist_ok=True)
+    # Hashed guest blobs are shared across immutable releases rather than copied
+    # into every snapshot. Retain old blobs while any snapshot may reference them.
+    runtime = source / "linux-runtime"
+    if runtime.exists():
+        stored = destination / "linux-runtime"
+        stored.mkdir(exist_ok=True)
+        for asset in runtime.iterdir():
+            target = stored / asset.name
+            if target.exists():
+                if target.read_bytes() != asset.read_bytes():
+                    raise ValueError(f"Immutable Linux asset changed: {asset.name}")
+            else:
+                shutil.copyfile(asset, target)
+    if tag:
+        snapshot = versions / tag
+        shutil.copytree(source, snapshot, ignore=shutil.ignore_patterns("linux-runtime"))
     else:
         for entry in destination.iterdir():
-            if entry.name == "versions":
+            if entry.name in ("versions", "linux-runtime"):
                 continue
             if entry.is_dir():
                 shutil.rmtree(entry)
             else:
                 entry.unlink()
         for entry in source.iterdir():
+            if entry.name == "linux-runtime":
+                continue
             if entry.is_dir():
                 shutil.copytree(entry, destination / entry.name)
             else:

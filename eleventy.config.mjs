@@ -7,6 +7,12 @@ export default function (config) {
   config.addPassthroughCopy({ 'docs/assets': 'assets', 'docs/_native': 'reference' });
   config.addPassthroughCopy({ 'docs/_generated/home-demo.json': 'assets/home-demo.json', 'docs/examples/home': 'demos' });
   config.addPassthroughCopy({ 'docs/_generated/playground-files.json': 'assets/playground-files.json' });
+  config.addPassthroughCopy({ 'docs/_generated/linux-lab': 'assets/linux-lab' });
+  config.addPassthroughCopy({ 'docs/_generated/linux-runtime': 'linux-runtime' });
+  config.addFilter('labRuntimeUrl', url => {
+    const root = (process.env.DOCS_PATH_PREFIX ?? '/').replace(/\/versions\/[^/]+\/$/, '/');
+    return root.replace(/\/$/, '') + url;
+  });
   config.ignores.add('docs/_native/**');
   config.ignores.add('docs/examples/**');
   config.ignores.add('docs/README.md');

@@ -5,6 +5,9 @@ section here.
 
 ## [Unreleased]
 
+- Static browser Linux lab running the unchanged Bash/Python examples with real
+  FFmpeg, curl, pipes and shell completion. Includes file transfers and a local
+  HTTP upload server inside the guest; assets load on demand from GitHub Pages.
 - The browser playground labels Bash files as source-only and explains how to
   run them locally instead of reporting an ambiguous Python-tools error.
   Example wrappers stop immediately if their Bash library cannot initialize.

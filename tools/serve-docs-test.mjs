@@ -5,12 +5,14 @@ import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../_site/', import.meta.url));
 const prefix = (process.env.DOCS_PATH_PREFIX ?? '/').replace(/\/$/, '');
-const types = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.wasm':'application/wasm' };
+const projectPrefix = prefix.replace(/\/versions\/[^/]+$/, '');
+const types = { '.html':'text/html', '.js':'text/javascript', '.mjs':'text/javascript', '.css':'text/css', '.json':'application/json', '.wasm':'application/wasm' };
 const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url, 'http://localhost');
-    if (request.method !== 'GET' || !url.pathname.startsWith(prefix + '/')) throw new Error('Unknown route');
-    const relative = decodeURIComponent(url.pathname.slice(prefix.length)).replace(/^\//, '');
+    const activePrefix = url.pathname.startsWith(projectPrefix + '/linux-runtime/') ? projectPrefix : prefix;
+    if (request.method !== 'GET' || !url.pathname.startsWith(activePrefix + '/')) throw new Error('Unknown route');
+    const relative = decodeURIComponent(url.pathname.slice(activePrefix.length)).replace(/^\//, '');
     let path = resolve(root, relative);
     if (!path.startsWith(resolve(root) + sep) && path !== resolve(root)) throw new Error('Invalid path');
     if ((await stat(path)).isDirectory()) path = resolve(path, 'index.html');
