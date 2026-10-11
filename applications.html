@@ -14,6 +14,9 @@
     <nav aria-label="Documentation">
       <a href="/guide.html">Concepts and behavior</a>
       <a href="/reference.html">API references</a>
+      <a href="/examples.html">Clone-and-run examples</a>
+      <a href="/linux-lab.html">Linux lab in your browser</a>
+      <a href="/completion.html">Bash, Zsh and Fish completion</a>
       <h2>Languages</h2>
       <a href="/languages/javascript.html">JavaScript / TypeScript</a><a href="/languages/python.html">Python</a><a href="/languages/rust.html">Rust</a><a href="/languages/go.html">Go</a><a href="/languages/java.html">Java</a><a href="/languages/ruby.html">Ruby</a><a href="/languages/c.html">C</a><a href="/languages/bash.html">Bash</a>
       <h2>Tools and servers</h2>
@@ -36,7 +39,7 @@ or denied tools. Source detection requires a supported import/source statement
 or an explicit <code># clyops-tool</code> / <code>// clyops-tool</code> header marker for wrappers.
 Binary completion markers and nested dispatcher shebangs are also supported.
 Schemas are cached by file stamp; probes have a timeout.</p>
-<p>The <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/apps/dispatch/README.md">dispatcher guide</a> covers definition files,
+<p>The <a href="https://github.com/wankdanker/clyops/blob/f452a61f968312a59a082c29bebf572ec59fa164/apps/dispatch/README.md">dispatcher guide</a> covers definition files,
 aliases, completion, caching and filesystem behavior. This application exposes
 a command-line interface, rather than an installed library API.</p>
 <h2 id="desktop-runner">Desktop runner</h2>
@@ -44,7 +47,7 @@ a command-line interface, rather than an installed library API.</p>
 secrets, constraints, effect badges and declared stdin/stdout. Unchecked flags
 explicitly override enabled config/environment values. Templates preserve false
 and zero values and omit secrets. Destructive tools require confirmation.</p>
-<p>See the <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/apps/runner/README.md">runner guide</a> for installation, usage, templates
+<p>See the <a href="https://github.com/wankdanker/clyops/blob/f452a61f968312a59a082c29bebf572ec59fa164/apps/runner/README.md">runner guide</a> for installation, usage, templates
 and frontend/native development. Its internal UI helpers are not a public package API.</p>
 <h2 id="web-runner">Web runner</h2>
 <p>The static SvelteKit web runner is served by <code>clyops-api</code> at <code>/ui/</code>. It discovers

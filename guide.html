@@ -14,6 +14,9 @@
     <nav aria-label="Documentation">
       <a href="/guide.html">Concepts and behavior</a>
       <a href="/reference.html">API references</a>
+      <a href="/examples.html">Clone-and-run examples</a>
+      <a href="/linux-lab.html">Linux lab in your browser</a>
+      <a href="/completion.html">Bash, Zsh and Fish completion</a>
       <h2>Languages</h2>
       <a href="/languages/javascript.html">JavaScript / TypeScript</a><a href="/languages/python.html">Python</a><a href="/languages/rust.html">Rust</a><a href="/languages/go.html">Go</a><a href="/languages/java.html">Java</a><a href="/languages/ruby.html">Ruby</a><a href="/languages/c.html">C</a><a href="/languages/bash.html">Bash</a>
       <h2>Tools and servers</h2>
@@ -143,7 +146,7 @@ field types in TypeScript, Python or Ruby.</p>
 <code>uuid</code>, <code>date:YYYY-MM-DD</code>, <code>path</code>, <code>file:exists</code>, <code>file:readable</code>, <code>file:writable</code>,
 <code>dir:exists</code> and <code>dir:writable</code>. Parameterized rules include <code>int:1-10</code>,
 <code>float:0-1</code>, <code>string:1-100</code>, <code>choice:red,green,blue</code> and <code>regex:PATTERN</code>.
-See <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/spec/SPEC.md#5-validation-rules">spec section 5</a> for ranges and exact behavior.</p>
+See <a href="https://github.com/wankdanker/clyops/blob/f452a61f968312a59a082c29bebf572ec59fa164/spec/SPEC.md#5-validation-rules">spec section 5</a> for ranges and exact behavior.</p>
 <p>Standalone <code>validate</code> helpers return a typed value or the native validation
 error/result. Unknown registration rules and duplicate names are programming
 errors. Bad CLI values are parse errors. These are separate error paths.</p>
@@ -171,7 +174,7 @@ select the program's keys; unknown keys are errors.</p>
 the config file containing the value; default/environment paths resolve against
 the CLI root. Paths are normalized after precedence. <code>-</code> denotes stdin where the
 application supports it. Path validation does not itself open/read files for the
-application. See <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/spec/SPEC.md#6-paths">spec section 6</a>.</p>
+application. See <a href="https://github.com/wankdanker/clyops/blob/f452a61f968312a59a082c29bebf572ec59fa164/spec/SPEC.md#6-paths">spec section 6</a>.</p>
 <h2 id="nested-commands-and-constraints">Nested commands and constraints</h2>
 <pre><code class="language-javascript">const db = cli.command('db', 'Database tasks');
 const migrate = db.command('migrate', 'Apply migrations');
@@ -199,6 +202,8 @@ Effects are <code>read-only</code>, <code>idempotent</code>, <code>destructive</
 stdin/stdout declarations describe your program; your code performs the actual
 I/O. Schemas carry these declarations for API/MCP/desktop consumers.</p>
 <h2 id="help-schema-and-shell-completion">Help, schema and shell completion</h2>
+<p>See <a href="/completion.html">Bash, Zsh and Fish setup</a> for startup files, PATH, sample tools
+and completing a whole directory with the dispatcher.</p>
 <p>Every standalone program supports <code>--help</code>, <code>--help-json-schema</code>, and
 <code>--completion bash|zsh|fish</code>. For example:</p>
 <pre><code class="language-sh">eval &quot;$(mytool --completion bash)&quot;
