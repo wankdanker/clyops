@@ -5,6 +5,8 @@ section here.
 
 ## [Unreleased]
 
+- The API CLI exits with an actionable error on occupied ports instead of
+  incorrectly announcing that it is serving; successful startup lists the UI URL.
 - Static SvelteKit web runner served by clyops-api at `/ui/`, with typed forms,
   explicit inheritance/overrides, JSON editing, non-secret templates, stdin and
   uploads, jobs/cancellation, destructive confirmation and authenticated downloads.

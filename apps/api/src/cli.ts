@@ -42,7 +42,7 @@ if (args.CLYOPS_API_KEYS) {
 }
 const within = args.CLYOPS_API_PATHS_WITHIN as string[];
 
-const { app, current } = await createApi({
+const { app, current, close } = await createApi({
   root: args.CLYOPS_API_ROOT as string,
   name: (args.CLYOPS_API_NAME as string | null) ?? undefined,
   cwd: (args.CLYOPS_API_CWD as string | null) ?? undefined,
@@ -62,7 +62,15 @@ const { app, current } = await createApi({
   onReload: ({ tools }) => info('reloaded: %d tool(s)', tools.length),
   version,
 });
-const server = app.listen(args.CLYOPS_API_PORT as number, args.CLYOPS_API_HOST as string, () => {
-  info('serving %d tool(s) on http://%s:%d (OpenAPI: /openapi.json%s)', current().tools.length, args.CLYOPS_API_HOST, args.CLYOPS_API_PORT, args.CLYOPS_API_MCP ? ', MCP: /mcp' : '');
+const server = app.listen(args.CLYOPS_API_PORT as number, args.CLYOPS_API_HOST as string, (error?: Error) => {
+  if (error) {
+    close();
+    const reason = (error as NodeJS.ErrnoException).code === 'EADDRINUSE'
+      ? 'address already in use; choose another port with --port'
+      : error.message;
+    die(1, 'cannot listen on http://%s:%d: %s', args.CLYOPS_API_HOST, args.CLYOPS_API_PORT, reason);
+    return;
+  }
+  info('serving %d tool(s) on http://%s:%d (OpenAPI: /openapi.json%s%s)', current().tools.length, args.CLYOPS_API_HOST, args.CLYOPS_API_PORT, args.CLYOPS_API_MCP ? ', MCP: /mcp' : '', args.CLYOPS_API_UI ? ', UI: /ui/' : '');
 });
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => server.close(() => process.exit(0)));

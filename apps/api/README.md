@@ -95,6 +95,11 @@ and job endpoints retain their existing authentication and scopes. `--no-ui`
 disables it; library callers can pass `ui: false` to `createApi`.
 See the [web runner guide](https://clyops.io/web-runner.html).
 
+If port 8080 is already occupied, select another port, for example
+`clyops-api --root ./scripts --port 8788`, and open `http://localhost:8788/ui/`.
+The CLI exits with an error if it cannot bind; it only reports serving after
+successfully listening.
+
 ## Endpoints
 
 | | |
