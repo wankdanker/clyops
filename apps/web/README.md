@@ -29,12 +29,15 @@ array controls, choices, boolean inheritance, relationship hints, JSON editing,
 stdin text/files, path uploads, destructive confirmation, synchronous results,
 asynchronous jobs/cancellation, and authenticated binary downloads.
 Jobs are polled; output is shown after completion.
+stdout and stderr support ANSI colors and styles by default; uncheck **ANSI colors**
+for plain text. Downloads preserve the original bytes. Tools that disable colors
+when piped need their own color option enabled to emit ANSI codes.
 
 Overrides are explicit. An untouched control does not override config/environment
 or defaults. Bearer keys stay in memory and are cleared from the connection input.
 Saved templates are local to the browser, scoped by API and tool, and exclude
 secrets, files and stdin. The JSON editor omits secrets and preserves values in
-their password controls. Output is rendered as text, never as HTML.
+their password controls. Output is rendered as escaped text spans, never tool HTML.
 
 ```sh
 pnpm --filter clyops-web typecheck

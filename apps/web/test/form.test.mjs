@@ -9,6 +9,18 @@ async function module(file) {
 }
 const { controlValue, inputErrors, template, restoreTemplate, resultBlob } = await module('form.ts');
 const { ApiClient, apiBase } = await module('client.ts');
+const { ansiSegments, ansiText } = await module('ansi.ts');
+
+test('ANSI output supports basic, indexed and true colors, while keeping tool markup literal', () => {
+  const segments = ansiSegments('\x1b[1;31mred\x1b[0m plain \x1b[38;5;196mpalette\x1b[0m \x1b[38;2;12;34;56mtruecolor\x1b[0m');
+  assert.match(segments.find(segment => segment.text === 'red').style, /font-weight:700/);
+  assert.match(segments.find(segment => segment.text === 'red').style, /color:rgb/);
+  assert.equal(segments.find(segment => segment.text === ' plain ').style, '');
+  assert.match(segments.find(segment => segment.text === 'palette').style, /color:rgb\(255, 0, 0\)/);
+  assert.match(segments.find(segment => segment.text === 'truecolor').style, /color:rgb\(12, 34, 56\)/);
+  assert.equal(ansiText('<img src=x onerror=alert(1)>&literal'), '<img src=x onerror=alert(1)>&literal');
+  assert.equal(ansiText('\x1b]8;;javascript:alert(1)\x07label\x1b]8;;\x07\x1b[2K'), 'label');
+});
 
 test('empty numeric controls remain invalid, while explicit zero/false retain their types', () => {
   assert.equal(controlValue('', { type: 'number' }), '');

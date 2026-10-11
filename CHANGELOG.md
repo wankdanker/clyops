@@ -5,6 +5,8 @@ section here.
 
 ## [Unreleased]
 
+- Web runner stdout and stderr render ANSI colors and styles, with a plain-text
+  toggle and original-byte downloads. API startup includes the full UI URL.
 - The API CLI exits with an actionable error on occupied ports instead of
   incorrectly announcing that it is serving; successful startup lists the UI URL.
 - Static SvelteKit web runner served by clyops-api at `/ui/`, with typed forms,

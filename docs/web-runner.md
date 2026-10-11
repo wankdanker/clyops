@@ -71,7 +71,13 @@ not saved, and restoring a template clears secret fields.
 Run synchronously for a result, or submit a background job and follow its status.
 The runner polls the existing job endpoints and supports cancellation. Output is
 shown when the job finishes; this interface does not promise live log streaming.
-stdout/stderr and parsed JSON are displayed as text. Binary envelopes and job
+stdout and stderr render ANSI colors (basic, 256-color and truecolor) and styles
+by default. Uncheck **ANSI colors** for plain text without escape sequences.
+Output remains escaped text; terminal hyperlinks and cursor instructions are
+ignored. This is a captured log view rather than an interactive terminal.
+Tools must emit ANSI codes; tools that disable color when piped need their own
+color option enabled. Downloads preserve original output bytes. Parsed JSON is
+displayed as text. Binary envelopes and job
 output are downloaded with the API client's bearer key, without putting the key
 into a download URL. See [REST endpoints](node-tools.md#http-api).
 

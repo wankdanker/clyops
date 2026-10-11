@@ -71,6 +71,8 @@ const server = app.listen(args.CLYOPS_API_PORT as number, args.CLYOPS_API_HOST a
     die(1, 'cannot listen on http://%s:%d: %s', args.CLYOPS_API_HOST, args.CLYOPS_API_PORT, reason);
     return;
   }
-  info('serving %d tool(s) on http://%s:%d (OpenAPI: /openapi.json%s%s)', current().tools.length, args.CLYOPS_API_HOST, args.CLYOPS_API_PORT, args.CLYOPS_API_MCP ? ', MCP: /mcp' : '', args.CLYOPS_API_UI ? ', UI: /ui/' : '');
+  const host = args.CLYOPS_API_HOST as string;
+  const address = `http://${host.includes(':') ? `[${host}]` : host}:${args.CLYOPS_API_PORT}`;
+  info('serving %d tool(s) on %s (OpenAPI: /openapi.json%s%s)', current().tools.length, address, args.CLYOPS_API_MCP ? ', MCP: /mcp' : '', args.CLYOPS_API_UI ? `, UI: ${address}/ui/` : '');
 });
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => server.close(() => process.exit(0)));

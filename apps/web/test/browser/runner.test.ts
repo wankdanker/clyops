@@ -91,6 +91,25 @@ test('background cancellation and authenticated binary download', async ({ page 
   expect([...await readFile((await (await authenticated).path())!)]).toEqual([0,1,255]);
 });
 
+test('ANSI stdout and stderr render colors safely, with a plain view and unchanged download', async ({ page }) => {
+  await connect(page); await choose(page, 'colors');
+  await page.getByRole('button', {name:'Run tool', exact:false}).click();
+  const stdout = page.getByLabel('stdout', {exact:true});
+  const stderr = page.getByLabel('stderr', {exact:true});
+  await expect(stdout).toContainText('red stdout plain <img src=x onerror=alert(1)>');
+  await expect(stdout.locator('span').filter({hasText:'red stdout'})).toHaveCSS('color', 'rgb(187, 0, 0)');
+  await expect(stdout.locator('span').filter({hasText:'red stdout'})).toHaveCSS('font-weight', '700');
+  await expect(stderr.locator('span').filter({hasText:'colored stderr'})).toHaveCSS('color', 'rgb(12, 34, 56)');
+  await expect(stdout.locator('img')).toHaveCount(0);
+  await page.getByRole('checkbox', {name:'ANSI colors'}).uncheck();
+  await expect(stdout.locator('span')).toHaveCount(0);
+  await expect(stderr.locator('span')).toHaveCount(0);
+  expect(await stdout.textContent()).not.toContain('\x1b');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', {name:'Download stdout'}).click();
+  expect(await readFile((await (await download).path())!, 'utf8')).toBe('\x1b[1;31mred stdout\x1b[0m plain <img src=x onerror=alert(1)>\n');
+});
+
 test('mobile connection and tools are accessible without horizontal overflow', async ({ page }) => {
   await page.setViewportSize({width:390,height:844}); await page.goto('/ui/');
   await page.getByRole('button',{name:'Connection & tools',exact:true}).click();
