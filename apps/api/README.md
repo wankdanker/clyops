@@ -86,10 +86,20 @@ with a streamed body keeps it in a file until it runs; a job with binary output 
 file served at `GET /jobs/<id>/stdout` (its result has `stdoutUrl`). A job's files are removed when
 it is dropped.
 
+## Web runner
+
+Open `/ui/` for the packaged static SvelteKit runner. It builds typed forms from
+these same schemas and supports templates, stdin/uploads, jobs, cancellation and
+output downloads. The static shell is public so it can ask for an API key; tool
+and job endpoints retain their existing authentication and scopes. `--no-ui`
+disables it; library callers can pass `ui: false` to `createApi`.
+See the [web runner guide](https://clyops.io/web-runner.html).
+
 ## Endpoints
 
 | | |
 | --- | --- |
+| `GET /ui/` | Static web runner |
 | `GET /openapi.json` | OpenAPI 3 document of everything below |
 | `GET /tools` | The tools: name, words, path, description |
 | `GET /tools/<words>` | A tool's clyops schema and the JSON Schema of its input |
@@ -102,7 +112,7 @@ it is dropped.
 
 ```
 clyops-api --root DIR [--name NAME] [--cwd DIR] [--timeout SECONDS] [--concurrency N]
-           [--host 127.0.0.1] [--port 8080] [--api-key KEY] [--keys FILE] [--no-mcp] [--no-watch]
+           [--host 127.0.0.1] [--port 8080] [--api-key KEY] [--keys FILE] [--no-mcp] [--no-watch] [--no-ui]
            [--allow GLOB]... [--deny GLOB]... [--read-only] [--paths-within DIR]...
            [--max-body BYTES] [--max-output BYTES] [--audit FILE]
 ```

@@ -1,3 +1,4 @@
+import { toJsonSchema } from 'clyops-schema';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Editor, { OnMount, OnValidate } from '@monaco-editor/react';
 import { ScriptSchema, FormValues } from '../types';
@@ -11,65 +12,6 @@ interface TemplateJsonEditorProps {
   values: FormValues;
   onChange: (values: FormValues) => void;
   className?: string;
-}
-
-/**
- * Generate a JSON Schema from the ScriptSchema for Monaco validation
- */
-function generateJsonSchema(schema: ScriptSchema) {
-  const properties: Record<string, any> = {};
-  const required: string[] = [];
-
-  // Add arguments
-  schema.arguments?.forEach((arg) => {
-    properties[arg.name] = {
-      type: 'string',
-      description: arg.description,
-      default: arg.default || undefined,
-    };
-    if (arg.required) {
-      required.push(arg.name);
-    }
-  });
-
-  // Add options
-  schema.options?.forEach((opt) => {
-    let propDef: any = {
-      description: opt.description,
-    };
-
-    if (opt.isFlag) {
-      propDef.type = 'boolean';
-      propDef.default = opt.default === 'true';
-    } else if (opt.isArray) {
-      propDef.type = 'array';
-      propDef.items = { type: 'string' };
-    } else if (opt.type === 'choice' && opt.choices?.length > 0) {
-      propDef.type = 'string';
-      propDef.enum = opt.choices;
-    } else if (opt.type === 'integer') {
-      propDef.type = 'integer';
-      if (opt.default) propDef.default = parseInt(opt.default, 10);
-    } else if (opt.type === 'number') {
-      propDef.type = 'number';
-      if (opt.default) propDef.default = parseFloat(opt.default);
-    } else {
-      propDef.type = 'string';
-      if (opt.default) propDef.default = opt.default;
-    }
-
-    properties[opt.name] = propDef;
-  });
-
-  return {
-    $schema: 'http://json-schema.org/draft-07/schema#',
-    type: 'object',
-    title: `${schema.script} Configuration`,
-    description: schema.description,
-    properties,
-    required: required.length > 0 ? required : undefined,
-    additionalProperties: false,
-  };
 }
 
 /**
@@ -120,7 +62,7 @@ export function TemplateJsonEditor({ schema, values, onChange, className }: Temp
   const monacoRef = useRef<any>(null);
 
   // Generate JSON schema for Monaco
-  const jsonSchema = useMemo(() => generateJsonSchema(schema), [schema]);
+  const jsonSchema = useMemo(() => toJsonSchema(schema, 'declared'), [schema]);
 
   // Sync values to JSON content
   useEffect(() => {

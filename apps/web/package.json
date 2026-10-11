@@ -1,0 +1,32 @@
+{
+  "name": "clyops-web",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Static SvelteKit runner for the clyops REST API.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "svelte-kit sync && vite build",
+    "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "test": "node --test test/*.test.mjs",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "clyops-schema": "0.3.0",
+    "ajv": "^8.20.0"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "3.0.10",
+    "@sveltejs/kit": "2.70.3",
+    "@sveltejs/vite-plugin-svelte": "6.2.4",
+    "svelte": "5.57.2",
+    "svelte-check": "4.7.6",
+    "vite": "7.3.7",
+    "typescript": "5.9.3",
+    "@types/node": "^22.0.0",
+    "@playwright/test": "^1.60.0"
+  }
+}

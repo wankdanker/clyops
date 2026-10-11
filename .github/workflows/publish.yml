@@ -63,7 +63,7 @@ jobs:
       - name: Publish public workspaces
         env:
           NPM_CONFIG_PROVENANCE: "true"
-        run: pnpm --filter '!clyops-runner' -r publish --no-git-checks --access public --npm-path "$PNPM_HOME/npm"
+        run: pnpm --filter '!clyops-runner' --filter '!clyops-web' -r publish --no-git-checks --access public --npm-path "$PNPM_HOME/npm"
 
   pypi:
     if: inputs.pypi

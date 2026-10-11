@@ -36,7 +36,7 @@
     "src"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
+    "build": "tsc -p tsconfig.json && node scripts/copy-ui.mjs && chmod +x dist/cli.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test test/*.test.mjs",
     "prepublishOnly": "pnpm run build && pnpm test"
@@ -55,7 +55,8 @@
     "@types/busboy": "^1.5.4",
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "clyops-web": "0.3.0"
   },
   "homepage": "https://clyops.io/node-tools.html"
 }

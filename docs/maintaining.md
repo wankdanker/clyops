@@ -6,7 +6,7 @@ title: Maintaining the documentation
 ## Build and preview
 
 The full site build runs on Linux or macOS and uses Markdown guides and native
-API references. Install Node 20+,
+API references. Install Node 20.19+ (22.12+ for Node 22),
 pnpm (the version pinned in `package.json`), Python 3.10+, Rust, Go 1.21+,
 Java 17+/Maven, Ruby 3.3+, Doxygen and Graphviz (`dot`). These are documentation build requirements;
 the supported library runtime versions remain those in each language guide.
@@ -71,7 +71,7 @@ using the TypeScript compiler, and Markdown example synchronization. The full
 build also validates TypeDoc references, rustdoc missing docs/links, Doxygen,
 Go public comments, Ruby public methods/RBS, and static HTML links.
 
-Installed-consumer checks pack all five Node packages and compile a TypeScript
+Installed-consumer checks pack all six public Node packages and compile a TypeScript
 consumer against their exported declarations. Declaration maps must resolve to
 source files included in each tarball, so editor navigation works after installation.
 The Python wheel is installed
@@ -105,3 +105,12 @@ The root site follows `main`; the displayed package version can contain changes
 that have not yet been published to a registry.
 `tools/version.py set` also updates versioned install examples in the guides and
 the Java README. The static Markdown and its release artifacts stay in step.
+
+## Web runner checks
+
+The Web runner workflow runs the static SvelteKit build and browser tests against
+a real authenticated API and executable tools. Locally, `pnpm test:web` uses a
+Playwright Chromium installation; `PLAYWRIGHT_CHANNEL=chrome pnpm test:web` uses
+an installed Chrome. Schema conversion has browser-bundle checks; API tests check
+that UI assets ship and load without weakening tool/job authentication. The private
+web app is copied into the public API package and is not packed/published separately.

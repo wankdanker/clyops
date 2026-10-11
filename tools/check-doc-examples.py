@@ -42,15 +42,17 @@ def main():
         scratch = Path(directory)
         packed = scratch / "packages"
         packed.mkdir()
-        run(["pnpm", "--filter", "!clyops-runner", "-r", "pack", "--pack-destination", packed])
+        run(["pnpm", "--filter", "!clyops-runner", "--filter", "!clyops-web", "-r", "pack", "--pack-destination", packed])
         artifacts = sorted(packed.glob("*.tgz"))
-        assert len(artifacts) == 5, artifacts
+        assert len(artifacts) == 6, artifacts
         dependencies = {}
         for artifact in artifacts:
             with tarfile.open(artifact) as archive:
                 manifest = json.load(archive.extractfile("package/package.json"))
                 assert manifest.get("types") and "package/" + manifest["types"].removeprefix("./") in archive.getnames(), artifact
                 assert "package/README.md" in archive.getnames(), artifact
+                if manifest["name"] == "clyops-api":
+                    assert "package/dist/ui/index.html" in archive.getnames(), artifact
                 maps = [name for name in archive.getnames() if name.endswith(".d.ts.map")]
                 assert maps, f"Missing declaration maps: {artifact}"
                 for name in maps:
@@ -74,7 +76,7 @@ def main():
         exercise(["node", str(consumer / "quickstart.cjs")], env)
         exercise(["node", str(consumer / "compiled/quickstart.js")], env)
         # This also proves declarations for the adapters resolve in an installed consumer.
-        print("All five packed Node packages retain types; consumer typing passed.")
+        print("All six packed Node packages retain types; consumer typing passed.")
 
         run([sys.executable, "-m", "build", "--wheel", "--no-isolation", "packages/python", "--outdir", packed])
         wheel = next(packed.glob("*.whl"))

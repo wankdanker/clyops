@@ -4,70 +4,15 @@ export interface ScriptInfo {
   description: string;
 }
 
-export interface ScriptArgument {
-  name: string;
-  description: string;
-  required: boolean;
-  isVariadic: boolean;
-  default: string;
-  validation: string;
-}
-
-export interface ScriptOption {
-  name: string;
-  shortName: string;
-  variableName: string;
-  description: string;
-  default: string;
-  group: string;
-  type: 'string' | 'integer' | 'number' | 'boolean' | 'choice' | 'path';
-  isFlag: boolean;
-  isArray: boolean;
-  required: boolean;
-  validation: string;
-  choices: string[];
-  /** Holds a secret: a password field, and kept out of saved templates. */
-  secret?: boolean;
-}
-
-/** A declared stdin or stdout (spec section 1.3). */
-export interface ScriptStream {
-  description: string;
-  contentType: string;
-}
-
-/** An option relationship (spec section 1.6). */
-export interface ScriptConstraint {
-  type: 'exclusive' | 'requires' | 'oneOf';
-  options: string[];
-}
-
-/** The fields a program and its commands (spec section 1.7) share; those added in 0.2 are optional. */
-export interface ScriptSchemaBody {
-  description: string;
-  epilog: string;
-  arguments: ScriptArgument[];
-  options: ScriptOption[];
-  requiredCommands: RequiredCommand[];
-  effects?: string[];
-  constraints?: ScriptConstraint[];
-  stdin?: ScriptStream | null;
-  stdout?: ScriptStream | null;
-  commands?: (ScriptSchemaBody & { name: string })[];
-}
-
-export interface RequiredCommand {
-  command: string;
-  description: string;
-  installHint: string;
-}
-
-/** Output of a clyops tool's --help-json-schema (spec/schema.json), plus the path we ran. */
-export interface ScriptSchema extends ScriptSchemaBody {
-  clyops: number;
-  script: string;
-  path: string;
-}
+import type { Schema, SchemaBody, SchemaArgument, SchemaOption, SchemaStream, SchemaConstraint } from 'clyops-schema';
+export type ScriptArgument = SchemaArgument;
+export type ScriptOption = SchemaOption;
+export type ScriptStream = SchemaStream;
+export type ScriptConstraint = SchemaConstraint;
+export type ScriptSchemaBody = SchemaBody;
+export type RequiredCommand = SchemaBody['requiredCommands'][number];
+/** Original tool schema plus its executable location. */
+export interface ScriptSchema extends Schema { path: string; }
 
 export interface RunningScript {
   id: string;

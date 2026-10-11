@@ -5,9 +5,9 @@ name: Runner
 on:
   push:
     branches: [main]
-    paths: ["pnpm-lock.yaml", "pnpm-workspace.yaml", "package.json", "apps/runner/**", "apps/dispatch/src/detection.rs", "packages/js/**", "tools/bundle-js.mjs", "spec/**", "packages/c/**", ".github/workflows/runner.yml"]
+    paths: ["pnpm-lock.yaml", "pnpm-workspace.yaml", "package.json", "apps/runner/**", "apps/dispatch/src/detection.rs", "packages/js/**", "packages/schema/**", "tools/bundle-js.mjs", "spec/**", "packages/c/**", ".github/workflows/runner.yml"]
   pull_request:
-    paths: ["pnpm-lock.yaml", "pnpm-workspace.yaml", "package.json", "apps/runner/**", "apps/dispatch/src/detection.rs", "packages/js/**", "tools/bundle-js.mjs", "spec/**", "packages/c/**", ".github/workflows/runner.yml"]
+    paths: ["pnpm-lock.yaml", "pnpm-workspace.yaml", "package.json", "apps/runner/**", "apps/dispatch/src/detection.rs", "packages/js/**", "packages/schema/**", "tools/bundle-js.mjs", "spec/**", "packages/c/**", ".github/workflows/runner.yml"]
   workflow_dispatch:
 
 concurrency:

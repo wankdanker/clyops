@@ -18,7 +18,7 @@ from clyops import Cli  # noqa: E402
 # every file keeps its formatting.
 TOP = r'(?m)^  "version": "([^"]+)"'
 # JS/TS workspace versions live in their package.json; pnpm links local packages.
-PUBLIC_WORKSPACES = ["packages/js", "packages/tools", "packages/jobs", "apps/mcp", "apps/api"]
+PUBLIC_WORKSPACES = ["packages/schema", "packages/js", "packages/tools", "packages/jobs", "apps/mcp", "apps/api"]
 FILES = [
     *[(f"{ws}/package.json", TOP) for ws in PUBLIC_WORKSPACES],
     ("packages/python/pyproject.toml", r'(?m)^version = "([^"]+)"'),
@@ -32,6 +32,7 @@ FILES = [
     ("packages/java/pom.xml", r'<artifactId>clyops</artifactId>\s*<version>([^<]+)</version>'),
     ("packages/java/src/main/java/io/github/wankdanker/clyops/Cli.java", r'VERSION = "([^"]+)"'),
     ("apps/runner/package.json", TOP),
+    ("apps/web/package.json", TOP),
     ("apps/runner/src-tauri/tauri.conf.json", TOP),
     ("apps/runner/src-tauri/Cargo.toml", r'(?m)^version = "([^"]+)"'),
     ("apps/runner/src-tauri/Cargo.lock", r'name = "clyops-runner"\nversion = "([^"]+)"'),
@@ -53,7 +54,7 @@ def read(rel):
 
 # Workspaces pin each other exactly; every such pin is checked and rewritten.
 JS_PIN = r'"clyops(?:-[a-z]+)?": "(\d[^"]*)"'
-PINNED = [f"{ws}/package.json" for ws in PUBLIC_WORKSPACES]
+PINNED = [f"{ws}/package.json" for ws in [*PUBLIC_WORKSPACES, "apps/web", "apps/runner"]]
 PNPM_PIN = r'(?m)^      clyops(?:-[a-z]+)?:\n        specifier: (\d[^\n]*)'
 
 

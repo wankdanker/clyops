@@ -32,3 +32,9 @@ and zero values and omit secrets. Destructive tools require confirmation.
 
 See the [runner guide](../apps/runner/README.md) for installation, usage, templates
 and frontend/native development. Its internal UI helpers are not a public package API.
+
+## Web runner
+
+The static SvelteKit web runner is served by `clyops-api` at `/ui/`. It discovers
+tools through REST and uses the shared schema package for typed fields, ranges,
+relationship hints and secret handling. See the [web runner guide](web-runner.md).

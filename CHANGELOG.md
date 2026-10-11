@@ -5,6 +5,13 @@ section here.
 
 ## [Unreleased]
 
+- Static SvelteKit web runner served by clyops-api at `/ui/`, with typed forms,
+  explicit inheritance/overrides, JSON editing, non-secret templates, stdin and
+  uploads, jobs/cancellation, destructive confirmation and authenticated downloads.
+- Browser-compatible clyops-schema package shared by REST/MCP conversion, the web
+  runner and desktop JSON editor. Desktop scalar/array controls use shared numeric
+  ranges and choice lists. Browser integration checks exercise real tool execution.
+
 - Documentation builds use the configured GitHub Pages URL's base path,
   supporting custom domains at the root without broken assets or navigation.
 - Project homepage with static terminal playback across Python, Bash, TypeScript

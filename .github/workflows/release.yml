@@ -226,7 +226,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: mkdir -p out
       - name: npm packages
-        run: pnpm install --frozen-lockfile && pnpm build && pnpm --filter '!clyops-runner' -r pack --pack-destination "$GITHUB_WORKSPACE/out"
+        run: pnpm install --frozen-lockfile && pnpm build && pnpm --filter '!clyops-runner' --filter '!clyops-web' -r pack --pack-destination "$GITHUB_WORKSPACE/out"
       - name: Python wheel and sdist
         run: pip install build && python -m build packages/python --outdir out
       - name: Rust crate

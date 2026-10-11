@@ -301,10 +301,8 @@ function commands(group) {
 // packages/tools/src/argv.ts
 var import_node_fs3 = require("node:fs");
 var import_node_path2 = require("node:path");
-var InputError = class extends Error {
-  /** HTTP status used by adapters to report invalid caller input. */
-  status = 400;
-};
+
+// packages/schema/src/names.ts
 function inputKey(name) {
   return name.replace(/-/g, "_");
 }
@@ -316,6 +314,102 @@ function isBareFlag(option) {
   const choices = [...option.choices].sort().join(",");
   return option.isFlag && choices !== "false,true";
 }
+
+// packages/schema/src/json-schema.ts
+var PATTERNS = {
+  ip: "^([0-9]{1,3}\\.){3}[0-9]{1,3}$|^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$",
+  hostname: "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$",
+  url: "^https?://[a-zA-Z0-9.-]+(:[0-9]+)?(/.*)?$",
+  email: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+  uuid: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+  "date:YYYY-MM-DD": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+};
+function bounds(spec, min, max) {
+  const m = /^([0-9.]*)-([0-9.]*)$/.exec(spec);
+  if (!m) return spec ? { [min]: Number(spec), [max]: Number(spec) } : {};
+  return { ...m[1] ? { [min]: Number(m[1]) } : {}, ...m[2] ? { [max]: Number(m[2]) } : {} };
+}
+function valueSchema(validation, choices = []) {
+  const [rule, spec = ""] = validation.split(/:(.*)/s);
+  if (validation in PATTERNS) return { type: "string", pattern: PATTERNS[validation] };
+  switch (rule) {
+    case "int":
+      return { type: "integer", ...bounds(spec, "minimum", "maximum") };
+    case "float":
+      return { type: "number", ...bounds(spec, "minimum", "maximum") };
+    case "port":
+      return { type: "integer", minimum: 1, maximum: 65535 };
+    case "bool":
+      return { type: "boolean" };
+    case "string":
+      return { type: "string", ...bounds(spec, "minLength", "maxLength") };
+    case "choice":
+      return { type: "string", enum: choices.length ? choices : spec.split(",") };
+    case "regex":
+      return { type: "string", pattern: spec };
+    default:
+      return { type: "string" };
+  }
+}
+function typedDefault(value, schema) {
+  if (schema.type === "integer" || schema.type === "number") return Number(value);
+  if (schema.type === "boolean") return /^(true|1|yes|on)$/i.test(value);
+  return value;
+}
+function property(item, many, flag) {
+  const value = flag ? { type: "boolean" } : valueSchema(item.validation, "choices" in item ? item.choices : []);
+  const out = many ? { type: "array", items: value } : { ...value };
+  if (item.description) out.description = item.description;
+  if (item.default !== "" && !many && !("secret" in item && item.secret)) out.default = typedDefault(item.default, value);
+  if ("secret" in item && item.secret) Object.assign(out, { writeOnly: true, format: "password" });
+  return out;
+}
+function toJsonSchema(schema, naming = "input") {
+  const key = naming === "input" ? inputKey : (name) => name;
+  const properties = {};
+  const required = [];
+  for (const argument of schema.arguments) {
+    properties[key(argument.name)] = property(argument, argument.isVariadic, false);
+    if (argument.required) required.push(key(argument.name));
+  }
+  for (const option of schema.options) {
+    if (option.name === "help") continue;
+    properties[key(option.name)] = property(option, option.isArray, isBareFlag(option));
+  }
+  const given = (long) => {
+    const option = schema.options.find((o) => o.name === long);
+    if (option && !option.isArray && (isBareFlag(option) || valueSchema(option.validation, option.choices).type === "boolean")) return { const: true };
+    if (option && !option.isArray && [...option.choices].sort().join(",") === "false,true") return { const: "true" };
+    return option?.isArray ? { type: "array", minItems: 1 } : { not: { type: "null" } };
+  };
+  const allOf = [];
+  for (const c of schema.constraints ?? []) {
+    if (c.type !== "exclusive") continue;
+    for (let i = 0; i < c.options.length; i++) {
+      for (let j = i + 1; j < c.options.length; j++) {
+        const [a, b] = [c.options[i], c.options[j]];
+        allOf.push({
+          not: { required: [key(a), key(b)], properties: { [key(a)]: given(a), [key(b)]: given(b) } },
+          description: `--${a} and --${b} cannot be used together`
+        });
+      }
+    }
+  }
+  return {
+    type: "object",
+    ...schema.description ? { description: schema.description } : {},
+    properties,
+    ...required.length ? { required } : {},
+    ...allOf.length ? { allOf } : {},
+    additionalProperties: false
+  };
+}
+
+// packages/tools/src/argv.ts
+var InputError = class extends Error {
+  /** HTTP status used by adapters to report invalid caller input. */
+  status = 400;
+};
 function isPathValued(validation, type) {
   return type === "path" || validation === "path" || validation.startsWith("file:") || validation.startsWith("dir:");
 }
@@ -608,94 +702,6 @@ function tail(text, lines = 40) {
 }
 function shellQuote(args) {
   return args.map((a) => /^[A-Za-z0-9_@%+=:,./-]+$/.test(a) ? a : `'${a.replace(/'/g, "'\\''")}'`).join(" ");
-}
-
-// packages/tools/src/json-schema.ts
-var PATTERNS = {
-  ip: "^([0-9]{1,3}\\.){3}[0-9]{1,3}$|^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$",
-  hostname: "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$",
-  url: "^https?://[a-zA-Z0-9.-]+(:[0-9]+)?(/.*)?$",
-  email: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
-  uuid: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
-  "date:YYYY-MM-DD": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
-};
-function bounds(spec, min, max) {
-  const m = /^([0-9.]*)-([0-9.]*)$/.exec(spec);
-  if (!m) return spec ? { [min]: Number(spec), [max]: Number(spec) } : {};
-  return { ...m[1] ? { [min]: Number(m[1]) } : {}, ...m[2] ? { [max]: Number(m[2]) } : {} };
-}
-function valueSchema(validation, choices = []) {
-  const [rule, spec = ""] = validation.split(/:(.*)/s);
-  if (validation in PATTERNS) return { type: "string", pattern: PATTERNS[validation] };
-  switch (rule) {
-    case "int":
-      return { type: "integer", ...bounds(spec, "minimum", "maximum") };
-    case "float":
-      return { type: "number", ...bounds(spec, "minimum", "maximum") };
-    case "port":
-      return { type: "integer", minimum: 1, maximum: 65535 };
-    case "bool":
-      return { type: "boolean" };
-    case "string":
-      return { type: "string", ...bounds(spec, "minLength", "maxLength") };
-    case "choice":
-      return { type: "string", enum: choices.length ? choices : spec.split(",") };
-    case "regex":
-      return { type: "string", pattern: spec };
-    default:
-      return { type: "string" };
-  }
-}
-function typedDefault(value, schema) {
-  if (schema.type === "integer" || schema.type === "number") return Number(value);
-  if (schema.type === "boolean") return /^(true|1|yes|on)$/i.test(value);
-  return value;
-}
-function property(item, many, flag) {
-  const value = flag ? { type: "boolean" } : valueSchema(item.validation, "choices" in item ? item.choices : []);
-  const out = many ? { type: "array", items: value } : { ...value };
-  if (item.description) out.description = item.description;
-  if (item.default !== "" && !many) out.default = typedDefault(item.default, value);
-  if ("secret" in item && item.secret) Object.assign(out, { writeOnly: true, format: "password" });
-  return out;
-}
-function toJsonSchema(schema) {
-  const properties = {};
-  const required = [];
-  for (const argument of schema.arguments) {
-    properties[inputKey(argument.name)] = property(argument, argument.isVariadic, false);
-    if (argument.required) required.push(inputKey(argument.name));
-  }
-  for (const option of schema.options) {
-    if (option.name === "help") continue;
-    properties[inputKey(option.name)] = property(option, option.isArray, isBareFlag(option));
-  }
-  const given = (long) => {
-    const option = schema.options.find((o) => o.name === long);
-    if (option && isBareFlag(option)) return { const: true };
-    return option?.isArray ? { type: "array", minItems: 1 } : { not: { type: "null" } };
-  };
-  const allOf = [];
-  for (const c of schema.constraints ?? []) {
-    if (c.type !== "exclusive") continue;
-    for (let i = 0; i < c.options.length; i++) {
-      for (let j = i + 1; j < c.options.length; j++) {
-        const [a, b] = [c.options[i], c.options[j]];
-        allOf.push({
-          not: { required: [inputKey(a), inputKey(b)], properties: { [inputKey(a)]: given(a), [inputKey(b)]: given(b) } },
-          description: `--${a} and --${b} cannot be used together`
-        });
-      }
-    }
-  }
-  return {
-    type: "object",
-    ...schema.description ? { description: schema.description } : {},
-    properties,
-    ...required.length ? { required } : {},
-    ...allOf.length ? { allOf } : {},
-    additionalProperties: false
-  };
 }
 
 // packages/tools/src/tools.ts

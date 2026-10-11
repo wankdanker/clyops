@@ -16,6 +16,7 @@ cli.opt('CLYOPS_API_CWD',          'cwd',         '',  'optional',  'Working dir
 cli.opt('CLYOPS_API_TIMEOUT',      'timeout',     't', '0',         'Kill a tool after this many seconds (0: never)', 'Tools', 'int:0-');
 cli.opt('CLYOPS_API_CONCURRENCY',  'concurrency', 'j', 'optional',  'Async jobs run at the same time (default: CPUs)', 'Tools', 'int:1-');
 cli.opt('CLYOPS_API_MCP',          'mcp',         '',  'true',      'Also serve the tools over MCP (streamable HTTP) at /mcp', 'Server', 'bool');
+cli.opt('CLYOPS_API_UI',           'ui',          '',  'true',      'Serve the static web runner at /ui/', 'Server', 'bool');
 cli.opt('CLYOPS_API_WATCH',        'watch',       'w', 'true',      'Pick up added, changed and removed tools without a restart', 'Tools', 'bool');
 cli.opt('CLYOPS_API_HOST',         'host',        'H', '127.0.0.1', 'Address to listen on', 'Server');
 cli.opt('CLYOPS_API_PORT',         'port',        'p', '8080',      'Port to listen on',                             'Server', 'port');
@@ -56,6 +57,7 @@ const { app, current } = await createApi({
   maxOutput: args.CLYOPS_API_MAX_OUTPUT as number,
   audit: args.CLYOPS_API_AUDIT ? auditLog(args.CLYOPS_API_AUDIT as string) : undefined,
   mcp: args.CLYOPS_API_MCP as boolean,
+  ui: args.CLYOPS_API_UI as boolean,
   watch: args.CLYOPS_API_WATCH as boolean,
   onReload: ({ tools }) => info('reloaded: %d tool(s)', tools.length),
   version,

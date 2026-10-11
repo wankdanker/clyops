@@ -43,5 +43,8 @@
     "@types/node": "^22.0.0",
     "typescript": "^5.6.0"
   },
-  "homepage": "https://clyops.io/node-tools.html"
+  "homepage": "https://clyops.io/node-tools.html",
+  "dependencies": {
+    "clyops-schema": "0.3.0"
+  }
 }

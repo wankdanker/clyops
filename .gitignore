@@ -11,3 +11,6 @@ docs/_native/
 docs/_generated/
 .docs-tools/
 .yardoc/
+.svelte-kit/
+playwright-report/
+test-results/

@@ -206,10 +206,8 @@ function loadSchema(file, opts = {}) {
 // packages/tools/src/argv.ts
 var import_node_fs3 = require("node:fs");
 var import_node_path2 = require("node:path");
-var InputError = class extends Error {
-  /** HTTP status used by adapters to report invalid caller input. */
-  status = 400;
-};
+
+// packages/schema/src/names.ts
 function inputKey(name) {
   return name.replace(/-/g, "_");
 }
@@ -221,6 +219,12 @@ function isBareFlag(option) {
   const choices = [...option.choices].sort().join(",");
   return option.isFlag && choices !== "false,true";
 }
+
+// packages/tools/src/argv.ts
+var InputError = class extends Error {
+  /** HTTP status used by adapters to report invalid caller input. */
+  status = 400;
+};
 function isPathValued(validation, type) {
   return type === "path" || validation === "path" || validation.startsWith("file:") || validation.startsWith("dir:");
 }

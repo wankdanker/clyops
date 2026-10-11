@@ -11,12 +11,14 @@
     "test": "pnpm --filter \"!clyops-runner\" -r run test",
     "typecheck": "pnpm --filter \"!clyops-runner\" -r run typecheck",
     "build:runner": "pnpm --filter clyops-runner run build",
-    "test:runner": "pnpm --filter clyops run build && pnpm --filter clyops-runner run test",
+    "test:runner": "pnpm --filter clyops-schema run build && pnpm --filter clyops run build && pnpm --filter clyops-runner run test",
     "bundles": "node tools/bundle-js.mjs",
     "docs:build": "pnpm build && python3 tools/build-docs.py",
     "docs:check": "python3 tools/check-docs.py",
     "docs:serve": "pnpm exec eleventy --config=eleventy.config.mjs --serve",
-    "docs:types": "pnpm exec tsc -p docs/tsconfig.examples.json --noEmit"
+    "docs:types": "pnpm exec tsc -p docs/tsconfig.examples.json --noEmit",
+    "build:web": "pnpm --filter clyops-schema run build && pnpm --filter clyops-web run build",
+    "test:web": "pnpm --filter clyops-web run test:browser"
   },
   "devDependencies": {
     "@11ty/eleventy": "3.1.6",

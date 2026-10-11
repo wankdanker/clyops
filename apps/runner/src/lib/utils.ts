@@ -1,3 +1,4 @@
+import { constraintIssues as sharedConstraintIssues } from 'clyops-schema';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import type { ScriptSchema, ScriptSchemaBody } from '../types';
@@ -366,20 +367,6 @@ export function expandCommands(schema: ScriptSchema): { words: string[]; schema:
 
 /** The option relationships (spec section 1.6) the form values break, as messages. */
 export function constraintIssues(schema: ScriptSchema, values: Record<string, unknown>): string[] {
-  const given = (name: string) => {
-    const v = values[name];
-    return Array.isArray(v) ? v.some((x) => x !== '') : v !== undefined && v !== '' && v !== false;
-  };
-  const list = (names: string[]) => names.map((n) => `--${n}`).join(', ');
-  const issues: string[] = [];
-  for (const c of schema.constraints ?? []) {
-    const on = c.options.filter(given);
-    if (c.type === 'exclusive' && on.length > 1) issues.push(`${list(on)} cannot be used together`);
-    if (c.type === 'requires' && given(c.options[0])) {
-      const absent = c.options.slice(1).filter((n) => !given(n));
-      if (absent.length) issues.push(`--${c.options[0]} requires ${list(absent)}`);
-    }
-    if (c.type === 'oneOf' && on.length === 0) issues.push(`One of ${list(c.options)} is required (unless set in a config file or the environment)`);
-  }
-  return issues;
+  const supplied = Object.fromEntries(Object.entries(values).filter(([, value]) => value !== ''));
+  return sharedConstraintIssues(schema, supplied, 'declared').map(issue => issue.message);
 }

@@ -1,5 +1,6 @@
 {
   "entryPoints": [
+    "../packages/schema/src/index.ts",
     "../packages/js/src/index.ts",
     "../packages/tools/src/index.ts",
     "../packages/jobs/src/index.ts",
@@ -34,6 +35,7 @@
     "clyops-tools",
     "clyops-jobs",
     "clyops-api",
-    "clyops-mcp"
+    "clyops-mcp",
+    "clyops-schema"
   ]
 }

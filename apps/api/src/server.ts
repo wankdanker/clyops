@@ -11,6 +11,7 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import { createReadStream, createWriteStream, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Readable, Transform } from 'node:stream';
 import { finished, pipeline } from 'node:stream/promises';
 import { plus, z } from 'plus-express';
@@ -56,6 +57,8 @@ export interface ApiOptions {
   concurrency?: number;
   /** Also serve the tools over MCP (streamable HTTP) at /mcp (default: true). */
   mcp?: boolean;
+  /** Serve the packaged static web runner at /ui/ (default: true). API routes still require authentication. */
+  ui?: boolean;
   /** Pick up added, changed and removed tools without a restart (default: false; call close() to stop). */
   watch?: boolean;
   /** Called after each reload when watching. */
@@ -250,6 +253,11 @@ export async function createApi(opts: ApiOptions) {
   swap(watcher ? watcher.current() : await loadTools(opts.root, { name: opts.name, filter: opts.filter, onError }));
 
   const app: Express = express();
+  if (opts.ui !== false) {
+    // The shell is public so it can ask for a key; no tool data is embedded in it.
+    // Authentication below still protects every API and MCP request.
+    app.use('/ui', express.static(fileURLToPath(new URL('./ui/', import.meta.url)), { index: 'index.html' }));
+  }
   app.use(express.json({ limit: maxBody }));
   const keys = Object.entries(opts.keys ?? {});
   if (opts.apiKey || keys.length) {

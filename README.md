@@ -310,6 +310,19 @@ each described and typed by the program's own schema, with arguments validated b
 runs. Declared effects become the MCP annotations clients use to decide when to ask before running a
 tool.
 
+## Web runner
+
+`clyops-api --root ./scripts` also serves the static SvelteKit web runner at
+`http://localhost:8080/ui/`. Connect with the API key when required, select a tool,
+set explicit overrides and run it synchronously or as a cancellable background job.
+Forms use enum dropdowns, numeric bounds, typed arrays, inheritance-aware booleans,
+relationship hints, secrets, stdin and binary downloads. Templates stay in the
+browser without secrets. `--no-ui` disables the bundled frontend.
+
+[clyops-schema](packages/schema) is the browser-compatible shared contract library
+used by the API/MCP converter, web forms and desktop JSON editor.
+See the [web runner guide](docs/web-runner.md).
+
 ## clyops runner
 
 [apps/runner](apps/runner) is a desktop app (Tauri + React) that lists the clyops tools in a
@@ -333,6 +346,7 @@ spec/
   conformance/            shared demo CLI definition, cases and golden outputs
 packages/
   js/                     TypeScript source -> ESM + CommonJS + .d.ts (npm: clyops)
+  schema/                 browser-safe schema types, conversion and form metadata
   tools/                  Node: discover, describe and run a directory of tools (npm: clyops-tools)
   jobs/                   Node: run tools as jobs: config, templates, artifacts, records (npm: clyops-jobs)
   bash/                   clyops.sh, a single sourceable file (Bash 4.3+)
@@ -346,6 +360,7 @@ apps/
   api/                    clyops-api: a directory of tools as an HTTP API with OpenAPI (npm: clyops-api)
   mcp/                    clyops-mcp: a directory of tools as MCP tools for AI agents (npm: clyops-mcp)
   dispatch/               clyops-dispatch: a directory of tools as one command with subcommands
+  web/                    static SvelteKit REST API runner, packaged with clyops-api
   runner/                 desktop UI for clyops tools (Tauri + React)
 tools/
   check-schema.py         validate --help-json-schema output against spec/schema.json
@@ -379,8 +394,10 @@ pnpm --filter clyops-runner tauri dev
 ```
 
 The root `packageManager` field pins pnpm for local tools and CI.
-`pnpm-workspace.yaml` includes all six packages and apps; the private desktop
+`pnpm-workspace.yaml` includes all eight packages and apps; the private desktop
 frontend is built separately and excluded from release packing and publishing.
+The private web app is built with the API and copied into its package; it is also
+excluded from standalone registry publishing.
 
 ```sh
 make build          # build every package
@@ -450,7 +467,7 @@ on each npm package (`clyops`, `clyops-tools`, `clyops-jobs`, `clyops-mcp`, and 
 The registry job installs, builds, tests, and publishes through pnpm on Node 24.
 pnpm 10 delegates registry uploads to npm, so CI installs npm 11 through pnpm
 for OIDC authentication. Publishing runs in workspace dependency order, excludes
-the private desktop app, and validates the selected release tag first.
+both private UI apps, and validates the selected release tag first.
 
 ## License
 

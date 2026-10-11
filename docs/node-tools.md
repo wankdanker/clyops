@@ -96,7 +96,8 @@ const server = api.app.listen(8080);
 // During shutdown: server.close(); api.close();
 ```
 
-The API exposes tool endpoints, OpenAPI, asynchronous job records and optional
+The API serves a [static web runner](web-runner.md) at `/ui/`; `ui: false` or
+`--no-ui` disables it. The API exposes tool endpoints, OpenAPI, asynchronous job records and optional
 MCP transport. Options include named scoped keys, filters, path boundaries,
 body/output limits, concurrency, audit and hot reload. Binary output and streamed
 stdin have transport-specific conventions; see the [HTTP guide](../apps/api/README.md)

@@ -5,14 +5,31 @@
     "moduleResolution": "NodeNext",
     "strict": true,
     "skipLibCheck": true,
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "baseUrl": "..",
     "paths": {
-      "clyops": ["packages/js/src/index.ts"],
-      "clyops-tools": ["packages/tools/src/index.ts"],
-      "clyops-jobs": ["packages/jobs/src/index.ts"],
-      "clyops-mcp": ["apps/mcp/src/index.ts"]
+      "clyops": [
+        "packages/js/src/index.ts"
+      ],
+      "clyops-tools": [
+        "packages/tools/src/index.ts"
+      ],
+      "clyops-jobs": [
+        "packages/jobs/src/index.ts"
+      ],
+      "clyops-mcp": [
+        "apps/mcp/src/index.ts"
+      ],
+      "clyops-schema": [
+        "packages/schema/src/index.ts"
+      ]
     }
   },
-  "include": ["../packages/*/src/**/*.ts", "../apps/api/src/**/*.ts", "../apps/mcp/src/**/*.ts"]
+  "include": [
+    "../packages/*/src/**/*.ts",
+    "../apps/api/src/**/*.ts",
+    "../apps/mcp/src/**/*.ts"
+  ]
 }

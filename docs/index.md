@@ -26,6 +26,9 @@ for validation, config, commands and completion.
 - [C](languages/c.md)
 - [Bash](languages/bash.md)
 
+[Web runner and shared schema](web-runner.md) provides a static browser UI for
+the REST API, with typed forms and job execution.
+
 [Node tools and servers](node-tools.md) turn registered programs into JSON-driven
 tools, jobs, HTTP endpoints and MCP tools. The [dispatcher and desktop runner](applications.md)
 provide a single command and generated forms for a directory of tools.

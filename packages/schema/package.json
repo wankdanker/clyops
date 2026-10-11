@@ -1,0 +1,39 @@
+{
+  "name": "clyops-schema",
+  "version": "0.3.0",
+  "description": "Browser-compatible clyops schema types, JSON Schema conversion and form metadata.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wankdanker/clyops.git",
+    "directory": "packages/schema"
+  },
+  "homepage": "https://clyops.io/web-runner.html",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./clyops-schema.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "clyops-schema.cjs"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test test/*.test.mjs",
+    "prepublishOnly": "pnpm run build && pnpm test"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

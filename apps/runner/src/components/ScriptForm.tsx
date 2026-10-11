@@ -1,3 +1,4 @@
+import { valueSchema } from 'clyops-schema';
 import { useState, useEffect, useMemo } from 'react';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { Play, Save, Loader2, X, RotateCcw, Search, Plus, Trash2, ChevronDown, ChevronUp, ChevronsDownUp, ChevronsUpDown, Copy, FileJson, Check, Terminal, AlertTriangle } from 'lucide-react';
@@ -203,6 +204,11 @@ export function ScriptForm({ schema: program, onRun, onSaveTemplate, isRunning, 
 
   const renderField = (opt: typeof schema.options[0]) => {
     const value = values[opt.name];
+    const fieldSchema = valueSchema(opt.validation, opt.choices);
+    const bounds = { min: fieldSchema.minimum as number | undefined, max: fieldSchema.maximum as number | undefined,
+      minLength: fieldSchema.minLength as number | undefined, maxLength: fieldSchema.maxLength as number | undefined };
+    const inputType = opt.secret ? 'password' : fieldSchema.type === 'integer' || fieldSchema.type === 'number' ? 'number' : 'text';
+    const step = fieldSchema.type === 'integer' ? 1 : 'any';
 
     if (opt.isFlag) {
       return (
@@ -235,8 +241,19 @@ export function ScriptForm({ schema: program, onRun, onSaveTemplate, isRunning, 
           <div className="space-y-2">
             {arrayValue.map((item, index) => (
               <div key={index} className="flex items-center gap-2">
+                {Array.isArray(fieldSchema.enum) ? (
+                  <select aria-label={`${opt.name} #${index + 1}`} value={item}
+                    onChange={(event) => {
+                      const updated = [...arrayValue]; updated[index] = event.target.value; handleChange(opt.name, updated);
+                    }} className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    <option value="">Select...</option>
+                    {(fieldSchema.enum as string[]).map(choice => <option key={choice} value={choice}>{choice}</option>)}
+                  </select>
+                ) : (
                 <Input
-                  type="text"
+                  type={inputType}
+                  {...bounds}
+                  step={step}
                   value={item}
                   onChange={(e) => {
                     const newArray = [...arrayValue];
@@ -246,6 +263,7 @@ export function ScriptForm({ schema: program, onRun, onSaveTemplate, isRunning, 
                   placeholder={`${opt.name} #${index + 1}`}
                   className="flex-1"
                 />
+                )}
                 <Button
                   type="button"
                   variant="ghost"
@@ -278,7 +296,7 @@ export function ScriptForm({ schema: program, onRun, onSaveTemplate, isRunning, 
       );
     }
 
-    if (opt.type === 'choice') {
+    if (Array.isArray(fieldSchema.enum)) {
       return (
         <div>
           <Label htmlFor={opt.name}>
@@ -293,7 +311,7 @@ export function ScriptForm({ schema: program, onRun, onSaveTemplate, isRunning, 
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 mt-1"
           >
             <option value="">Select...</option>
-            {opt.choices.map((choice) => (
+            {(fieldSchema.enum as string[]).map((choice) => (
               <option key={choice} value={choice}>
                 {choice}
               </option>
@@ -312,7 +330,9 @@ export function ScriptForm({ schema: program, onRun, onSaveTemplate, isRunning, 
         </Label>
         <Input
           id={opt.name}
-          type={opt.secret ? 'password' : opt.type === 'integer' || opt.type === 'number' ? 'number' : 'text'}
+          type={inputType}
+          {...bounds}
+          step={step}
           autoComplete={opt.secret ? 'off' : undefined}
           value={value as string}
           onChange={(e) => handleChange(opt.name, e.target.value)}
