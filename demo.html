@@ -4,24 +4,24 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>From script to agent · clyops</title>
-  <link rel="stylesheet" href="/clyops/assets/docs.css">
-  <script defer src="/clyops/assets/search.js"></script>
+  <link rel="stylesheet" href="/assets/docs.css">
+  <script defer src="/assets/search.js"></script>
 </head>
-<body data-search-index="/clyops/search-index.json">
+<body data-search-index="/search-index.json">
   <a class="skip" href="#content">Skip to content</a>
-  <header><a href="/clyops/"><strong>clyops</strong></a><span>Documentation · 0.3.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <header><a href="/"><strong>clyops</strong></a><span>Documentation · 0.3.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
   <div class="shell">
     <nav aria-label="Documentation">
-      <a href="/clyops/guide.html">Concepts and behavior</a>
-      <a href="/clyops/reference.html">API references</a>
+      <a href="/guide.html">Concepts and behavior</a>
+      <a href="/reference.html">API references</a>
       <h2>Languages</h2>
-      <a href="/clyops/languages/javascript.html">JavaScript / TypeScript</a><a href="/clyops/languages/python.html">Python</a><a href="/clyops/languages/rust.html">Rust</a><a href="/clyops/languages/go.html">Go</a><a href="/clyops/languages/java.html">Java</a><a href="/clyops/languages/ruby.html">Ruby</a><a href="/clyops/languages/c.html">C</a><a href="/clyops/languages/bash.html">Bash</a>
+      <a href="/languages/javascript.html">JavaScript / TypeScript</a><a href="/languages/python.html">Python</a><a href="/languages/rust.html">Rust</a><a href="/languages/go.html">Go</a><a href="/languages/java.html">Java</a><a href="/languages/ruby.html">Ruby</a><a href="/languages/c.html">C</a><a href="/languages/bash.html">Bash</a>
       <h2>Tools and servers</h2>
-      <a href="/clyops/node-tools.html">Node tools, jobs, API and MCP</a>
-      <a href="/clyops/applications.html">Dispatcher and desktop runner</a>
-      <a href="/clyops/maintaining.html">Maintaining the docs</a>
-      <a href="/clyops/versions.html">Release documentation</a>
-      <form action="/clyops/search.html" role="search"><label for="search">Search guides</label><input id="search" name="q" type="search"><button>Search</button></form>
+      <a href="/node-tools.html">Node tools, jobs, API and MCP</a>
+      <a href="/applications.html">Dispatcher and desktop runner</a>
+      <a href="/maintaining.html">Maintaining the docs</a>
+      <a href="/versions.html">Release documentation</a>
+      <form action="/search.html" role="search"><label for="search">Search guides</label><input id="search" name="q" type="search"><button>Search</button></form>
     </nav>
     <main id="content"><h1 id="from-script-to-agent">From script to agent</h1>
 <p>The homepage follows a tiny tool called <code>plan</code>. It validates a service, an
@@ -46,23 +46,23 @@ its library using the corresponding guide:</p>
 <tbody>
 <tr>
 <td>Python</td>
-<td><a href="/clyops/demos/plan.py">plan.py</a></td>
-<td><a href="/clyops/languages/python.html">Python</a></td>
+<td><a href="/demos/plan.py">plan.py</a></td>
+<td><a href="/languages/python.html">Python</a></td>
 </tr>
 <tr>
 <td>Bash</td>
-<td><a href="/clyops/demos/plan.sh">plan.sh</a></td>
-<td><a href="/clyops/languages/bash.html">Bash</a></td>
+<td><a href="/demos/plan.sh">plan.sh</a></td>
+<td><a href="/languages/bash.html">Bash</a></td>
 </tr>
 <tr>
 <td>TypeScript</td>
-<td><a href="/clyops/demos/plan.ts">plan.ts</a></td>
-<td><a href="/clyops/languages/javascript.html">JavaScript / TypeScript</a></td>
+<td><a href="/demos/plan.ts">plan.ts</a></td>
+<td><a href="/languages/javascript.html">JavaScript / TypeScript</a></td>
 </tr>
 <tr>
 <td>Rust</td>
-<td><a href="/clyops/demos/plan.rs">plan.rs</a></td>
-<td><a href="/clyops/languages/rust.html">Rust</a></td>
+<td><a href="/demos/plan.rs">plan.rs</a></td>
+<td><a href="/languages/rust.html">Rust</a></td>
 </tr>
 </tbody>
 </table>
@@ -108,7 +108,7 @@ the <code>plan</code> tool with this input:</p>
 <p>The server derives the tool's inputs from its schema, validates them, runs the
 program and returns the plan. The tool's declared read-only effect becomes an
 MCP annotation; <code>--read-only</code> filters the directory to tools declaring that effect.
-See <a href="/clyops/node-tools.html#mcp">MCP setup and behavior</a> for the full interface.</p>
+See <a href="/node-tools.html#mcp">MCP setup and behavior</a> for the full interface.</p>
 <h2 id="serve-the-same-tool-over-http">Serve the same tool over HTTP</h2>
 <p>In one terminal:</p>
 <pre><code class="language-sh">pnpm exec clyops-api --root ./scripts --read-only
@@ -119,13 +119,13 @@ See <a href="/clyops/node-tools.html#mcp">MCP setup and behavior</a> for the ful
   -d '{&quot;service&quot;:&quot;api&quot;,&quot;env&quot;:&quot;staging&quot;,&quot;replicas&quot;:2}'
 </code></pre>
 <p>The response includes <code>ok</code>, <code>exitCode</code>, the captured output and its parsed <code>json</code>
-plan. <code>/openapi.json</code> describes the HTTP interface. See the <a href="/clyops/node-tools.html#http-api">HTTP guide</a>
+plan. <code>/openapi.json</code> describes the HTTP interface. See the <a href="/node-tools.html#http-api">HTTP guide</a>
 for the complete response, authentication, filters, jobs and streamed I/O.</p>
 <h2 id="open-the-desktop-runner">Open the desktop runner</h2>
 <p>Install the runner from the <a href="https://github.com/wankdanker/clyops/releases">GitHub releases</a>
 and select the same scripts directory. It reads the schema to create fields for
 service, environment and replica count, and streams the tool's output when you
-run it. See the <a href="/clyops/applications.html#desktop-runner">desktop guide</a>.</p>
+run it. See the <a href="/applications.html#desktop-runner">desktop guide</a>.</p>
 </main>
   </div>
   <footer>Guides are Markdown. API references come from the published source interfaces.</footer>

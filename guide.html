@@ -4,28 +4,28 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Concepts and behavior · clyops</title>
-  <link rel="stylesheet" href="/clyops/assets/docs.css">
-  <script defer src="/clyops/assets/search.js"></script>
+  <link rel="stylesheet" href="/assets/docs.css">
+  <script defer src="/assets/search.js"></script>
 </head>
-<body data-search-index="/clyops/search-index.json">
+<body data-search-index="/search-index.json">
   <a class="skip" href="#content">Skip to content</a>
-  <header><a href="/clyops/"><strong>clyops</strong></a><span>Documentation · 0.3.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <header><a href="/"><strong>clyops</strong></a><span>Documentation · 0.3.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
   <div class="shell">
     <nav aria-label="Documentation">
-      <a href="/clyops/guide.html">Concepts and behavior</a>
-      <a href="/clyops/reference.html">API references</a>
+      <a href="/guide.html">Concepts and behavior</a>
+      <a href="/reference.html">API references</a>
       <h2>Languages</h2>
-      <a href="/clyops/languages/javascript.html">JavaScript / TypeScript</a><a href="/clyops/languages/python.html">Python</a><a href="/clyops/languages/rust.html">Rust</a><a href="/clyops/languages/go.html">Go</a><a href="/clyops/languages/java.html">Java</a><a href="/clyops/languages/ruby.html">Ruby</a><a href="/clyops/languages/c.html">C</a><a href="/clyops/languages/bash.html">Bash</a>
+      <a href="/languages/javascript.html">JavaScript / TypeScript</a><a href="/languages/python.html">Python</a><a href="/languages/rust.html">Rust</a><a href="/languages/go.html">Go</a><a href="/languages/java.html">Java</a><a href="/languages/ruby.html">Ruby</a><a href="/languages/c.html">C</a><a href="/languages/bash.html">Bash</a>
       <h2>Tools and servers</h2>
-      <a href="/clyops/node-tools.html">Node tools, jobs, API and MCP</a>
-      <a href="/clyops/applications.html">Dispatcher and desktop runner</a>
-      <a href="/clyops/maintaining.html">Maintaining the docs</a>
-      <a href="/clyops/versions.html">Release documentation</a>
-      <form action="/clyops/search.html" role="search"><label for="search">Search guides</label><input id="search" name="q" type="search"><button>Search</button></form>
+      <a href="/node-tools.html">Node tools, jobs, API and MCP</a>
+      <a href="/applications.html">Dispatcher and desktop runner</a>
+      <a href="/maintaining.html">Maintaining the docs</a>
+      <a href="/versions.html">Release documentation</a>
+      <form action="/search.html" role="search"><label for="search">Search guides</label><input id="search" name="q" type="search"><button>Search</button></form>
     </nav>
     <main id="content"><h1 id="concepts-and-behavior">Concepts and behavior</h1>
 <p>The APIs use native naming conventions, with the same underlying behavior.
-The <a href="/clyops/reference.html">language guides</a> show their signatures and runnable programs.
+The <a href="/reference.html">language guides</a> show their signatures and runnable programs.
 This guide uses JavaScript spelling for recipes; register everything before <code>run()</code>.</p>
 <h2 id="register-options-and-arguments">Register options and arguments</h2>
 <pre><code class="language-javascript">cli.opt('PORT', 'port', 'p', '8080', 'Server port', 'Network', 'port');
@@ -142,7 +142,7 @@ field types in TypeScript, Python or Ruby.</p>
 <code>uuid</code>, <code>date:YYYY-MM-DD</code>, <code>path</code>, <code>file:exists</code>, <code>file:readable</code>, <code>file:writable</code>,
 <code>dir:exists</code> and <code>dir:writable</code>. Parameterized rules include <code>int:1-10</code>,
 <code>float:0-1</code>, <code>string:1-100</code>, <code>choice:red,green,blue</code> and <code>regex:PATTERN</code>.
-See <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/spec/SPEC.md#5-validation-rules">spec section 5</a> for ranges and exact behavior.</p>
+See <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/spec/SPEC.md#5-validation-rules">spec section 5</a> for ranges and exact behavior.</p>
 <p>Standalone <code>validate</code> helpers return a typed value or the native validation
 error/result. Unknown registration rules and duplicate names are programming
 errors. Bad CLI values are parse errors. These are separate error paths.</p>
@@ -170,7 +170,7 @@ select the program's keys; unknown keys are errors.</p>
 the config file containing the value; default/environment paths resolve against
 the CLI root. Paths are normalized after precedence. <code>-</code> denotes stdin where the
 application supports it. Path validation does not itself open/read files for the
-application. See <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/spec/SPEC.md#6-paths">spec section 6</a>.</p>
+application. See <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/spec/SPEC.md#6-paths">spec section 6</a>.</p>
 <h2 id="nested-commands-and-constraints">Nested commands and constraints</h2>
 <pre><code class="language-javascript">const db = cli.command('db', 'Database tasks');
 const migrate = db.command('migrate', 'Apply migrations');

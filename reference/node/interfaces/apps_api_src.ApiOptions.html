@@ -16,7 +16,7 @@
 </div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">ApiOptions</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#apikey">apiKey</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#audit">audit</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">entry</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Omit</span><span class="tsd-signature-symbol">&lt;</span><a href="packages_tools_src.AuditEntry.html" class="tsd-signature-type tsd-kind-interface">AuditEntry</a><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">&quot;time&quot;</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#concurrency">concurrency</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#cwd">cwd</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#filter">filter</a><span class="tsd-signature-symbol">?:</span> <a href="packages_tools_src.ToolFilter.html" class="tsd-signature-type tsd-kind-interface">ToolFilter</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#keys">keys</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <a href="apps_api_src.ApiKey.html" class="tsd-signature-type tsd-kind-interface">ApiKey</a><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#maxbody">maxBody</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#maxoutput">maxOutput</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#mcp">mcp</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#name">name</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#onreload">onReload</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">loaded</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">tools</span><span class="tsd-signature-symbol">:</span> <a href="../types/apps_api_src.ApiTool.html" class="tsd-signature-type tsd-kind-type-alias">ApiTool</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">tree</span><span class="tsd-signature-symbol">:</span> <a href="packages_tools_src.Group.html" class="tsd-signature-type tsd-kind-interface">Group</a> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#positionalsorder">positionalsOrder</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">&quot;first&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;last&quot;</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#root">root</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#timeoutms">timeoutMs</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#version">version</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#watch">watch</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#within">within</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L30">apps/api/src/server.ts:30</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L30">apps/api/src/server.ts:30</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -51,119 +51,119 @@
 <div class="tsd-comment tsd-typography"><p>Required as <code>Authorization: Bearer KEY</code> or <code>X-API-Key: KEY</code> when set; it may run every tool.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L40">apps/api/src/server.ts:40</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L40">apps/api/src/server.ts:40</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="audit"><code class="tsd-tag">Optional</code><span>audit</span><a href="#audit" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">audit</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">entry</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Omit</span><span class="tsd-signature-symbol">&lt;</span><a href="packages_tools_src.AuditEntry.html" class="tsd-signature-type tsd-kind-interface">AuditEntry</a><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">&quot;time&quot;</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-comment tsd-typography"><p>Called after every run, for an audit log.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L54">apps/api/src/server.ts:54</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L54">apps/api/src/server.ts:54</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="concurrency"><code class="tsd-tag">Optional</code><span>concurrency</span><a href="#concurrency" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">concurrency</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>Async jobs run at the same time (default: the number of CPUs).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L56">apps/api/src/server.ts:56</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L56">apps/api/src/server.ts:56</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="cwd"><code class="tsd-tag">Optional</code><span>cwd</span><a href="#cwd" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">cwd</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>Working directory tools run in (default: the server's).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L38">apps/api/src/server.ts:38</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L38">apps/api/src/server.ts:38</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="filter"><code class="tsd-tag">Optional</code><span>filter</span><a href="#filter" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">filter</span><span class="tsd-signature-symbol">?:</span> <a href="packages_tools_src.ToolFilter.html" class="tsd-signature-type tsd-kind-interface">ToolFilter</a></div>
 <div class="tsd-comment tsd-typography"><p>Which tools to serve at all (with the root's <code>allow</code>/<code>deny</code> settings).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L44">apps/api/src/server.ts:44</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L44">apps/api/src/server.ts:44</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="keys"><code class="tsd-tag">Optional</code><span>keys</span><a href="#keys" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">keys</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <a href="apps_api_src.ApiKey.html" class="tsd-signature-type tsd-kind-interface">ApiKey</a><span class="tsd-signature-symbol">&gt;</span></div>
 <div class="tsd-comment tsd-typography"><p>Named keys, each limited to the tools its allow/deny globs let through.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L42">apps/api/src/server.ts:42</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L42">apps/api/src/server.ts:42</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="maxbody"><code class="tsd-tag">Optional</code><span>max<wbr/>Body</span><a href="#maxbody" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">maxBody</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>Largest request body accepted: JSON, multipart, or spooled for an async job (default 10 MiB).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L50">apps/api/src/server.ts:50</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L50">apps/api/src/server.ts:50</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="maxoutput"><code class="tsd-tag">Optional</code><span>max<wbr/>Output</span><a href="#maxoutput" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">maxOutput</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>Keep at most this many bytes of a tool's stdout and stderr (0 or unset: all). Streamed stdout is not kept.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L52">apps/api/src/server.ts:52</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L52">apps/api/src/server.ts:52</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="mcp"><code class="tsd-tag">Optional</code><span>mcp</span><a href="#mcp" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">mcp</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div>
 <div class="tsd-comment tsd-typography"><p>Also serve the tools over MCP (streamable HTTP) at /mcp (default: true).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L58">apps/api/src/server.ts:58</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L58">apps/api/src/server.ts:58</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="name"><code class="tsd-tag">Optional</code><span>name</span><a href="#name" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">name</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>API title (default: the root's name).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L36">apps/api/src/server.ts:36</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L36">apps/api/src/server.ts:36</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="onreload"><code class="tsd-tag">Optional</code><span>on<wbr/>Reload</span><a href="#onreload" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">onReload</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">loaded</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">tools</span><span class="tsd-signature-symbol">:</span> <a href="../types/apps_api_src.ApiTool.html" class="tsd-signature-type tsd-kind-type-alias">ApiTool</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">tree</span><span class="tsd-signature-symbol">:</span> <a href="packages_tools_src.Group.html" class="tsd-signature-type tsd-kind-interface">Group</a> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-comment tsd-typography"><p>Called after each reload when watching.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L62">apps/api/src/server.ts:62</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L62">apps/api/src/server.ts:62</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="positionalsorder"><code class="tsd-tag">Optional</code><span>positionals<wbr/>Order</span><a href="#positionalsorder" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">positionalsOrder</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">&quot;first&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;last&quot;</span></div>
 <div class="tsd-comment tsd-typography"><p>Positionals before or after options (default: first).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L32">apps/api/src/server.ts:32</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L32">apps/api/src/server.ts:32</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="root"><span>root</span><a href="#root" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">root</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>Tools directory or dispatcher definition file.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L34">apps/api/src/server.ts:34</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L34">apps/api/src/server.ts:34</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="timeoutms"><code class="tsd-tag">Optional</code><span>timeout<wbr/>Ms</span><a href="#timeoutms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">timeoutMs</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>Kill a tool after this long (0: never).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L48">apps/api/src/server.ts:48</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L48">apps/api/src/server.ts:48</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="version"><code class="tsd-tag">Optional</code><span>version</span><a href="#version" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">version</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>Server version advertised to clients.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L64">apps/api/src/server.ts:64</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L64">apps/api/src/server.ts:64</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="watch"><code class="tsd-tag">Optional</code><span>watch</span><a href="#watch" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">watch</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div>
 <div class="tsd-comment tsd-typography"><p>Pick up added, changed and removed tools without a restart (default: false; call close() to stop).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L60">apps/api/src/server.ts:60</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L60">apps/api/src/server.ts:60</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="within"><code class="tsd-tag">Optional</code><span>within</span><a href="#within" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">within</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span></div>
 <div class="tsd-comment tsd-typography"><p>Path-valued inputs must resolve inside these directories.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1dd4997c480c1c41af22830821f5204aec0175ca/apps/api/src/server.ts#L46">apps/api/src/server.ts:46</a></li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/apps/api/src/server.ts#L46">apps/api/src/server.ts:46</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
