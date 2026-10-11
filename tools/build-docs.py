@@ -53,6 +53,7 @@ def main():
     run(sys.executable, "tools/test-examples.py")
     run("node", "tools/check-example-adapters.mjs")
     run("node", "tools/build-playground.mjs")
+    run(sys.executable, "tools/test-linux-lab.py")
     run(sys.executable, "tools/build-linux-lab.py")
     run("node", "tools/build-linux-lab.mjs")
     shutil.rmtree(ROOT / "_site", ignore_errors=True)

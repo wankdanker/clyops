@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Build the browser Linux guest and a v86 filesystem from normal Alpine packages."""
 import hashlib
+import http.client
 import json
 from pathlib import Path, PurePosixPath
 import shutil
 import stat
 import subprocess
 import tarfile
+import time
+import urllib.error
 import urllib.request
 import zstandard
 
@@ -24,6 +27,39 @@ BIOS = {
 
 def run(*args):
     return subprocess.check_output(args, cwd=ROOT, text=True).strip()
+
+
+def download_verified(url, cached, checksum):
+    """Retry transient failures; cache only complete, checksum-verified files."""
+    if cached.exists():
+        data = cached.read_bytes()
+        if hashlib.sha256(data).hexdigest() == checksum:
+            return data
+        print(f"Discarding invalid cached {cached.name}", flush=True)
+        cached.unlink()
+    attempts = 4
+    for attempt in range(attempts):
+        try:
+            with urllib.request.urlopen(url, timeout=30) as response:
+                data = response.read()
+        except (urllib.error.URLError, OSError, http.client.HTTPException) as error:
+            if isinstance(error, urllib.error.HTTPError) and error.code not in (408, 429) and error.code < 500:
+                raise
+            if attempt == attempts - 1:
+                raise RuntimeError(f"Could not download {cached.name} after {attempts} attempts") from error
+            delay = 2 ** attempt
+            print(f"Download failed for {cached.name}: {error}; retrying in {delay}s ({attempt + 2}/{attempts})", flush=True)
+            time.sleep(delay)
+            continue
+        if hashlib.sha256(data).hexdigest() != checksum:
+            raise ValueError(f"Invalid checksum for {cached.name}")
+        partial = cached.with_suffix(cached.suffix + ".partial")
+        try:
+            partial.write_bytes(data)
+            partial.replace(cached)
+        finally:
+            partial.unlink(missing_ok=True)
+        return data
 
 
 def guest_tar():
@@ -124,12 +160,8 @@ def build():
         assets[name] = filename
 
     for name, checksum in BIOS.items():
-        cached = CACHE / name
-        if not cached.exists():
-            cached.write_bytes(urllib.request.urlopen(f"https://raw.githubusercontent.com/copy/v86/{BIOS_REVISION}/bios/{name}", timeout=30).read())
-        if hashlib.sha256(cached.read_bytes()).hexdigest() != checksum:
-            raise ValueError(f"Invalid checksum for {name}")
-        asset(name, cached.read_bytes())
+        url = f"https://raw.githubusercontent.com/copy/v86/{BIOS_REVISION}/bios/{name}"
+        asset(name, download_verified(url, CACHE / name, checksum))
     for name in ("v86.wasm", "v86-fallback.wasm"):
         asset(name, (ROOT / "node_modules/v86/build" / name).read_bytes())
     shutil.copyfile(ROOT / "node_modules/v86/build/libv86.mjs", OUTPUT / "libv86.mjs")
