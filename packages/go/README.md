@@ -70,9 +70,9 @@ each has its own help (`mytool db migrate --help`), schema and completion. See t
 
 ## Documentation
 
-Read the [language guide](https://wankdanker.github.io/clyops/languages/go.html)
+Read the [language guide](https://clyops.io/languages/go.html)
 for installation, examples and editor setup, and the
-[complete API reference](https://wankdanker.github.io/clyops/reference.html)
+[complete API reference](https://clyops.io/reference.html)
 for public signatures, return values and errors. The
 [Markdown sources](https://github.com/wankdanker/clyops/tree/main/docs/languages)
 are also readable on GitHub.

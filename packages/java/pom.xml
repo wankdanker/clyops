@@ -11,7 +11,7 @@
 
   <name>clyops</name>
   <description>One-line-per-option CLI parsing: validation, help text, JSON schema, config files and completion.</description>
-  <url>https://wankdanker.github.io/clyops/languages/java.html</url>
+  <url>https://clyops.io/languages/java.html</url>
   <licenses>
     <license><name>MIT</name><url>https://opensource.org/licenses/MIT</url></license>
   </licenses>

@@ -27,6 +27,7 @@ then the site into `_site`, and validates local links and fragments.
 `docs:serve` previews the previously generated references and watches Markdown
 changes. Re-run the full build after changing public interfaces or native comments.
 `DOCS_PATH_PREFIX=/clyops/ pnpm docs:build` validates a GitHub project-site build.
+`DOCS_PATH_PREFIX=/ pnpm docs:build` builds for a custom domain such as `clyops.io`.
 
 ## Content and public interfaces
 
@@ -87,6 +88,10 @@ and deploys successful `main` builds to GitHub Pages. Generated output is stored
 on `docs-pages` so release snapshots survive future deployments and artifact expiry.
 In repository Settings →
 Pages, choose **GitHub Actions** as the source. No custom domain is required.
+The workflow reads the configured Pages URL before building and uses its path
+for assets, navigation, search and publishing. A custom domain such as
+`https://clyops.io/` uses `/`; a GitHub project URL uses `/clyops/`.
+After changing the Pages custom domain, run Docs again to rebuild the links.
 Until Pages is configured, the workflow completes its checks and uploads the
 site artifact, then skips deployment. Enable Pages and run Docs again to publish.
 Allow `main` and release tags in the `github-pages` environment's deployment rules

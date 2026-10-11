@@ -13,7 +13,7 @@ Gem::Specification.new do |s|
   s.license = "MIT"
   s.homepage = "https://github.com/wankdanker/clyops"
   s.metadata = { "source_code_uri" => "https://github.com/wankdanker/clyops/tree/main/packages/ruby",
-                 "documentation_uri" => "https://wankdanker.github.io/clyops/reference/ruby/index.html",
+                 "documentation_uri" => "https://clyops.io/reference/ruby/index.html",
                  "rubygems_mfa_required" => "true" }
   s.required_ruby_version = ">= 3.1"
   s.files = Dir["lib/**/*.rb", "sig/**/*.rbs"] + ["README.md"]

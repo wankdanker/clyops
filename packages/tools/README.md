@@ -68,6 +68,6 @@ pipes still cannot delay settlement indefinitely.
 
 ## Documentation
 
-Read the [Node guide](https://wankdanker.github.io/clyops/node-tools.html) and
-[complete public API reference](https://wankdanker.github.io/clyops/reference/node/index.html).
+Read the [Node guide](https://clyops.io/node-tools.html) and
+[complete public API reference](https://clyops.io/reference/node/index.html).
 Type declarations and documentation comments are included in the package.

@@ -10,7 +10,7 @@ handles parsing, validation, help text, config files, environment variables,
 a JSON schema of the interface, logging helpers and shell completion for
 bash, zsh and fish.
 
-See the [animated project homepage](https://wankdanker.github.io/clyops/) or
+See the [animated project homepage](https://clyops.io/) or
 [run the walkthrough](docs/demo.md): one small deployment-plan tool, from
 generated help to an agent call and an HTTP endpoint.
 
@@ -414,7 +414,7 @@ described in [spec/conformance/README.md](spec/conformance/README.md), add the d
 
 ## Documentation
 
-The [documentation site](https://wankdanker.github.io/clyops/) has a guide for every
+The [documentation site](https://clyops.io/) has a guide for every
 language, runnable examples, editor setup, shared recipes, and complete generated
 API references. The [Markdown guides](docs/index.md) are readable in this repository.
 See [maintaining the docs](docs/maintaining.md) for the native toolchain, checks,

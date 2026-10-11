@@ -5,6 +5,8 @@ section here.
 
 ## [Unreleased]
 
+- Documentation builds use the configured GitHub Pages URL's base path,
+  supporting custom domains at the root without broken assets or navigation.
 - Project homepage with static terminal playback across Python, Bash, TypeScript
   and Rust, demonstrating generated help, validation, schema, MCP and HTTP.
   Includes playback controls, reduced-motion support and a runnable walkthrough;
