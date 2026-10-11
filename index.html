@@ -15,7 +15,7 @@
 <body data-demo-url="/assets/home-demo.json">
   <a class="skip" href="#content">Skip to content</a>
   <header class="site-header wrap">
-    <a class="brand" href="/" aria-label="clyops home"><span class="brand-mark" aria-hidden="true">[<b>c</b>]</span>clyops<span class="version">0.3.0</span></a>
+    <a class="brand" href="/" aria-label="clyops home"><span class="brand-mark" aria-hidden="true">[<b>c</b>]</span>clyops<span class="version">0.4.0</span></a>
     <nav aria-label="Main navigation">
       <a href="#how-it-works">How it works</a>
       <a href="/guide.html">Docs</a>
@@ -83,7 +83,7 @@ print(json.dumps({&quot;service&quot;: args.SERVICE, &quot;env&quot;: args.ENV, 
       <div class="interface-grid">
         <article><span class="interface-number">01 — TERMINAL</span><h3>Stay in your flow.</h3><p>Parsing, validation, generated help and shell completion. Turn a directory of tools into one command with the dispatcher.</p><code>$ ops plan --env staging</code><a href="/applications.html#dispatcher">Explore the dispatcher <span aria-hidden="true">↗︎</span></a></article>
         <article><span class="interface-number">02 — DESKTOP</span><h3>Give scripts a face.</h3><p>The desktop runner builds forms from the schema, streams output and handles secrets, templates and declared effects.</p><div class="mini-form" aria-hidden="true"><span>Environment</span><span>staging <b>⌄</b></span></div><a href="/applications.html#desktop-runner">Meet the desktop runner <span aria-hidden="true">↗︎</span></a></article>
-        <article><span class="interface-number">03 — HTTP</span><h3>Make it an endpoint.</h3><p>Serve a tool directory with JSON input, OpenAPI, streamed I/O and optional jobs. Keep the execution logic in your tool.</p><code>POST /tools/plan</code><a href="/node-tools.html#http-api">Build an HTTP API <span aria-hidden="true">↗︎</span></a></article>
+        <article><span class="interface-number">03 — HTTP + WEB</span><h3>Make it an endpoint.</h3><p>Serve a tool directory with JSON input, OpenAPI and jobs. Open the web runner for typed forms and execution results.</p><code>POST /tools/plan · /ui/</code><a href="/web-runner.html">Explore the web runner <span aria-hidden="true">↗︎</span></a></article>
         <article><span class="interface-number">04 — AGENTS</span><h3>Let agents call it.</h3><p>MCP exposes each tool with typed inputs and effect annotations. Validate arguments before the tool runs.</p><code>plan({ env: "staging" })</code><a href="/node-tools.html#mcp">Connect an MCP client <span aria-hidden="true">↗︎</span></a></article>
       </div>
     </section>

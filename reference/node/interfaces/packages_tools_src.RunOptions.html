@@ -15,14 +15,14 @@
 <div class="tsd-comment tsd-typography"><p>Environment, working directory, input/output handling, timeout, and cancellation for an executable.</p>
 </div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">RunOptions</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#cwd">cwd</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#env">env</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">ProcessEnv</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#maxoutput">maxOutput</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#onstderr">onStderr</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">chunk</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#onstdout">onStdout</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">chunk</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#signal">signal</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">AbortSignal</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#stdin">stdin</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Readable</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Buffer</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">ArrayBufferLike</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#stdout">stdout</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">&quot;text&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;buffer&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;stream&quot;</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#timeoutms">timeoutMs</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div>
-<section class="tsd-panel tsd-hierarchy" data-refl="478">
+<section class="tsd-panel tsd-hierarchy" data-refl="541">
 <h4>Hierarchy (<a href="../hierarchy.html#packages/tools/src.RunOptions">View Summary</a>)</h4>
 <ul class="tsd-hierarchy">
 <li class="tsd-hierarchy-item"><span class="tsd-hierarchy-target">RunOptions</span>
 <ul class="tsd-hierarchy">
 <li class="tsd-hierarchy-item"><a href="packages_tools_src.ToolRunOptions.html" class="tsd-signature-type tsd-kind-interface">ToolRunOptions</a></li></ul></li></ul></section><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/run.ts#L7">packages/tools/src/run.ts:7</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/tools/src/run.ts#L7">packages/tools/src/run.ts:7</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -49,49 +49,49 @@
 <div class="tsd-comment tsd-typography"><p>Working directory used to resolve command-line paths and execute tools.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/run.ts#L9">packages/tools/src/run.ts:9</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/tools/src/run.ts#L9">packages/tools/src/run.ts:9</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="env"><code class="tsd-tag">Optional</code><span>env</span><a href="#env" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">env</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">ProcessEnv</span></div>
 <div class="tsd-comment tsd-typography"><p>Environment supplied to the process or read for option defaults.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/run.ts#L11">packages/tools/src/run.ts:11</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/tools/src/run.ts#L11">packages/tools/src/run.ts:11</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="maxoutput"><code class="tsd-tag">Optional</code><span>max<wbr/>Output</span><a href="#maxoutput" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">maxOutput</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>Keep at most this many bytes of stdout and of stderr (0 or unset: all); the rest is dropped and <code>truncated</code> set.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/run.ts#L29">packages/tools/src/run.ts:29</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/tools/src/run.ts#L29">packages/tools/src/run.ts:29</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="onstderr"><code class="tsd-tag">Optional</code><span>on<wbr/>Stderr</span><a href="#onstderr" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">onStderr</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">chunk</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-comment tsd-typography"><p>Called for each decoded stderr chunk.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/run.ts#L19">packages/tools/src/run.ts:19</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/tools/src/run.ts#L19">packages/tools/src/run.ts:19</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="onstdout"><code class="tsd-tag">Optional</code><span>on<wbr/>Stdout</span><a href="#onstdout" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">onStdout</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">chunk</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-comment tsd-typography"><p>Called for each decoded stdout chunk.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/run.ts#L17">packages/tools/src/run.ts:17</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/tools/src/run.ts#L17">packages/tools/src/run.ts:17</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="signal"><code class="tsd-tag">Optional</code><span>signal</span><a href="#signal" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">signal</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">AbortSignal</span></div>
 <div class="tsd-comment tsd-typography"><p>Abort the process tree (SIGTERM, then SIGKILL after a short grace period).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/run.ts#L15">packages/tools/src/run.ts:15</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/tools/src/run.ts#L15">packages/tools/src/run.ts:15</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="stdin"><code class="tsd-tag">Optional</code><span>stdin</span><a href="#stdin" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">stdin</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Readable</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Buffer</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">ArrayBufferLike</span><span class="tsd-signature-symbol">&gt;</span></div>
 <div class="tsd-comment tsd-typography"><p>Fed to the tool's stdin, which is closed otherwise.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/run.ts#L21">packages/tools/src/run.ts:21</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/tools/src/run.ts#L21">packages/tools/src/run.ts:21</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="stdout"><code class="tsd-tag">Optional</code><span>stdout</span><a href="#stdout" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">stdout</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">&quot;text&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;buffer&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;stream&quot;</span></div>
@@ -100,14 +100,14 @@
 <code>start()</code>'s <code>stdout</code> as the tool writes it.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/run.ts#L27">packages/tools/src/run.ts:27</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/tools/src/run.ts#L27">packages/tools/src/run.ts:27</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="timeoutms"><code class="tsd-tag">Optional</code><span>timeout<wbr/>Ms</span><a href="#timeoutms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">timeoutMs</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>Kill the tool and its process tree after this long; 0 or unset waits forever.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/run.ts#L13">packages/tools/src/run.ts:13</a></li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/tools/src/run.ts#L13">packages/tools/src/run.ts:13</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">

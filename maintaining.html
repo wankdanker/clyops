@@ -9,7 +9,7 @@
 </head>
 <body data-search-index="/search-index.json">
   <a class="skip" href="#content">Skip to content</a>
-  <header><a href="/"><strong>clyops</strong></a><span>Documentation · 0.3.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <header><a href="/"><strong>clyops</strong></a><span>Documentation · 0.4.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
   <div class="shell">
     <nav aria-label="Documentation">
       <a href="/guide.html">Concepts and behavior</a>
@@ -18,6 +18,7 @@
       <a href="/languages/javascript.html">JavaScript / TypeScript</a><a href="/languages/python.html">Python</a><a href="/languages/rust.html">Rust</a><a href="/languages/go.html">Go</a><a href="/languages/java.html">Java</a><a href="/languages/ruby.html">Ruby</a><a href="/languages/c.html">C</a><a href="/languages/bash.html">Bash</a>
       <h2>Tools and servers</h2>
       <a href="/node-tools.html">Node tools, jobs, API and MCP</a>
+      <a href="/web-runner.html">Web runner and shared schema</a>
       <a href="/applications.html">Dispatcher and desktop runner</a>
       <a href="/maintaining.html">Maintaining the docs</a>
       <a href="/versions.html">Release documentation</a>
@@ -26,7 +27,7 @@
     <main id="content"><h1 id="maintaining-the-documentation">Maintaining the documentation</h1>
 <h2 id="build-and-preview">Build and preview</h2>
 <p>The full site build runs on Linux or macOS and uses Markdown guides and native
-API references. Install Node 20+,
+API references. Install Node 20.19+ (22.12+ for Node 22),
 pnpm (the version pinned in <code>package.json</code>), Python 3.10+, Rust, Go 1.21+,
 Java 17+/Maven, Ruby 3.3+, Doxygen and Graphviz (<code>dot</code>). These are documentation build requirements;
 the supported library runtime versions remain those in each language guide.</p>
@@ -81,7 +82,7 @@ the test suite. Generated folders are ignored and rebuilt, not committed.</p>
 using the TypeScript compiler, and Markdown example synchronization. The full
 build also validates TypeDoc references, rustdoc missing docs/links, Doxygen,
 Go public comments, Ruby public methods/RBS, and static HTML links.</p>
-<p>Installed-consumer checks pack all five Node packages and compile a TypeScript
+<p>Installed-consumer checks pack all six public Node packages and compile a TypeScript
 consumer against their exported declarations. Declaration maps must resolve to
 source files included in each tarball, so editor navigation works after installation.
 The Python wheel is installed
@@ -112,6 +113,13 @@ The root site follows <code>main</code>; the displayed package version can conta
 that have not yet been published to a registry.
 <code>tools/version.py set</code> also updates versioned install examples in the guides and
 the Java README. The static Markdown and its release artifacts stay in step.</p>
+<h2 id="web-runner-checks">Web runner checks</h2>
+<p>The Web runner workflow runs the static SvelteKit build and browser tests against
+a real authenticated API and executable tools. Locally, <code>pnpm test:web</code> uses a
+Playwright Chromium installation; <code>PLAYWRIGHT_CHANNEL=chrome pnpm test:web</code> uses
+an installed Chrome. Schema conversion has browser-bundle checks; API tests check
+that UI assets ship and load without weakening tool/job authentication. The private
+web app is copied into the public API package and is not packed/published separately.</p>
 </main>
   </div>
   <footer>Guides are Markdown. API references come from the published source interfaces.</footer>

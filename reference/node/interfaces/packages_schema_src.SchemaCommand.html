@@ -8,21 +8,21 @@
 <div class="col-content">
 <div class="tsd-page-title">
 <ul class="tsd-breadcrumb" aria-label="Breadcrumb">
-<li><a href="../modules/packages_tools_src.html">packages/tools/src</a></li>
+<li><a href="../modules/packages_schema_src.html">packages/schema/src</a></li>
 <li><a href="" aria-current="page">SchemaCommand</a></li></ul>
 <h1>Interface SchemaCommand</h1></div>
 <section class="tsd-panel tsd-comment">
 <div class="tsd-comment tsd-typography"><p>A command (spec section 1.7): its own options only.</p>
 </div></section>
-<div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">SchemaCommand</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#arguments">arguments</a><span class="tsd-signature-symbol">:</span> <a href="packages_tools_src.SchemaArgument.html" class="tsd-signature-type tsd-kind-interface">SchemaArgument</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#commands">commands</a><span class="tsd-signature-symbol">?:</span> <a href="" class="tsd-signature-type tsd-kind-interface">SchemaCommand</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#constraints">constraints</a><span class="tsd-signature-symbol">?:</span> <a href="packages_tools_src.SchemaConstraint.html" class="tsd-signature-type tsd-kind-interface">SchemaConstraint</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#description">description</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#effects">effects</a><span class="tsd-signature-symbol">?:</span> <a href="../types/packages_tools_src.Effect.html" class="tsd-signature-type tsd-kind-type-alias">Effect</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#epilog">epilog</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#name">name</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#options">options</a><span class="tsd-signature-symbol">:</span> <a href="packages_tools_src.SchemaOption.html" class="tsd-signature-type tsd-kind-interface">SchemaOption</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#requiredcommands">requiredCommands</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">{</span><br/>        <span class="tsd-kind-property">command</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>        <span class="tsd-kind-property">description</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>        <span class="tsd-kind-property">installHint</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#stdin">stdin</a><span class="tsd-signature-symbol">?:</span> <a href="packages_tools_src.SchemaStream.html" class="tsd-signature-type tsd-kind-interface">SchemaStream</a><br/>    <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#stdout">stdout</a><span class="tsd-signature-symbol">?:</span> <a href="packages_tools_src.SchemaStream.html" class="tsd-signature-type tsd-kind-interface">SchemaStream</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div>
-<section class="tsd-panel tsd-hierarchy" data-refl="324">
-<h4>Hierarchy (<a href="../hierarchy.html#packages/tools/src.SchemaCommand">View Summary</a>)</h4>
+<div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">SchemaCommand</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#arguments">arguments</a><span class="tsd-signature-symbol">:</span> <a href="packages_schema_src.SchemaArgument.html" class="tsd-signature-type tsd-kind-interface">SchemaArgument</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#commands">commands</a><span class="tsd-signature-symbol">?:</span> <a href="" class="tsd-signature-type tsd-kind-interface">SchemaCommand</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#constraints">constraints</a><span class="tsd-signature-symbol">?:</span> <a href="packages_schema_src.SchemaConstraint.html" class="tsd-signature-type tsd-kind-interface">SchemaConstraint</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#description">description</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#effects">effects</a><span class="tsd-signature-symbol">?:</span> <a href="../types/packages_schema_src.Effect.html" class="tsd-signature-type tsd-kind-type-alias">Effect</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#epilog">epilog</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#name">name</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#options">options</a><span class="tsd-signature-symbol">:</span> <a href="packages_schema_src.SchemaOption.html" class="tsd-signature-type tsd-kind-interface">SchemaOption</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#requiredcommands">requiredCommands</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">{</span><br/>        <span class="tsd-kind-property">command</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>        <span class="tsd-kind-property">description</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>        <span class="tsd-kind-property">installHint</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#stdin">stdin</a><span class="tsd-signature-symbol">?:</span> <a href="packages_schema_src.SchemaStream.html" class="tsd-signature-type tsd-kind-interface">SchemaStream</a><br/>    <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#stdout">stdout</a><span class="tsd-signature-symbol">?:</span> <a href="packages_schema_src.SchemaStream.html" class="tsd-signature-type tsd-kind-interface">SchemaStream</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div>
+<section class="tsd-panel tsd-hierarchy" data-refl="312">
+<h4>Hierarchy (<a href="../hierarchy.html#packages/schema/src.SchemaCommand">View Summary</a>)</h4>
 <ul class="tsd-hierarchy">
-<li class="tsd-hierarchy-item"><a href="packages_tools_src.SchemaBody.html" class="tsd-signature-type tsd-kind-interface">SchemaBody</a>
+<li class="tsd-hierarchy-item"><a href="packages_schema_src.SchemaBody.html" class="tsd-signature-type tsd-kind-interface">SchemaBody</a>
 <ul class="tsd-hierarchy">
 <li class="tsd-hierarchy-item"><span class="tsd-hierarchy-target">SchemaCommand</span></li></ul></li></ul></section><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/schema.ts#L104">packages/tools/src/schema.ts:104</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/schema/src/types.ts#L98">packages/schema/src/types.ts:98</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -47,67 +47,67 @@
 <section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="arguments"><span>arguments</span><a href="#arguments" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<div class="tsd-signature"><span class="tsd-kind-property">arguments</span><span class="tsd-signature-symbol">:</span> <a href="packages_tools_src.SchemaArgument.html" class="tsd-signature-type tsd-kind-interface">SchemaArgument</a><span class="tsd-signature-symbol">[]</span></div>
+<div class="tsd-signature"><span class="tsd-kind-property">arguments</span><span class="tsd-signature-symbol">:</span> <a href="packages_schema_src.SchemaArgument.html" class="tsd-signature-type tsd-kind-interface">SchemaArgument</a><span class="tsd-signature-symbol">[]</span></div>
 <div class="tsd-comment tsd-typography"><p>Positional arguments in registration order.</p>
 </div><aside class="tsd-sources">
-<p>Inherited from <a href="packages_tools_src.SchemaBody.html">SchemaBody</a>.<a href="packages_tools_src.SchemaBody.html#arguments">arguments</a></p>
+<p>Inherited from <a href="packages_schema_src.SchemaBody.html">SchemaBody</a>.<a href="packages_schema_src.SchemaBody.html#arguments">arguments</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/schema.ts#L79">packages/tools/src/schema.ts:79</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/schema/src/types.ts#L73">packages/schema/src/types.ts:73</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="commands"><code class="tsd-tag">Optional</code><span>commands</span><a href="#commands" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">commands</span><span class="tsd-signature-symbol">?:</span> <a href="" class="tsd-signature-type tsd-kind-interface">SchemaCommand</a><span class="tsd-signature-symbol">[]</span></div>
 <div class="tsd-comment tsd-typography"><p>Nested commands with their own options, arguments, and metadata.</p>
 </div><aside class="tsd-sources">
-<p>Inherited from <a href="packages_tools_src.SchemaBody.html">SchemaBody</a>.<a href="packages_tools_src.SchemaBody.html#commands">commands</a></p>
+<p>Inherited from <a href="packages_schema_src.SchemaBody.html">SchemaBody</a>.<a href="packages_schema_src.SchemaBody.html#commands">commands</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/schema.ts#L100">packages/tools/src/schema.ts:100</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/schema/src/types.ts#L94">packages/schema/src/types.ts:94</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="constraints"><code class="tsd-tag">Optional</code><span>constraints</span><a href="#constraints" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<div class="tsd-signature"><span class="tsd-kind-property">constraints</span><span class="tsd-signature-symbol">?:</span> <a href="packages_tools_src.SchemaConstraint.html" class="tsd-signature-type tsd-kind-interface">SchemaConstraint</a><span class="tsd-signature-symbol">[]</span></div>
+<div class="tsd-signature"><span class="tsd-kind-property">constraints</span><span class="tsd-signature-symbol">?:</span> <a href="packages_schema_src.SchemaConstraint.html" class="tsd-signature-type tsd-kind-interface">SchemaConstraint</a><span class="tsd-signature-symbol">[]</span></div>
 <div class="tsd-comment tsd-typography"><p>Declared exclusive, requires, and oneOf option relationships.</p>
 </div><aside class="tsd-sources">
-<p>Inherited from <a href="packages_tools_src.SchemaBody.html">SchemaBody</a>.<a href="packages_tools_src.SchemaBody.html#constraints">constraints</a></p>
+<p>Inherited from <a href="packages_schema_src.SchemaBody.html">SchemaBody</a>.<a href="packages_schema_src.SchemaBody.html#constraints">constraints</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/schema.ts#L94">packages/tools/src/schema.ts:94</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/schema/src/types.ts#L88">packages/schema/src/types.ts:88</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="description"><span>description</span><a href="#description" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">description</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>Human-readable description shown in help and documentation.</p>
 </div><aside class="tsd-sources">
-<p>Inherited from <a href="packages_tools_src.SchemaBody.html">SchemaBody</a>.<a href="packages_tools_src.SchemaBody.html#description">description</a></p>
+<p>Inherited from <a href="packages_schema_src.SchemaBody.html">SchemaBody</a>.<a href="packages_schema_src.SchemaBody.html#description">description</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/schema.ts#L75">packages/tools/src/schema.ts:75</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/schema/src/types.ts#L69">packages/schema/src/types.ts:69</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="effects"><code class="tsd-tag">Optional</code><span>effects</span><a href="#effects" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<div class="tsd-signature"><span class="tsd-kind-property">effects</span><span class="tsd-signature-symbol">?:</span> <a href="../types/packages_tools_src.Effect.html" class="tsd-signature-type tsd-kind-type-alias">Effect</a><span class="tsd-signature-symbol">[]</span></div>
+<div class="tsd-signature"><span class="tsd-kind-property">effects</span><span class="tsd-signature-symbol">?:</span> <a href="../types/packages_schema_src.Effect.html" class="tsd-signature-type tsd-kind-type-alias">Effect</a><span class="tsd-signature-symbol">[]</span></div>
 <div class="tsd-comment tsd-typography"><p>Declared read-only, idempotent, destructive, or network effects.</p>
 </div><aside class="tsd-sources">
-<p>Inherited from <a href="packages_tools_src.SchemaBody.html">SchemaBody</a>.<a href="packages_tools_src.SchemaBody.html#effects">effects</a></p>
+<p>Inherited from <a href="packages_schema_src.SchemaBody.html">SchemaBody</a>.<a href="packages_schema_src.SchemaBody.html#effects">effects</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/schema.ts#L92">packages/tools/src/schema.ts:92</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/schema/src/types.ts#L86">packages/schema/src/types.ts:86</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="epilog"><span>epilog</span><a href="#epilog" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">epilog</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>Text shown after the help sections.</p>
 </div><aside class="tsd-sources">
-<p>Inherited from <a href="packages_tools_src.SchemaBody.html">SchemaBody</a>.<a href="packages_tools_src.SchemaBody.html#epilog">epilog</a></p>
+<p>Inherited from <a href="packages_schema_src.SchemaBody.html">SchemaBody</a>.<a href="packages_schema_src.SchemaBody.html#epilog">epilog</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/schema.ts#L77">packages/tools/src/schema.ts:77</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/schema/src/types.ts#L71">packages/schema/src/types.ts:71</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="name"><span>name</span><a href="#name" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">name</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>Program, command, option, or argument name as declared in its containing type.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/schema.ts#L106">packages/tools/src/schema.ts:106</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/schema/src/types.ts#L100">packages/schema/src/types.ts:100</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="options"><span>options</span><a href="#options" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<div class="tsd-signature"><span class="tsd-kind-property">options</span><span class="tsd-signature-symbol">:</span> <a href="packages_tools_src.SchemaOption.html" class="tsd-signature-type tsd-kind-interface">SchemaOption</a><span class="tsd-signature-symbol">[]</span></div>
+<div class="tsd-signature"><span class="tsd-kind-property">options</span><span class="tsd-signature-symbol">:</span> <a href="packages_schema_src.SchemaOption.html" class="tsd-signature-type tsd-kind-interface">SchemaOption</a><span class="tsd-signature-symbol">[]</span></div>
 <div class="tsd-comment tsd-typography"><p>Options declared at this command level, in registration order.</p>
 </div><aside class="tsd-sources">
-<p>Inherited from <a href="packages_tools_src.SchemaBody.html">SchemaBody</a>.<a href="packages_tools_src.SchemaBody.html#options">options</a></p>
+<p>Inherited from <a href="packages_schema_src.SchemaBody.html">SchemaBody</a>.<a href="packages_schema_src.SchemaBody.html#options">options</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/schema.ts#L81">packages/tools/src/schema.ts:81</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/schema/src/types.ts#L75">packages/schema/src/types.ts:75</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="requiredcommands"><span>required<wbr/>Commands</span><a href="#requiredcommands" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">requiredCommands</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">command</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">description</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">installHint</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">[]</span></div>
@@ -128,25 +128,25 @@
 <h5><span class="tsd-kind-property">installHint</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span></h5>
 <div class="tsd-comment tsd-typography"><p>Installation instructions when the executable is absent.</p>
 </div></li></ul></div><aside class="tsd-sources">
-<p>Inherited from <a href="packages_tools_src.SchemaBody.html">SchemaBody</a>.<a href="packages_tools_src.SchemaBody.html#requiredcommands">requiredCommands</a></p>
+<p>Inherited from <a href="packages_schema_src.SchemaBody.html">SchemaBody</a>.<a href="packages_schema_src.SchemaBody.html#requiredcommands">requiredCommands</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/schema.ts#L83">packages/tools/src/schema.ts:83</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/schema/src/types.ts#L77">packages/schema/src/types.ts:77</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="stdin"><code class="tsd-tag">Optional</code><span>stdin</span><a href="#stdin" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<div class="tsd-signature"><span class="tsd-kind-property">stdin</span><span class="tsd-signature-symbol">?:</span> <a href="packages_tools_src.SchemaStream.html" class="tsd-signature-type tsd-kind-interface">SchemaStream</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></div>
+<div class="tsd-signature"><span class="tsd-kind-property">stdin</span><span class="tsd-signature-symbol">?:</span> <a href="packages_schema_src.SchemaStream.html" class="tsd-signature-type tsd-kind-interface">SchemaStream</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></div>
 <div class="tsd-comment tsd-typography"><p>Declared input stream, or null/absent when none is declared.</p>
 </div><aside class="tsd-sources">
-<p>Inherited from <a href="packages_tools_src.SchemaBody.html">SchemaBody</a>.<a href="packages_tools_src.SchemaBody.html#stdin">stdin</a></p>
+<p>Inherited from <a href="packages_schema_src.SchemaBody.html">SchemaBody</a>.<a href="packages_schema_src.SchemaBody.html#stdin">stdin</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/schema.ts#L96">packages/tools/src/schema.ts:96</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/schema/src/types.ts#L90">packages/schema/src/types.ts:90</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="stdout"><code class="tsd-tag">Optional</code><span>stdout</span><a href="#stdout" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<div class="tsd-signature"><span class="tsd-kind-property">stdout</span><span class="tsd-signature-symbol">?:</span> <a href="packages_tools_src.SchemaStream.html" class="tsd-signature-type tsd-kind-interface">SchemaStream</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></div>
+<div class="tsd-signature"><span class="tsd-kind-property">stdout</span><span class="tsd-signature-symbol">?:</span> <a href="packages_schema_src.SchemaStream.html" class="tsd-signature-type tsd-kind-interface">SchemaStream</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></div>
 <div class="tsd-comment tsd-typography"><p>Declared output stream, or null/absent when undeclared (text output).</p>
 </div><aside class="tsd-sources">
-<p>Inherited from <a href="packages_tools_src.SchemaBody.html">SchemaBody</a>.<a href="packages_tools_src.SchemaBody.html#stdout">stdout</a></p>
+<p>Inherited from <a href="packages_schema_src.SchemaBody.html">SchemaBody</a>.<a href="packages_schema_src.SchemaBody.html#stdout">stdout</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/7041a2e7e3754e439f7939a34b47008b80bd327c/packages/tools/src/schema.ts#L98">packages/tools/src/schema.ts:98</a></li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/0d738f01149695fae4c9ed096606c0e309d82b1d/packages/schema/src/types.ts#L92">packages/schema/src/types.ts:92</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
