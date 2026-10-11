@@ -1,10 +1,17 @@
 ---
-title: Documentation
+title: Small tools, big reach
+layout: home.njk
+description: Define a CLI in your language. Use the same tool from terminals, desktop forms, HTTP and AI agents.
 ---
-# clyops documentation
+# Small tools. Big reach.
 
-clyops registers command-line options in one line and resolves them consistently
-across Bash, JavaScript, TypeScript, Python, Rust, C, Go, Ruby and Java.
+Define your CLI once. Use the same tool from terminals, desktop forms, HTTP and
+AI agents. clyops turns the options beside your code into a consistent,
+machine-readable contract across nine language implementations.
+
+The [homepage walkthrough](demo.md) follows a small deployment-plan tool from
+its source code to generated help, its schema, an MCP tool and an HTTP endpoint.
+The tool only prints a plan; it changes no infrastructure.
 
 Choose a [language guide](reference.md) for installation, a runnable example,
 editor support and its complete API reference. Start with [shared behavior](guide.md)

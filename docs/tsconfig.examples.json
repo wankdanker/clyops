@@ -1,4 +1,4 @@
 {
   "extends": "./tsconfig.json",
-  "include": ["examples/quickstart.ts"]
+  "include": ["examples/quickstart.ts", "examples/home/plan.ts"]
 }

@@ -49,6 +49,7 @@ def main():
         lines += [f"## `{match[1]}`", "", *comments, ""]
     (generated / "bash.md").write_text("\n".join(lines))
     run(sys.executable, "tools/check-doc-examples.py")
+    run("node", "tools/build-home-demo.mjs")
     shutil.rmtree(ROOT / "_site", ignore_errors=True)
     run("pnpm", "exec", "eleventy", "--config=eleventy.config.mjs")
     run(sys.executable, "tools/check-doc-links.py", "_site")

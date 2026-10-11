@@ -5,6 +5,7 @@ export default function (config) {
   // Generated reference Markdown is ignored by Git, but is a site input.
   config.setUseGitIgnore(false);
   config.addPassthroughCopy({ 'docs/assets': 'assets', 'docs/_native': 'reference' });
+  config.addPassthroughCopy({ 'docs/_generated/home-demo.json': 'assets/home-demo.json', 'docs/examples/home': 'demos' });
   config.ignores.add('docs/_native/**');
   config.ignores.add('docs/examples/**');
   config.ignores.add('docs/README.md');

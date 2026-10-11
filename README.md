@@ -1,9 +1,18 @@
 # clyops
 
-**One line per option, every language.** Register your options and arguments
-once at the top of a program, and clyops handles the rest: parsing, validation,
-help text, config files, environment variables, a JSON schema of the interface,
-logging helpers and shell completion for bash, zsh and fish.
+**Define your CLI once. Use it from terminals, desktop forms, HTTP and AI agents.**
+clyops turns the options beside your code into a consistent, machine-readable
+contract. Keep the execution logic in your language; use the same tool through
+the terminal, the desktop runner, the HTTP API or an MCP client.
+
+Register your options and arguments once at the top of a program, and clyops
+handles parsing, validation, help text, config files, environment variables,
+a JSON schema of the interface, logging helpers and shell completion for
+bash, zsh and fish.
+
+See the [animated project homepage](https://wankdanker.github.io/clyops/) or
+[run the walkthrough](docs/demo.md): one small deployment-plan tool, from
+generated help to an agent call and an HTTP endpoint.
 
 The same behavior ships for **Bash, JavaScript, TypeScript, Python, Rust, C,
 Go, Ruby and Java**. Every implementation is checked against one shared [specification](spec/SPEC.md)

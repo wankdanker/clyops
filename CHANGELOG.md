@@ -5,6 +5,10 @@ section here.
 
 ## [Unreleased]
 
+- Project homepage with static terminal playback across Python, Bash, TypeScript
+  and Rust, demonstrating generated help, validation, schema, MCP and HTTP.
+  Includes playback controls, reduced-motion support and a runnable walkthrough;
+  demo output is captured and verified during the documentation build.
 - Per-language Markdown guides, runnable examples and complete generated API
   references in an Eleventy documentation site. CI checks public documentation,
   installed-consumer typing, examples and links; Pages deployment preserves
