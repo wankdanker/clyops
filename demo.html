@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>From script to agent · clyops</title>
+  <link rel="stylesheet" href="/clyops/assets/docs.css">
+  <script defer src="/clyops/assets/search.js"></script>
+</head>
+<body data-search-index="/clyops/search-index.json">
+  <a class="skip" href="#content">Skip to content</a>
+  <header><a href="/clyops/"><strong>clyops</strong></a><span>Documentation · 0.3.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <div class="shell">
+    <nav aria-label="Documentation">
+      <a href="/clyops/guide.html">Concepts and behavior</a>
+      <a href="/clyops/reference.html">API references</a>
+      <h2>Languages</h2>
+      <a href="/clyops/languages/javascript.html">JavaScript / TypeScript</a><a href="/clyops/languages/python.html">Python</a><a href="/clyops/languages/rust.html">Rust</a><a href="/clyops/languages/go.html">Go</a><a href="/clyops/languages/java.html">Java</a><a href="/clyops/languages/ruby.html">Ruby</a><a href="/clyops/languages/c.html">C</a><a href="/clyops/languages/bash.html">Bash</a>
+      <h2>Tools and servers</h2>
+      <a href="/clyops/node-tools.html">Node tools, jobs, API and MCP</a>
+      <a href="/clyops/applications.html">Dispatcher and desktop runner</a>
+      <a href="/clyops/maintaining.html">Maintaining the docs</a>
+      <a href="/clyops/versions.html">Release documentation</a>
+      <form action="/clyops/search.html" role="search"><label for="search">Search guides</label><input id="search" name="q" type="search"><button>Search</button></form>
+    </nav>
+    <main id="content"><h1 id="from-script-to-agent">From script to agent</h1>
+<p>The homepage follows a tiny tool called <code>plan</code>. It validates a service, an
+environment and a replica count, then prints a JSON deployment plan. It changes
+no infrastructure. The same example works in Python, Bash, TypeScript and Rust.</p>
+<p>The animation is static illustrative playback. Help and tool results are captured
+from the actual programs during the documentation build, which also calls each
+variant through MCP and HTTP. The agent conversation is illustrative; it is not
+a recorded Claude session. Schema and HTTP frames show selected fields to fit
+the terminal. Browsers do not execute scripts or connect to an agent.</p>
+<h2 id="write-the-tool">Write the tool</h2>
+<p>Create a project directory with a <code>scripts</code> folder. Pick a language and install
+its library using the corresponding guide:</p>
+<table>
+<thead>
+<tr>
+<th>Language</th>
+<th>Example source</th>
+<th>Guide</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python</td>
+<td><a href="/clyops/demos/plan.py">plan.py</a></td>
+<td><a href="/clyops/languages/python.html">Python</a></td>
+</tr>
+<tr>
+<td>Bash</td>
+<td><a href="/clyops/demos/plan.sh">plan.sh</a></td>
+<td><a href="/clyops/languages/bash.html">Bash</a></td>
+</tr>
+<tr>
+<td>TypeScript</td>
+<td><a href="/clyops/demos/plan.ts">plan.ts</a></td>
+<td><a href="/clyops/languages/javascript.html">JavaScript / TypeScript</a></td>
+</tr>
+<tr>
+<td>Rust</td>
+<td><a href="/clyops/demos/plan.rs">plan.rs</a></td>
+<td><a href="/clyops/languages/rust.html">Rust</a></td>
+</tr>
+</tbody>
+</table>
+<p>These source downloads are generated website destinations. On GitHub, use
+the <a href="https://github.com/wankdanker/clyops/tree/main/docs/examples/home">example directory</a> instead.</p>
+<p>For Python, install <code>clyops</code>, save <code>plan.py</code> in <code>scripts</code>, then:</p>
+<pre><code class="language-sh">chmod +x scripts/plan.py
+python scripts/plan.py --service api --env staging --replicas 2
+python scripts/plan.py --help
+python scripts/plan.py --help-json-schema
+</code></pre>
+<p>The plan is:</p>
+<pre><code class="language-json">{&quot;service&quot;: &quot;api&quot;, &quot;env&quot;: &quot;staging&quot;, &quot;replicas&quot;: 2}
+</code></pre>
+<p>The help text includes <code>--service</code>, <code>--env</code> and <code>--replicas</code>, defaults and accepted
+values. <code>--replicas 99</code> fails validation and exits with status 1. The schema
+describes the same interface, the <code>read-only</code> effect and JSON stdout.</p>
+<p>For Bash, put <code>clyops.sh</code> in the project root, save <code>scripts/plan.sh</code> and make it
+executable. Run <code>bash scripts/plan.sh</code> with the same options. For TypeScript,
+install <code>clyops</code> and <code>tsx</code>, save <code>scripts/plan.ts</code>, make it executable and run
+<code>pnpm exec tsx scripts/plan.ts</code>. The TypeScript shebang uses <code>env -S</code> to launch
+<code>pnpm exec tsx</code> when a server invokes the file directly. For Rust, put <code>plan.rs</code>
+in a Cargo project's <code>src/main.rs</code>, add <code>clyops</code> with <code>cargo add clyops</code>, build
+with <code>cargo build --release</code>, and copy the executable to <code>scripts/plan</code>.
+Keep only your chosen variant in the served directory so it appears as one tool.</p>
+<h2 id="connect-an-agent">Connect an agent</h2>
+<p>Install the Node adapters in the project root:</p>
+<pre><code class="language-sh">pnpm add clyops-mcp clyops-api
+</code></pre>
+<p>Register the directory with Claude Code, then start a session:</p>
+<pre><code class="language-sh">claude mcp add --transport stdio ops -- pnpm exec clyops-mcp --root ./scripts --read-only
+claude
+</code></pre>
+<p>This uses Claude Code's <a href="https://code.claude.com/docs/en/mcp#option-3-add-a-local-stdio-server">local stdio MCP configuration</a>.
+Run from the project root; a client launched from another directory can use
+absolute paths and <code>pnpm --dir /absolute/project exec ...</code>. Follow the client's
+connection and approval prompts. Other MCP clients can use <code>pnpm</code> as the command
+with <code>exec</code>, <code>clyops-mcp</code>, <code>--root</code> and the absolute scripts directory as arguments.</p>
+<p>An illustrative request is: “Plan two api replicas in staging.” The agent can call
+the <code>plan</code> tool with this input:</p>
+<pre><code class="language-json">{&quot;service&quot;: &quot;api&quot;, &quot;env&quot;: &quot;staging&quot;, &quot;replicas&quot;: 2}
+</code></pre>
+<p>The server derives the tool's inputs from its schema, validates them, runs the
+program and returns the plan. The tool's declared read-only effect becomes an
+MCP annotation; <code>--read-only</code> filters the directory to tools declaring that effect.
+See <a href="/clyops/node-tools.html#mcp">MCP setup and behavior</a> for the full interface.</p>
+<h2 id="serve-the-same-tool-over-http">Serve the same tool over HTTP</h2>
+<p>In one terminal:</p>
+<pre><code class="language-sh">pnpm exec clyops-api --root ./scripts --read-only
+</code></pre>
+<p>In another:</p>
+<pre><code class="language-sh">curl localhost:8080/tools/plan \
+  -H 'content-type: application/json' \
+  -d '{&quot;service&quot;:&quot;api&quot;,&quot;env&quot;:&quot;staging&quot;,&quot;replicas&quot;:2}'
+</code></pre>
+<p>The response includes <code>ok</code>, <code>exitCode</code>, the captured output and its parsed <code>json</code>
+plan. <code>/openapi.json</code> describes the HTTP interface. See the <a href="/clyops/node-tools.html#http-api">HTTP guide</a>
+for the complete response, authentication, filters, jobs and streamed I/O.</p>
+<h2 id="open-the-desktop-runner">Open the desktop runner</h2>
+<p>Install the runner from the <a href="https://github.com/wankdanker/clyops/releases">GitHub releases</a>
+and select the same scripts directory. It reads the schema to create fields for
+service, environment and replica count, and streams the tool's output when you
+run it. See the <a href="/clyops/applications.html#desktop-runner">desktop guide</a>.</p>
+</main>
+  </div>
+  <footer>Guides are Markdown. API references come from the published source interfaces.</footer>
+</body>
+</html>
