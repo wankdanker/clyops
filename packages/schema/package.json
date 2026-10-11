@@ -1,6 +1,6 @@
 {
   "name": "clyops-schema",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Browser-compatible clyops schema types, JSON Schema conversion and form metadata.",
   "license": "MIT",
   "repository": {

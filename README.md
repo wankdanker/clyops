@@ -394,7 +394,7 @@ pnpm --filter clyops-runner tauri dev
 ```
 
 The root `packageManager` field pins pnpm for local tools and CI.
-`pnpm-workspace.yaml` includes all eight packages and apps; the private desktop
+`pnpm-workspace.yaml` includes all nine packages and apps; the private desktop
 frontend is built separately and excluded from release packing and publishing.
 The private web app is built with the API and copied into its package; it is also
 excluded from standalone registry publishing.
@@ -463,7 +463,8 @@ npm, PyPI, crates.io and RubyGems is a separate manual workflow ([publish.yml](.
 It needs the `CARGO_REGISTRY_TOKEN` and `RUBYGEMS_API_KEY` secrets, plus PyPI trusted publishing for
 `publish.yml` with environment `pypi`. npm uses trusted publishing without an `NPM_TOKEN` secret:
 configure `wankdanker/clyops`, workflow `publish.yml`, no environment, and allow direct publishing
-on each npm package (`clyops`, `clyops-tools`, `clyops-jobs`, `clyops-mcp`, and `clyops-api`).
+on each npm package (`clyops`, `clyops-schema`, `clyops-tools`, `clyops-jobs`,
+`clyops-mcp`, and `clyops-api`).
 The registry job installs, builds, tests, and publishes through pnpm on Node 24.
 pnpm 10 delegates registry uploads to npm, so CI installs npm 11 through pnpm
 for OIDC authentication. Publishing runs in workspace dependency order, excludes

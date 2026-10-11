@@ -5,16 +5,22 @@ section here.
 
 ## [Unreleased]
 
-- Web runner stdout and stderr render ANSI colors and styles, with a plain-text
-  toggle and original-byte downloads. API startup includes the full UI URL.
-- The API CLI exits with an actionable error on occupied ports instead of
-  incorrectly announcing that it is serving; successful startup lists the UI URL.
+## [0.4.0] - 2026-10-11
+
+### Web runner and shared schema
+
 - Static SvelteKit web runner served by clyops-api at `/ui/`, with typed forms,
   explicit inheritance/overrides, JSON editing, non-secret templates, stdin and
   uploads, jobs/cancellation, destructive confirmation and authenticated downloads.
 - Browser-compatible clyops-schema package shared by REST/MCP conversion, the web
   runner and desktop JSON editor. Desktop scalar/array controls use shared numeric
   ranges and choice lists. Browser integration checks exercise real tool execution.
+- Web runner stdout and stderr render ANSI colors and styles, with a plain-text
+  toggle and original-byte downloads.
+- The API CLI exits with an actionable error on occupied ports instead of
+  incorrectly announcing that it is serving; successful startup lists the full UI URL.
+
+### Documentation and project website
 
 - Documentation builds use the configured GitHub Pages URL's base path,
   supporting custom domains at the root without broken assets or navigation.
