@@ -6,6 +6,7 @@ export default function (config) {
   config.setUseGitIgnore(false);
   config.addPassthroughCopy({ 'docs/assets': 'assets', 'docs/_native': 'reference' });
   config.addPassthroughCopy({ 'docs/_generated/home-demo.json': 'assets/home-demo.json', 'docs/examples/home': 'demos' });
+  config.addPassthroughCopy({ 'docs/_generated/playground-files.json': 'assets/playground-files.json' });
   config.ignores.add('docs/_native/**');
   config.ignores.add('docs/examples/**');
   config.ignores.add('docs/README.md');

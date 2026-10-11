@@ -14,6 +14,18 @@ See the [animated project homepage](https://clyops.io/) or
 [run the walkthrough](docs/demo.md): one small deployment-plan tool, from
 generated help to an agent call and an HTTP endpoint.
 
+Try the [mixed Bash/Python scripts](examples/README.md) immediately after cloning:
+
+```sh
+./examples/scripts/plan.py --env production --replicas 3
+./examples/scripts/report.py --format table
+./examples/scripts/transcode.sh examples/data/tone.wav /tmp/clyops-demo.m4a
+```
+
+No library compilation or pip dependencies are needed. FFmpeg and curl wrappers
+preview commands before explicit execution. The [browser playground](https://clyops.io/#playground)
+executes the Python examples in your tab.
+
 The same behavior ships for **Bash, JavaScript, TypeScript, Python, Rust, C,
 Go, Ruby and Java**. Every implementation is checked against one shared [specification](spec/SPEC.md)
 and [conformance suite](spec/conformance/), so a tool keeps the same help
@@ -254,6 +266,9 @@ Global:
 The [spec](spec/SPEC.md) is the precise reference for all of it.
 
 ## Shell completion
+
+The [completion guide](docs/completion.md) has copyable Bash, Zsh and Fish setup,
+including the example scripts and a dispatcher wrapper.
 
 Every clyops program completes itself. Add one line to your shell startup:
 

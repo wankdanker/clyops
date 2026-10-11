@@ -18,7 +18,8 @@
     "docs:serve": "pnpm exec eleventy --config=eleventy.config.mjs --serve",
     "docs:types": "pnpm exec tsc -p docs/tsconfig.examples.json --noEmit",
     "build:web": "pnpm --filter clyops-schema run build && pnpm --filter clyops-web run build",
-    "test:web": "pnpm --filter clyops-web run test:browser"
+    "test:web": "pnpm --filter clyops-web run test:browser",
+    "test:docs-browser": "pnpm --filter clyops-web exec playwright test --config playwright.docs.config.ts"
   },
   "devDependencies": {
     "@11ty/eleventy": "3.1.6",

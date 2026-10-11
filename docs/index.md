@@ -5,6 +5,9 @@ description: Define a CLI in your language. Use the same tool from terminals, de
 ---
 # Small tools. Big reach.
 
+Try the [clone-and-run Bash/Python scripts](examples.md),
+[browser playground](/#playground), or [set up Bash, Zsh and Fish completion](completion.md).
+
 Define your CLI once. Use the same tool from terminals, desktop forms, HTTP and
 AI agents. clyops turns the options beside your code into a consistent,
 machine-readable contract across nine language implementations.

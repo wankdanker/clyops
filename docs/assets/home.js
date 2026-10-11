@@ -1,4 +1,4 @@
-// Static, precomputed playback. No tools or agents run in the visitor's browser.
+// Static, precomputed hero playback. The separate Python playground runs real tools.
 (async () => {
   const demo = document.querySelector('#terminal-demo');
   if (!demo) return;

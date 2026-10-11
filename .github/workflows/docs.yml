@@ -69,6 +69,19 @@ jobs:
           python3 tools/test-doc-publishing.py
           cargo test --locked --manifest-path packages/rust/Cargo.toml --doc
           RBS_TEST_TARGET='Clyops::Cli' RBS_TEST_OPT='-I packages/ruby/sig' ruby -Ipackages/ruby/lib -rrbs/test/setup packages/ruby/test/test_clyops.rb
+      - name: Verify the real browser playground
+        env:
+          PROJECT_PREFIX: ${{ steps.pages.outputs.base_prefix || format('/{0}/', github.event.repository.name) }}
+        run: |
+          export DOCS_PATH_PREFIX="$PROJECT_PREFIX"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            export DOCS_PATH_PREFIX="${PROJECT_PREFIX}versions/$GITHUB_REF_NAME/"
+          fi
+          pnpm --filter clyops-web exec playwright install --with-deps chromium
+          pnpm test:docs-browser
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: docs-browser-test-results, path: apps/web/test-results }
       - uses: actions/upload-artifact@v4
         with: { name: docs-site, path: _site, include-hidden-files: true }
 

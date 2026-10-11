@@ -5,6 +5,11 @@ section here.
 
 ## [Unreleased]
 
+- Clone-and-run Bash/Python example tools with bundled sample data, FFmpeg/curl
+  wrappers that preview by default, and API/MCP/dispatcher walkthroughs.
+- A real Python browser playground on the static homepage, with help, validation,
+  schemas, stdin, command history and completion. Prominent Bash/Zsh/Fish setup.
+
 ## [0.4.0] - 2026-10-11
 
 ### Web runner and shared schema

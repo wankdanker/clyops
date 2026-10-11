@@ -1,0 +1,1 @@
+{"service":"api","replicas":2,"env":"staging","tags":["demo","read-only"]}

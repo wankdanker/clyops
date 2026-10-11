@@ -141,6 +141,9 @@ I/O. Schemas carry these declarations for API/MCP/desktop consumers.
 
 ## Help, schema and shell completion
 
+See [Bash, Zsh and Fish setup](completion.md) for startup files, PATH, sample tools
+and completing a whole directory with the dispatcher.
+
 Every standalone program supports `--help`, `--help-json-schema`, and
 `--completion bash|zsh|fish`. For example:
 

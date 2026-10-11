@@ -11,6 +11,7 @@
   <meta property="og:type" content="website">
   <link rel="stylesheet" href="{{ '/assets/home.css' | url }}">
   <script defer src="{{ '/assets/home.js' | url }}"></script>
+  <script defer src="{{ '/assets/playground.js' | url }}"></script>
 </head>
 <body data-demo-url="{{ '/assets/home-demo.json' | url }}">
   <a class="skip" href="#content">Skip to content</a>
@@ -29,7 +30,7 @@
         <h1 id="hero-title">Small tools.<br><span>Big reach.</span></h1>
         <p class="hero-lead">Define your CLI once.<br>Use it from <strong>terminals, desktop forms,<br class="desktop-break"> HTTP, and AI agents.</strong></p>
         <p class="hero-description">Your language. Your scripts. One consistent contract.<br>clyops makes the tools you write accessible wherever work happens.</p>
-        <div class="hero-actions"><a class="button primary" href="{{ '/reference.html' | url }}">Build your first tool <span aria-hidden="true">→</span></a><a class="text-link" href="{{ '/demo.html' | url }}">Follow the walkthrough <span aria-hidden="true">↗︎</span></a></div>
+        <div class="hero-actions"><a class="button primary" href="#playground">Try it in your browser <span aria-hidden="true">→</span></a><a class="text-link" href="{{ '/examples.html' | url }}">Clone and run the examples <span aria-hidden="true">↗︎</span></a></div>
         <div class="hero-meta"><span>OPEN SOURCE / MIT</span><span>9 LANGUAGE IMPLEMENTATIONS</span></div>
       </div>
       <div class="demo" id="terminal-demo" aria-label="Interactive terminal walkthrough">
@@ -68,14 +69,36 @@
     <section class="interfaces wrap" aria-labelledby="interfaces-title">
       <div class="section-heading"><p class="eyebrow">02 / MEET YOUR TOOLS WHERE YOU WORK</p><h2 id="interfaces-title">A script can be more than a script.</h2></div>
       <div class="interface-grid">
-        <article><span class="interface-number">01 — TERMINAL</span><h3>Stay in your flow.</h3><p>Parsing, validation, generated help and shell completion. Turn a directory of tools into one command with the dispatcher.</p><code>$ ops plan --env staging</code><a href="{{ '/applications.html#dispatcher' | url }}">Explore the dispatcher <span aria-hidden="true">↗︎</span></a></article>
+        <article><span class="interface-number">01 — TERMINAL</span><h3>Stay in your flow.</h3><p>Parsing, validation, generated help and completion for Bash, Zsh and Fish. Turn a directory of tools into one command with the dispatcher.</p><code>$ ops plan --env staging</code><a href="{{ '/completion.html' | url }}">Set up shell completion <span aria-hidden="true">↗︎</span></a></article>
         <article><span class="interface-number">02 — DESKTOP</span><h3>Give scripts a face.</h3><p>The desktop runner builds forms from the schema, streams output and handles secrets, templates and declared effects.</p><div class="mini-form" aria-hidden="true"><span>Environment</span><span>staging <b>⌄</b></span></div><a href="{{ '/applications.html#desktop-runner' | url }}">Meet the desktop runner <span aria-hidden="true">↗︎</span></a></article>
         <article><span class="interface-number">03 — HTTP + WEB</span><h3>Make it an endpoint.</h3><p>Serve a tool directory with JSON input, OpenAPI and jobs. Open the web runner for typed forms and execution results.</p><code>POST /tools/plan · /ui/</code><a href="{{ '/web-runner.html' | url }}">Explore the web runner <span aria-hidden="true">↗︎</span></a></article>
         <article><span class="interface-number">04 — AGENTS</span><h3>Let agents call it.</h3><p>MCP exposes each tool with typed inputs and effect annotations. Validate arguments before the tool runs.</p><code>plan({ env: "staging" })</code><a href="{{ '/node-tools.html#mcp' | url }}">Connect an MCP client <span aria-hidden="true">↗︎</span></a></article>
       </div>
     </section>
+    <section class="playground-section wrap" id="playground" aria-labelledby="playground-title" data-worker-url="{{ '/assets/playground-worker.js' | url }}" data-files-url="{{ '/assets/playground-files.json' | url }}">
+      <div class="section-heading"><p class="eyebrow">03 / YOUR TURN</p><h2 id="playground-title">Real scripts. Right here.</h2><p>Run the Python examples with real parsing, validation and generated help. Change a command. Press Enter. See what happens.</p></div>
+      <div class="playground-card">
+        <div class="playground-toolbar"><span>PYTHON / BROWSER WORKSPACE</span><div><button type="button" id="playground-start">Start Python playground</button><button type="button" id="playground-reset" disabled>Reset</button></div></div>
+        <pre id="playground-output" tabindex="0" aria-label="Playground terminal output">Try plan.py --help, report.py --format table, or a command of your own.
+Python loads when you press Start. No server connection needed.
+</pre>
+        <form class="playground-command-row"><span aria-hidden="true">❯</span><label class="sr-only" for="playground-command">Playground command</label><input id="playground-command" value="plan.py --help" placeholder="plan.py --env production --replicas 3" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="4000" disabled><button type="submit" disabled>Run ↵</button></form>
+        <div class="playground-suggestions" aria-label="Example commands"><button type="button" data-command="plan.py --help" disabled>Generated help</button><button type="button" data-command="plan.py --env production --replicas 3 --tag demo" disabled>Make a plan</button><button type="button" data-command="plan.py --replicas 99" disabled>Try validation</button><button type="button" data-command="report.py --format table" disabled>Read a CSV</button><button type="button" data-command="plan.py --help-json-schema" disabled>See the schema</button></div>
+        <details class="playground-stdin"><summary>stdin · for json-format.py</summary><label for="playground-stdin">Input document</label><textarea id="playground-stdin" maxlength="32000" spellcheck="false">{"service":"api","replicas":2}</textarea></details>
+        <p id="playground-status" role="status">Ready to start · the first load downloads the Python runtime</p>
+      </div>
+      <p class="playground-note">Python runs in this tab through <a href="https://pyodide.org/">Pyodide</a>, with an in-memory workspace. Try <code>help</code>, <code>ls</code>, or <code>cat examples/scripts/plan.py</code>. Tab completes options and choices; ↑/↓ recall commands. Bash, FFmpeg and curl examples run locally. <a href="{{ '/examples.html' | url }}">Get the whole scripts directory →</a></p>
+      <noscript><p>Enable JavaScript for the browser playground, or <a href="{{ '/examples.html' | url }}">run the examples locally</a>.</p></noscript>
+    </section>
+    <section class="completion-section wrap" aria-labelledby="completion-title">
+      <div class="section-heading"><p class="eyebrow">04 / LESS TYPING, MORE DOING</p><h2 id="completion-title">Your shell already knows the options.</h2><p>Options, enum values, files and nested commands. Completion comes from the tool itself and follows your code.</p></div>
+      <div class="completion-grid"><article><h3>Bash</h3><pre>eval "$(plan.py --completion bash)"</pre></article><article><h3>Zsh</h3><pre>autoload -Uz compinit &amp;&amp; compinit
+eval "$(plan.py --completion zsh)"</pre></article><article><h3>Fish</h3><pre>plan.py --completion fish &gt; \
+  ~/.config/fish/completions/plan.py.fish</pre></article></div>
+      <p>Add the examples directory to your PATH, then enable your shell. <a href="{{ '/completion.html' | url }}">Copy the full setup →</a></p>
+    </section>
     <section class="start-section wrap" aria-labelledby="start-title">
-      <div><p class="eyebrow">03 / START SMALL</p><h2 id="start-title">Your next useful tool<br>starts here.</h2><p>Pick your language. Register a few options.<br>Let the same interface do more of the work.</p><a class="text-link" href="{{ '/reference.html' | url }}">All guides and API references <span aria-hidden="true">→</span></a></div>
+      <div><p class="eyebrow">05 / START SMALL</p><h2 id="start-title">Your next useful tool<br>starts here.</h2><p>Pick your language. Register a few options.<br>Let the same interface do more of the work.</p><a class="text-link" href="{{ '/reference.html' | url }}">All guides and API references <span aria-hidden="true">→</span></a></div>
       <div class="install-panel"><div><span id="install-language">PYTHON / INSTALL</span><button type="button" id="copy-install" hidden>Copy command</button></div><pre id="install-command">{{ home.variants[0].install }}</pre><a id="install-guide" href="{{ '/languages/python.html' | url }}" data-base="{{ '/languages/' | url }}">Read the Python guide →</a><span id="copy-status" role="status"></span></div>
     </section>
     <section class="project-notes wrap"><p><span class="status-dot" aria-hidden="true"></span> Shared specification. Shared conformance suite.</p><p>Every language is checked against the same behavior contract.</p><a href="https://github.com/wankdanker/clyops/tree/main/spec">Read the specification <span aria-hidden="true">↗︎</span></a></section>
