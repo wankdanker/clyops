@@ -5,6 +5,8 @@ export default function (config) {
   // Generated reference Markdown is ignored by Git, but is a site input.
   config.setUseGitIgnore(false);
   config.addPassthroughCopy({ 'docs/assets': 'assets', 'docs/_native': 'reference' });
+  // Our llms.txt index for AI agents is served from the site root (llmstxt.org).
+  config.addPassthroughCopy({ 'docs/llms.txt': 'llms.txt' });
   config.addPassthroughCopy({ 'docs/_generated/home-demo.json': 'assets/home-demo.json', 'docs/examples/home': 'demos' });
   config.addPassthroughCopy({ 'docs/_generated/playground-files.json': 'assets/playground-files.json' });
   config.addPassthroughCopy({ 'docs/_generated/linux-lab': 'assets/linux-lab' });
