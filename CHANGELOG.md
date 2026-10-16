@@ -5,6 +5,10 @@ section here.
 
 ## [Unreleased]
 
+- Agent skills in `skills/`: `clyops-build` (writing tools, with a verified
+  example per language), `clyops-use` (running tools safely from a shell via
+  `--help-json-schema`) and `clyops-skillify` (generating project skills from a
+  repository's tools, docs and source, with a schema-to-Markdown renderer).
 - Static browser Linux lab running the unchanged Bash/Python examples with real
   FFmpeg, curl, pipes and shell completion. Includes file transfers and a local
   HTTP upload server inside the guest; assets load on demand from GitHub Pages.
