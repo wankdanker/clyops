@@ -25,6 +25,43 @@ anything you leave undeclared is something an agent or form has to guess.
    argument, before `run`. Then write the tool's logic below it.
 4. **Verify** (see below) before calling the tool done.
 
+## Do nothing until `run` succeeds
+
+**A clyops tool must have no side effects before `run` returns successfully.**
+Everything above `run` is declaration only: registering options, arguments,
+commands and metadata. All real work comes after it, and only after it. That
+includes connecting to a database or service, opening or creating files,
+making network calls, spawning processes, taking locks, and writing to stdout.
+
+The reason is that `run` often doesn't return. It exits early to print
+`--help`, `--help-json-schema` or a completion script, and it exits with an
+error when a value fails validation, a required option is missing or a
+relationship is violated. Anything the program did before that is a side
+effect of a call that was never valid:
+
+- a user asked for `--help` and a migration ran;
+- `--replicas 11` was rejected, but the database connection was already open
+  and a row was already written;
+- the dispatcher, API and MCP server **run every tool with
+  `--help-json-schema` and `--bash-completion` just to describe it**, and
+  they do this on their own whenever the tool changes. Opting in to clyops (by
+  importing the library or adding `# clyops-tool`) promises them those probes
+  do no work, with a five-second timeout.
+
+So:
+
+- Keep module-level and top-of-script code free of work. In Python and
+  JavaScript, nothing that acts at import time; in Bash, nothing but `source`
+  and `clyops_*` calls before `clyops_run "$@"`; in compiled languages, nothing
+  before `run` in `main`.
+- Build clients, connections and handles from the parsed values, after `run`.
+  The validated values are what decide whether and where to connect.
+- Check preconditions that clyops can express *as registrations* (rules,
+  `require_command`, relationships, required options) so they fail inside
+  `run`, before any work starts, instead of halfway through.
+- If a program uses non-exiting `parse` instead, the same rule applies to its
+  result: do nothing until it reports success.
+
 ## What every tool should declare
 
 - **A description** (`set_description` / `clyops_description` / …). Its first
@@ -105,6 +142,11 @@ Run each of these. If any of them fails, the tool isn't done.
 ./tool <valid args>           # does the work
 ./tool <one invalid value>    # exit 1, the rule's message, usage on stderr
 ```
+
+Then confirm that `--help`, `--help-json-schema` and the invalid-value run did
+**nothing**: no files created or changed, no connections or network calls, no
+output beyond help or the error. Read the code above `run` once more. If
+anything there does work, move it below `run`.
 
 For a tool with commands, repeat `--help` and `--help-json-schema` on each leaf
 command (`./tool db migrate --help`). If the project has a dispatcher or uses

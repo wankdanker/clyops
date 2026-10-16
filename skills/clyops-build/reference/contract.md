@@ -106,6 +106,11 @@ usage on stderr), fill env then defaults, resolve paths, validate and convert
 (empty strings are not validated), check required commands, required options,
 then relationships.
 
+Because `run` exits for help, schema, completion and every error, **a tool must
+do no work before `run` returns successfully**: no connections, file writes,
+network calls or output. The dispatcher, API and MCP server probe tools with
+`--help-json-schema` and `--bash-completion` and rely on this (§12).
+
 **Precedence: command line > config file > environment > default.** Accessors:
 `source(long)` → `cli|config|env|default|unset`; `isSet` (cli);
 `isExplicitlySet` (cli, config or env).

@@ -46,7 +46,11 @@ will tell agents to run.
 
 **Report, don't fix, gaps you find on the way:** Ruby scripts or Java launchers
 missing `# clyops-tool`, tools with no effects declared, tools whose name or
-description doesn't say what they do. These are findings for the user (the
+description doesn't say what they do, and above all **tools that do work before
+`run`** (connect, write, call out or print at import time or above the
+registrations). Those act during the very `--help-json-schema` probe you are
+about to run: read the code above `run` before probing a tool, and skip
+probing any that does work there. These are findings for the user (the
 `clyops-build` skill covers fixing them).
 
 ## 2. Collect the contracts
