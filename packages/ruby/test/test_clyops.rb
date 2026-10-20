@@ -129,66 +129,78 @@ class ClyopsTest < Minitest::Test
     assert_equal "to", JSON.parse(cli.json_schema)["commands"][0]["commands"][0]["options"][0]["name"]
   end
 
-  def test_fd_registration_errors
+  def test_role_registration_errors
     cli = -> { Clyops::Cli.new(name: "t", env: {}) }
     [
-      [-> { cli.().fd(2, "out", "X") }, "Invalid file descriptor 2"],
-      [-> { cli.().fd(3, "both", "X") }, "Unknown fd direction 'both'"],
-      [-> { cli.().fd(3, "out", "X", "", "7") }, "Invalid fd role '7'"],
-      [-> { cli.().fd(3, "out", "X").fd(3, "in", "Y") }, "Duplicate file descriptor 3"],
-      [-> { cli.().fd(3, "out", "X", "", "log").fd(4, "out", "Y", "", "log") }, "Duplicate fd role 'log'"]
+      [-> { cli.().role("7up", "out", "X") }, "Invalid role name '7up'"],
+      [-> { cli.().role("a:b", "out", "X") }, "Invalid role name 'a:b'"],
+      [-> { cli.().role("log", "both", "X") }, "Unknown role direction 'both'"],
+      [-> { cli.().role("log", "out", "X").role("log", "in", "Y") }, "Duplicate role 'log'"]
     ].each do |register, message|
       assert_equal message, assert_raises(Clyops::DefinitionError, &register).message
     end
   end
 
-  def test_fd_schema_hash_or_text
-    cli = Clyops::Cli.new(name: "t", env: {}).fd(3, "out", "A", "application/json", "meta", { "type" => "object" })
-    cli.fd(4, "in", "B", "", "", '{"type":"string"}')
+  def test_role_schema_hash_or_text
+    cli = Clyops::Cli.new(name: "t", env: {}).role("meta", "out", "A", "application/json", { "type" => "object" })
+    cli.role("extra", "in", "B", "", '{"type":"string"}')
     assert_equal [
-      { "fd" => 3, "direction" => "out", "role" => "meta", "description" => "A", "contentType" => "application/json",
+      { "name" => "meta", "direction" => "out", "description" => "A", "contentType" => "application/json",
         "schema" => { "type" => "object" } },
-      { "fd" => 4, "direction" => "in", "role" => "", "description" => "B", "contentType" => "",
+      { "name" => "extra", "direction" => "in", "description" => "B", "contentType" => "",
         "schema" => { "type" => "string" } }
-    ], JSON.parse(cli.json_schema)["fds"]
+    ], JSON.parse(cli.json_schema)["roles"]
   end
 
-  def test_fd_emit_only_to_listed_descriptors
+  def test_role_emit_and_forward_follow_the_mapping
     require "tempfile"
     Tempfile.create("clyops-fd") do |file|
       fd = file.fileno
-      build = lambda do |listed|
-        c = Clyops::Cli.new(name: "t", env: { "CLYOPS_FDS" => listed }).fd(fd, "out", "Progress", "", "progress")
-        c.fd(999, "in", "Extra")
+      build = lambda do |env|
+        c = Clyops::Cli.new(name: "t", env: env).role("progress", "out", "Progress").role("extra", "in", "Extra")
         assert_equal "ok", c.parse([]).status
         c
       end
-      unlisted = build.("")
-      assert_nil unlisted.fd_open("progress")
-      unlisted.emit("progress", { "pct" => 1 })
-      cli = build.("#{fd}, 999")
+      unmapped = build.({})
+      assert_nil unmapped.fd_open("progress")
+      unmapped.emit("progress", { "pct" => 1 })
+      assert_equal "", unmapped.forward_fds("progress")
+      cli = build.({ "CLYOPS_FDS" => "progress:#{fd}, extra:999, log:#{fd}" })
       assert_equal fd, cli.fd_open("progress")
-      assert_equal fd, cli.fd_open(fd)
-      assert_nil cli.fd_open(999)
+      assert_nil cli.fd_open("extra")
+      assert_nil cli.fd_open("log")
       cli.emit("progress", { "pct" => 50 })
-      cli.emit(fd.to_s, "plain text")
+      cli.emit("progress", "plain text")
       cli.emit("progress", "ends with newline\n")
-      assert_raises(Clyops::DefinitionError) { cli.emit("nope", "x") }
-      assert_equal "File descriptor 999 is not an output", assert_raises(Clyops::DefinitionError) { cli.emit(999, "x") }.message
+      assert_equal "progress:#{fd},log:#{fd}", cli.forward_fds("progress", "extra", "log", "nope")
+      assert_equal "Unknown role 'nope'", assert_raises(Clyops::DefinitionError) { cli.emit("nope", "x") }.message
+      assert_equal "Role 'extra' is not an output", assert_raises(Clyops::DefinitionError) { cli.emit("extra", "x") }.message
       assert_equal "{\"pct\":50}\nplain text\nends with newline\n", File.read(file.path)
     end
   end
 
-  def test_fd_lookup_follows_the_selected_command
-    cli = Clyops::Cli.new(name: "m", env: {}).fd(3, "out", "Progress", "application/x-ndjson", "progress")
+  def test_role_mapping_is_read_once_and_removed
+    ENV["CLYOPS_FDS"] = "progress:2"
+    cli = Clyops::Cli.new(name: "t").role("progress", "out", "Progress")
+    cli.parse([])
+    assert_nil ENV["CLYOPS_FDS"]
+    cli.parse([])
+    assert_equal 2, cli.fd_open("progress")
+  ensure
+    ENV.delete("CLYOPS_FDS")
+  end
+
+  def test_role_lookup_follows_the_selected_command
+    cli = Clyops::Cli.new(name: "m", env: { "CLYOPS_FDS" => "progress:2,plan:2" }).role("progress", "out", "Progress")
     db = cli.command("db", "Database")
-    db.command("migrate", "Migrate").fd(4, "out", "Migration progress", "", "progress")
+    db.command("migrate", "Migrate").role("plan", "out", "Migration plan")
     db.command("status", "Status")
     cli.parse(%w[db status])
-    assert_equal 3, cli.send(:find_fd, "progress")["fd"]
+    assert_equal 2, cli.fd_open("progress")
+    assert_nil cli.fd_open("plan")
     cli.parse(%w[db migrate])
-    assert_equal 4, cli.send(:find_fd, "progress")["fd"]
-    assert_includes cli.usage, "\nOutput fd 4 [progress]: Migration progress\n"
-    refute_includes cli.usage, "fd 3"
+    assert_equal 2, cli.fd_open("plan")
+    assert_includes cli.usage, "\nOutput [plan]: Migration plan\n"
+    refute_includes cli.usage, "[progress]"
   end
 end

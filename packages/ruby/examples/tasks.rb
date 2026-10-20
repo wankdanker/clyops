@@ -8,7 +8,7 @@ cli = Clyops::Cli.new(name: "tasks", root: ENV["DEMO_ROOT"])
 cli.set_description("Commands demo for the clyops conformance suite.")
 cli.set_epilog("Run 'tasks <command> --help' for a command's options.")
 cli.opt "VERBOSE", "verbose", "v", "flag", "Verbose output", "Global"
-cli.fd(3, "out", "Progress, one JSON object per line", "application/x-ndjson", "progress")
+cli.role("progress", "out", "Progress, one JSON object per line", "application/x-ndjson")
 
 db = cli.command("db", "Database tasks")
 db.opt "DB_URL", "url", "u", "sqlite:app.db", "Database URL", "Database"
@@ -16,7 +16,7 @@ migrate = db.command("migrate", "Apply migrations")
 migrate.arg "target", "Target version", "latest"
 migrate.opt "DRY_RUN", "dry-run", "n", "flag", "Show what would run"
 migrate.set_effects("destructive")
-migrate.fd(4, "out", "Migration progress", "application/x-ndjson", "progress")
+migrate.role("plan", "out", "Migration plan", "text/plain")
 status = db.command("status", "Show migration status")
 status.set_effects("read-only")
 
