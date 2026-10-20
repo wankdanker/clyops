@@ -73,33 +73,40 @@ void clyops_stdin(clyops_t* cli, const char* description, const char* content_ty
 /** What the program writes on stdout; undeclared means text. */
 void clyops_stdout(clyops_t* cli, const char* description, const char* content_type);
 
-/** Optional fields of a declared file descriptor. Unset fields are NULL. */
+/** Optional fields of a declared role. Unset fields are NULL. */
 typedef struct {
     int _; /**< Reserved placeholder for the registration macro. */
     const char* description; /**< Help description. */
     const char* content_type; /**< MIME type. */
-    const char* role; /**< meta, progress, log, result or another agreed name (spec section 14). */
     const char* schema; /**< JSON Schema, as JSON text, each document or line matches. */
-} clyops_fd_meta_t;
+} clyops_role_meta_t;
 
 /**
- * Declare a file descriptor above 2 the program writes ("out") or reads ("in") (spec section 1.3).
- * Registration errors (number below 3, duplicate number or role) print a message and exit(2).
+ * Declare a role (spec section 1.3): a stream the program writes ("out") or reads ("in") on a
+ * descriptor its runner chooses. `name` is meta, progress, log, result or another agreed name.
+ * Registration errors (invalid or duplicate name, other direction) print a message and exit(2).
  */
-void clyops_add_fd(clyops_t* cli, int fd, const char* direction, clyops_fd_meta_t meta);
-/** Declare a file descriptor with designated fields: .description, .content_type, .role, .schema. */
-#define clyops_fd(cli, fd, direction, ...) \
-    clyops_add_fd((cli), (fd), (direction), ((clyops_fd_meta_t){ ._ = 0, __VA_ARGS__ }))
+void clyops_add_role(clyops_t* cli, const char* name, const char* direction, clyops_role_meta_t meta);
+/** Declare a role with designated fields: .description, .content_type, .schema. */
+#define clyops_role(cli, name, direction, ...) \
+    clyops_add_role((cli), (name), (direction), ((clyops_role_meta_t){ ._ = 0, __VA_ARGS__ }))
 /**
- * The descriptor number for a declared role or number (digits) when the runner opened it (listed in
- * CLYOPS_FDS) and it is open, else -1 (spec section 14). Call after parsing.
+ * The descriptor for a declared role when CLYOPS_FDS maps it and it is open, else -1 (spec
+ * section 14). Call after parsing.
  */
-int clyops_fd_open(const clyops_t* cli, const char* target);
+int clyops_fd_open(const clyops_t* cli, const char* name);
 /**
- * Write `text` and a newline (unless it ends with one) to a declared "out" descriptor. Does nothing
- * when it isn't open; write errors are ignored. An undeclared target or an input exits(2).
+ * Write `text` and a newline (unless it ends with one) to a declared "out" role. Does nothing when
+ * the runner didn't map it; write errors are ignored. An undeclared role or an input exits(2).
  */
-void clyops_emit(const clyops_t* cli, const char* target, const char* text);
+void clyops_emit(const clyops_t* cli, const char* name, const char* text);
+/**
+ * The CLYOPS_FDS value passing these roles (a NULL-terminated list) on to a program this one
+ * starts (spec section 14). The caller frees it.
+ */
+char* clyops_forward_fds_list(const clyops_t* cli, const char* const* names);
+/** clyops_forward_fds_list over a variadic list of role names. */
+#define clyops_forward_fds(cli, ...) clyops_forward_fds_list((cli), (const char* const[]){ __VA_ARGS__, NULL })
 
 /**
  * Option relationships (spec section 1.6) over a NULL-terminated list of long
