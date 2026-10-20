@@ -426,6 +426,7 @@ module Clyops
       @effects = []
       @stdin = nil
       @stdout = nil
+      @fds = []
       @constraints = []
       @children = []
       @parent = nil
@@ -464,6 +465,68 @@ module Clyops
     # @param content_type [String] The content type value.
     # @return [Clyops::Cli] this CLI or the new child command.
     def set_stdout(description, content_type = "") = tap { @stdout = { "description" => description, "contentType" => content_type } }
+
+    # Declare a file descriptor above 2 the program writes ("out") or reads ("in") (spec section 1.3).
+    # @param fd [Integer] The descriptor number, 3 or more.
+    # @param direction [String] "out" or "in".
+    # @param description [String] The description value.
+    # @param content_type [String] The MIME type.
+    # @param role [String] meta, progress, log, result or another agreed name.
+    # @param schema [Hash, String, nil] A JSON Schema (Hash or JSON text) for each document or line.
+    # @return [Clyops::Cli] this CLI or the new child command.
+    def fd(fd, direction, description, content_type = "", role = "", schema = nil)
+      raise DefinitionError, "Invalid file descriptor #{fd}" unless fd.is_a?(Integer) && fd >= 3
+      raise DefinitionError, "Unknown fd direction '#{direction}'" unless %w[in out].include?(direction)
+      raise DefinitionError, "Invalid fd role '#{role}'" if role.match?(/\A[0-9]+\z/)
+      raise DefinitionError, "Duplicate file descriptor #{fd}" if @fds.any? { |d| d["fd"] == fd }
+      raise DefinitionError, "Duplicate fd role '#{role}'" if !role.empty? && @fds.any? { |d| d["role"] == role }
+
+      schema = JSON.parse(schema) if schema.is_a?(String)
+      @fds << { "fd" => fd, "direction" => direction, "role" => role, "description" => description,
+                "contentType" => content_type, "schema" => schema }
+      self
+    end
+
+    # The descriptor number for a declared role or number when the runner opened it (listed in
+    # CLYOPS_FDS) and it is open, else nil (spec section 14).
+    # @param target [String, Integer] A role, or a descriptor number.
+    # @return [Integer, nil] the descriptor number, or nil.
+    def fd_open(target)
+      decl = find_fd(target)
+      return nil unless decl
+
+      num = decl["fd"]
+      return nil unless @env.fetch("CLYOPS_FDS", "").split(",").map(&:strip).include?(num.to_s)
+
+      IO.for_fd(num, autoclose: false)
+      num
+    rescue Errno::EBADF, ArgumentError, NotImplementedError
+      nil
+    end
+
+    # Write a line to a declared "out" descriptor (spec section 14): a String as is, anything else as
+    # compact JSON, then a newline. Does nothing when the descriptor isn't open; write errors are ignored.
+    # @param target [String, Integer] A role, or a descriptor number.
+    # @param value [Object] The text or JSON value to write.
+    # @return [void]
+    def emit(target, value)
+      decl = find_fd(target)
+      raise DefinitionError, "No file descriptor declared for '#{target}'" unless decl
+      raise DefinitionError, "File descriptor #{decl["fd"]} is not an output" unless decl["direction"] == "out"
+
+      num = fd_open(decl["fd"])
+      return unless num
+
+      text = value.is_a?(String) ? value.dup : JSON.generate(value)
+      text << "\n" unless text.end_with?("\n")
+      begin
+        # autoclose: false leaves the runner's descriptor open when the IO is collected.
+        IO.for_fd(num, "w", autoclose: false).tap { |io| io.sync = true }.syswrite(text)
+      rescue SystemCallError, IOError
+        nil # The reader went away; the descriptor is optional, so the program carries on.
+      end
+      nil
+    end
 
     # At most one of these options may be given.
     # @param longs [Array<String>] The longs value.
@@ -740,6 +803,11 @@ module Clyops
         ctype = decl["contentType"]
         [label, decl["description"], ctype.empty? ? "" : "(#{ctype})"].reject(&:empty?).join(" ")
       end
+      node.fds.each do |d|
+        label = "#{d["direction"] == "in" ? "Input" : "Output"} fd #{d["fd"]}#{d["role"].empty? ? "" : " [#{d["role"]}]"}:"
+        ctype = d["contentType"]
+        io << [label, d["description"], ctype.empty? ? "" : "(#{ctype})"].reject(&:empty?).join(" ")
+      end
       sections << io unless io.empty?
 
       sections << (["Commands:"] + node.children.flat_map { |c| row.(c.word, c.description) }) unless node.children.empty?
@@ -863,7 +931,7 @@ module Clyops
 
     protected
 
-    attr_reader :word, :parent, :children, :options, :args, :commands, :constraints, :description, :epilog, :stdin, :stdout
+    attr_reader :word, :parent, :children, :options, :args, :commands, :constraints, :description, :epilog, :stdin, :stdout, :fds
 
     def adopt(parent, word, description)
       @parent = parent
@@ -915,6 +983,7 @@ module Clyops
         "constraints" => @constraints,
         "stdin" => @stdin,
         "stdout" => @stdout,
+        "fds" => @fds.map(&:dup),
         "commands" => @children.map { |c| c.schema_node }
       )
     end
@@ -933,6 +1002,17 @@ module Clyops
     end
 
     def chain_options = chain.flat_map { |n| n.options }
+
+    # The declared descriptor for a role or number, searching the selected command then its ancestors.
+    def find_fd(target)
+      key = target.to_s
+      by_number = key.match?(/\A[0-9]+\z/)
+      chain.each do |node|
+        decl = node.fds.find { |d| by_number ? d["fd"] == key.to_i : d["role"] == key }
+        return decl if decl
+      end
+      nil
+    end
 
     def add_constraint(type, longs)
       longs.each { |l| raise DefinitionError, "Unknown option --#{l} in constraint" unless find_option(l, false) }

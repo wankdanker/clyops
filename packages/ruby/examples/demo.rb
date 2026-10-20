@@ -11,6 +11,10 @@ cli.require_command("sh", "POSIX shell", "install dash")
 cli.set_effects("idempotent", "network")
 cli.set_stdin("Lines to process", "text/plain")
 cli.set_stdout("The resolved values", "application/json")
+cli.fd(3, "out", "Run metadata, before the values", "application/json", "meta")
+cli.fd(4, "out", "Progress, one JSON object per line", "application/x-ndjson", "progress",
+       '{"type":"object","properties":{"pct":{"type":"number"}}}')
+cli.fd(5, "in", "Extra lines to process", "text/plain")
 
 cli.arg "input", "Input file", "", "path"
 cli.arg "mode", "Processing mode", "fast", "choice:fast,slow"
@@ -49,6 +53,8 @@ cli.exclusive("endpoint", "addr")
 cli.requires("dest", "src")
 
 cli.run
+cli.emit("meta", cli.fd_open("5") ? '{"extra":true}' : '{"extra":false}')
+cli.emit("4", '{"pct":100}')
 
 longs = %w[config verbose quiet color out notes count ratio enabled tag no-cache key host port endpoint addr id email date
            code level size data-dir src dest include help]
