@@ -139,6 +139,36 @@ Effects are `read-only`, `idempotent`, `destructive` and `network`.
 stdin/stdout declarations describe your program; your code performs the actual
 I/O. Schemas carry these declarations for API/MCP/desktop consumers.
 
+## Declared file descriptors
+
+A program can say what it writes or reads on descriptors beyond stdin, stdout and
+stderr, so a runner knows what each one carries:
+
+```javascript
+cli.fd(3, 'out', 'Transfer metadata, before the output', 'application/json', 'meta');
+cli.fd(4, 'out', 'Progress, one JSON object per line', 'application/x-ndjson', 'progress');
+cli.run();
+cli.emit('meta', { name: 'clip.mp4' });
+cli.emit('progress', { pct: 50 });
+```
+
+The roles `meta`, `progress`, `log` and `result` mean the same to every runner; any
+other role is free text. Declarations show in help (`Output fd 4 [progress]: …`)
+and as `fds` in the schema, on the level they are registered on; commands inherit
+their ancestors'.
+
+`emit` writes a line only when the runner opened the descriptor and listed it in
+`CLYOPS_FDS`, so the same program runs unchanged by hand. An open descriptor alone
+isn't enough, because language runtimes open low-numbered descriptors of their own.
+To watch progress in a terminal:
+
+```sh
+CLYOPS_FDS=4 mytool input.wav 4>&2
+```
+
+`fdOpen` returns the number of a declared descriptor that is open this way (or
+none), for reading an `in` descriptor or writing raw bytes.
+
 ## Help, schema and shell completion
 
 See [Bash, Zsh and Fish setup](completion.md) for startup files, PATH, sample tools

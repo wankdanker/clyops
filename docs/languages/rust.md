@@ -55,6 +55,7 @@ migrate.effects(&["destructive"]);                         // read-only, idempot
 cli.opt("TOKEN", "token", "t", "", "API token").group("Auth").rule("secret"); // masked in help and values_json()
 cli.exclusive(&["json", "quiet"]);                         // also requires("a", &["b"]) and one_of(&[...])
 cli.stdin("Audio to transcribe", "audio/wav");             // and stdout(description, content_type)
+cli.fd(4, "out", "Progress", "application/x-ndjson").role("progress"); // then cli.emit("progress", r#"{"pct":50}"#)
 let args = cli.run();                                      // args.strs("command") == ["db", "migrate"]
 ```
 

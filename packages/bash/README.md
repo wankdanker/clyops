@@ -51,6 +51,7 @@ macOS ships Bash 3.2; install a current Bash (`brew install bash`) and use `#!/u
 clyops_opt     TOKEN token t "" "API token" Auth secret   # masked in help and clyops_values_json
 clyops_exclusive json quiet                               # also clyops_requires a b..., clyops_one_of a b...
 clyops_stdin   "Audio to transcribe" audio/wav            # and clyops_stdout description content-type
+clyops_fd      4 out "Progress" application/x-ndjson progress  # then clyops_emit progress '{"pct":50}'
 clyops_effects read-only                                  # read-only, idempotent, destructive, network
 clyops_command db "Database tasks"                        # later registrations belong to db...
 clyops_command "db migrate" "Apply migrations"            # ...then to db migrate

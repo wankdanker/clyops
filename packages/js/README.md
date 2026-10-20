@@ -45,6 +45,7 @@ migrate.setEffects('destructive');                           // read-only, idemp
 cli.opt('TOKEN', 'token', 't', '', 'API token', 'Auth', 'secret');  // masked in help and valuesJson()
 cli.exclusive('json', 'quiet');                              // also requires(a, b...) and oneOf(a, b...)
 cli.setStdin('Audio to transcribe', 'audio/wav');            // and setStdout(description, contentType)
+cli.fd(4, 'out', 'Progress', 'application/x-ndjson', 'progress');  // then cli.emit('progress', { pct: 50 })
 const args = cli.run();                                      // args.command: ['db', 'migrate']
 ```
 

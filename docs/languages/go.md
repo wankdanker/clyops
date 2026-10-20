@@ -58,6 +58,7 @@ migrate.SetEffects("destructive")                        // read-only, idempoten
 cli.Opt("TOKEN", "token", "t", "", "API token", "Auth", "secret") // masked in help and ValuesJSON()
 cli.Exclusive("json", "quiet")                           // also Requires("a", "b"...) and OneOf("a", "b"...)
 cli.SetStdin("Audio to transcribe", "audio/wav")         // and SetStdout(description, contentType)
+cli.Fd(4, "out", "Progress", "application/x-ndjson", "progress", nil) // then cli.Emit("progress", map[string]int{"pct": 50})
 v := cli.Run()                                           // cli.CommandPath() == []string{"db", "migrate"}
 ```
 

@@ -1038,7 +1038,8 @@ class Cli:
                 ctype = decl["contentType"]
                 io.append(" ".join(x for x in (label, decl["description"], ctype and f"({ctype})") if x))
         for d in node._fds:
-            label = f"{'Input' if d['direction'] == 'in' else 'Output'} fd {d['fd']}" + (f" [{d['role']}]" if d["role"] else "") + ":"
+            role = f" [{d['role']}]" if d["role"] else ""
+            label = f"{'Input' if d['direction'] == 'in' else 'Output'} fd {d['fd']}{role}:"
             ctype = str(d["contentType"])
             io.append(" ".join(x for x in (label, str(d["description"]), ctype and f"({ctype})") if x))
         if io:
