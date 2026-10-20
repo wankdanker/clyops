@@ -240,86 +240,100 @@ func TestCommands(t *testing.T) {
 	}
 }
 
-func TestFdRegistrationErrors(t *testing.T) {
-	mustPanic(t, "invalid file descriptor 2", func() { New().Fd(2, "out", "X", "", "", nil) })
-	mustPanic(t, "unknown fd direction 'both'", func() { New().Fd(3, "both", "X", "", "", nil) })
-	mustPanic(t, "invalid fd role '7'", func() { New().Fd(3, "out", "X", "", "7", nil) })
-	mustPanic(t, "duplicate file descriptor 3", func() { New().Fd(3, "out", "X", "", "", nil).Fd(3, "in", "Y", "", "", nil) })
-	mustPanic(t, "duplicate fd role 'log'", func() { New().Fd(3, "out", "X", "", "log", nil).Fd(4, "out", "Y", "", "log", nil) })
+func TestRoleRegistrationErrors(t *testing.T) {
+	mustPanic(t, "invalid role name '7up'", func() { New().Role("7up", "out", "X", "", nil) })
+	mustPanic(t, "invalid role name 'a:b'", func() { New().Role("a:b", "out", "X", "", nil) })
+	mustPanic(t, "unknown role direction 'both'", func() { New().Role("log", "both", "X", "", nil) })
+	mustPanic(t, "duplicate role 'log'", func() { New().Role("log", "out", "X", "", nil).Role("log", "in", "Y", "", nil) })
 }
 
-func TestFdSchemaTextOrValue(t *testing.T) {
-	cli := New().Fd(3, "out", "A", "application/json", "meta", map[string]string{"type": "object"}).Fd(4, "in", "B", "", "", `{"type":"string"}`)
-	var got struct{ Fds []map[string]any }
+func TestRoleSchemaTextOrValue(t *testing.T) {
+	cli := New().Role("meta", "out", "A", "application/json", map[string]string{"type": "object"}).Role("extra", "in", "B", "", `{"type":"string"}`)
+	var got struct{ Roles []map[string]any }
 	if err := json.Unmarshal([]byte(cli.JSONSchema()), &got); err != nil {
 		t.Fatal(err)
 	}
 	want := []map[string]any{
-		{"fd": 3.0, "direction": "out", "role": "meta", "description": "A", "contentType": "application/json", "schema": map[string]any{"type": "object"}},
-		{"fd": 4.0, "direction": "in", "role": "", "description": "B", "contentType": "", "schema": map[string]any{"type": "string"}},
+		{"name": "meta", "direction": "out", "description": "A", "contentType": "application/json", "schema": map[string]any{"type": "object"}},
+		{"name": "extra", "direction": "in", "description": "B", "contentType": "", "schema": map[string]any{"type": "string"}},
 	}
-	if !reflect.DeepEqual(got.Fds, want) {
-		t.Fatalf("fds %#v", got.Fds)
+	if !reflect.DeepEqual(got.Roles, want) {
+		t.Fatalf("roles %#v", got.Roles)
 	}
-	if !strings.Contains(New().JSONSchema(), `"fds": []`) {
-		t.Fatal("fds should be an empty list when none are declared")
+	if !strings.Contains(New().JSONSchema(), `"roles": []`) {
+		t.Fatal("roles should be an empty list when none are declared")
 	}
 }
 
-func TestFdEmitOnlyToListedDescriptors(t *testing.T) {
+func TestRoleEmitAndForwardFollowTheMapping(t *testing.T) {
 	file, err := os.CreateTemp(t.TempDir(), "fd")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer file.Close()
-	fd := int(file.Fd())
-	num := strconv.Itoa(fd)
-	newCli := func(listed string) *Cli {
+	fd := strconv.Itoa(int(file.Fd()))
+	newCli := func(env map[string]string) *Cli {
 		cli := New()
-		cli.Name, cli.Env = "t", map[string]string{"CLYOPS_FDS": listed}
-		cli.Fd(fd, "out", "Progress", "", "progress", nil).Fd(999, "in", "Extra", "", "", nil)
+		cli.Name, cli.Env = "t", env
+		cli.Role("progress", "out", "Progress", "", nil).Role("extra", "in", "Extra", "", nil)
 		if r := cli.Parse(nil); r.Status != "ok" {
 			t.Fatal(r.Error)
 		}
 		return cli
 	}
-	unlisted := newCli("")
-	if unlisted.FdOpen("progress") != -1 {
-		t.Fatal("unlisted descriptor reported open")
+	unmapped := newCli(map[string]string{})
+	if unmapped.FdOpen("progress") != -1 || unmapped.ForwardFds("progress") != "" {
+		t.Fatal("unmapped role reported open")
 	}
-	unlisted.Emit("progress", "never")
-	cli := newCli(num + ", 999")
-	if cli.FdOpen("progress") != fd || cli.FdOpen(num) != fd || cli.FdOpen("999") != -1 {
+	unmapped.Emit("progress", "never")
+	cli := newCli(map[string]string{"CLYOPS_FDS": "progress:" + fd + ", extra:999, log:" + fd})
+	if strconv.Itoa(cli.FdOpen("progress")) != fd || cli.FdOpen("extra") != -1 || cli.FdOpen("log") != -1 {
 		t.Fatal("FdOpen")
 	}
 	cli.Emit("progress", map[string]int{"pct": 50})
-	cli.Emit(num, "plain text")
+	cli.Emit("progress", "plain text")
 	cli.Emit("progress", "ends with newline\n")
-	mustPanic(t, "no file descriptor declared for 'nope'", func() { cli.Emit("nope", "x") })
-	mustPanic(t, "file descriptor 999 is not an output", func() { cli.Emit("999", "x") })
+	if got := cli.ForwardFds("progress", "extra", "log", "nope"); got != "progress:"+fd+",log:"+fd {
+		t.Fatalf("ForwardFds %q", got)
+	}
+	mustPanic(t, "unknown role 'nope'", func() { cli.Emit("nope", "x") })
+	mustPanic(t, "role 'extra' is not an output", func() { cli.Emit("extra", "x") })
 	got, _ := os.ReadFile(file.Name())
 	if string(got) != "{\"pct\":50}\nplain text\nends with newline\n" {
 		t.Fatalf("wrote %q", got)
 	}
 }
 
-func TestFdLookupFollowsTheSelectedCommand(t *testing.T) {
+func TestRoleMappingIsReadOnceAndRemoved(t *testing.T) {
+	t.Setenv("CLYOPS_FDS", "progress:2")
+	cli := New().Role("progress", "out", "Progress", "", nil)
+	cli.Parse(nil)
+	if _, ok := os.LookupEnv("CLYOPS_FDS"); ok {
+		t.Fatal("CLYOPS_FDS should be removed from the process environment")
+	}
+	cli.Parse(nil)
+	if cli.FdOpen("progress") != 2 {
+		t.Fatal("the mapping should outlive the variable")
+	}
+}
+
+func TestRoleLookupFollowsTheSelectedCommand(t *testing.T) {
 	cli := New()
-	cli.Name, cli.Env = "m", map[string]string{}
-	cli.Fd(3, "out", "Progress", "application/x-ndjson", "progress", nil)
+	cli.Name, cli.Env = "m", map[string]string{"CLYOPS_FDS": "progress:2,plan:2"}
+	cli.Role("progress", "out", "Progress", "application/x-ndjson", nil)
 	db := cli.Command("db", "Database")
-	db.Command("migrate", "Migrate").Fd(4, "out", "Migration progress", "", "progress", nil)
+	db.Command("migrate", "Migrate").Role("plan", "out", "Migration plan", "", nil)
 	db.Command("status", "Status")
 	cli.Parse([]string{"db", "status"})
-	if d := cli.findFd("progress"); d == nil || d.Fd != 3 {
-		t.Fatal("status should inherit fd 3")
+	if cli.FdOpen("progress") != 2 || cli.FdOpen("plan") != -1 {
+		t.Fatal("status should inherit progress and not see plan")
 	}
 	cli.Parse([]string{"db", "migrate"})
-	if d := cli.findFd("progress"); d == nil || d.Fd != 4 {
-		t.Fatal("migrate's own progress should win")
+	if cli.FdOpen("plan") != 2 {
+		t.Fatal("migrate should see its own plan")
 	}
 	usage := cli.Usage()
-	if !strings.Contains(usage, "\nOutput fd 4 [progress]: Migration progress\n") || strings.Contains(usage, "fd 3") {
+	if !strings.Contains(usage, "\nOutput [plan]: Migration plan\n") || strings.Contains(usage, "[progress]") {
 		t.Fatal(usage)
 	}
 }

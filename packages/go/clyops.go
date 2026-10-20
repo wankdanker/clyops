@@ -432,15 +432,16 @@ type stream struct {
 	ContentType string `json:"contentType"`
 }
 
-// fdDecl is a declared file descriptor above 2 (spec sections 1.3 and 14).
-type fdDecl struct {
-	Fd          int             `json:"fd"`
+// roleDecl is a declared role: a stream on a descriptor the runner chooses (spec sections 1.3 and 14).
+type roleDecl struct {
+	Name        string          `json:"name"`
 	Direction   string          `json:"direction"`
-	Role        string          `json:"role"`
 	Description string          `json:"description"`
 	ContentType string          `json:"contentType"`
 	Schema      json.RawMessage `json:"schema"`
 }
+
+var roleName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.-]*$`)
 
 // constraint is an option relationship (spec section 1.6).
 type constraint struct {
@@ -515,7 +516,8 @@ type Cli struct {
 	config              map[string]configValue
 	effects             []string
 	stdin, stdout       *stream
-	fds                 []fdDecl
+	roles               []roleDecl
+	fdMap               map[string]int // CLYOPS_FDS as read once (spec section 14); nil until then
 	constraints         []constraint
 	children            []*Cli
 	parent              *Cli
@@ -573,25 +575,19 @@ func (c *Cli) SetStdout(description, contentType string) *Cli {
 	return c
 }
 
-// Fd declares a file descriptor above 2 the program writes ("out") or reads ("in") (spec section 1.3).
-// role is meta, progress, log, result, another agreed name or ""; schema is a JSON Schema for each
-// document or line: JSON text as a string, any other value marshalled, or nil.
-func (c *Cli) Fd(fd int, direction, description, contentType, role string, schema any) *Cli {
-	if fd < 3 {
-		panic(fmt.Sprintf("clyops: invalid file descriptor %d", fd))
+// Role declares a role (spec section 1.3): a stream the program writes ("out") or reads ("in") on a
+// descriptor its runner chooses. name is meta, progress, log, result or another agreed name; schema is
+// a JSON Schema for each document or line: JSON text as a string, any other value marshalled, or nil.
+func (c *Cli) Role(name, direction, description, contentType string, schema any) *Cli {
+	if !roleName.MatchString(name) {
+		panic("clyops: invalid role name '" + name + "'")
 	}
 	if direction != "in" && direction != "out" {
-		panic("clyops: unknown fd direction '" + direction + "'")
+		panic("clyops: unknown role direction '" + direction + "'")
 	}
-	if isDigits(role) {
-		panic("clyops: invalid fd role '" + role + "'")
-	}
-	for _, d := range c.fds {
-		if d.Fd == fd {
-			panic(fmt.Sprintf("clyops: duplicate file descriptor %d", fd))
-		}
-		if role != "" && d.Role == role {
-			panic("clyops: duplicate fd role '" + role + "'")
+	for _, r := range c.roles {
+		if r.Name == name {
+			panic("clyops: duplicate role '" + name + "'")
 		}
 	}
 	var raw json.RawMessage
@@ -602,69 +598,85 @@ func (c *Cli) Fd(fd int, direction, description, contentType, role string, schem
 	default:
 		b, err := json.Marshal(s)
 		if err != nil {
-			panic("clyops: fd schema: " + err.Error())
+			panic("clyops: role schema: " + err.Error())
 		}
 		raw = b
 	}
-	c.fds = append(c.fds, fdDecl{fd, direction, role, description, contentType, raw})
+	c.roles = append(c.roles, roleDecl{name, direction, description, contentType, raw})
 	return c
 }
 
-func isDigits(s string) bool {
-	if s == "" {
-		return false
-	}
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return true
-}
-
-// findFd is the declared descriptor for a role or number, searching the selected command then its ancestors.
-func (c *Cli) findFd(target string) *fdDecl {
-	number, byNumber := -1, isDigits(target)
-	if byNumber {
-		number, _ = strconv.Atoi(target)
-	}
+// findRole is the declared role, searching the selected command then its ancestors.
+func (c *Cli) findRole(name string) *roleDecl {
 	for _, node := range c.chain() {
-		for i := range node.fds {
-			if d := &node.fds[i]; (byNumber && d.Fd == number) || (!byNumber && d.Role == target) {
-				return d
+		for i := range node.roles {
+			if node.roles[i].Name == name {
+				return &node.roles[i]
 			}
 		}
 	}
 	return nil
 }
 
-// FdOpen is the descriptor number for a declared role or number when the runner opened it (listed in
-// CLYOPS_FDS) and it is open, else -1 (spec section 14).
-func (c *Cli) FdOpen(target string) int {
-	d := c.findFd(target)
-	if d == nil {
-		return -1
+// fdMapping is CLYOPS_FDS, read once on the program and then removed from the process environment.
+func (c *Cli) fdMapping() map[string]int {
+	top := c
+	for top.parent != nil {
+		top = top.parent
 	}
-	for _, s := range strings.Split(c.Env["CLYOPS_FDS"], ",") {
-		if strings.TrimSpace(s) == strconv.Itoa(d.Fd) && fdIsOpen(d.Fd) {
-			return d.Fd
+	if top.fdMap != nil {
+		return top.fdMap
+	}
+	top.fdMap = map[string]int{}
+	raw, set := top.Env["CLYOPS_FDS"]
+	for _, entry := range strings.Split(raw, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
 		}
+		name, num, ok := strings.Cut(entry, ":")
+		fd, err := strconv.Atoi(num)
+		if !ok || err != nil || fd < 2 || !roleName.MatchString(name) || strings.TrimLeft(num, "0123456789") != "" {
+			Warn("Ignoring CLYOPS_FDS entry '%s'", entry)
+			continue
+		}
+		top.fdMap[name] = fd
+	}
+	if v, ok := os.LookupEnv("CLYOPS_FDS"); set && ok && v == raw {
+		os.Unsetenv("CLYOPS_FDS")
+	}
+	return top.fdMap
+}
+
+// mappedFd is the descriptor CLYOPS_FDS maps to name, when it is open, else -1.
+func (c *Cli) mappedFd(name string) int {
+	if fd, ok := c.fdMapping()[name]; ok && fdIsOpen(fd) {
+		return fd
 	}
 	return -1
 }
 
-// Emit writes value and a newline (unless it ends with one) to a declared "out" descriptor (spec
-// section 14): a string as is, anything else as compact JSON. It does nothing when the descriptor
-// isn't open and ignores write errors. It panics when target isn't declared or is an input.
-func (c *Cli) Emit(target string, value any) {
-	d := c.findFd(target)
-	if d == nil {
-		panic("clyops: no file descriptor declared for '" + target + "'")
+// FdOpen is the descriptor for a declared role when CLYOPS_FDS maps it and it is open, else -1
+// (spec section 14).
+func (c *Cli) FdOpen(name string) int {
+	if c.findRole(name) == nil {
+		return -1
 	}
-	if d.Direction != "out" {
-		panic(fmt.Sprintf("clyops: file descriptor %d is not an output", d.Fd))
+	return c.mappedFd(name)
+}
+
+// Emit writes value and a newline (unless it ends with one) to a declared "out" role (spec section
+// 14): a string as is, anything else as compact JSON. It does nothing when the runner didn't map the
+// role and ignores write errors. It panics when name isn't declared or is an input.
+func (c *Cli) Emit(name string, value any) {
+	r := c.findRole(name)
+	if r == nil {
+		panic("clyops: unknown role '" + name + "'")
 	}
-	fd := c.FdOpen(strconv.Itoa(d.Fd))
+	if r.Direction != "out" {
+		panic("clyops: role '" + name + "' is not an output")
+	}
+	fd := c.mappedFd(name)
 	if fd < 0 {
 		return
 	}
@@ -680,6 +692,18 @@ func (c *Cli) Emit(target string, value any) {
 		text += "\n"
 	}
 	writeFd(fd, []byte(text))
+}
+
+// ForwardFds is the CLYOPS_FDS value passing these roles on to a program this one starts (spec
+// section 14). Set it in the child's environment and pass the descriptors in ExtraFiles.
+func (c *Cli) ForwardFds(names ...string) string {
+	var out []string
+	for _, n := range names {
+		if fd := c.mappedFd(n); fd >= 0 {
+			out = append(out, n+":"+strconv.Itoa(fd))
+		}
+	}
+	return strings.Join(out, ",")
 }
 
 // Exclusive says at most one of these options may be given.
@@ -912,6 +936,7 @@ func (c *Cli) Parse(argv []string) ParseResult {
 	c.sources, c.config = map[string]string{}, map[string]configValue{}
 	c.Values = Values{}
 	c.selected = nil
+	c.fdMapping()
 	c.ensureHelp()
 
 	scanErr := c.catch(func() { c.scan(argv) })
@@ -1575,21 +1600,17 @@ func (c *Cli) Usage() string {
 		}
 		io = append(io, line)
 	}
-	for _, d := range node.fds {
+	for _, r := range node.roles {
 		line := "Output"
-		if d.Direction == "in" {
+		if r.Direction == "in" {
 			line = "Input"
 		}
-		line += " fd " + strconv.Itoa(d.Fd)
-		if d.Role != "" {
-			line += " [" + d.Role + "]"
+		line += " [" + r.Name + "]:"
+		if r.Description != "" {
+			line += " " + r.Description
 		}
-		line += ":"
-		if d.Description != "" {
-			line += " " + d.Description
-		}
-		if d.ContentType != "" {
-			line += " (" + d.ContentType + ")"
+		if r.ContentType != "" {
+			line += " (" + r.ContentType + ")"
 		}
 		io = append(io, line)
 	}
@@ -1749,7 +1770,7 @@ type schemaBody struct {
 	Constraints      []constraint     `json:"constraints"`
 	Stdin            *stream          `json:"stdin"`
 	Stdout           *stream          `json:"stdout"`
-	Fds              []fdDecl         `json:"fds"`
+	Roles            []roleDecl       `json:"roles"`
 	Commands         []schemaNode     `json:"commands"`
 }
 
@@ -1773,7 +1794,7 @@ func (c *Cli) JSONSchema() string {
 func (c *Cli) schemaBody() schemaBody {
 	s := schemaBody{Description: c.description, Epilog: c.epilog, Arguments: []schemaArgument{}, Options: []schemaOption{},
 		RequiredCommands: []schemaCommand{}, Effects: append([]string{}, c.effects...),
-		Constraints: append([]constraint{}, c.constraints...), Stdin: c.stdin, Stdout: c.stdout, Fds: append([]fdDecl{}, c.fds...), Commands: []schemaNode{}}
+		Constraints: append([]constraint{}, c.constraints...), Stdin: c.stdin, Stdout: c.stdout, Roles: append([]roleDecl{}, c.roles...), Commands: []schemaNode{}}
 	for _, a := range c.args {
 		s.Arguments = append(s.Arguments, schemaArgument{a.name, a.description, !a.variadic && a.def == "", a.variadic, a.def, a.rule})
 	}
