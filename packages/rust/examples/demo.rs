@@ -12,9 +12,9 @@ fn main() {
     cli.effects(&["idempotent", "network"]);
     cli.stdin("Lines to process", "text/plain");
     cli.stdout("The resolved values", "application/json");
-    cli.fd(3, "out", "Run metadata, before the values", "application/json").role("meta");
-    cli.fd(4, "out", "Progress, one JSON object per line", "application/x-ndjson").role("progress").schema(r#"{"type":"object","properties":{"pct":{"type":"number"}}}"#);
-    cli.fd(5, "in", "Extra lines to process", "text/plain");
+    cli.role("meta", "out", "Run metadata, before the values", "application/json");
+    cli.role("progress", "out", "Progress, one JSON object per line", "application/x-ndjson").schema(r#"{"type":"object","properties":{"pct":{"type":"number"}}}"#);
+    cli.role("extra", "in", "Extra lines to process", "text/plain");
 
     cli.arg("input", "Input file", "", "path");
     cli.arg("mode", "Processing mode", "fast", "choice:fast,slow");
@@ -53,8 +53,8 @@ fn main() {
     cli.requires("dest", &["src"]);
 
     cli.run();
-    cli.emit("meta", if cli.fd_open("5").is_some() { r#"{"extra":true}"# } else { r#"{"extra":false}"# });
-    cli.emit("4", r#"{"pct":100}"#);
+    cli.emit("meta", if cli.fd_open("extra").is_some() { r#"{"extra":true}"# } else { r#"{"extra":false}"# });
+    cli.emit("progress", r#"{"pct":100}"#);
 
     let longs = ["config", "verbose", "quiet", "color", "out", "notes", "count", "ratio", "enabled", "tag", "no-cache", "key",
         "host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "data-dir", "src", "dest", "include", "help"];

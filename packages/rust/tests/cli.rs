@@ -159,89 +159,89 @@ fn commands() {
 }
 
 #[test]
-fn fd_registration_errors_panic() {
-    let cases: [(&str, fn()); 5] = [
-        ("Invalid file descriptor 2", || {
-            Cli::new().fd(2, "out", "X", "");
+fn role_registration_errors_panic() {
+    let cases: [(&str, fn()); 4] = [
+        ("Invalid role name '7up'", || {
+            Cli::new().role("7up", "out", "X", "");
         }),
-        ("Unknown fd direction 'both'", || {
-            Cli::new().fd(3, "both", "X", "");
+        ("Invalid role name 'a:b'", || {
+            Cli::new().role("a:b", "out", "X", "");
         }),
-        ("Invalid fd role '7'", || {
-            Cli::new().fd(3, "out", "X", "").role("7");
+        ("Unknown role direction 'both'", || {
+            Cli::new().role("log", "both", "X", "");
         }),
-        ("Duplicate file descriptor 3", || {
+        ("Duplicate role 'log'", || {
             let mut c = Cli::new();
-            c.fd(3, "out", "X", "");
-            c.fd(3, "in", "Y", "");
-        }),
-        ("Duplicate fd role 'log'", || {
-            let mut c = Cli::new();
-            c.fd(3, "out", "X", "").role("log");
-            c.fd(4, "out", "Y", "").role("log");
+            c.role("log", "out", "X", "");
+            c.role("log", "in", "Y", "");
         }),
     ];
     for (message, register) in cases {
         let err = std::panic::catch_unwind(register).expect_err(message);
-        let text = err.downcast_ref::<String>().cloned().unwrap_or_default();
-        assert_eq!(text, message);
+        assert_eq!(err.downcast_ref::<String>().cloned().unwrap_or_default(), message);
     }
 }
 
 #[test]
-fn fd_schema_is_embedded_json() {
+fn role_schema_is_embedded_json() {
     let mut cli = Cli::new();
     cli.name("t").env(Vec::new());
-    cli.fd(3, "out", "A", "application/json").role("meta").schema(r#"{"type":"object"}"#);
-    cli.fd(4, "in", "B", "");
-    let schema = cli.json_schema();
-    let compact: String = schema.split_whitespace().collect();
-    assert!(compact.contains(r#""fds":[{"fd":3,"direction":"out","role":"meta","description":"A","contentType":"application/json","schema":{"type":"object"}},{"fd":4,"direction":"in","role":"","description":"B","contentType":"","schema":null}]"#), "{schema}");
+    cli.role("meta", "out", "A", "application/json").schema(r#"{"type":"object"}"#);
+    cli.role("extra", "in", "B", "");
+    let compact: String = cli.json_schema().split_whitespace().collect();
+    assert!(compact.contains(r#""roles":[{"name":"meta","direction":"out","description":"A","contentType":"application/json","schema":{"type":"object"}},{"name":"extra","direction":"in","description":"B","contentType":"","schema":null}]"#), "{compact}");
 }
 
 #[test]
-fn fd_emit_only_to_listed_descriptors() {
+fn role_emit_and_forward_follow_the_mapping() {
     use std::os::fd::AsRawFd;
     let path = std::env::temp_dir().join(format!("clyops-fd-{}", std::process::id()));
     let file = std::fs::File::create(&path).unwrap();
     let fd = file.as_raw_fd();
-    let make = |listed: &str| {
+    let make = |mapping: &str| {
         let mut cli = Cli::new();
-        cli.name("t").env(vec![("CLYOPS_FDS".to_string(), listed.to_string())]);
-        cli.fd(fd, "out", "Progress", "").role("progress");
-        cli.fd(999, "in", "Extra", "");
+        let env = if mapping.is_empty() { vec![] } else { vec![("CLYOPS_FDS".to_string(), mapping.to_string())] };
+        cli.name("t").env(env);
+        cli.role("progress", "out", "Progress", "");
+        cli.role("extra", "in", "Extra", "");
         assert_eq!(cli.parse(&[] as &[&str]), Parsed::Ok);
         cli
     };
-    let unlisted = make("");
-    assert_eq!(unlisted.fd_open("progress"), None);
-    unlisted.emit("progress", "never");
-    let cli = make(&format!("{fd}, 999"));
+    let unmapped = make("");
+    assert_eq!(unmapped.fd_open("progress"), None);
+    unmapped.emit("progress", "never");
+    assert_eq!(unmapped.forward_fds(&["progress"]), "");
+    let cli = make(&format!("progress:{fd}, extra:999, log:{fd}"));
     assert_eq!(cli.fd_open("progress"), Some(fd));
-    assert_eq!(cli.fd_open(&fd.to_string()), Some(fd));
-    assert_eq!(cli.fd_open("999"), None);
+    assert_eq!(cli.fd_open("extra"), None);
+    assert_eq!(cli.fd_open("log"), None);
     cli.emit("progress", r#"{"pct":50}"#);
-    cli.emit(&fd.to_string(), "plain text");
+    cli.emit("progress", "plain text");
     cli.emit("progress", "ends with newline\n");
-    assert!(std::panic::catch_unwind(|| cli.emit("nope", "x")).is_err());
-    assert!(std::panic::catch_unwind(|| cli.emit("999", "x")).is_err());
+    assert_eq!(cli.forward_fds(&["progress", "extra", "log", "nope"]), format!("progress:{fd},log:{fd}"));
+    let err = std::panic::catch_unwind(|| cli.emit("nope", "x")).unwrap_err();
+    assert_eq!(err.downcast_ref::<String>().unwrap(), "Unknown role 'nope'");
+    let err = std::panic::catch_unwind(|| cli.emit("extra", "x")).unwrap_err();
+    assert_eq!(err.downcast_ref::<String>().unwrap(), "Role 'extra' is not an output");
     drop(file);
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "{\"pct\":50}\nplain text\nends with newline\n");
     std::fs::remove_file(&path).unwrap();
 }
 
 #[test]
-fn fd_lookup_follows_the_selected_command() {
+fn role_scope_and_help() {
     let mut cli = Cli::new();
-    cli.name("m").env(vec![("CLYOPS_FDS".to_string(), "0,1".to_string())]);
-    cli.fd(3, "out", "Progress", "application/x-ndjson").role("progress");
+    cli.name("m").env(vec![("CLYOPS_FDS".to_string(), "progress:2,plan:2".to_string())]);
+    cli.role("progress", "out", "Progress", "application/x-ndjson");
     let db = cli.command("db", "Database");
-    db.command("migrate", "Migrate").fd(4, "out", "Migration progress", "").role("progress");
+    db.command("migrate", "Migrate").role("plan", "out", "Migration plan", "");
     db.command("status", "Status");
+    assert_eq!(cli.parse(&["db", "status"]), Parsed::Ok);
+    assert_eq!(cli.fd_open("progress"), Some(2));
+    assert_eq!(cli.fd_open("plan"), None);
     assert_eq!(cli.parse(&["db", "migrate"]), Parsed::Ok);
+    assert_eq!(cli.fd_open("plan"), Some(2));
     let usage = cli.usage();
-    assert!(usage.contains("\nOutput fd 4 [progress]: Migration progress\n"), "{usage}");
-    assert!(!usage.contains("fd 3"));
-    let panic = std::panic::catch_unwind(|| cli.emit("log", "x")).unwrap_err();
-    assert_eq!(panic.downcast_ref::<String>().unwrap(), "No file descriptor declared for 'log'");
+    assert!(usage.contains("\nOutput [plan]: Migration plan\n"), "{usage}");
+    assert!(!usage.contains("[progress]"));
 }
