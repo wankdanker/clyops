@@ -149,4 +149,40 @@ class CliTest {
         assertEquals("help", cli.parse("db", "migrate", "-h").status());
         assertTrue(cli.usage().startsWith("Usage: m db migrate [<name>] [OPTIONS]"));
     }
+
+    @Test
+    void fdRegistrationErrors() {
+        Map<String, Runnable> cases = new java.util.LinkedHashMap<>();
+        cases.put("Invalid file descriptor 2", () -> new Cli("t").fd(2, "out", "X"));
+        cases.put("Unknown fd direction 'both'", () -> new Cli("t").fd(3, "both", "X"));
+        cases.put("Invalid fd role '7'", () -> new Cli("t").fd(3, "out", "X", "", "7"));
+        cases.put("Duplicate file descriptor 3", () -> new Cli("t").fd(3, "out", "X").fd(3, "in", "Y"));
+        cases.put("Duplicate fd role 'log'", () -> new Cli("t").fd(3, "out", "X", "", "log").fd(4, "out", "Y", "", "log"));
+        cases.forEach((message, register) ->
+            assertEquals(message, assertThrows(IllegalArgumentException.class, register::run).getMessage()));
+    }
+
+    @Test
+    void fdSchemaIsEmbeddedJson() {
+        Cli cli = new Cli("t").setEnv(Map.of()).fd(3, "out", "A", "application/json", "meta", "{\"type\":\"object\"}").fd(4, "in", "B");
+        String compact = cli.jsonSchema().replaceAll("\\s+", "");
+        assertTrue(compact.contains("\"fds\":[{\"fd\":3,\"direction\":\"out\",\"role\":\"meta\",\"description\":\"A\",\"contentType\":\"application/json\",\"schema\":{\"type\":\"object\"}},{\"fd\":4,\"direction\":\"in\",\"role\":\"\",\"description\":\"B\",\"contentType\":\"\",\"schema\":null}]"), compact);
+    }
+
+    @Test
+    void fdHelpersFollowTheSelectedCommand() {
+        Cli cli = new Cli("m").setEnv(Map.of("CLYOPS_FDS", "999")).fd(3, "out", "Progress", "application/x-ndjson", "progress");
+        Cli db = cli.command("db", "Database");
+        db.command("migrate", "Migrate").fd(4, "out", "Migration progress", "", "progress").fd(999, "in", "Plan");
+        db.command("status", "Status");
+        assertEquals("ok", cli.parse("db", "migrate").status());
+        String usage = cli.usage();
+        assertTrue(usage.contains("\nOutput fd 4 [progress]: Migration progress\n"), usage);
+        assertTrue(!usage.contains("fd 3"));
+        assertEquals(-1, cli.fdOpen("progress"), "unlisted");
+        assertEquals(-1, cli.fdOpen(999), "listed but not open");
+        cli.emit("progress", "nothing happens");
+        assertEquals("No file descriptor declared for 'log'", assertThrows(IllegalArgumentException.class, () -> cli.emit("log", "x")).getMessage());
+        assertEquals("File descriptor 999 is not an output", assertThrows(IllegalArgumentException.class, () -> cli.emit(999, "x")).getMessage());
+    }
 }

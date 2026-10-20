@@ -1,7 +1,11 @@
 package io.github.wankdanker.clyops;
 
 import java.io.File;
+import java.io.FileDescriptor;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.lang.reflect.Field;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -18,6 +22,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -357,6 +362,10 @@ public class Cli {
     private List<String> effects = List.of();
     private Map<String, Object> stdin;
     private Map<String, Object> stdout;
+    private final List<Map<String, Object>> fds = new ArrayList<>();
+    // Streams to the runner's descriptors, kept open for the life of the process.
+    private static final Map<Integer, OutputStream> FD_STREAMS = new ConcurrentHashMap<>();
+    private static final Set<Integer> FD_WARNED = ConcurrentHashMap.newKeySet();
     private final List<Map<String, Object>> constraints = new ArrayList<>();
     private final List<Cli> children = new ArrayList<>();
     private Cli parent;
@@ -429,6 +438,128 @@ public class Cli {
         m.put("description", description);
         m.put("contentType", contentType);
         return m;
+    }
+
+    /** Declare a file descriptor above 2 the program writes ({@code "out"}) or reads ({@code "in"}) (spec section 1.3). */
+    public Cli fd(int fd, String direction, String description) { return fd(fd, direction, description, "", "", null); }
+
+    /** Declare a file descriptor with its MIME type. */
+    public Cli fd(int fd, String direction, String description, String contentType) {
+        return fd(fd, direction, description, contentType, "", null);
+    }
+
+    /** Declare a file descriptor with its MIME type and role (meta, progress, log, result or another agreed name). */
+    public Cli fd(int fd, String direction, String description, String contentType, String role) {
+        return fd(fd, direction, description, contentType, role, null);
+    }
+
+    /**
+     * Declare a file descriptor with its MIME type, role and a JSON Schema, as JSON text, for each
+     * document or line ({@code null} for none).
+     */
+    public Cli fd(int fd, String direction, String description, String contentType, String role, String schema) {
+        if (fd < 3) throw new IllegalArgumentException("Invalid file descriptor " + fd);
+        if (!direction.equals("in") && !direction.equals("out")) {
+            throw new IllegalArgumentException("Unknown fd direction '" + direction + "'");
+        }
+        if (role.matches("[0-9]+")) throw new IllegalArgumentException("Invalid fd role '" + role + "'");
+        for (Map<String, Object> d : fds) {
+            if ((int) d.get("fd") == fd) throw new IllegalArgumentException("Duplicate file descriptor " + fd);
+            if (!role.isEmpty() && role.equals(d.get("role"))) throw new IllegalArgumentException("Duplicate fd role '" + role + "'");
+        }
+        Map<String, Object> d = new LinkedHashMap<>();
+        d.put("fd", fd);
+        d.put("direction", direction);
+        d.put("role", role);
+        d.put("description", description);
+        d.put("contentType", contentType);
+        d.put("schema", schema == null || schema.isEmpty() ? null : new Json.Raw(schema));
+        fds.add(d);
+        return this;
+    }
+
+    /** The declared descriptor for a role or number, searching the selected command then its ancestors. */
+    private Map<String, Object> findFd(String target) {
+        boolean byNumber = target.matches("[0-9]+");
+        int number = -1;
+        if (byNumber) {
+            try {
+                number = Integer.parseInt(target);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        for (Cli node : chain()) {
+            for (Map<String, Object> d : node.fds) {
+                if (byNumber ? (int) d.get("fd") == number : target.equals(d.get("role"))) return d;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The descriptor number for a declared role or number when the runner opened it (listed in
+     * CLYOPS_FDS) and it is open, else -1 (spec section 14).
+     */
+    public int fdOpen(String target) {
+        Map<String, Object> d = findFd(target);
+        if (d == null) return -1;
+        int fd = (int) d.get("fd");
+        boolean listed = Arrays.stream(env.getOrDefault("CLYOPS_FDS", "").split(",")).map(String::trim).anyMatch(String.valueOf(fd)::equals);
+        return listed && Files.exists(Paths.get("/dev/fd/" + fd)) ? fd : -1;
+    }
+
+    /** {@link #fdOpen(String)} for a descriptor number. */
+    public int fdOpen(int fd) { return fdOpen(String.valueOf(fd)); }
+
+    /**
+     * Write {@code text} and a newline (unless it ends with one) to a declared "out" descriptor (spec
+     * section 14). Does nothing when it isn't open; write errors are ignored.
+     */
+    public void emit(String target, String text) {
+        Map<String, Object> d = findFd(target);
+        if (d == null) throw new IllegalArgumentException("No file descriptor declared for '" + target + "'");
+        if (!"out".equals(d.get("direction"))) throw new IllegalArgumentException("File descriptor " + d.get("fd") + " is not an output");
+        int fd = fdOpen((int) d.get("fd"));
+        if (fd < 0) return;
+        String line = text.endsWith("\n") ? text : text + "\n";
+        try {
+            OutputStream out = FD_STREAMS.computeIfAbsent(fd, Cli::openFd);
+            if (out == null) return;
+            synchronized (out) {
+                out.write(line.getBytes(StandardCharsets.UTF_8));
+                out.flush();
+            }
+        } catch (IOException e) {
+            // The reader went away; the descriptor is optional, so the program carries on.
+        }
+    }
+
+    /** {@link #emit(String, String)} for a descriptor number. */
+    public void emit(int fd, String text) { emit(String.valueOf(fd), text); }
+
+    /**
+     * A stream to descriptor {@code fd}. With {@code --add-opens java.base/java.io=ALL-UNNAMED} it
+     * writes to the descriptor itself; otherwise it reopens {@code /dev/fd/N} for appending, which
+     * works for pipes and files but not sockets.
+     */
+    private static OutputStream openFd(int fd) {
+        try {
+            FileDescriptor descriptor = new FileDescriptor();
+            Field field = FileDescriptor.class.getDeclaredField("fd");
+            field.setAccessible(true);
+            field.setInt(descriptor, fd);
+            return new FileOutputStream(descriptor);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            try {
+                return new FileOutputStream("/dev/fd/" + fd, true);
+            } catch (IOException e2) {
+                if (FD_WARNED.add(fd)) {
+                    Log.warn("Cannot write to file descriptor %d (a socket?): run java with --add-opens java.base/java.io=ALL-UNNAMED", fd);
+                }
+                return null;
+            }
+        }
     }
 
     /** At most one of these options may be given. */
@@ -1033,6 +1164,14 @@ public class Cli {
             if (!((String) decl.get("contentType")).isEmpty()) line += " (" + decl.get("contentType") + ")";
             io.add(line);
         }
+        for (Map<String, Object> d : node.fds) {
+            String line = ("in".equals(d.get("direction")) ? "Input" : "Output") + " fd " + d.get("fd");
+            if (!((String) d.get("role")).isEmpty()) line += " [" + d.get("role") + "]";
+            line += ":";
+            if (!((String) d.get("description")).isEmpty()) line += " " + d.get("description");
+            if (!((String) d.get("contentType")).isEmpty()) line += " (" + d.get("contentType") + ")";
+            io.add(line);
+        }
         if (!io.isEmpty()) sections.add(io);
 
         if (!node.children.isEmpty()) {
@@ -1178,6 +1317,7 @@ public class Cli {
         out.put("constraints", constraints);
         out.put("stdin", stdin);
         out.put("stdout", stdout);
+        out.put("fds", fds.stream().map(LinkedHashMap::new).toList());
         out.put("commands", children.stream().map(Cli::schemaNode).toList());
         return out;
     }
