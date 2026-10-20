@@ -157,3 +157,91 @@ fn commands() {
     assert_eq!(cli.parse(&["db", "migrate", "-h"]), Parsed::Help);
     assert!(cli.usage().starts_with("Usage: m db migrate [<name>] [OPTIONS]"));
 }
+
+#[test]
+fn fd_registration_errors_panic() {
+    let cases: [(&str, fn()); 5] = [
+        ("Invalid file descriptor 2", || {
+            Cli::new().fd(2, "out", "X", "");
+        }),
+        ("Unknown fd direction 'both'", || {
+            Cli::new().fd(3, "both", "X", "");
+        }),
+        ("Invalid fd role '7'", || {
+            Cli::new().fd(3, "out", "X", "").role("7");
+        }),
+        ("Duplicate file descriptor 3", || {
+            let mut c = Cli::new();
+            c.fd(3, "out", "X", "");
+            c.fd(3, "in", "Y", "");
+        }),
+        ("Duplicate fd role 'log'", || {
+            let mut c = Cli::new();
+            c.fd(3, "out", "X", "").role("log");
+            c.fd(4, "out", "Y", "").role("log");
+        }),
+    ];
+    for (message, register) in cases {
+        let err = std::panic::catch_unwind(register).expect_err(message);
+        let text = err.downcast_ref::<String>().cloned().unwrap_or_default();
+        assert_eq!(text, message);
+    }
+}
+
+#[test]
+fn fd_schema_is_embedded_json() {
+    let mut cli = Cli::new();
+    cli.name("t").env(Vec::new());
+    cli.fd(3, "out", "A", "application/json").role("meta").schema(r#"{"type":"object"}"#);
+    cli.fd(4, "in", "B", "");
+    let schema = cli.json_schema();
+    let compact: String = schema.split_whitespace().collect();
+    assert!(compact.contains(r#""fds":[{"fd":3,"direction":"out","role":"meta","description":"A","contentType":"application/json","schema":{"type":"object"}},{"fd":4,"direction":"in","role":"","description":"B","contentType":"","schema":null}]"#), "{schema}");
+}
+
+#[test]
+fn fd_emit_only_to_listed_descriptors() {
+    use std::os::fd::AsRawFd;
+    let path = std::env::temp_dir().join(format!("clyops-fd-{}", std::process::id()));
+    let file = std::fs::File::create(&path).unwrap();
+    let fd = file.as_raw_fd();
+    let make = |listed: &str| {
+        let mut cli = Cli::new();
+        cli.name("t").env(vec![("CLYOPS_FDS".to_string(), listed.to_string())]);
+        cli.fd(fd, "out", "Progress", "").role("progress");
+        cli.fd(999, "in", "Extra", "");
+        assert_eq!(cli.parse(&[] as &[&str]), Parsed::Ok);
+        cli
+    };
+    let unlisted = make("");
+    assert_eq!(unlisted.fd_open("progress"), None);
+    unlisted.emit("progress", "never");
+    let cli = make(&format!("{fd}, 999"));
+    assert_eq!(cli.fd_open("progress"), Some(fd));
+    assert_eq!(cli.fd_open(&fd.to_string()), Some(fd));
+    assert_eq!(cli.fd_open("999"), None);
+    cli.emit("progress", r#"{"pct":50}"#);
+    cli.emit(&fd.to_string(), "plain text");
+    cli.emit("progress", "ends with newline\n");
+    assert!(std::panic::catch_unwind(|| cli.emit("nope", "x")).is_err());
+    assert!(std::panic::catch_unwind(|| cli.emit("999", "x")).is_err());
+    drop(file);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "{\"pct\":50}\nplain text\nends with newline\n");
+    std::fs::remove_file(&path).unwrap();
+}
+
+#[test]
+fn fd_lookup_follows_the_selected_command() {
+    let mut cli = Cli::new();
+    cli.name("m").env(vec![("CLYOPS_FDS".to_string(), "0,1".to_string())]);
+    cli.fd(3, "out", "Progress", "application/x-ndjson").role("progress");
+    let db = cli.command("db", "Database");
+    db.command("migrate", "Migrate").fd(4, "out", "Migration progress", "").role("progress");
+    db.command("status", "Status");
+    assert_eq!(cli.parse(&["db", "migrate"]), Parsed::Ok);
+    let usage = cli.usage();
+    assert!(usage.contains("\nOutput fd 4 [progress]: Migration progress\n"), "{usage}");
+    assert!(!usage.contains("fd 3"));
+    let panic = std::panic::catch_unwind(|| cli.emit("log", "x")).unwrap_err();
+    assert_eq!(panic.downcast_ref::<String>().unwrap(), "No file descriptor declared for 'log'");
+}

@@ -140,6 +140,8 @@ enum Json {
     Arr(Vec<Json>),
     Obj(Vec<(&'static str, Json)>),
     Map(Vec<(String, Json)>),
+    // JSON text written as given (a declared fd schema).
+    Raw(String),
 }
 
 fn json_str(s: &str, out: &mut String) {
@@ -167,6 +169,7 @@ impl Json {
             Json::Null => out.push_str("null"),
             Json::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
             Json::Num(n) => out.push_str(n),
+            Json::Raw(text) => out.push_str(text),
             Json::Str(s) => json_str(s, out),
             Json::Arr(items) if items.is_empty() => out.push_str("[]"),
             Json::Arr(items) => {
@@ -752,6 +755,43 @@ impl Parsed {
     }
 }
 
+/// A declared file descriptor above 2 (spec sections 1.3 and 14).
+#[derive(Debug, Clone)]
+struct FdDecl {
+    fd: i32,
+    output: bool,
+    role: String,
+    description: String,
+    content_type: String,
+    schema: Option<String>,
+}
+
+/// Handle returned by [`Cli::fd`] for its optional role and schema on the same line.
+pub struct FdRef<'a> {
+    cli: &'a mut Cli,
+    index: usize,
+}
+
+impl<'a> FdRef<'a> {
+    /// `meta`, `progress`, `log`, `result` or another agreed name. Panics on a role made only of
+    /// digits, or one already used on this level.
+    pub fn role(self, role: &str) -> Self {
+        if !role.is_empty() && role.bytes().all(|b| b.is_ascii_digit()) {
+            panic!("Invalid fd role '{role}'");
+        }
+        if !role.is_empty() && self.cli.fds.iter().any(|d| d.role == role) {
+            panic!("Duplicate fd role '{role}'");
+        }
+        self.cli.fds[self.index].role = role.to_string();
+        self
+    }
+    /// JSON Schema, as JSON text, that each document or line on the descriptor matches.
+    pub fn schema(self, schema: &str) -> Self {
+        self.cli.fds[self.index].schema = Some(schema.to_string());
+        self
+    }
+}
+
 /// Handle returned by [`Cli::opt`] and friends for optional settings on the same line.
 pub struct OptRef<'a> {
     cli: &'a mut Cli,
@@ -822,6 +862,7 @@ pub struct Cli {
     effects: Vec<String>,
     stdin: Option<(String, String)>,
     stdout: Option<(String, String)>,
+    fds: Vec<FdDecl>,
     constraints: Vec<(&'static str, Vec<String>)>,
     children: Vec<Cli>,
     word: String,
@@ -862,6 +903,7 @@ impl Cli {
             effects: Vec::new(),
             stdin: None,
             stdout: None,
+            fds: Vec::new(),
             constraints: Vec::new(),
             children: Vec::new(),
             word: String::new(),
@@ -921,6 +963,71 @@ impl Cli {
         self.stdout = Some((description.into(), content_type.into()));
         self
     }
+    /// Declare a file descriptor above 2 the program writes (`"out"`) or reads (`"in"`); set its role
+    /// and schema on the returned handle. Panics on a number below 3, a number used twice on this
+    /// level, or another direction.
+    pub fn fd(&mut self, fd: i32, direction: &str, description: &str, content_type: &str) -> FdRef<'_> {
+        if fd < 3 {
+            panic!("Invalid file descriptor {fd}");
+        }
+        if direction != "in" && direction != "out" {
+            panic!("Unknown fd direction '{direction}'");
+        }
+        if self.fds.iter().any(|d| d.fd == fd) {
+            panic!("Duplicate file descriptor {fd}");
+        }
+        self.fds.push(FdDecl {
+            fd,
+            output: direction == "out",
+            role: String::new(),
+            description: description.into(),
+            content_type: content_type.into(),
+            schema: None,
+        });
+        let index = self.fds.len() - 1;
+        FdRef { cli: self, index }
+    }
+
+    /// The declared descriptor for a role or number, searching the selected command then its ancestors.
+    fn find_fd(&self, target: &str) -> Option<&FdDecl> {
+        let by_number = !target.is_empty() && target.bytes().all(|b| b.is_ascii_digit());
+        let number = target.parse::<i32>().ok();
+        self.chain()
+            .into_iter()
+            .find_map(|node| node.fds.iter().find(|d| if by_number { Some(d.fd) == number } else { d.role == target }))
+    }
+
+    /// The descriptor number for a declared role or number when the runner opened it (listed in
+    /// `CLYOPS_FDS`) and it is open, else `None` (spec section 14).
+    pub fn fd_open(&self, target: &str) -> Option<i32> {
+        let fd = self.find_fd(target)?.fd;
+        let listed = self.env.get("CLYOPS_FDS").map(String::as_str).unwrap_or("");
+        if !listed.split(',').any(|s| s.trim() == fd.to_string()) {
+            return None;
+        }
+        if cfg!(unix) && std::path::Path::new(&format!("/dev/fd/{fd}")).exists() {
+            Some(fd)
+        } else {
+            None
+        }
+    }
+
+    /// Write `text` and a newline (unless it ends with one) to a declared `"out"` descriptor (spec
+    /// section 14). Does nothing when the descriptor isn't open; write errors are ignored. Panics
+    /// when `target` isn't declared or is an input.
+    pub fn emit(&self, target: &str, text: &str) {
+        let decl = self.find_fd(target).unwrap_or_else(|| panic!("No file descriptor declared for '{target}'"));
+        if !decl.output {
+            panic!("File descriptor {} is not an output", decl.fd);
+        }
+        let Some(fd) = self.fd_open(&decl.fd.to_string()) else { return };
+        let mut line = text.to_string();
+        if !line.ends_with('\n') {
+            line.push('\n');
+        }
+        write_fd(fd, line.as_bytes());
+    }
+
     /// At most one of these options may be given.
     pub fn exclusive(&mut self, longs: &[&str]) -> &mut Self {
         self.add_constraint("exclusive", longs.iter().copied())
@@ -1635,8 +1742,19 @@ impl Cli {
             sections.push(wrap_text(&node.description, max_width));
         }
 
-        let io: Vec<String> = [("Input:", &node.stdin), ("Output:", &node.stdout)]
+        let fd_lines: Vec<(String, Option<(String, String)>)> = node
+            .fds
             .iter()
+            .map(|d| {
+                let role = if d.role.is_empty() { String::new() } else { format!(" [{}]", d.role) };
+                let label = format!("{} fd {}{role}:", if d.output { "Output" } else { "Input" }, d.fd);
+                (label, Some((d.description.clone(), d.content_type.clone())))
+            })
+            .collect();
+        let streams = [("Input:".to_string(), node.stdin.clone()), ("Output:".to_string(), node.stdout.clone())];
+        let io: Vec<String> = streams
+            .iter()
+            .chain(fd_lines.iter())
             .filter_map(|(label, decl)| {
                 let (d, t) = decl.as_ref()?;
                 let mut line = label.to_string();
@@ -1853,6 +1971,24 @@ impl Cli {
             ),
             ("stdin", stream(&self.stdin)),
             ("stdout", stream(&self.stdout)),
+            (
+                "fds",
+                Json::Arr(
+                    self.fds
+                        .iter()
+                        .map(|d| {
+                            Json::Obj(vec![
+                                ("fd", Json::Num(d.fd.to_string())),
+                                ("direction", s(if d.output { "out" } else { "in" })),
+                                ("role", s(&d.role)),
+                                ("description", s(&d.description)),
+                                ("contentType", s(&d.content_type)),
+                                ("schema", d.schema.clone().map(Json::Raw).unwrap_or(Json::Null)),
+                            ])
+                        })
+                        .collect(),
+                ),
+            ),
             ("commands", Json::Arr(self.children.iter().map(|c| Json::Obj(c.schema_node())).collect())),
         ]);
         fields
@@ -1922,3 +2058,17 @@ impl Cli {
         out
     }
 }
+
+/// Write all of `bytes` to an open descriptor the runner owns, without closing it. Errors (the reader
+/// went away) are ignored: a declared descriptor is optional.
+#[cfg(unix)]
+fn write_fd(fd: i32, bytes: &[u8]) {
+    use std::io::Write;
+    use std::os::fd::FromRawFd;
+    // SAFETY: fd_open checked the descriptor is open; ManuallyDrop leaves it open for the next call.
+    let mut file = std::mem::ManuallyDrop::new(unsafe { std::fs::File::from_raw_fd(fd) });
+    let _ = file.write_all(bytes);
+}
+
+#[cfg(not(unix))]
+fn write_fd(_fd: i32, _bytes: &[u8]) {}
