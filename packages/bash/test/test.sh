@@ -101,38 +101,42 @@ check "sibling commands may reuse option names" "seed|5" "$(run '
 check "commands and positional arguments do not mix" "Cannot mix commands and positional arguments" "$(run '
     clyops_arg X "X"; clyops_command c "C"' | sed 's/.*\] //')"
 
-check "fd registration errors" "Invalid file descriptor 2|Unknown fd direction 'both'|Invalid fd role '7'|Duplicate file descriptor 3|Duplicate fd role 'log'" "$(
-    for reg in 'clyops_fd 2 out X' 'clyops_fd 3 both X' 'clyops_fd 3 out X "" 7' \
-        'clyops_fd 3 out X; clyops_fd 3 in Y' 'clyops_fd 3 out X "" log; clyops_fd 4 out Y "" log'; do
+check "role registration errors" "Invalid role name '7up'|Invalid role name 'a:b'|Unknown role direction 'both'|Duplicate role 'log'" "$(
+    for reg in 'clyops_role 7up out X' 'clyops_role a:b out X' 'clyops_role log both X' \
+        'clyops_role log out X; clyops_role log in Y'; do
         run "$reg" | sed 's/.*\] //'
     done | paste -sd'|')"
 
-check "fd emit writes only to descriptors listed in CLYOPS_FDS" '{"pct":50}|plain|ends' "$(
+check "emit and forward_fds follow the CLYOPS_FDS mapping" '{"pct":50}|plain|ends|progress:7,log:7|unset' "$(
     tmp="$(mktemp)"; trap 'rm -f "$tmp"' RETURN
-    CLYOPS_FDS="7, 9" run '
-        clyops_fd 7 out "Progress" "" progress; clyops_fd 8 out "Unlisted" "" log; clyops_fd 9 in "Extra"
+    { CLYOPS_FDS="progress:7, extra:9, log:7" run '
+        clyops_role progress out "Progress"; clyops_role extra in "Extra"
         clyops_run
-        clyops_emit progress "{\"pct\":50}"; clyops_emit 7 plain; clyops_emit progress $'"'"'ends\n'"'"'
-        clyops_emit log "never"
-        clyops_fd_open 9 || echo "9 closed" >&2' 7>"$tmp" 8>>"$tmp" >/dev/null
+        clyops_emit progress "{\"pct\":50}"; clyops_emit progress plain; clyops_emit progress $'"'"'ends\n'"'"'
+        clyops_fd_open extra >&2 || true; clyops_fd_open log >&2 || true
+        clyops_forward_fds progress extra log nope >&8
+        echo "${CLYOPS_FDS-unset}" >&8' 7>"$tmp" 8>>"$tmp" >/dev/null; } 2>&1
     paste -sd'|' "$tmp"
     )"
 
-check "fd emit to an undeclared role or an input is a programming error" "No file descriptor declared for 'nope'|File descriptor 9 is not an output" "$({
-    run 'clyops_fd 9 in X; clyops_run; clyops_emit nope x' | sed 's/.*\] //'
-    run 'clyops_fd 9 in X; clyops_run; clyops_emit 9 x' | sed 's/.*\] //'; } | paste -sd'|')"
+check "emit to an undeclared role or an input is a programming error" "Unknown role 'nope'|Role 'extra' is not an output" "$({
+    run 'clyops_role extra in X; clyops_run; clyops_emit nope x' | sed 's/.*\] //'
+    run 'clyops_role extra in X; clyops_run; clyops_emit extra x' | sed 's/.*\] //'; } | paste -sd'|')"
 
-check "fd lookup: commands inherit, nearest wins, help lists their own" "3|4|Output fd 4 [progress]: Migration progress|0" "$({ CLYOPS_FDS=3,4 run '
-    clyops_fd 3 out "Progress" "" progress
-    clyops_command db "Database"; clyops_command "db migrate" "Migrate"; clyops_fd 4 out "Migration progress" "" progress
+check "malformed CLYOPS_FDS entries warn" "Ignoring CLYOPS_FDS entry 'meta'|Ignoring CLYOPS_FDS entry 'progress:1'" "$(
+    CLYOPS_FDS="meta, progress:1" run 'clyops_role progress out P; clyops_run' | sed 's/.*\] //' | paste -sd'|')"
+
+check "roles: commands inherit, help lists their own" "2||2|Output [plan]: Migration plan|0" "$({ CLYOPS_FDS=progress:2,plan:2 run '
+    clyops_role progress out "Progress"
+    clyops_command db "Database"; clyops_command "db migrate" "Migrate"; clyops_role plan out "Migration plan"
     clyops_command "db status" "Status"
     clyops_run "$@"
-    clyops_fd_open progress' db status 3>/dev/null 4>/dev/null
-    CLYOPS_FDS=3,4 run '
-    clyops_fd 3 out "Progress" "" progress
-    clyops_command db "Database"; clyops_command "db migrate" "Migrate"; clyops_fd 4 out "Migration progress" "" progress
-    clyops_run "$@"; clyops_fd_open progress
-    clyops_usage | grep "fd"; clyops_usage | grep -c "fd 3" || true' db migrate 3>/dev/null 4>/dev/null; } | paste -sd'|')"
+    clyops_fd_open progress; clyops_fd_open plan || echo' db status
+    CLYOPS_FDS=progress:2,plan:2 run '
+    clyops_role progress out "Progress"
+    clyops_command db "Database"; clyops_command "db migrate" "Migrate"; clyops_role plan out "Migration plan"
+    clyops_run "$@"; clyops_fd_open plan
+    clyops_usage | grep "\[plan\]"; clyops_usage | grep -c "\[progress\]" || true' db migrate; } | paste -sd'|')"
 
 if (( failures )); then echo "$failures failed"; exit 1; fi
 echo "all passed"

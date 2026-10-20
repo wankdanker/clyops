@@ -115,70 +115,79 @@ class CliTest(unittest.TestCase):
         schema = json.loads(cli.json_schema())
         self.assertEqual(schema["commands"][0]["commands"][0]["options"][0]["name"], "to")
 
-    def test_fd_registration_errors(self):
+    def test_role_registration_errors(self):
         def cli():
             return Cli(name="t", env={})
         for build, message in [
-            (lambda: cli().fd(2, "out", "X"), "Invalid file descriptor 2"),
-            (lambda: cli().fd(True, "out", "X"), "Invalid file descriptor True"),
-            (lambda: cli().fd(3, "both", "X"), "Unknown fd direction 'both'"),
-            (lambda: cli().fd(3, "out", "X", role="7"), "Invalid fd role '7'"),
-            (lambda: cli().fd(3, "out", "X").fd(3, "in", "Y"), "Duplicate file descriptor 3"),
-            (lambda: cli().fd(3, "out", "X", role="log").fd(4, "out", "Y", role="log"), "Duplicate fd role 'log'"),
+            (lambda: cli().role("7up", "out", "X"), "Invalid role name '7up'"),
+            (lambda: cli().role("a:b", "out", "X"), "Invalid role name 'a:b'"),
+            (lambda: cli().role("log", "both", "X"), "Unknown role direction 'both'"),
+            (lambda: cli().role("log", "out", "X").role("log", "in", "Y"), "Duplicate role 'log'"),
         ]:
             with self.assertRaisesRegex(ValueError, message):
                 build()
-        cli().fd(3, "out", "X").fd(4, "out", "Y")
+        cli().role("progress", "out", "X").role("my.role-2_x", "in", "Y")
 
-    def test_fd_schema_object_or_text(self):
-        cli = Cli(name="t", env={}).fd(3, "out", "A", "application/json", "meta", {"type": "object"})
-        cli.fd(4, "in", "B", schema='{"type":"string"}')
-        self.assertEqual(json.loads(cli.json_schema())["fds"], [
-            {"fd": 3, "direction": "out", "role": "meta", "description": "A", "contentType": "application/json",
+    def test_role_schema_dict_or_text(self):
+        cli = Cli(name="t", env={}).role("meta", "out", "A", "application/json", {"type": "object"})
+        cli.role("extra", "in", "B", schema='{"type":"string"}')
+        self.assertEqual(json.loads(cli.json_schema())["roles"], [
+            {"name": "meta", "direction": "out", "description": "A", "contentType": "application/json",
              "schema": {"type": "object"}},
-            {"fd": 4, "direction": "in", "role": "", "description": "B", "contentType": "", "schema": {"type": "string"}},
+            {"name": "extra", "direction": "in", "description": "B", "contentType": "", "schema": {"type": "string"}},
         ])
 
-    def test_fd_emit_only_to_listed_descriptors(self):
+    def test_role_emit_and_forward_follow_the_mapping(self):
         import tempfile
         with tempfile.TemporaryFile("w+") as fh:
             fd = fh.fileno()
 
-            def make(listed):
-                c = Cli(name="t", env={"CLYOPS_FDS": listed}).fd(fd, "out", "Progress", role="progress")
-                c.fd(999, "in", "Extra")
+            def make(env):
+                c = Cli(name="t", env=env).role("progress", "out", "Progress").role("extra", "in", "Extra")
                 self.assertEqual(c.parse([]).status, "ok")
                 return c
-            unlisted = make("")
-            self.assertIsNone(unlisted.fd_open("progress"))
-            unlisted.emit("progress", {"pct": 1})
-            cli = make(f"{fd}, 999")
+            unmapped = make({})
+            self.assertIsNone(unmapped.fd_open("progress"))
+            unmapped.emit("progress", {"pct": 1})
+            self.assertEqual(unmapped.forward_fds("progress"), "")
+            cli = make({"CLYOPS_FDS": f"progress:{fd}, extra:999, log:{fd}"})
             self.assertEqual(cli.fd_open("progress"), fd)
-            self.assertEqual(cli.fd_open(fd), fd)
-            self.assertIsNone(cli.fd_open(999))
+            self.assertIsNone(cli.fd_open("extra"))
+            self.assertIsNone(cli.fd_open("log"))
             cli.emit("progress", {"pct": 50})
-            cli.emit(str(fd), "plain text")
+            cli.emit("progress", "plain text")
             cli.emit("progress", "ends with newline\n")
-            with self.assertRaisesRegex(ValueError, "No file descriptor declared for 'nope'"):
+            self.assertEqual(cli.forward_fds("progress", "extra", "log", "nope"), f"progress:{fd},log:{fd}")
+            with self.assertRaisesRegex(ValueError, "Unknown role 'nope'"):
                 cli.emit("nope", "x")
-            with self.assertRaisesRegex(ValueError, "File descriptor 999 is not an output"):
-                cli.emit(999, "x")
+            with self.assertRaisesRegex(ValueError, "Role 'extra' is not an output"):
+                cli.emit("extra", "x")
             fh.seek(0)
             self.assertEqual(fh.read(), '{"pct":50}\nplain text\nends with newline\n')
 
-    def test_fd_scope_and_help(self):
-        cli = Cli(name="m", env={}).fd(3, "out", "Progress", "application/x-ndjson", "progress")
+    def test_role_mapping_is_read_once_and_removed(self):
+        os.environ["CLYOPS_FDS"] = "progress:2"
+        cli = Cli(name="t").role("progress", "out", "Progress")
+        cli.parse([])
+        self.assertNotIn("CLYOPS_FDS", os.environ)
+        cli.parse([])
+        self.assertEqual(cli.fd_open("progress"), 2)
+        os.environ["CLYOPS_FDS"] = "other:5"
+        Cli(name="t", env={"CLYOPS_FDS": "progress:2"}).parse([])
+        self.assertEqual(os.environ.pop("CLYOPS_FDS"), "other:5")
+
+    def test_role_scope_and_help(self):
+        cli = Cli(name="m", env={"CLYOPS_FDS": "progress:2,plan:2"}).role("progress", "out", "Progress")
         db = cli.command("db", "Database")
-        db.command("migrate", "Migrate").fd(4, "out", "Migration progress", role="progress")
+        db.command("migrate", "Migrate").role("plan", "out", "Migration plan")
         db.command("status", "Status")
         cli.parse(["db", "status"])
-        self.assertEqual(cli._find_fd("progress")["fd"], 3)
+        self.assertEqual(cli.fd_open("progress"), 2)
+        self.assertIsNone(cli.fd_open("plan"))
         cli.parse(["db", "migrate"])
-        self.assertEqual(cli._find_fd("progress")["fd"], 4)
-        self.assertEqual(cli._find_fd(3)["fd"], 3)
-        self.assertIn("\nOutput fd 4 [progress]: Migration progress\n", cli.usage())
-        self.assertNotIn("fd 3", cli.usage())
-
+        self.assertEqual(cli.fd_open("plan"), 2)
+        self.assertIn("\nOutput [plan]: Migration plan\n", cli.usage())
+        self.assertNotIn("[progress]", cli.usage())
 
 if __name__ == "__main__":
     unittest.main()

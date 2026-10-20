@@ -47,9 +47,11 @@ declare -A _CLYOPS_OWNER=()     # long -> the command that registered it ("" for
 _CLYOPS_EFFECTS=()
 _CLYOPS_STDIN=() _CLYOPS_STDOUT=()   # (description content-type) when declared
 _CLYOPS_CON_TYPE=() _CLYOPS_CON_OPTS=() _CLYOPS_CON_OWNER=()   # option relationships
-# Declared file descriptors above 2 (spec sections 1.3 and 14), with the command that declared them
-_CLYOPS_FD_NUM=() _CLYOPS_FD_DIR=() _CLYOPS_FD_ROLE=() _CLYOPS_FD_DESC=() _CLYOPS_FD_TYPE=()
-_CLYOPS_FD_SCHEMA=() _CLYOPS_FD_OWNER=()
+# Declared roles (spec sections 1.3 and 14), with the command that declared them
+_CLYOPS_ROLE_NAME=() _CLYOPS_ROLE_DIR=() _CLYOPS_ROLE_DESC=() _CLYOPS_ROLE_TYPE=() _CLYOPS_ROLE_SCHEMA=()
+_CLYOPS_ROLE_OWNER=()
+declare -A _CLYOPS_FDMAP=()     # CLYOPS_FDS as read once: role -> descriptor
+_CLYOPS_FDMAP_READ=""
 
 # Commands (spec section 1.7). Registrations made after clyops_command are
 # recorded, and replayed when the command is selected, so sibling commands
@@ -148,66 +150,90 @@ clyops_stdin()  { _clyops_record clyops_stdin "$@" || _CLYOPS_STDIN=("$1" "${2:-
 # Usage: clyops_stdout <description> [content-type]. Declare output metadata.
 clyops_stdout() { _clyops_record clyops_stdout "$@" || _CLYOPS_STDOUT=("$1" "${2:-}"); }
 
-# Usage: clyops_fd <fd> <in|out> <description> [content-type] [role] [schema-json]
-# Declare a file descriptor above 2 (spec section 1.3). role: meta, progress, log, result or another
-# agreed name; schema-json: a JSON Schema each document or line matches.
-clyops_fd() {
-    _clyops_record clyops_fd "$@" && return 0
-    local fd="$1" dir="$2" role="${5:-}" i
-    [[ "$fd" =~ ^[0-9]+$ ]] && (( 10#$fd >= 3 )) || _clyops_fatal "Invalid file descriptor $fd"
-    fd=$(( 10#$fd ))
-    [[ "$dir" == in || "$dir" == out ]] || _clyops_fatal "Unknown fd direction '$dir'"
-    [[ "$role" =~ ^[0-9]+$ ]] && _clyops_fatal "Invalid fd role '$role'"
-    for (( i = 0; i < ${#_CLYOPS_FD_NUM[@]}; i++ )); do
-        [[ "${_CLYOPS_FD_OWNER[i]}" == "$_CLYOPS_SEL" ]] || continue
-        [[ "${_CLYOPS_FD_NUM[i]}" == "$fd" ]] && _clyops_fatal "Duplicate file descriptor $fd"
-        [[ -n "$role" && "${_CLYOPS_FD_ROLE[i]}" == "$role" ]] && _clyops_fatal "Duplicate fd role '$role'"
+# Usage: clyops_role <name> <in|out> <description> [content-type] [schema-json]
+# Declare a role (spec section 1.3): a stream on a descriptor the runner chooses. name: meta,
+# progress, log, result or another agreed name; schema-json: a JSON Schema each document or line matches.
+clyops_role() {
+    _clyops_record clyops_role "$@" && return 0
+    local name="$1" dir="$2" i
+    [[ "$name" =~ ^[A-Za-z][A-Za-z0-9_.-]*$ ]] || _clyops_fatal "Invalid role name '$name'"
+    [[ "$dir" == in || "$dir" == out ]] || _clyops_fatal "Unknown role direction '$dir'"
+    for (( i = 0; i < ${#_CLYOPS_ROLE_NAME[@]}; i++ )); do
+        [[ "${_CLYOPS_ROLE_OWNER[i]}" == "$_CLYOPS_SEL" && "${_CLYOPS_ROLE_NAME[i]}" == "$name" ]] &&
+            _clyops_fatal "Duplicate role '$name'"
     done
-    _CLYOPS_FD_NUM+=("$fd"); _CLYOPS_FD_DIR+=("$dir"); _CLYOPS_FD_ROLE+=("$role")
-    _CLYOPS_FD_DESC+=("$3"); _CLYOPS_FD_TYPE+=("${4:-}"); _CLYOPS_FD_SCHEMA+=("${6:-}")
-    _CLYOPS_FD_OWNER+=("$_CLYOPS_SEL")
+    _CLYOPS_ROLE_NAME+=("$name"); _CLYOPS_ROLE_DIR+=("$dir"); _CLYOPS_ROLE_DESC+=("$3")
+    _CLYOPS_ROLE_TYPE+=("${4:-}"); _CLYOPS_ROLE_SCHEMA+=("${5:-}"); _CLYOPS_ROLE_OWNER+=("$_CLYOPS_SEL")
 }
 
-# The index of the declaration for role or number $1, searching the selected command then its
-# ancestors, into _r; returns 1 when none.
-_clyops_find_fd() {
+# The index of declared role $1, searching the selected command then its ancestors, into _r;
+# returns 1 when none.
+_clyops_find_role() {
     local level="$_CLYOPS_SEL" i
     while :; do
-        for (( i = 0; i < ${#_CLYOPS_FD_NUM[@]}; i++ )); do
-            [[ "${_CLYOPS_FD_OWNER[i]}" == "$level" ]] || continue
-            if [[ "$1" =~ ^[0-9]+$ ]]; then
-                (( 10#$1 == _CLYOPS_FD_NUM[i] )) || continue
-            else
-                [[ "${_CLYOPS_FD_ROLE[i]}" == "$1" ]] || continue
-            fi
-            _r="$i"; return 0
+        for (( i = 0; i < ${#_CLYOPS_ROLE_NAME[@]}; i++ )); do
+            [[ "${_CLYOPS_ROLE_OWNER[i]}" == "$level" && "${_CLYOPS_ROLE_NAME[i]}" == "$1" ]] && { _r="$i"; return 0; }
         done
         [[ -z "$level" ]] && return 1
         if [[ "$level" == *" "* ]]; then level="${level% *}"; else level=""; fi
     done
 }
 
-# Usage: clyops_fd_open <role-or-number>
-# Prints the descriptor number and succeeds when it is declared, listed in CLYOPS_FDS by the runner
-# and open (spec section 14); fails silently otherwise.
-clyops_fd_open() {
-    _clyops_find_fd "$1" || return 1
-    local fd="${_CLYOPS_FD_NUM[_r]}"
-    [[ ",${CLYOPS_FDS//[[:space:]]/}," == *",$fd,"* ]] || return 1
-    { : >&"$fd"; } 2>/dev/null || return 1
-    echo "$fd"
+# Read CLYOPS_FDS once (spec section 14), then unset it so programs we start don't inherit it.
+_clyops_read_fdmap() {
+    [[ -n "$_CLYOPS_FDMAP_READ" ]] && return 0
+    _CLYOPS_FDMAP_READ=1
+    local entry entries
+    IFS=, read -ra entries <<< "${CLYOPS_FDS:-}"
+    for entry in "${entries[@]}"; do
+        entry="${entry#"${entry%%[![:space:]]*}"}"; entry="${entry%"${entry##*[![:space:]]}"}"
+        [[ -z "$entry" ]] && continue
+        if [[ "$entry" =~ ^([A-Za-z][A-Za-z0-9_.-]*):([0-9]+)$ ]] && (( 10#${BASH_REMATCH[2]} >= 2 )); then
+            _CLYOPS_FDMAP[${BASH_REMATCH[1]}]=$(( 10#${BASH_REMATCH[2]} ))
+        else
+            warn "Ignoring CLYOPS_FDS entry '$entry'"
+        fi
+    done
+    unset CLYOPS_FDS
 }
 
-# Usage: clyops_emit <role-or-number> <text>
-# Write text and a newline (unless it ends with one) to a declared "out" descriptor (spec section 14).
-# Does nothing when the descriptor isn't open; write errors are ignored.
+# The descriptor CLYOPS_FDS maps to role $1, when it is open, into _r; returns 1 otherwise.
+_clyops_mapped_fd() {
+    _clyops_read_fdmap
+    local fd="${_CLYOPS_FDMAP[$1]:-}"
+    [[ -n "$fd" ]] || return 1
+    { : >&"$fd"; } 2>/dev/null || return 1
+    _r="$fd"
+}
+
+# Usage: clyops_fd_open <role>
+# Prints the descriptor for a declared role and succeeds when CLYOPS_FDS maps it and it is open
+# (spec section 14); fails silently otherwise.
+clyops_fd_open() {
+    _clyops_find_role "$1" || return 1
+    _clyops_mapped_fd "$1" || return 1
+    echo "$_r"
+}
+
+# Usage: clyops_emit <role> <text>
+# Write text and a newline (unless it ends with one) to a declared "out" role (spec section 14).
+# Does nothing when the runner didn't map it; write errors are ignored.
 clyops_emit() {
-    _clyops_find_fd "$1" || _clyops_fatal "No file descriptor declared for '$1'"
-    [[ "${_CLYOPS_FD_DIR[_r]}" == out ]] || _clyops_fatal "File descriptor ${_CLYOPS_FD_NUM[_r]} is not an output"
-    local fd text="$2"
-    fd="$(clyops_fd_open "${_CLYOPS_FD_NUM[_r]}")" || return 0
+    _clyops_find_role "$1" || _clyops_fatal "Unknown role '$1'"
+    [[ "${_CLYOPS_ROLE_DIR[_r]}" == out ]] || _clyops_fatal "Role '$1' is not an output"
+    _clyops_mapped_fd "$1" || return 0
+    local fd="$_r" text="$2"
     [[ "$text" == *$'\n' ]] || text+=$'\n'
-    ( trap '' PIPE; printf '%s' "$text" >&"$fd" ) 2>/dev/null || true
+    # >&fd before 2>/dev/null, so a role mapped to stderr still reaches it.
+    ( trap '' PIPE; printf '%s' "$text" >&"$fd" 2>/dev/null ) || true
+}
+
+# Usage: clyops_forward_fds <role>...
+# Prints the CLYOPS_FDS value passing these roles on to a program this one starts (spec section 14).
+clyops_forward_fds() {
+    local name out=()
+    for name in "$@"; do _clyops_mapped_fd "$name" && out+=("$name:$_r"); done
+    local IFS=,; echo "${out[*]}"
 }
 
 # Usage: clyops_exclusive <long>...  /  clyops_requires <long> <long>...  /  clyops_one_of <long>...
@@ -828,6 +854,7 @@ _clyops_assign() {
 clyops_parse() {
     local _c_long
     _clyops_ensure_help
+    _clyops_read_fdmap
     _CLYOPS_RAW=() _CLYOPS_HAS=() _CLYOPS_SRC=() _CLYOPS_CFG_VAL=() _CLYOPS_CFG_DIR=()
     _CLYOPS_ARGV=() _CLYOPS_REST=() _CLYOPS_ERROR="" _CLYOPS_DETAIL=() _CLYOPS_SHOW_USAGE=1 _CLYOPS_HELP=""
     _CLYOPS_SEL=""
@@ -1145,11 +1172,10 @@ clyops_usage() {
     local io=() label
     (( ${#_CLYOPS_STDIN[@]} )) && io+=("$(_clyops_stream_line Input: "${_CLYOPS_STDIN[@]}")")
     (( ${#_CLYOPS_STDOUT[@]} )) && io+=("$(_clyops_stream_line Output: "${_CLYOPS_STDOUT[@]}")")
-    for (( i = 0; i < ${#_CLYOPS_FD_NUM[@]}; i++ )); do
-        [[ "${_CLYOPS_FD_OWNER[i]}" == "$_CLYOPS_SEL" ]] || continue
-        label="Output"; [[ "${_CLYOPS_FD_DIR[i]}" == in ]] && label="Input"
-        label+=" fd ${_CLYOPS_FD_NUM[i]}"; [[ -n "${_CLYOPS_FD_ROLE[i]}" ]] && label+=" [${_CLYOPS_FD_ROLE[i]}]"
-        io+=("$(_clyops_stream_line "$label:" "${_CLYOPS_FD_DESC[i]}" "${_CLYOPS_FD_TYPE[i]}")")
+    for (( i = 0; i < ${#_CLYOPS_ROLE_NAME[@]}; i++ )); do
+        [[ "${_CLYOPS_ROLE_OWNER[i]}" == "$_CLYOPS_SEL" ]] || continue
+        label="Output"; [[ "${_CLYOPS_ROLE_DIR[i]}" == in ]] && label="Input"
+        io+=("$(_clyops_stream_line "$label [${_CLYOPS_ROLE_NAME[i]}]:" "${_CLYOPS_ROLE_DESC[i]}" "${_CLYOPS_ROLE_TYPE[i]}")")
     done
     if (( ${#io[@]} )); then
         echo
@@ -1314,15 +1340,14 @@ _clyops_schema_node() {
         sep=", "
     done
     _clyops_json_stream "${_CLYOPS_STDIN[@]}"; printf '],\n  "stdin": %s,\n' "$_r"
-    _clyops_json_stream "${_CLYOPS_STDOUT[@]}"; printf '  "stdout": %s,\n  "fds": [' "$_r"
+    _clyops_json_stream "${_CLYOPS_STDOUT[@]}"; printf '  "stdout": %s,\n  "roles": [' "$_r"
     sep=""
-    for (( i = 0; i < ${#_CLYOPS_FD_NUM[@]}; i++ )); do
-        [[ "${_CLYOPS_FD_OWNER[i]}" == "$path" ]] || continue
-        printf '%s\n    {\n      "fd": %s,\n      "direction": "%s",\n' "$sep" "${_CLYOPS_FD_NUM[i]}" "${_CLYOPS_FD_DIR[i]}"
-        _clyops_json_str "${_CLYOPS_FD_ROLE[i]}"; printf '      "role": %s,\n' "$_r"
-        _clyops_json_str "${_CLYOPS_FD_DESC[i]}"; printf '      "description": %s,\n' "$_r"
-        _clyops_json_str "${_CLYOPS_FD_TYPE[i]}"; printf '      "contentType": %s,\n' "$_r"
-        printf '      "schema": %s\n    }' "${_CLYOPS_FD_SCHEMA[i]:-null}"
+    for (( i = 0; i < ${#_CLYOPS_ROLE_NAME[@]}; i++ )); do
+        [[ "${_CLYOPS_ROLE_OWNER[i]}" == "$path" ]] || continue
+        printf '%s\n    {\n      "name": "%s",\n      "direction": "%s",\n' "$sep" "${_CLYOPS_ROLE_NAME[i]}" "${_CLYOPS_ROLE_DIR[i]}"
+        _clyops_json_str "${_CLYOPS_ROLE_DESC[i]}"; printf '      "description": %s,\n' "$_r"
+        _clyops_json_str "${_CLYOPS_ROLE_TYPE[i]}"; printf '      "contentType": %s,\n' "$_r"
+        printf '      "schema": %s\n    }' "${_CLYOPS_ROLE_SCHEMA[i]:-null}"
         sep=","
     done
     [[ -n "$sep" ]] && printf '\n  '
