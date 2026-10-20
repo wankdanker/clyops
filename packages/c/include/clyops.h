@@ -73,6 +73,34 @@ void clyops_stdin(clyops_t* cli, const char* description, const char* content_ty
 /** What the program writes on stdout; undeclared means text. */
 void clyops_stdout(clyops_t* cli, const char* description, const char* content_type);
 
+/** Optional fields of a declared file descriptor. Unset fields are NULL. */
+typedef struct {
+    int _; /**< Reserved placeholder for the registration macro. */
+    const char* description; /**< Help description. */
+    const char* content_type; /**< MIME type. */
+    const char* role; /**< meta, progress, log, result or another agreed name (spec section 14). */
+    const char* schema; /**< JSON Schema, as JSON text, each document or line matches. */
+} clyops_fd_meta_t;
+
+/**
+ * Declare a file descriptor above 2 the program writes ("out") or reads ("in") (spec section 1.3).
+ * Registration errors (number below 3, duplicate number or role) print a message and exit(2).
+ */
+void clyops_add_fd(clyops_t* cli, int fd, const char* direction, clyops_fd_meta_t meta);
+/** Declare a file descriptor with designated fields: .description, .content_type, .role, .schema. */
+#define clyops_fd(cli, fd, direction, ...) \
+    clyops_add_fd((cli), (fd), (direction), ((clyops_fd_meta_t){ ._ = 0, __VA_ARGS__ }))
+/**
+ * The descriptor number for a declared role or number (digits) when the runner opened it (listed in
+ * CLYOPS_FDS) and it is open, else -1 (spec section 14). Call after parsing.
+ */
+int clyops_fd_open(const clyops_t* cli, const char* target);
+/**
+ * Write `text` and a newline (unless it ends with one) to a declared "out" descriptor. Does nothing
+ * when it isn't open; write errors are ignored. An undeclared target or an input exits(2).
+ */
+void clyops_emit(const clyops_t* cli, const char* target, const char* text);
+
 /**
  * Option relationships (spec section 1.6) over a NULL-terminated list of long
  * names: "exclusive" (at most one given), "requires" (the first needs the

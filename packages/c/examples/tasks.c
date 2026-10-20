@@ -10,6 +10,7 @@ int main(int argc, char** argv) {
     clyops_description(cli, "Commands demo for the clyops conformance suite.");
     clyops_epilog(cli, "Run 'tasks <command> --help' for a command's options.");
     clyops_opt(cli, "VERBOSE", "verbose", "flag", .short_name = 'v', .description = "Verbose output", .group = "Global");
+    clyops_fd(cli, 3, "out", .description = "Progress, one JSON object per line", .content_type = "application/x-ndjson", .role = "progress");
 
     clyops_t* db = clyops_command(cli, "db", "Database tasks");
     clyops_opt(db, "DB_URL", "url", "sqlite:app.db", .short_name = 'u', .description = "Database URL", .group = "Database");
@@ -17,6 +18,7 @@ int main(int argc, char** argv) {
     clyops_arg(migrate, "target", .description = "Target version", .default_value = "latest");
     clyops_opt(migrate, "DRY_RUN", "dry-run", "flag", .short_name = 'n', .description = "Show what would run");
     clyops_effects(migrate, "destructive");
+    clyops_fd(migrate, 4, "out", .description = "Migration progress", .content_type = "application/x-ndjson", .role = "progress");
     clyops_effects(clyops_command(db, "status", "Show migration status"), "read-only");
 
     clyops_t* send = clyops_command(cli, "send", "Send a message");
@@ -28,6 +30,7 @@ int main(int argc, char** argv) {
     clyops_stdin(send, "Attachment", "application/octet-stream");
 
     clyops_run(cli, argc, argv);
+    clyops_emit(cli, "progress", "{\"stage\":\"done\"}");
 
     char* values = clyops_values_json(cli);
     printf("{\"values\": %s}\n", values);

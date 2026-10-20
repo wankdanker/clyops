@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <regex.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -212,6 +213,11 @@ typedef struct {
 
 typedef struct { char *key, *value, *dir; } cfg_t;
 
+typedef struct {
+    int fd, out;
+    char *role, *desc, *type, *schema; /* schema NULL when not given */
+} fd_t;
+
 struct clyops {
     char *name, *root, *cwd, *root_abs, *description, *epilog, *config_option;
     svec prefixes;
@@ -228,6 +234,8 @@ struct clyops {
     svec effects;
     char *stdin_desc, *stdin_type, *stdout_desc, *stdout_type; /* NULL desc: undeclared */
     svec con_type, con_opts; /* relationships: type and space-separated long names */
+    fd_t* fds; /* declared file descriptors above 2 */
+    size_t nfds, capfds;
     clyops_t** kids;
     size_t nkids, capkids;
     clyops_t* parent;
@@ -314,6 +322,11 @@ void clyops_free(clyops_t* cli) {
         free(a->name); free(a->desc); free(a->dflt); free(a->rule);
         sv_free(&a->list);
     }
+    for (size_t i = 0; i < cli->nfds; i++) {
+        fd_t* d = &cli->fds[i];
+        free(d->role); free(d->desc); free(d->type); free(d->schema);
+    }
+    free(cli->fds);
     for (size_t i = 0; i < cli->nkids; i++) clyops_free(cli->kids[i]);
     free(cli->kids); free(cli->chain); sv_free(&cli->words);
     free(cli->opts); free(cli->args); free(cli->cfg);
@@ -388,6 +401,91 @@ void clyops_set_effects(clyops_t* cli, const char* const* effects) {
 void clyops_stdin(clyops_t* cli, const char* description, const char* content_type) {
     set_str(&cli->stdin_desc, description);
     set_str(&cli->stdin_type, content_type);
+}
+
+static int all_digits(const char* s) {
+    if (!s || !*s) return 0;
+    for (; *s; s++) if (!isdigit((unsigned char)*s)) return 0;
+    return 1;
+}
+
+void clyops_add_fd(clyops_t* cli, int fd, const char* direction, clyops_fd_meta_t meta) {
+    const char* role = meta.role ? meta.role : "";
+    if (fd < 3) clyops_die(2, "Invalid file descriptor %d", fd);
+    if (!streq(direction, "in") && !streq(direction, "out")) clyops_die(2, "Unknown fd direction '%s'", direction ? direction : "");
+    if (all_digits(role)) clyops_die(2, "Invalid fd role '%s'", role);
+    for (size_t i = 0; i < cli->nfds; i++) {
+        if (cli->fds[i].fd == fd) clyops_die(2, "Duplicate file descriptor %d", fd);
+        if (*role && streq(cli->fds[i].role, role)) clyops_die(2, "Duplicate fd role '%s'", role);
+    }
+    if (cli->nfds == cli->capfds) {
+        cli->capfds = cli->capfds ? cli->capfds * 2 : 4;
+        cli->fds = realloc(cli->fds, cli->capfds * sizeof *cli->fds);
+        if (!cli->fds) { fputs("clyops: out of memory\n", stderr); exit(70); }
+    }
+    fd_t* d = &cli->fds[cli->nfds++];
+    d->fd = fd;
+    d->out = streq(direction, "out");
+    d->role = xstrdup(role);
+    d->desc = xstrdup(meta.description ? meta.description : "");
+    d->type = xstrdup(meta.content_type ? meta.content_type : "");
+    d->schema = empty(meta.schema) ? NULL : xstrdup(meta.schema);
+}
+
+/* The declared descriptor for a role or number, searching the selected command then its ancestors. */
+static const fd_t* find_fd(const clyops_t* cli, const char* target) {
+    int by_number = all_digits(target);
+    long number = by_number ? strtol(target, NULL, 10) : -1;
+    for (const clyops_t* c = cli->selected; c; c = c == cli ? NULL : c->parent)
+        for (size_t i = 0; i < c->nfds; i++)
+            if (by_number ? c->fds[i].fd == number : streq(c->fds[i].role, target)) return &c->fds[i];
+    return NULL;
+}
+
+int clyops_fd_open(const clyops_t* cli, const char* target) {
+    const fd_t* d = find_fd(cli, target ? target : "");
+    if (!d) return -1;
+    const char* listed = getenv("CLYOPS_FDS");
+    int found = 0;
+    for (const char* p = listed ? listed : ""; *p && !found;) {
+        while (*p == ' ' || *p == '\t') p++;
+        char* end;
+        long n = strtol(p, &end, 10);
+        if (end != p && n == d->fd) {
+            const char* q = end;
+            while (*q == ' ' || *q == '\t') q++;
+            found = *q == ',' || !*q;
+        }
+        const char* comma = strchr(p, ',');
+        p = comma ? comma + 1 : p + strlen(p);
+    }
+    struct stat st;
+    return found && fstat(d->fd, &st) == 0 ? d->fd : -1;
+}
+
+void clyops_emit(const clyops_t* cli, const char* target, const char* text) {
+    const fd_t* d = find_fd(cli, target ? target : "");
+    if (!d) clyops_die(2, "No file descriptor declared for '%s'", target ? target : "");
+    if (!d->out) clyops_die(2, "File descriptor %d is not an output", d->fd);
+    char num[16];
+    snprintf(num, sizeof num, "%d", d->fd);
+    int fd = clyops_fd_open(cli, num);
+    if (fd < 0) return;
+    text = text ? text : "";
+    size_t len = strlen(text);
+    int newline = !len || text[len - 1] != '\n';
+    /* Write errors (the reader went away) are ignored, so SIGPIPE is ignored for the write. */
+    struct sigaction ign = { 0 }, old;
+    ign.sa_handler = SIG_IGN;
+    sigaction(SIGPIPE, &ign, &old);
+    for (size_t off = 0; off < len;) {
+        ssize_t w = write(fd, text + off, len - off);
+        if (w < 0 && errno == EINTR) continue;
+        if (w <= 0) { len = 0; newline = 0; break; }
+        off += (size_t)w;
+    }
+    while (newline && write(fd, "\n", 1) < 0 && errno == EINTR) {}
+    sigaction(SIGPIPE, &old, NULL);
 }
 
 void clyops_stdout(clyops_t* cli, const char* description, const char* content_type) {
@@ -1517,7 +1615,7 @@ char* clyops_usage(clyops_t* cli) {
         sv_free(&lines);
     }
 
-    if (node->stdin_desc || node->stdout_desc) sb_putc(&b, '\n');
+    if (node->stdin_desc || node->stdout_desc || node->nfds) sb_putc(&b, '\n');
     for (int k = 0; k < 2; k++) {
         const char* d = k ? node->stdout_desc : node->stdin_desc;
         const char* t = k ? node->stdout_type : node->stdin_type;
@@ -1525,6 +1623,15 @@ char* clyops_usage(clyops_t* cli) {
         sb_put(&b, k ? "Output:" : "Input:");
         if (*d) sb_printf(&b, " %s", d);
         if (*t) sb_printf(&b, " (%s)", t);
+        sb_putc(&b, '\n');
+    }
+    for (size_t i = 0; i < node->nfds; i++) {
+        const fd_t* d = &node->fds[i];
+        sb_printf(&b, "%s fd %d", d->out ? "Output" : "Input", d->fd);
+        if (*d->role) sb_printf(&b, " [%s]", d->role);
+        sb_putc(&b, ':');
+        if (*d->desc) sb_printf(&b, " %s", d->desc);
+        if (*d->type) sb_printf(&b, " (%s)", d->type);
         sb_putc(&b, '\n');
     }
 
@@ -1728,7 +1835,20 @@ static void schema_node(sbuf* b, const clyops_t* cli) {
     json_stream(b, cli->stdin_desc, cli->stdin_type);
     sb_put(b, ",\n  \"stdout\": ");
     json_stream(b, cli->stdout_desc, cli->stdout_type);
-    sb_put(b, ",\n  \"commands\": [");
+    sb_put(b, ",\n  \"fds\": [");
+    for (size_t i = 0; i < cli->nfds; i++) {
+        const fd_t* d = &cli->fds[i];
+        sb_printf(b, "%s{\"fd\": %d, \"direction\": \"%s\", \"role\": ", i ? ", " : "", d->fd, d->out ? "out" : "in");
+        json_str(b, d->role);
+        sb_put(b, ", \"description\": ");
+        json_str(b, d->desc);
+        sb_put(b, ", \"contentType\": ");
+        json_str(b, d->type);
+        sb_put(b, ", \"schema\": ");
+        sb_put(b, d->schema ? d->schema : "null");
+        sb_putc(b, '}');
+    }
+    sb_put(b, "],\n  \"commands\": [");
     for (size_t i = 0; i < cli->nkids; i++) {
         sb_put(b, i ? ", {\n  \"name\": " : "{\n  \"name\": ");
         json_str(b, cli->kids[i]->word);
