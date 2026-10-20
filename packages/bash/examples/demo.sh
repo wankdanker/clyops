@@ -10,6 +10,9 @@ clyops_require_command sh "POSIX shell" "install dash"
 clyops_effects idempotent network
 clyops_stdin  "Lines to process" text/plain
 clyops_stdout "The resolved values" application/json
+clyops_fd 3 out "Run metadata, before the values" application/json meta
+clyops_fd 4 out "Progress, one JSON object per line" application/x-ndjson progress '{"type":"object","properties":{"pct":{"type":"number"}}}'
+clyops_fd 5 in "Extra lines to process" text/plain
 
 clyops_arg          input "Input file" "" path
 clyops_arg          mode  "Processing mode" fast "choice:fast,slow"
@@ -48,6 +51,8 @@ clyops_exclusive   endpoint addr
 clyops_requires    dest src
 
 clyops_run "$@"
+if clyops_fd_open 5 >/dev/null; then clyops_emit meta '{"extra":true}'; else clyops_emit meta '{"extra":false}'; fi
+clyops_emit 4 '{"pct":100}'
 
 sources=""
 for long in config verbose quiet color out notes count ratio enabled tag no-cache key host port endpoint addr id email date code level size data-dir src dest include help; do

@@ -7,6 +7,7 @@ clyops_root "${DEMO_ROOT:-$PWD}"
 clyops_description "Commands demo for the clyops conformance suite."
 clyops_epilog "Run 'tasks <command> --help' for a command's options."
 clyops_opt VERBOSE verbose v flag "Verbose output" Global
+clyops_fd 3 out "Progress, one JSON object per line" application/x-ndjson progress
 
 clyops_command db "Database tasks"
 clyops_opt DB_URL url u sqlite:app.db "Database URL" Database
@@ -14,6 +15,7 @@ clyops_command "db migrate" "Apply migrations"
 clyops_arg     target "Target version" latest
 clyops_opt     DRY_RUN dry-run n flag "Show what would run"
 clyops_effects destructive
+clyops_fd       4 out "Migration progress" application/x-ndjson progress
 clyops_command "db status" "Show migration status"
 clyops_effects read-only
 
@@ -26,4 +28,5 @@ clyops_effects network
 clyops_stdin   "Attachment" application/octet-stream
 
 clyops_run "$@"
+clyops_emit progress '{"stage":"done"}'
 printf '{"values": %s}\n' "$(clyops_values_json)"

@@ -115,6 +115,70 @@ class CliTest(unittest.TestCase):
         schema = json.loads(cli.json_schema())
         self.assertEqual(schema["commands"][0]["commands"][0]["options"][0]["name"], "to")
 
+    def test_fd_registration_errors(self):
+        def cli():
+            return Cli(name="t", env={})
+        for build, message in [
+            (lambda: cli().fd(2, "out", "X"), "Invalid file descriptor 2"),
+            (lambda: cli().fd(True, "out", "X"), "Invalid file descriptor True"),
+            (lambda: cli().fd(3, "both", "X"), "Unknown fd direction 'both'"),
+            (lambda: cli().fd(3, "out", "X", role="7"), "Invalid fd role '7'"),
+            (lambda: cli().fd(3, "out", "X").fd(3, "in", "Y"), "Duplicate file descriptor 3"),
+            (lambda: cli().fd(3, "out", "X", role="log").fd(4, "out", "Y", role="log"), "Duplicate fd role 'log'"),
+        ]:
+            with self.assertRaisesRegex(ValueError, message):
+                build()
+        cli().fd(3, "out", "X").fd(4, "out", "Y")
+
+    def test_fd_schema_object_or_text(self):
+        cli = Cli(name="t", env={}).fd(3, "out", "A", "application/json", "meta", {"type": "object"})
+        cli.fd(4, "in", "B", schema='{"type":"string"}')
+        self.assertEqual(json.loads(cli.json_schema())["fds"], [
+            {"fd": 3, "direction": "out", "role": "meta", "description": "A", "contentType": "application/json",
+             "schema": {"type": "object"}},
+            {"fd": 4, "direction": "in", "role": "", "description": "B", "contentType": "", "schema": {"type": "string"}},
+        ])
+
+    def test_fd_emit_only_to_listed_descriptors(self):
+        import tempfile
+        with tempfile.TemporaryFile("w+") as fh:
+            fd = fh.fileno()
+
+            def make(listed):
+                c = Cli(name="t", env={"CLYOPS_FDS": listed}).fd(fd, "out", "Progress", role="progress")
+                c.fd(999, "in", "Extra")
+                self.assertEqual(c.parse([]).status, "ok")
+                return c
+            unlisted = make("")
+            self.assertIsNone(unlisted.fd_open("progress"))
+            unlisted.emit("progress", {"pct": 1})
+            cli = make(f"{fd}, 999")
+            self.assertEqual(cli.fd_open("progress"), fd)
+            self.assertEqual(cli.fd_open(fd), fd)
+            self.assertIsNone(cli.fd_open(999))
+            cli.emit("progress", {"pct": 50})
+            cli.emit(str(fd), "plain text")
+            cli.emit("progress", "ends with newline\n")
+            with self.assertRaisesRegex(ValueError, "No file descriptor declared for 'nope'"):
+                cli.emit("nope", "x")
+            with self.assertRaisesRegex(ValueError, "File descriptor 999 is not an output"):
+                cli.emit(999, "x")
+            fh.seek(0)
+            self.assertEqual(fh.read(), '{"pct":50}\nplain text\nends with newline\n')
+
+    def test_fd_scope_and_help(self):
+        cli = Cli(name="m", env={}).fd(3, "out", "Progress", "application/x-ndjson", "progress")
+        db = cli.command("db", "Database")
+        db.command("migrate", "Migrate").fd(4, "out", "Migration progress", role="progress")
+        db.command("status", "Status")
+        cli.parse(["db", "status"])
+        self.assertEqual(cli._find_fd("progress")["fd"], 3)
+        cli.parse(["db", "migrate"])
+        self.assertEqual(cli._find_fd("progress")["fd"], 4)
+        self.assertEqual(cli._find_fd(3)["fd"], 3)
+        self.assertIn("\nOutput fd 4 [progress]: Migration progress\n", cli.usage())
+        self.assertNotIn("fd 3", cli.usage())
+
 
 if __name__ == "__main__":
     unittest.main()

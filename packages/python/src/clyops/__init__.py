@@ -402,6 +402,7 @@ class Cli:
         self._effects: List[str] = []
         self._stdin: Optional[Dict[str, str]] = None
         self._stdout: Optional[Dict[str, str]] = None
+        self._fds: List[Dict[str, object]] = []
         self._constraints: List[Dict[str, object]] = []
         self._children: List["Cli"] = []
         self._parent: Optional["Cli"] = None
@@ -438,6 +439,73 @@ class Cli:
         """What the program writes on stdout; undeclared means text."""
         self._stdout = {"description": description, "contentType": content_type}
         return self
+
+    def fd(self, fd: int, direction: str, description: str, content_type: str = "", role: str = "",
+           schema: object = None) -> "Cli":
+        """Declare a file descriptor above 2 the program writes ("out") or reads ("in") (spec section 1.3).
+        `role` is meta, progress, log, result or another agreed name; `schema` is a JSON Schema (dict or
+        JSON text) for each document or line."""
+        if isinstance(fd, bool) or not isinstance(fd, int) or fd < 3:
+            raise ValueError(f"Invalid file descriptor {fd}")
+        if direction not in ("in", "out"):
+            raise ValueError(f"Unknown fd direction '{direction}'")
+        if re.fullmatch(r"[0-9]+", role):
+            raise ValueError(f"Invalid fd role '{role}'")
+        if any(d["fd"] == fd for d in self._fds):
+            raise ValueError(f"Duplicate file descriptor {fd}")
+        if role and any(d["role"] == role for d in self._fds):
+            raise ValueError(f"Duplicate fd role '{role}'")
+        if isinstance(schema, str):
+            schema = json.loads(schema)
+        self._fds.append({"fd": fd, "direction": direction, "role": role, "description": description,
+                          "contentType": content_type, "schema": schema})
+        return self
+
+    def _find_fd(self, target: Union[str, int]) -> Optional[Dict[str, object]]:
+        """The declared descriptor for a role or number, searching the selected command then its ancestors."""
+        key = str(target)
+        by_number = re.fullmatch(r"[0-9]+", key) is not None
+        for node in self._chain():
+            for d in node._fds:
+                if (d["fd"] == int(key)) if by_number else (d["role"] == key):
+                    return d
+        return None
+
+    def fd_open(self, target: Union[str, int]) -> Optional[int]:
+        """The descriptor number for a declared role or number when the runner opened it (listed in
+        CLYOPS_FDS) and it is open, else None (spec section 14)."""
+        decl = self._find_fd(target)
+        if decl is None or os.name != "posix":
+            return None
+        num = int(decl["fd"])  # type: ignore[call-overload]
+        if str(num) not in [s.strip() for s in self.env.get("CLYOPS_FDS", "").split(",")]:
+            return None
+        try:
+            os.fstat(num)
+        except OSError:
+            return None
+        return num
+
+    def emit(self, target: Union[str, int], value: object) -> None:
+        """Write a line to a declared "out" descriptor (spec section 14): a string as is, anything else as
+        compact JSON, then a newline. Does nothing when the descriptor isn't open."""
+        decl = self._find_fd(target)
+        if decl is None:
+            raise ValueError(f"No file descriptor declared for '{target}'")
+        if decl["direction"] != "out":
+            raise ValueError(f"File descriptor {decl['fd']} is not an output")
+        num = self.fd_open(int(decl["fd"]))  # type: ignore[call-overload]
+        if num is None:
+            return
+        text = value if isinstance(value, str) else json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+        if not text.endswith("\n"):
+            text += "\n"
+        data = text.encode("utf-8")
+        try:
+            while data:
+                data = data[os.write(num, data):]
+        except OSError:
+            pass  # The reader went away; the descriptor is optional, so the program carries on.
 
     def exclusive(self, *longs: str) -> "Cli":
         """At most one of these options may be given."""
@@ -969,6 +1037,10 @@ class Cli:
             if decl is not None:
                 ctype = decl["contentType"]
                 io.append(" ".join(x for x in (label, decl["description"], ctype and f"({ctype})") if x))
+        for d in node._fds:
+            label = f"{'Input' if d['direction'] == 'in' else 'Output'} fd {d['fd']}" + (f" [{d['role']}]" if d["role"] else "") + ":"
+            ctype = str(d["contentType"])
+            io.append(" ".join(x for x in (label, str(d["description"]), ctype and f"({ctype})") if x))
         if io:
             sections.append(io)
 
@@ -1067,6 +1139,7 @@ class Cli:
             "constraints": self._constraints,
             "stdin": self._stdin,
             "stdout": self._stdout,
+            "fds": [dict(d) for d in self._fds],
             "commands": [c._schema_node() for c in self._children],
         }
 
