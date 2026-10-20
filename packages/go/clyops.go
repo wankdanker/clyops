@@ -432,6 +432,16 @@ type stream struct {
 	ContentType string `json:"contentType"`
 }
 
+// fdDecl is a declared file descriptor above 2 (spec sections 1.3 and 14).
+type fdDecl struct {
+	Fd          int             `json:"fd"`
+	Direction   string          `json:"direction"`
+	Role        string          `json:"role"`
+	Description string          `json:"description"`
+	ContentType string          `json:"contentType"`
+	Schema      json.RawMessage `json:"schema"`
+}
+
 // constraint is an option relationship (spec section 1.6).
 type constraint struct {
 	Type    string   `json:"type"`
@@ -505,6 +515,7 @@ type Cli struct {
 	config              map[string]configValue
 	effects             []string
 	stdin, stdout       *stream
+	fds                 []fdDecl
 	constraints         []constraint
 	children            []*Cli
 	parent              *Cli
@@ -560,6 +571,115 @@ func (c *Cli) SetStdin(description, contentType string) *Cli {
 func (c *Cli) SetStdout(description, contentType string) *Cli {
 	c.stdout = &stream{description, contentType}
 	return c
+}
+
+// Fd declares a file descriptor above 2 the program writes ("out") or reads ("in") (spec section 1.3).
+// role is meta, progress, log, result, another agreed name or ""; schema is a JSON Schema for each
+// document or line: JSON text as a string, any other value marshalled, or nil.
+func (c *Cli) Fd(fd int, direction, description, contentType, role string, schema any) *Cli {
+	if fd < 3 {
+		panic(fmt.Sprintf("clyops: invalid file descriptor %d", fd))
+	}
+	if direction != "in" && direction != "out" {
+		panic("clyops: unknown fd direction '" + direction + "'")
+	}
+	if isDigits(role) {
+		panic("clyops: invalid fd role '" + role + "'")
+	}
+	for _, d := range c.fds {
+		if d.Fd == fd {
+			panic(fmt.Sprintf("clyops: duplicate file descriptor %d", fd))
+		}
+		if role != "" && d.Role == role {
+			panic("clyops: duplicate fd role '" + role + "'")
+		}
+	}
+	var raw json.RawMessage
+	switch s := schema.(type) {
+	case nil:
+	case string:
+		raw = json.RawMessage(s)
+	default:
+		b, err := json.Marshal(s)
+		if err != nil {
+			panic("clyops: fd schema: " + err.Error())
+		}
+		raw = b
+	}
+	c.fds = append(c.fds, fdDecl{fd, direction, role, description, contentType, raw})
+	return c
+}
+
+func isDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// findFd is the declared descriptor for a role or number, searching the selected command then its ancestors.
+func (c *Cli) findFd(target string) *fdDecl {
+	number, byNumber := -1, isDigits(target)
+	if byNumber {
+		number, _ = strconv.Atoi(target)
+	}
+	for _, node := range c.chain() {
+		for i := range node.fds {
+			if d := &node.fds[i]; (byNumber && d.Fd == number) || (!byNumber && d.Role == target) {
+				return d
+			}
+		}
+	}
+	return nil
+}
+
+// FdOpen is the descriptor number for a declared role or number when the runner opened it (listed in
+// CLYOPS_FDS) and it is open, else -1 (spec section 14).
+func (c *Cli) FdOpen(target string) int {
+	d := c.findFd(target)
+	if d == nil {
+		return -1
+	}
+	for _, s := range strings.Split(c.Env["CLYOPS_FDS"], ",") {
+		if strings.TrimSpace(s) == strconv.Itoa(d.Fd) && fdIsOpen(d.Fd) {
+			return d.Fd
+		}
+	}
+	return -1
+}
+
+// Emit writes value and a newline (unless it ends with one) to a declared "out" descriptor (spec
+// section 14): a string as is, anything else as compact JSON. It does nothing when the descriptor
+// isn't open and ignores write errors. It panics when target isn't declared or is an input.
+func (c *Cli) Emit(target string, value any) {
+	d := c.findFd(target)
+	if d == nil {
+		panic("clyops: no file descriptor declared for '" + target + "'")
+	}
+	if d.Direction != "out" {
+		panic(fmt.Sprintf("clyops: file descriptor %d is not an output", d.Fd))
+	}
+	fd := c.FdOpen(strconv.Itoa(d.Fd))
+	if fd < 0 {
+		return
+	}
+	text, ok := value.(string)
+	if !ok {
+		b, err := json.Marshal(value)
+		if err != nil {
+			panic("clyops: emit: " + err.Error())
+		}
+		text = string(b)
+	}
+	if !strings.HasSuffix(text, "\n") {
+		text += "\n"
+	}
+	writeFd(fd, []byte(text))
 }
 
 // Exclusive says at most one of these options may be given.
@@ -1455,6 +1575,24 @@ func (c *Cli) Usage() string {
 		}
 		io = append(io, line)
 	}
+	for _, d := range node.fds {
+		line := "Output"
+		if d.Direction == "in" {
+			line = "Input"
+		}
+		line += " fd " + strconv.Itoa(d.Fd)
+		if d.Role != "" {
+			line += " [" + d.Role + "]"
+		}
+		line += ":"
+		if d.Description != "" {
+			line += " " + d.Description
+		}
+		if d.ContentType != "" {
+			line += " (" + d.ContentType + ")"
+		}
+		io = append(io, line)
+	}
 	if len(io) > 0 {
 		sections = append(sections, io)
 	}
@@ -1611,6 +1749,7 @@ type schemaBody struct {
 	Constraints      []constraint     `json:"constraints"`
 	Stdin            *stream          `json:"stdin"`
 	Stdout           *stream          `json:"stdout"`
+	Fds              []fdDecl         `json:"fds"`
 	Commands         []schemaNode     `json:"commands"`
 }
 
@@ -1634,7 +1773,7 @@ func (c *Cli) JSONSchema() string {
 func (c *Cli) schemaBody() schemaBody {
 	s := schemaBody{Description: c.description, Epilog: c.epilog, Arguments: []schemaArgument{}, Options: []schemaOption{},
 		RequiredCommands: []schemaCommand{}, Effects: append([]string{}, c.effects...),
-		Constraints: append([]constraint{}, c.constraints...), Stdin: c.stdin, Stdout: c.stdout, Commands: []schemaNode{}}
+		Constraints: append([]constraint{}, c.constraints...), Stdin: c.stdin, Stdout: c.stdout, Fds: append([]fdDecl{}, c.fds...), Commands: []schemaNode{}}
 	for _, a := range c.args {
 		s.Arguments = append(s.Arguments, schemaArgument{a.name, a.description, !a.variadic && a.def == "", a.variadic, a.def, a.rule})
 	}

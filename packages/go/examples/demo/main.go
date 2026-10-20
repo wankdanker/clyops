@@ -19,6 +19,9 @@ func main() {
 	cli.SetEffects("idempotent", "network")
 	cli.SetStdin("Lines to process", "text/plain")
 	cli.SetStdout("The resolved values", "application/json")
+	cli.Fd(3, "out", "Run metadata, before the values", "application/json", "meta", nil)
+	cli.Fd(4, "out", "Progress, one JSON object per line", "application/x-ndjson", "progress", `{"type":"object","properties":{"pct":{"type":"number"}}}`)
+	cli.Fd(5, "in", "Extra lines to process", "text/plain", "", nil)
 
 	cli.Arg("input", "Input file", "", "path")
 	cli.Arg("mode", "Processing mode", "fast", "choice:fast,slow")
@@ -57,6 +60,12 @@ func main() {
 	cli.Requires("dest", "src")
 
 	cli.Run()
+	if cli.FdOpen("5") >= 0 {
+		cli.Emit("meta", `{"extra":true}`)
+	} else {
+		cli.Emit("meta", `{"extra":false}`)
+	}
+	cli.Emit("4", `{"pct":100}`)
 
 	longs := []string{"config", "verbose", "quiet", "color", "out", "notes", "count", "ratio", "enabled", "tag", "no-cache", "key",
 		"host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "data-dir", "src", "dest",

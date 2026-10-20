@@ -16,6 +16,7 @@ func main() {
 	cli.SetDescription("Commands demo for the clyops conformance suite.")
 	cli.SetEpilog("Run 'tasks <command> --help' for a command's options.")
 	cli.Opt("VERBOSE", "verbose", "v", "flag", "Verbose output", "Global")
+	cli.Fd(3, "out", "Progress, one JSON object per line", "application/x-ndjson", "progress", nil)
 
 	db := cli.Command("db", "Database tasks")
 	db.Opt("DB_URL", "url", "u", "sqlite:app.db", "Database URL", "Database")
@@ -23,6 +24,7 @@ func main() {
 	migrate.Arg("target", "Target version", "latest")
 	migrate.Opt("DRY_RUN", "dry-run", "n", "flag", "Show what would run")
 	migrate.SetEffects("destructive")
+	migrate.Fd(4, "out", "Migration progress", "application/x-ndjson", "progress", nil)
 	db.Command("status", "Show migration status").SetEffects("read-only")
 
 	send := cli.Command("send", "Send a message")
@@ -34,6 +36,7 @@ func main() {
 	send.SetStdin("Attachment", "application/octet-stream")
 
 	cli.Run()
+	cli.Emit("progress", `{"stage":"done"}`)
 	var values any
 	if err := json.Unmarshal([]byte(cli.ValuesJSON()), &values); err != nil {
 		panic(err)

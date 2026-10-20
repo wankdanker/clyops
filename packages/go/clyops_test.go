@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -236,5 +237,89 @@ func TestCommands(t *testing.T) {
 	}
 	if r := cli.Parse([]string{"db", "migrate", "-h"}); r.Status != "help" || !strings.HasPrefix(cli.Usage(), "Usage: m db migrate [<name>] [OPTIONS]") {
 		t.Fatal(cli.Usage())
+	}
+}
+
+func TestFdRegistrationErrors(t *testing.T) {
+	mustPanic(t, "invalid file descriptor 2", func() { New().Fd(2, "out", "X", "", "", nil) })
+	mustPanic(t, "unknown fd direction 'both'", func() { New().Fd(3, "both", "X", "", "", nil) })
+	mustPanic(t, "invalid fd role '7'", func() { New().Fd(3, "out", "X", "", "7", nil) })
+	mustPanic(t, "duplicate file descriptor 3", func() { New().Fd(3, "out", "X", "", "", nil).Fd(3, "in", "Y", "", "", nil) })
+	mustPanic(t, "duplicate fd role 'log'", func() { New().Fd(3, "out", "X", "", "log", nil).Fd(4, "out", "Y", "", "log", nil) })
+}
+
+func TestFdSchemaTextOrValue(t *testing.T) {
+	cli := New().Fd(3, "out", "A", "application/json", "meta", map[string]string{"type": "object"}).Fd(4, "in", "B", "", "", `{"type":"string"}`)
+	var got struct{ Fds []map[string]any }
+	if err := json.Unmarshal([]byte(cli.JSONSchema()), &got); err != nil {
+		t.Fatal(err)
+	}
+	want := []map[string]any{
+		{"fd": 3.0, "direction": "out", "role": "meta", "description": "A", "contentType": "application/json", "schema": map[string]any{"type": "object"}},
+		{"fd": 4.0, "direction": "in", "role": "", "description": "B", "contentType": "", "schema": map[string]any{"type": "string"}},
+	}
+	if !reflect.DeepEqual(got.Fds, want) {
+		t.Fatalf("fds %#v", got.Fds)
+	}
+	if !strings.Contains(New().JSONSchema(), `"fds": []`) {
+		t.Fatal("fds should be an empty list when none are declared")
+	}
+}
+
+func TestFdEmitOnlyToListedDescriptors(t *testing.T) {
+	file, err := os.CreateTemp(t.TempDir(), "fd")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	fd := int(file.Fd())
+	num := strconv.Itoa(fd)
+	newCli := func(listed string) *Cli {
+		cli := New()
+		cli.Name, cli.Env = "t", map[string]string{"CLYOPS_FDS": listed}
+		cli.Fd(fd, "out", "Progress", "", "progress", nil).Fd(999, "in", "Extra", "", "", nil)
+		if r := cli.Parse(nil); r.Status != "ok" {
+			t.Fatal(r.Error)
+		}
+		return cli
+	}
+	unlisted := newCli("")
+	if unlisted.FdOpen("progress") != -1 {
+		t.Fatal("unlisted descriptor reported open")
+	}
+	unlisted.Emit("progress", "never")
+	cli := newCli(num + ", 999")
+	if cli.FdOpen("progress") != fd || cli.FdOpen(num) != fd || cli.FdOpen("999") != -1 {
+		t.Fatal("FdOpen")
+	}
+	cli.Emit("progress", map[string]int{"pct": 50})
+	cli.Emit(num, "plain text")
+	cli.Emit("progress", "ends with newline\n")
+	mustPanic(t, "no file descriptor declared for 'nope'", func() { cli.Emit("nope", "x") })
+	mustPanic(t, "file descriptor 999 is not an output", func() { cli.Emit("999", "x") })
+	got, _ := os.ReadFile(file.Name())
+	if string(got) != "{\"pct\":50}\nplain text\nends with newline\n" {
+		t.Fatalf("wrote %q", got)
+	}
+}
+
+func TestFdLookupFollowsTheSelectedCommand(t *testing.T) {
+	cli := New()
+	cli.Name, cli.Env = "m", map[string]string{}
+	cli.Fd(3, "out", "Progress", "application/x-ndjson", "progress", nil)
+	db := cli.Command("db", "Database")
+	db.Command("migrate", "Migrate").Fd(4, "out", "Migration progress", "", "progress", nil)
+	db.Command("status", "Status")
+	cli.Parse([]string{"db", "status"})
+	if d := cli.findFd("progress"); d == nil || d.Fd != 3 {
+		t.Fatal("status should inherit fd 3")
+	}
+	cli.Parse([]string{"db", "migrate"})
+	if d := cli.findFd("progress"); d == nil || d.Fd != 4 {
+		t.Fatal("migrate's own progress should win")
+	}
+	usage := cli.Usage()
+	if !strings.Contains(usage, "\nOutput fd 4 [progress]: Migration progress\n") || strings.Contains(usage, "fd 3") {
+		t.Fatal(usage)
 	}
 }
