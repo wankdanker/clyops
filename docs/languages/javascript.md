@@ -66,7 +66,7 @@ cli.opt('JSON', 'json', '', 'flag', 'JSON output');
 cli.opt('QUIET', 'quiet', '', 'flag', 'Quiet output');
 cli.exclusive('json', 'quiet');                              // also requires(a, b...) and oneOf(a, b...)
 cli.setStdin('Audio to transcribe', 'audio/wav');            // and setStdout(description, contentType)
-cli.fd(4, 'out', 'Progress', 'application/x-ndjson', 'progress');  // then cli.emit('progress', { pct: 50 })
+cli.role('progress', 'out', 'Progress', 'application/x-ndjson');  // then cli.emit('progress', { pct: 50 })
 const args = cli.run();                                      // args.command: ['db', 'migrate']
 ```
 

@@ -81,15 +81,17 @@ migrate.setEffects("destructive");                         // read-only, idempot
 cli.opt("TOKEN", "token", "t", "", "API token", "Auth", "secret"); // masked in help and valuesJson()
 cli.exclusive("json", "quiet");                            // also requires("a", "b"...) and oneOf("a", "b"...)
 cli.setStdin("Audio to transcribe", "audio/wav");          // and setStdout(description, contentType)
-cli.fd(4, "out", "Progress", "application/x-ndjson", "progress");  // then cli.emit("progress", "{\"pct\":50}")
+cli.role("progress", "out", "Progress", "application/x-ndjson");  // then cli.emit("progress", "{\"pct\":50}")
 cli.run(argv);                                             // cli.commandPath() == [db, migrate]
 ```
 
-Declared file descriptors (`fd`, `emit`): the JVM can't write to a descriptor
-number directly, so `emit` reopens `/dev/fd/N`, which works for pipes and files.
-For a socket (Node's `child_process` pipes are socketpairs), start the JVM with
+Roles (`role`, `emit`): the JVM can't write to a descriptor number directly, so
+`emit` reopens `/dev/fd/N`, which works for pipes and files. For a socket (Node's
+`child_process` pipes are socketpairs), start the JVM with
 `--add-opens java.base/java.io=ALL-UNNAMED`; without it, `emit` warns once and
-writes nothing.
+writes nothing. Java also can't remove `CLYOPS_FDS` from its own environment, so
+a program that starts others removes it from `ProcessBuilder.environment()`, or
+sets it to `forwardFds(...)`.
 
 Commands share the program's options (accepted before or after the command words) and config file;
 each has its own help (`mytool db migrate --help`), schema and completion. See the

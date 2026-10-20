@@ -50,7 +50,7 @@ migrate.set_effects("destructive")                      # read-only, idempotent,
 cli.opt "TOKEN", "token", "t", "", "API token", "Auth", "secret"  # masked in help and values_json
 cli.exclusive("json", "quiet")                          # also requires(a, b...) and one_of(a, b...)
 cli.set_stdin("Audio to transcribe", "audio/wav")       # and set_stdout(description, content_type)
-cli.fd(4, "out", "Progress", "application/x-ndjson", "progress")  # then cli.emit("progress", { pct: 50 })
+cli.role("progress", "out", "Progress", "application/x-ndjson")  # then cli.emit("progress", { pct: 50 })
 args = cli.run                                          # args.command == ["db", "migrate"]
 ```
 

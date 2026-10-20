@@ -139,35 +139,40 @@ Effects are `read-only`, `idempotent`, `destructive` and `network`.
 stdin/stdout declarations describe your program; your code performs the actual
 I/O. Schemas carry these declarations for API/MCP/desktop consumers.
 
-## Declared file descriptors
+## Roles on file descriptors
 
-A program can say what it writes or reads on descriptors beyond stdin, stdout and
-stderr, so a runner knows what each one carries:
+A program can offer streams beyond stdin, stdout and stderr, such as progress or
+metadata, by declaring roles. The runner that starts it decides which it wants and
+on which descriptors:
 
 ```javascript
-cli.fd(3, 'out', 'Transfer metadata, before the output', 'application/json', 'meta');
-cli.fd(4, 'out', 'Progress, one JSON object per line', 'application/x-ndjson', 'progress');
+cli.role('meta', 'out', 'Transfer metadata, before the output', 'application/json');
+cli.role('progress', 'out', 'Progress, one JSON object per line', 'application/x-ndjson');
 cli.run();
 cli.emit('meta', { name: 'clip.mp4' });
 cli.emit('progress', { pct: 50 });
 ```
 
-The roles `meta`, `progress`, `log` and `result` mean the same to every runner; any
-other role is free text. Declarations show in help (`Output fd 4 [progress]: …`)
-and as `fds` in the schema, on the level they are registered on; commands inherit
-their ancestors'.
+The names `meta`, `progress`, `log` and `result` mean the same to every runner;
+any other name is free text. Roles show in help (`Output [progress]: …`) and as
+`roles` in the schema, on the level they are registered on; commands inherit their
+ancestors'.
 
-`emit` writes a line only when the runner opened the descriptor and listed it in
-`CLYOPS_FDS`, so the same program runs unchanged by hand. An open descriptor alone
-isn't enough, because language runtimes open low-numbered descriptors of their own.
-To watch progress in a terminal:
+The runner puts each descriptor at its number before starting the program and
+lists the mapping in `CLYOPS_FDS`. Without it, `emit` does nothing, so a program
+run by hand needs only stdin, stdout and stderr. To see progress in a terminal:
 
 ```sh
-CLYOPS_FDS=4 mytool input.wav 4>&2
+CLYOPS_FDS=progress:2 mytool input.wav           # progress on stderr
+CLYOPS_FDS=progress:4 mytool input.wav 4>log.ndjson
 ```
 
-`fdOpen` returns the number of a declared descriptor that is open this way (or
-none), for reading an `in` descriptor or writing raw bytes.
+The library reads `CLYOPS_FDS` once and removes it from the environment, so
+programs yours starts don't inherit it by accident. To share a stream with one,
+keep its descriptor open in the child and set the child's `CLYOPS_FDS` to
+`forwardFds('progress')`. Streams of lines (`progress`, `log`) share well; `meta`
+and `result` describe one program's output. `fdOpen` returns a role's descriptor
+(or none), for reading an `in` role or writing raw bytes.
 
 ## Help, schema and shell completion
 

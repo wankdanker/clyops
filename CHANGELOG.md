@@ -5,11 +5,13 @@ section here.
 
 ## [Unreleased]
 
-- Declared file descriptors (spec sections 1.3 and 14): `fd(N, in|out, description,
-  contentType, role, schema)` beside stdin/stdout, listed as `fds` in
-  `--help-json-schema` and in help. Well-known roles `meta`, `progress`, `log` and
-  `result`; `emit(target, value)` and `fdOpen(target)` write to or find a descriptor a
-  runner opened and listed in `CLYOPS_FDS`, and do nothing otherwise.
+- Roles on file descriptors (spec sections 1.3 and 14): `role(name, in|out, description,
+  contentType, schema)` beside stdin/stdout, listed as `roles` in `--help-json-schema` and
+  in help. Well-known `meta`, `progress`, `log` and `result`. The runner chooses each
+  descriptor and maps it in `CLYOPS_FDS` (`meta:3,progress:4`, or `progress:2` for
+  stderr); `emit(name, value)`, `fdOpen(name)` and `forwardFds(name...)` use the mapping
+  and do nothing without it. Libraries remove `CLYOPS_FDS` from the environment after
+  reading it.
 - Static browser Linux lab running the unchanged Bash/Python examples with real
   FFmpeg, curl, pipes and shell completion. Includes file transfers and a local
   HTTP upload server inside the guest; assets load on demand from GitHub Pages.
