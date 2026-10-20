@@ -70,8 +70,6 @@ def run_case(cmd, case, verbose):
 
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LANG": "C.UTF-8",
                "KEY": "secret", "DEMO_ROOT": tmp}
-        if case.get("fds"):
-            env["CLYOPS_FDS"] = ",".join(case["fds"])
         for key, value in case.get("env", {}).items():
             if value is None:
                 env.pop(key, None)

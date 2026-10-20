@@ -55,14 +55,12 @@ export interface SchemaStream {
   contentType: string;
 }
 
-/** A declared file descriptor above 2 (spec sections 1.3 and 14). */
-export interface SchemaFd {
-  /** Descriptor number, 3 or more. */
-  fd: number;
+/** A declared role: a stream on a descriptor the runner chooses (spec sections 1.3 and 14). */
+export interface SchemaRole {
+  /** `meta`, `progress`, `log`, `result` or another agreed name. */
+  name: string;
   /** `out` when the tool writes it, `in` when it reads it. */
   direction: 'in' | 'out';
-  /** `meta`, `progress`, `log`, `result`, another agreed name, or an empty string. */
-  role: string;
   /** Human-readable description shown in help and documentation. */
   description: string;
   /** Declared MIME type, or an empty string when unspecified. */
@@ -106,8 +104,8 @@ export interface SchemaBody {
   stdin?: SchemaStream | null;
   /** Declared output stream, or null/absent when undeclared (text output). */
   stdout?: SchemaStream | null;
-  /** Declared file descriptors above 2 at this level; absent before 0.5. */
-  fds?: SchemaFd[];
+  /** Declared roles at this level; absent before 0.5. */
+  roles?: SchemaRole[];
   /** Nested commands with their own options, arguments, and metadata. */
   commands?: SchemaCommand[];
 }

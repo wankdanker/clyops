@@ -33,14 +33,12 @@ export interface Stream {
   contentType: string;
 }
 
-/** A declared file descriptor above 2 (spec sections 1.3 and 14). */
-export interface FdDecl {
-  /** Descriptor number, 3 or more. */
-  fd: number;
+/** A declared role: a stream on a descriptor the runner chooses (spec sections 1.3 and 14). */
+export interface RoleDecl {
+  /** `meta`, `progress`, `log`, `result` or another agreed name. */
+  name: string;
   /** `out` when the program writes it, `in` when it reads it. */
   direction: 'in' | 'out';
-  /** `meta`, `progress`, `log`, `result`, another agreed name, or an empty string. */
-  role: string;
   /** Human-readable description shown in help and documentation. */
   description: string;
   /** Declared MIME type, or an empty string when unspecified. */
@@ -48,6 +46,8 @@ export interface FdDecl {
   /** JSON Schema each document or line matches, or null. */
   schema: unknown;
 }
+
+const ROLE_NAME = /^[A-Za-z][A-Za-z0-9_.-]*$/;
 
 /** An option relationship (spec section 1.6). */
 export interface Constraint {
@@ -422,7 +422,9 @@ export class Cli {
   private effects: Effect[] = [];
   private stdinDecl: Stream | null = null;
   private stdoutDecl: Stream | null = null;
-  private fdDecls: FdDecl[] = [];
+  private roles: RoleDecl[] = [];
+  // CLYOPS_FDS as read once (spec section 14), on the program.
+  private fdMap?: Map<string, number>;
   private constraints: Constraint[] = [];
   private children: Cli[] = [];
   private parent?: Cli;
@@ -462,65 +464,87 @@ export class Cli {
   setStdout(description: string, contentType = ''): this { this.stdoutDecl = { description, contentType }; return this; }
 
   /**
-   * Declare a file descriptor above 2 that the program writes (`out`) or reads (`in`). `role` is
-   * `meta`, `progress`, `log`, `result` or another agreed name; `schema` is a JSON Schema (object or
-   * JSON text) for each document or line.
+   * Declare a role (spec section 1.3): a stream the program writes (`out`) or reads (`in`) on a
+   * descriptor its runner chooses. `name` is `meta`, `progress`, `log`, `result` or another agreed
+   * name; `schema` is a JSON Schema (object or JSON text) for each document or line.
    */
-  fd(fd: number, direction: 'in' | 'out', description: string, contentType = '', role = '', schema?: unknown): this {
-    if (!Number.isInteger(fd) || fd < 3) throw new Error(`Invalid file descriptor ${fd}`);
-    if (direction !== 'in' && direction !== 'out') throw new Error(`Unknown fd direction '${direction}'`);
-    if (/^[0-9]+$/.test(role)) throw new Error(`Invalid fd role '${role}'`);
-    if (this.fdDecls.some((d) => d.fd === fd)) throw new Error(`Duplicate file descriptor ${fd}`);
-    if (role && this.fdDecls.some((d) => d.role === role)) throw new Error(`Duplicate fd role '${role}'`);
+  role(name: string, direction: 'in' | 'out', description: string, contentType = '', schema?: unknown): this {
+    if (!ROLE_NAME.test(name)) throw new Error(`Invalid role name '${name}'`);
+    if (direction !== 'in' && direction !== 'out') throw new Error(`Unknown role direction '${direction}'`);
+    if (this.roles.some((r) => r.name === name)) throw new Error(`Duplicate role '${name}'`);
     const parsed = typeof schema === 'string' ? JSON.parse(schema) : schema;
-    this.fdDecls.push({ fd, direction, role, description, contentType, schema: parsed ?? null });
+    this.roles.push({ name, direction, description, contentType, schema: parsed ?? null });
     return this;
   }
 
-  /** The declared descriptor for a role or number, searching the selected command then its ancestors. */
-  private findFd(target: string | number): FdDecl | undefined {
-    const key = String(target);
-    const byNumber = /^[0-9]+$/.test(key);
+  /** The declared role, searching the selected command then its ancestors. */
+  private findRole(name: string): RoleDecl | undefined {
     for (const node of this.chain()) {
-      const decl = node.fdDecls.find((d) => (byNumber ? d.fd === Number(key) : d.role === key));
+      const decl = node.roles.find((r) => r.name === name);
       if (decl) return decl;
     }
     return undefined;
   }
 
-  /**
-   * The descriptor number for a declared role or number when the runner opened it (listed in
-   * CLYOPS_FDS) and it is open, else null (spec section 14).
-   */
-  fdOpen(target: string | number): number | null {
-    const decl = this.findFd(target);
-    if (!decl || process.platform === 'win32') return null;
-    const listed = (this.env.CLYOPS_FDS ?? '').split(',').map((s) => s.trim());
-    if (!listed.includes(String(decl.fd))) return null;
+  /** CLYOPS_FDS, read once on the program and then removed from the process environment. */
+  private fdMapping(): Map<string, number> {
+    let top: Cli = this;
+    while (top.parent) top = top.parent;
+    if (top.fdMap) return top.fdMap;
+    const map = new Map<string, number>();
+    const raw = top.env.CLYOPS_FDS;
+    for (const entry of (raw ?? '').split(',').map((s) => s.trim()).filter(Boolean)) {
+      const m = /^([A-Za-z][A-Za-z0-9_.-]*):([0-9]+)$/.exec(entry);
+      if (!m || Number(m[2]) < 2) warn("Ignoring CLYOPS_FDS entry '%s'", entry);
+      else map.set(m[1], Number(m[2]));
+    }
+    if (raw !== undefined && process.env.CLYOPS_FDS === raw) delete process.env.CLYOPS_FDS;
+    top.fdMap = map;
+    return map;
+  }
+
+  /** The descriptor `CLYOPS_FDS` maps to `name`, when it is open. */
+  private mappedFd(name: string): number | null {
+    const fd = this.fdMapping().get(name);
+    if (fd === undefined || process.platform === 'win32') return null;
     try {
-      fs.fstatSync(decl.fd);
-      return decl.fd;
+      fs.fstatSync(fd);
+      return fd;
     } catch {
       return null;
     }
   }
 
+  /** The descriptor for a declared role when CLYOPS_FDS maps it and it is open, else null (spec section 14). */
+  fdOpen(name: string): number | null {
+    return this.findRole(name) ? this.mappedFd(name) : null;
+  }
+
   /**
-   * Write a line to a declared `out` descriptor (spec section 14): a string as is, anything else as
-   * compact JSON, then a newline. Does nothing when the descriptor isn't open.
+   * Write a line to a declared `out` role (spec section 14): a string as is, anything else as compact
+   * JSON, then a newline. Does nothing when the runner didn't map it.
    */
-  emit(target: string | number, value: unknown): void {
-    const decl = this.findFd(target);
-    if (!decl) throw new Error(`No file descriptor declared for '${target}'`);
-    if (decl.direction !== 'out') throw new Error(`File descriptor ${decl.fd} is not an output`);
-    if (this.fdOpen(decl.fd) === null) return;
+  emit(name: string, value: unknown): void {
+    const decl = this.findRole(name);
+    if (!decl) throw new Error(`Unknown role '${name}'`);
+    if (decl.direction !== 'out') throw new Error(`Role '${name}' is not an output`);
+    const fd = this.mappedFd(name);
+    if (fd === null) return;
     let text = typeof value === 'string' ? value : JSON.stringify(value);
     if (!text.endsWith('\n')) text += '\n';
     try {
-      fs.writeSync(decl.fd, text);
+      fs.writeSync(fd, text);
     } catch {
-      // The reader went away; the descriptor is optional, so the program carries on.
+      // The reader went away; a role is optional, so the program carries on.
     }
+  }
+
+  /** The CLYOPS_FDS value passing these roles on to a program this one starts (spec section 14). */
+  forwardFds(...names: string[]): string {
+    return names.flatMap((n) => {
+      const fd = this.mappedFd(n);
+      return fd === null ? [] : [`${n}:${fd}`];
+    }).join(',');
   }
 
   /** At most one of these options may be given. */
@@ -687,6 +711,7 @@ export class Cli {
     this.configValues.clear();
     this.values = Object.create(null);
     this.selected = this;
+    this.fdMapping();
     this.ensureHelp();
 
     let err = this.scan(argv);
@@ -1057,7 +1082,7 @@ export class Cli {
 
     const stream = (label: string, s: Stream) => [label, s.description, s.contentType && `(${s.contentType})`].filter(Boolean).join(' ');
     const io = [node.stdinDecl && stream('Input:', node.stdinDecl), node.stdoutDecl && stream('Output:', node.stdoutDecl),
-      ...node.fdDecls.map((d) => stream(`${d.direction === 'in' ? 'Input' : 'Output'} fd ${d.fd}${d.role ? ` [${d.role}]` : ''}:`, d))];
+      ...node.roles.map((r) => stream(`${r.direction === 'in' ? 'Input' : 'Output'} [${r.name}]:`, r))];
     if (io.some(Boolean)) sections.push(io.filter((l): l is string => Boolean(l)));
 
     if (node.children.length > 0) sections.push(['Commands:', ...node.children.flatMap((c) => row(c.word, c.description))]);
@@ -1149,8 +1174,8 @@ export class Cli {
       constraints: this.constraints,
       stdin: this.stdinDecl,
       stdout: this.stdoutDecl,
-      fds: this.fdDecls.map((d) => ({ fd: d.fd, direction: d.direction, role: d.role, description: d.description,
-        contentType: d.contentType, schema: d.schema })),
+      roles: this.roles.map((r) => ({ name: r.name, direction: r.direction, description: r.description,
+        contentType: r.contentType, schema: r.schema })),
       commands: this.children.map((c) => c.schemaNode()),
     };
   }

@@ -226,12 +226,12 @@
     "stdout": {
       "$ref": "#/$defs/stream"
     },
-    "fds": {
+    "roles": {
       "type": "array",
       "items": {
-        "$ref": "#/$defs/fd"
+        "$ref": "#/$defs/role"
       },
-      "description": "Declared file descriptors above 2 (spec sections 1.3 and 14), in registration order; absent in output from versions before they existed."
+      "description": "Declared roles on file descriptors above stdio (spec sections 1.3 and 14), in registration order; absent in output from versions before they existed."
     },
     "commands": {
       "type": "array",
@@ -272,22 +272,22 @@
         }
       ]
     },
-    "fd": {
-      "description": "A declared file descriptor (spec section 1.3).",
+    "role": {
+      "description": "A declared role (spec section 1.3).",
       "type": "object",
       "required": [
-        "fd",
+        "name",
         "direction",
-        "role",
         "description",
         "contentType",
         "schema"
       ],
       "additionalProperties": false,
       "properties": {
-        "fd": {
-          "type": "integer",
-          "minimum": 3
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]*$",
+          "description": "meta, progress, log, result (spec section 14) or another agreed name."
         },
         "direction": {
           "enum": [
@@ -295,11 +295,6 @@
             "out"
           ],
           "description": "out: the program writes it; in: the program reads it."
-        },
-        "role": {
-          "type": "string",
-          "pattern": "^(|.*[^0-9].*)$",
-          "description": "meta, progress, log, result (spec section 14), another agreed name, or empty."
         },
         "description": {
           "type": "string"
@@ -538,12 +533,12 @@
         "stdout": {
           "$ref": "#/$defs/stream"
         },
-        "fds": {
+        "roles": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/fd"
+            "$ref": "#/$defs/role"
           },
-          "description": "Declared file descriptors above 2 (spec sections 1.3 and 14), in registration order; absent in output from versions before they existed."
+          "description": "Declared roles on file descriptors above stdio (spec sections 1.3 and 14), in registration order; absent in output from versions before they existed."
         },
         "commands": {
           "type": "array",

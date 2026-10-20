@@ -2,7 +2,7 @@ Usage: tasks <command> [OPTIONS]
 
 Commands demo for the clyops conformance suite.
 
-Output fd 3 [progress]: Progress, one JSON object per line (application/x-ndjson)
+Output [progress]: Progress, one JSON object per line (application/x-ndjson)
 
 Commands:
   db                            Database tasks

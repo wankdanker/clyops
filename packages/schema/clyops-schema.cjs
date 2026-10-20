@@ -22,7 +22,8 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var index_exports = {};
 __export(index_exports, {
   constraintIssues: () => constraintIssues,
-  effectiveFds: () => effectiveFds,
+  effectiveRoles: () => effectiveRoles,
+  fdsEnv: () => fdsEnv,
   formFields: () => formFields,
   formSchema: () => formSchema,
   inputKey: () => inputKey,
@@ -195,11 +196,11 @@ function isTextType(contentType = "") {
   return !type || type.startsWith("text/") || type === "application/json" || type.endsWith("+json") || type === "application/xml";
 }
 function formSchema(schema) {
-  return { ...toJsonSchema(schema), "x-clyops": { constraints: schema.constraints ?? [], effects: schema.effects ?? [], stdin: schema.stdin ?? null, stdout: schema.stdout ?? null, fds: schema.fds ?? [] } };
+  return { ...toJsonSchema(schema), "x-clyops": { constraints: schema.constraints ?? [], effects: schema.effects ?? [], stdin: schema.stdin ?? null, stdout: schema.stdout ?? null, roles: schema.roles ?? [] } };
 }
 
-// packages/schema/src/fds.ts
-function effectiveFds(schema, path = []) {
+// packages/schema/src/roles.ts
+function effectiveRoles(schema, path = []) {
   const levels = [schema];
   let node = schema;
   for (const word of path) {
@@ -208,20 +209,18 @@ function effectiveFds(schema, path = []) {
     levels.push(next);
     node = next;
   }
-  const out = [];
-  for (const level of levels.reverse()) {
-    for (const decl of level.fds ?? []) {
-      if (out.some((d) => d.fd === decl.fd)) continue;
-      const shadowed = decl.role !== "" && out.some((d) => d.role === decl.role);
-      out.push(shadowed ? { ...decl, role: "" } : { ...decl });
-    }
-  }
-  return out.sort((a, b) => a.fd - b.fd);
+  const byName = /* @__PURE__ */ new Map();
+  for (const level of levels) for (const role of level.roles ?? []) byName.set(role.name, { ...role });
+  return [...byName.values()];
+}
+function fdsEnv(mapping) {
+  return Object.entries(mapping).map(([name, fd]) => `${name}:${fd}`).join(",");
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   constraintIssues,
-  effectiveFds,
+  effectiveRoles,
+  fdsEnv,
   formFields,
   formSchema,
   inputKey,

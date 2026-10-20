@@ -475,19 +475,17 @@
     "description": "The resolved values",
     "contentType": "application/json"
   },
-  "fds": [
+  "roles": [
     {
-      "fd": 3,
+      "name": "meta",
       "direction": "out",
-      "role": "meta",
       "description": "Run metadata, before the values",
       "contentType": "application/json",
       "schema": null
     },
     {
-      "fd": 4,
+      "name": "progress",
       "direction": "out",
-      "role": "progress",
       "description": "Progress, one JSON object per line",
       "contentType": "application/x-ndjson",
       "schema": {
@@ -500,9 +498,8 @@
       }
     },
     {
-      "fd": 5,
+      "name": "extra",
       "direction": "in",
-      "role": "",
       "description": "Extra lines to process",
       "contentType": "text/plain",
       "schema": null

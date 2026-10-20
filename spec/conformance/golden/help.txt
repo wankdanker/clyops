@@ -5,9 +5,9 @@ so that each implementation can be checked against the same help text, schema an
 
 Input: Lines to process (text/plain)
 Output: The resolved values (application/json)
-Output fd 3 [meta]: Run metadata, before the values (application/json)
-Output fd 4 [progress]: Progress, one JSON object per line (application/x-ndjson)
-Input fd 5: Extra lines to process (text/plain)
+Output [meta]: Run metadata, before the values (application/json)
+Output [progress]: Progress, one JSON object per line (application/x-ndjson)
+Input [extra]: Extra lines to process (text/plain)
 
 Positional Arguments:
   input                         Input file (accepts: path)

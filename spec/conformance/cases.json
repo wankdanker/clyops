@@ -2227,7 +2227,7 @@
     }
   },
   {
-    "name": "fd: closed descriptors are skipped",
+    "name": "fd: without CLYOPS_FDS nothing extra is used",
     "args": [
       "in.txt"
     ],
@@ -2239,13 +2239,16 @@
     }
   },
   {
-    "name": "fd: meta and progress written to open descriptors",
+    "name": "fd: roles written to the descriptors the caller maps",
     "args": [
       "in.txt"
     ],
     "fds": {
       "3": "out",
       "4": "out"
+    },
+    "env": {
+      "CLYOPS_FDS": "meta:3,progress:4"
     },
     "expect": {
       "exit": 0,
@@ -2259,13 +2262,36 @@
     }
   },
   {
-    "name": "fd: an open input descriptor is found",
+    "name": "fd: the caller chooses the numbers",
+    "args": [
+      "in.txt"
+    ],
+    "fds": {
+      "6": "out",
+      "9": "out"
+    },
+    "env": {
+      "CLYOPS_FDS": " progress:6 , meta:9 "
+    },
+    "expect": {
+      "exit": 0,
+      "fd": {
+        "6": "{\"pct\":100}\n",
+        "9": "{\"extra\":false}\n"
+      }
+    }
+  },
+  {
+    "name": "fd: an input role is found",
     "args": [
       "in.txt"
     ],
     "fds": {
       "3": "out",
       "5": "x\n"
+    },
+    "env": {
+      "CLYOPS_FDS": "meta:3,extra:5"
     },
     "expect": {
       "exit": 0,
@@ -2275,18 +2301,116 @@
     }
   },
   {
-    "name": "fd: only the open descriptor is written",
+    "name": "fd: a role can share stderr",
+    "args": [
+      "in.txt"
+    ],
+    "env": {
+      "CLYOPS_FDS": "progress:2"
+    },
+    "expect": {
+      "exit": 0,
+      "stderr": [
+        "{\"pct\":100}\n"
+      ]
+    }
+  },
+  {
+    "name": "fd: an open descriptor the mapping doesn't name is left alone",
+    "args": [
+      "in.txt"
+    ],
+    "fds": {
+      "3": "out",
+      "4": "out"
+    },
+    "env": {
+      "CLYOPS_FDS": "progress:4"
+    },
+    "expect": {
+      "exit": 0,
+      "fd": {
+        "3": "",
+        "4": "{\"pct\":100}\n"
+      }
+    }
+  },
+  {
+    "name": "fd: a mapped descriptor that isn't open is skipped",
+    "args": [
+      "in.txt"
+    ],
+    "env": {
+      "CLYOPS_FDS": "meta:3,progress:4,extra:5"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 3
+      }
+    }
+  },
+  {
+    "name": "fd: roles the program doesn't declare are ignored",
+    "args": [
+      "in.txt"
+    ],
+    "fds": {
+      "4": "out",
+      "5": "out"
+    },
+    "env": {
+      "CLYOPS_FDS": "log:5,progress:4"
+    },
+    "expect": {
+      "exit": 0,
+      "fd": {
+        "4": "{\"pct\":100}\n",
+        "5": ""
+      }
+    }
+  },
+  {
+    "name": "fd: the last entry for a role wins",
+    "args": [
+      "in.txt"
+    ],
+    "fds": {
+      "4": "out",
+      "6": "out"
+    },
+    "env": {
+      "CLYOPS_FDS": "progress:4,progress:6"
+    },
+    "expect": {
+      "exit": 0,
+      "fd": {
+        "4": "",
+        "6": "{\"pct\":100}\n"
+      }
+    }
+  },
+  {
+    "name": "fd: malformed entries and stdin/stdout are ignored with a warning",
     "args": [
       "in.txt"
     ],
     "fds": {
       "4": "out"
     },
+    "env": {
+      "CLYOPS_FDS": "meta,progress:1,x:y,progress:4"
+    },
     "expect": {
       "exit": 0,
       "fd": {
         "4": "{\"pct\":100}\n"
-      }
+      },
+      "stderr": [
+        "Ignoring CLYOPS_FDS entry 'meta'",
+        "Ignoring CLYOPS_FDS entry 'progress:1'",
+        "Ignoring CLYOPS_FDS entry 'x:y'"
+      ]
     }
   },
   {
@@ -2298,6 +2422,9 @@
       "3": "out",
       "4": "out"
     },
+    "env": {
+      "CLYOPS_FDS": "meta:3,progress:4"
+    },
     "expect": {
       "exit": 0,
       "fd": {
@@ -2307,75 +2434,22 @@
     }
   },
   {
-    "name": "fd: a command inherits the program's descriptor",
+    "name": "fd: a command inherits the program's roles",
     "program": "tasks",
     "args": [
       "db",
       "status"
     ],
     "fds": {
-      "3": "out",
-      "4": "out"
-    },
-    "expect": {
-      "exit": 0,
-      "fd": {
-        "3": "{\"stage\":\"done\"}\n",
-        "4": ""
-      }
-    }
-  },
-  {
-    "name": "fd: a command's own role overrides the program's",
-    "program": "tasks",
-    "args": [
-      "db",
-      "migrate"
-    ],
-    "fds": {
-      "3": "out",
-      "4": "out"
-    },
-    "expect": {
-      "exit": 0,
-      "fd": {
-        "3": "",
-        "4": "{\"stage\":\"done\"}\n"
-      }
-    }
-  },
-  {
-    "name": "fd: an open descriptor missing from CLYOPS_FDS is left alone",
-    "args": [
-      "in.txt"
-    ],
-    "fds": {
-      "3": "out",
-      "4": "out"
+      "3": "out"
     },
     "env": {
-      "CLYOPS_FDS": "4"
+      "CLYOPS_FDS": "progress:3"
     },
     "expect": {
       "exit": 0,
       "fd": {
-        "3": "",
-        "4": "{\"pct\":100}\n"
-      }
-    }
-  },
-  {
-    "name": "fd: a listed descriptor that isn't open is skipped",
-    "args": [
-      "in.txt"
-    ],
-    "env": {
-      "CLYOPS_FDS": "3,4,5"
-    },
-    "expect": {
-      "exit": 0,
-      "values": {
-        "COUNT": 3
+        "3": "{\"stage\":\"done\"}\n"
       }
     }
   }

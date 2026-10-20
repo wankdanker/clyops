@@ -2,7 +2,7 @@ Usage: tasks db migrate [<target>] [OPTIONS]
 
 Apply migrations
 
-Output fd 4 [progress]: Migration progress (application/x-ndjson)
+Output [plan]: Migration plan (text/plain)
 
 Positional Arguments:
   target                        Target version (default: latest)
