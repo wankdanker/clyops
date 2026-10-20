@@ -92,13 +92,26 @@ resolves to a list.
   `contentType` is a MIME type (`audio/wav`); for stdin it may be a
   comma-separated list of accepted types (`audio/wav,audio/flac`). Undeclared
   stdin means the program doesn't read it; undeclared stdout means text.
+* `fd(FD, DIRECTION, description, contentType, role, schema)`: a further file
+  descriptor the program writes (`DIRECTION` `out`) or reads (`in`), with what
+  it carries, so a runner knows what each one means (section 14). `FD` is an
+  integer of 3 or more (0, 1 and 2 are stdin, stdout and stderr). `role` is
+  optional: one of the well-known `meta`, `progress`, `log` and `result`
+  (section 14), or any other name a runner that knows the program agrees on.
+  `schema` is an optional JSON Schema, as JSON text or the language's native
+  object, that each document or line on the descriptor matches. Each call
+  adds one descriptor; they are listed in registration order.
 * Option relationships (1.6) and commands (1.7).
 
 Registering an unknown validation rule, a duplicate long/short name, a
 positional argument after a variadic, an unknown effect (`Unknown effect 'E'`),
 a relationship naming an option that isn't registered (`Unknown option --NAME
-in constraint`), or mixing commands and positional arguments on one level
-(`Cannot mix commands and positional arguments`) is a programming error,
+in constraint`), mixing commands and positional arguments on one level
+(`Cannot mix commands and positional arguments`), a file descriptor below 3
+(`Invalid file descriptor N`), one registered twice on a level (`Duplicate
+file descriptor N`), a direction other than `in` or `out` (`Unknown fd
+direction 'D'`), a role made only of digits (`Invalid fd role 'R'`) or a role
+used twice on a level (`Duplicate fd role 'R'`) is a programming error,
 reported at registration time in the language's usual way (exception, panic, or
 a message and exit status 2 in Bash and C), e.g. `Unknown validation rule 'R'
 for --NAME`.
@@ -354,7 +367,10 @@ Help is that of the selected command (1.7): `mytool db --help` describes
    default) or ` [<name>...]` (variadic), then ` [OPTIONS]`.
 2. **Description** (if any), word-wrapped at `MAXW`.
 3. **Input and output** (if declared): `Input: DESCRIPTION (TYPE)` and
-   `Output: DESCRIPTION (TYPE)` lines, leaving out an empty description or type.
+   `Output: DESCRIPTION (TYPE)` lines, then one line per declared file
+   descriptor in registration order, `Input fd N: DESCRIPTION (TYPE)` or
+   `Output fd N: DESCRIPTION (TYPE)`, with ` [ROLE]` after `N` when it has a
+   role (`Output fd 4 [progress]: …`). An empty description or type is left out.
 4. **`Commands:`** (if any), one row per command: its name and description.
 5. **`Positional Arguments:`** (if any), one row per argument.
 6. **`Required Commands:`** (if any) of the chain, from the program down, one
@@ -414,10 +430,14 @@ line of its own).
   ],
   "stdin": { "description": "", "contentType": "" },
   "stdout": null,
+  "fds": [
+    { "fd": 3, "direction": "out", "role": "meta", "description": "", "contentType": "",
+      "schema": null }
+  ],
   "commands": [
     { "name": "", "description": "", "epilog": "", "arguments": [], "options": [],
       "requiredCommands": [], "effects": [], "constraints": [], "stdin": null, "stdout": null,
-      "commands": [] }
+      "fds": [], "commands": [] }
   ]
 }
 ```
@@ -429,7 +449,10 @@ line of its own).
 `effects` lists the declared effects (1.3) in the order given; `constraints`
 the relationships (1.6) in registration order, `type` being `exclusive`,
 `requires` or `oneOf` and `options` the long names; `stdin` and `stdout` are
-`null` unless declared. `commands` holds each command (1.7) with the same
+`null` unless declared. `fds` lists the declared file descriptors (1.3) in
+registration order, `role` being `""` and `schema` `null` when not given; a
+consumer reading the output of an older version without `fds` treats it as
+empty. `commands` holds each command (1.7) with the same
 fields as the program, `name` in place of `clyops` and `script`, and only its
 own options. Output is indented with two spaces. [schema.json](schema.json) is the formal JSON Schema of this output.
 
@@ -707,3 +730,56 @@ a required option from its environment or a config file. Each pair of
 `exclusive` options becomes an `allOf` entry `{"not": {"required": [A, B], …}}`
 (a flag given as `false` or a `null` value doesn't count); the other
 relationships are left to the tool, like required options.
+
+## 14. Declared file descriptors
+
+A program declares descriptors beyond stdin, stdout and stderr with `fd`
+(1.3), so a runner that starts it knows what each one carries.
+
+**Roles.** Four roles have a meaning every runner may rely on:
+
+* `meta`: one JSON document describing the main output (stdout), written
+  before the first byte of it, e.g. a file name or content length;
+* `progress`: newline-delimited JSON objects, one per update;
+* `log`: structured log lines, kept apart from the human-readable stderr;
+* `result`: the machine-readable result, when stdout carries something else.
+
+Any other role is free text for runners that know the program. Roles are
+optional; an undeclared descriptor has no meaning.
+
+**Runners.** A runner opens a declared descriptor only when it consumes it,
+closes every undeclared descriptor above 2 before starting the program, and
+lists the descriptors it opened in `CLYOPS_FDS`, comma-separated (`3,4`). A
+program must work with any of its declared descriptors missing.
+
+`CLYOPS_FDS` is the only signal that a descriptor was opened for the
+program: a descriptor merely being open proves nothing, since language
+runtimes (Node's event loop, the JVM, Go) open low-numbered descriptors of
+their own. By hand: `CLYOPS_FDS=4 mytool 4>&2` shows progress on the
+terminal. A program that starts other programs without meaning to pass its
+descriptors on removes `CLYOPS_FDS` from their environment.
+
+**Scope.** Declarations belong to the level they are registered on and show
+in that level's help and schema. At run time the selected command (1.7) and
+its ancestors are searched, nearest first, so a descriptor declared on the
+program applies to every command unless a command declares the same number
+or role.
+
+**Helpers.** Every package ships two helpers, called after parsing. Their
+`TARGET` is a role, or a descriptor number when it is made only of digits.
+
+* `fdOpen(TARGET)`: the descriptor number when `TARGET` is declared, listed
+  in `CLYOPS_FDS` and open, otherwise none (`-1`, `null` or the language's
+  equivalent). A program uses it to read an `in` descriptor or write raw
+  bytes.
+* `emit(TARGET, VALUE)`: write `VALUE` to an `out` descriptor, followed by a
+  newline unless it already ends with one. A string is written as is; in
+  languages with native JSON values, any other value is written as compact
+  JSON. It does nothing when `fdOpen` finds none, and ignores write errors (the
+  reader went away), so a program runs the same with or without a runner. A
+  `TARGET` that is not declared, or declared `in`, is a programming error
+  (`No file descriptor declared for 'TARGET'`, `File descriptor N is not an
+  output`).
+
+Descriptors are a POSIX notion: where there are none (Windows), `fdOpen`
+returns none and `emit` does nothing.

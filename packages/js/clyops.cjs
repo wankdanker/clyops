@@ -491,6 +491,7 @@ var Cli = class _Cli {
   effects = [];
   stdinDecl = null;
   stdoutDecl = null;
+  fdDecls = [];
   constraints = [];
   children = [];
   parent;
@@ -536,6 +537,63 @@ var Cli = class _Cli {
   setStdout(description, contentType = "") {
     this.stdoutDecl = { description, contentType };
     return this;
+  }
+  /**
+   * Declare a file descriptor above 2 that the program writes (`out`) or reads (`in`). `role` is
+   * `meta`, `progress`, `log`, `result` or another agreed name; `schema` is a JSON Schema (object or
+   * JSON text) for each document or line.
+   */
+  fd(fd, direction, description, contentType = "", role = "", schema) {
+    if (!Number.isInteger(fd) || fd < 3) throw new Error(`Invalid file descriptor ${fd}`);
+    if (direction !== "in" && direction !== "out") throw new Error(`Unknown fd direction '${direction}'`);
+    if (/^[0-9]+$/.test(role)) throw new Error(`Invalid fd role '${role}'`);
+    if (this.fdDecls.some((d) => d.fd === fd)) throw new Error(`Duplicate file descriptor ${fd}`);
+    if (role && this.fdDecls.some((d) => d.role === role)) throw new Error(`Duplicate fd role '${role}'`);
+    const parsed = typeof schema === "string" ? JSON.parse(schema) : schema;
+    this.fdDecls.push({ fd, direction, role, description, contentType, schema: parsed ?? null });
+    return this;
+  }
+  /** The declared descriptor for a role or number, searching the selected command then its ancestors. */
+  findFd(target) {
+    const key = String(target);
+    const byNumber = /^[0-9]+$/.test(key);
+    for (const node of this.chain()) {
+      const decl = node.fdDecls.find((d) => byNumber ? d.fd === Number(key) : d.role === key);
+      if (decl) return decl;
+    }
+    return void 0;
+  }
+  /**
+   * The descriptor number for a declared role or number when the runner opened it (listed in
+   * CLYOPS_FDS) and it is open, else null (spec section 14).
+   */
+  fdOpen(target) {
+    const decl = this.findFd(target);
+    if (!decl || process.platform === "win32") return null;
+    const listed = (this.env.CLYOPS_FDS ?? "").split(",").map((s) => s.trim());
+    if (!listed.includes(String(decl.fd))) return null;
+    try {
+      fs.fstatSync(decl.fd);
+      return decl.fd;
+    } catch {
+      return null;
+    }
+  }
+  /**
+   * Write a line to a declared `out` descriptor (spec section 14): a string as is, anything else as
+   * compact JSON, then a newline. Does nothing when the descriptor isn't open.
+   */
+  emit(target, value) {
+    const decl = this.findFd(target);
+    if (!decl) throw new Error(`No file descriptor declared for '${target}'`);
+    if (decl.direction !== "out") throw new Error(`File descriptor ${decl.fd} is not an output`);
+    if (this.fdOpen(decl.fd) === null) return;
+    let text = typeof value === "string" ? value : JSON.stringify(value);
+    if (!text.endsWith("\n")) text += "\n";
+    try {
+      fs.writeSync(decl.fd, text);
+    } catch {
+    }
   }
   /** At most one of these options may be given. */
   exclusive(...longs) {
@@ -1089,7 +1147,11 @@ var Cli = class _Cli {
     sections.push([usageLine + " [OPTIONS]"]);
     if (node.description) sections.push(wrapText(node.description, maxWidth));
     const stream = (label, s) => [label, s.description, s.contentType && `(${s.contentType})`].filter(Boolean).join(" ");
-    const io = [node.stdinDecl && stream("Input:", node.stdinDecl), node.stdoutDecl && stream("Output:", node.stdoutDecl)];
+    const io = [
+      node.stdinDecl && stream("Input:", node.stdinDecl),
+      node.stdoutDecl && stream("Output:", node.stdoutDecl),
+      ...node.fdDecls.map((d) => stream(`${d.direction === "in" ? "Input" : "Output"} fd ${d.fd}${d.role ? ` [${d.role}]` : ""}:`, d))
+    ];
     if (io.some(Boolean)) sections.push(io.filter((l) => Boolean(l)));
     if (node.children.length > 0) sections.push(["Commands:", ...node.children.flatMap((c) => row(c.word, c.description))]);
     if (node.args.length > 0) {
@@ -1186,6 +1248,14 @@ var Cli = class _Cli {
       constraints: this.constraints,
       stdin: this.stdinDecl,
       stdout: this.stdoutDecl,
+      fds: this.fdDecls.map((d) => ({
+        fd: d.fd,
+        direction: d.direction,
+        role: d.role,
+        description: d.description,
+        contentType: d.contentType,
+        schema: d.schema
+      })),
       commands: this.children.map((c) => c.schemaNode())
     };
   }

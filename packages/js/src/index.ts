@@ -33,6 +33,22 @@ export interface Stream {
   contentType: string;
 }
 
+/** A declared file descriptor above 2 (spec sections 1.3 and 14). */
+export interface FdDecl {
+  /** Descriptor number, 3 or more. */
+  fd: number;
+  /** `out` when the program writes it, `in` when it reads it. */
+  direction: 'in' | 'out';
+  /** `meta`, `progress`, `log`, `result`, another agreed name, or an empty string. */
+  role: string;
+  /** Human-readable description shown in help and documentation. */
+  description: string;
+  /** Declared MIME type, or an empty string when unspecified. */
+  contentType: string;
+  /** JSON Schema each document or line matches, or null. */
+  schema: unknown;
+}
+
 /** An option relationship (spec section 1.6). */
 export interface Constraint {
   /** Relationship checked after configuration and environment values resolve. */
@@ -406,6 +422,7 @@ export class Cli {
   private effects: Effect[] = [];
   private stdinDecl: Stream | null = null;
   private stdoutDecl: Stream | null = null;
+  private fdDecls: FdDecl[] = [];
   private constraints: Constraint[] = [];
   private children: Cli[] = [];
   private parent?: Cli;
@@ -443,6 +460,68 @@ export class Cli {
   setStdin(description: string, contentType = ''): this { this.stdinDecl = { description, contentType }; return this; }
   /** What the program writes on stdout; undeclared means text. */
   setStdout(description: string, contentType = ''): this { this.stdoutDecl = { description, contentType }; return this; }
+
+  /**
+   * Declare a file descriptor above 2 that the program writes (`out`) or reads (`in`). `role` is
+   * `meta`, `progress`, `log`, `result` or another agreed name; `schema` is a JSON Schema (object or
+   * JSON text) for each document or line.
+   */
+  fd(fd: number, direction: 'in' | 'out', description: string, contentType = '', role = '', schema?: unknown): this {
+    if (!Number.isInteger(fd) || fd < 3) throw new Error(`Invalid file descriptor ${fd}`);
+    if (direction !== 'in' && direction !== 'out') throw new Error(`Unknown fd direction '${direction}'`);
+    if (/^[0-9]+$/.test(role)) throw new Error(`Invalid fd role '${role}'`);
+    if (this.fdDecls.some((d) => d.fd === fd)) throw new Error(`Duplicate file descriptor ${fd}`);
+    if (role && this.fdDecls.some((d) => d.role === role)) throw new Error(`Duplicate fd role '${role}'`);
+    const parsed = typeof schema === 'string' ? JSON.parse(schema) : schema;
+    this.fdDecls.push({ fd, direction, role, description, contentType, schema: parsed ?? null });
+    return this;
+  }
+
+  /** The declared descriptor for a role or number, searching the selected command then its ancestors. */
+  private findFd(target: string | number): FdDecl | undefined {
+    const key = String(target);
+    const byNumber = /^[0-9]+$/.test(key);
+    for (const node of this.chain()) {
+      const decl = node.fdDecls.find((d) => (byNumber ? d.fd === Number(key) : d.role === key));
+      if (decl) return decl;
+    }
+    return undefined;
+  }
+
+  /**
+   * The descriptor number for a declared role or number when the runner opened it (listed in
+   * CLYOPS_FDS) and it is open, else null (spec section 14).
+   */
+  fdOpen(target: string | number): number | null {
+    const decl = this.findFd(target);
+    if (!decl || process.platform === 'win32') return null;
+    const listed = (this.env.CLYOPS_FDS ?? '').split(',').map((s) => s.trim());
+    if (!listed.includes(String(decl.fd))) return null;
+    try {
+      fs.fstatSync(decl.fd);
+      return decl.fd;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Write a line to a declared `out` descriptor (spec section 14): a string as is, anything else as
+   * compact JSON, then a newline. Does nothing when the descriptor isn't open.
+   */
+  emit(target: string | number, value: unknown): void {
+    const decl = this.findFd(target);
+    if (!decl) throw new Error(`No file descriptor declared for '${target}'`);
+    if (decl.direction !== 'out') throw new Error(`File descriptor ${decl.fd} is not an output`);
+    if (this.fdOpen(decl.fd) === null) return;
+    let text = typeof value === 'string' ? value : JSON.stringify(value);
+    if (!text.endsWith('\n')) text += '\n';
+    try {
+      fs.writeSync(decl.fd, text);
+    } catch {
+      // The reader went away; the descriptor is optional, so the program carries on.
+    }
+  }
 
   /** At most one of these options may be given. */
   exclusive(...longs: string[]): this { return this.addConstraint('exclusive', longs); }
@@ -977,7 +1056,8 @@ export class Cli {
     if (node.description) sections.push(wrapText(node.description, maxWidth));
 
     const stream = (label: string, s: Stream) => [label, s.description, s.contentType && `(${s.contentType})`].filter(Boolean).join(' ');
-    const io = [node.stdinDecl && stream('Input:', node.stdinDecl), node.stdoutDecl && stream('Output:', node.stdoutDecl)];
+    const io = [node.stdinDecl && stream('Input:', node.stdinDecl), node.stdoutDecl && stream('Output:', node.stdoutDecl),
+      ...node.fdDecls.map((d) => stream(`${d.direction === 'in' ? 'Input' : 'Output'} fd ${d.fd}${d.role ? ` [${d.role}]` : ''}:`, d))];
     if (io.some(Boolean)) sections.push(io.filter((l): l is string => Boolean(l)));
 
     if (node.children.length > 0) sections.push(['Commands:', ...node.children.flatMap((c) => row(c.word, c.description))]);
@@ -1069,6 +1149,8 @@ export class Cli {
       constraints: this.constraints,
       stdin: this.stdinDecl,
       stdout: this.stdoutDecl,
+      fds: this.fdDecls.map((d) => ({ fd: d.fd, direction: d.direction, role: d.role, description: d.description,
+        contentType: d.contentType, schema: d.schema })),
       commands: this.children.map((c) => c.schemaNode()),
     };
   }

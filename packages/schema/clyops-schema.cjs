@@ -22,6 +22,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var index_exports = {};
 __export(index_exports, {
   constraintIssues: () => constraintIssues,
+  effectiveFds: () => effectiveFds,
   formFields: () => formFields,
   formSchema: () => formSchema,
   inputKey: () => inputKey,
@@ -194,11 +195,33 @@ function isTextType(contentType = "") {
   return !type || type.startsWith("text/") || type === "application/json" || type.endsWith("+json") || type === "application/xml";
 }
 function formSchema(schema) {
-  return { ...toJsonSchema(schema), "x-clyops": { constraints: schema.constraints ?? [], effects: schema.effects ?? [], stdin: schema.stdin ?? null, stdout: schema.stdout ?? null } };
+  return { ...toJsonSchema(schema), "x-clyops": { constraints: schema.constraints ?? [], effects: schema.effects ?? [], stdin: schema.stdin ?? null, stdout: schema.stdout ?? null, fds: schema.fds ?? [] } };
+}
+
+// packages/schema/src/fds.ts
+function effectiveFds(schema, path = []) {
+  const levels = [schema];
+  let node = schema;
+  for (const word of path) {
+    const next = node.commands?.find((c) => c.name === word);
+    if (!next) break;
+    levels.push(next);
+    node = next;
+  }
+  const out = [];
+  for (const level of levels.reverse()) {
+    for (const decl of level.fds ?? []) {
+      if (out.some((d) => d.fd === decl.fd)) continue;
+      const shadowed = decl.role !== "" && out.some((d) => d.role === decl.role);
+      out.push(shadowed ? { ...decl, role: "" } : { ...decl });
+    }
+  }
+  return out.sort((a, b) => a.fd - b.fd);
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   constraintIssues,
+  effectiveFds,
   formFields,
   formSchema,
   inputKey,

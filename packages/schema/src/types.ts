@@ -55,6 +55,22 @@ export interface SchemaStream {
   contentType: string;
 }
 
+/** A declared file descriptor above 2 (spec sections 1.3 and 14). */
+export interface SchemaFd {
+  /** Descriptor number, 3 or more. */
+  fd: number;
+  /** `out` when the tool writes it, `in` when it reads it. */
+  direction: 'in' | 'out';
+  /** `meta`, `progress`, `log`, `result`, another agreed name, or an empty string. */
+  role: string;
+  /** Human-readable description shown in help and documentation. */
+  description: string;
+  /** Declared MIME type, or an empty string when unspecified. */
+  contentType: string;
+  /** JSON Schema each document or line matches, or null. */
+  schema: unknown;
+}
+
 /** An option relationship (spec section 1.6). */
 export interface SchemaConstraint {
   /** Declared value type or relationship kind, according to the containing interface. */
@@ -90,6 +106,8 @@ export interface SchemaBody {
   stdin?: SchemaStream | null;
   /** Declared output stream, or null/absent when undeclared (text output). */
   stdout?: SchemaStream | null;
+  /** Declared file descriptors above 2 at this level; absent before 0.5. */
+  fds?: SchemaFd[];
   /** Nested commands with their own options, arguments, and metadata. */
   commands?: SchemaCommand[];
 }

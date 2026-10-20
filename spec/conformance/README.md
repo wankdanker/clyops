@@ -33,12 +33,16 @@ python3 tools/conformance.py js -k config   # cases whose name contains "config"
   "dirs": ["data"],                    // optional, created under {tmp}
   "cwd": "sub",                        // optional, relative to {tmp}
   "program": "tasks",                  // optional: the commands demo instead of demo
+  "fds": { "3": "out", "5": "x\n" },   // optional: open fd 3 for writing and fd 5
+                                       // for reading with that content, and list them in
+                                       // CLYOPS_FDS (spec section 14); "env" can override it
   "expect": {
     "exit": 0,
     "values": { "COUNT": 5 },          // subset match
     "sources": { "count": "config" },  // subset match
     "stdout": "@help.txt",             // "@file" = golden file; else exact text
-    "stderr": ["substring", "…"]       // each must appear in stderr
+    "stderr": ["substring", "…"],      // each must appear in stderr
+    "fd": { "3": "{\"extra\":true}\n" } // exact text written to each opened "out" fd
   }
 }
 ```
@@ -55,6 +59,14 @@ python3 tools/conformance.py js -k config   # cases whose name contains "config"
 * effects: `idempotent`, `network`
 * stdin: `Lines to process`, `text/plain`; stdout: `The resolved values`, `application/json`
 * relationships: `exclusive(endpoint, addr)`, `requires(dest, src)`
+* file descriptors (spec section 1.3), in this order:
+  * `3` `out` `Run metadata, before the values` `application/json`, role `meta`
+  * `4` `out` `Progress, one JSON object per line` `application/x-ndjson`, role
+    `progress`, schema `{"type":"object","properties":{"pct":{"type":"number"}}}`
+  * `5` `in` `Extra lines to process` `text/plain`, no role
+* after a successful parse, before printing, the demo calls
+  `emit("meta", "{\"extra\":true}")` when `fdOpen("5")` finds fd 5 open and
+  `emit("meta", "{\"extra\":false}")` otherwise, then `emit("4", "{\"pct\":100}")`
 
 Positional arguments:
 
@@ -119,3 +131,9 @@ section 1.7). It prints `{ "values": { …valuesJson()… } }`.
   `Options` `url` and `EMAIL` `email` `e` `optional` `Email address` `Options`
   `email`; `oneOf(webhook, email)`; effects `network`; stdin `Attachment`,
   `application/octet-stream`
+* file descriptor `3` `out` `Progress, one JSON object per line`
+  `application/x-ndjson`, role `progress`, on the program; `migrate` declares
+  its own `4` `out` `Migration progress` `application/x-ndjson`, role
+  `progress`
+* after a successful parse, before printing, it calls
+  `emit("progress", "{\"stage\":\"done\"}")`

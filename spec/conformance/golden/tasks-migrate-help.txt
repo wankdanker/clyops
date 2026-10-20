@@ -2,6 +2,8 @@ Usage: tasks db migrate [<target>] [OPTIONS]
 
 Apply migrations
 
+Output fd 4 [progress]: Migration progress (application/x-ndjson)
+
 Positional Arguments:
   target                        Target version (default: latest)
 

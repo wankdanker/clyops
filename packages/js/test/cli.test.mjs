@@ -133,3 +133,72 @@ test('commands: scanning, values and the chain', () => {
   assert.equal(schema.commands[0].commands[0].options[0].name, 'to');
   assert.equal(schema.commands[0].commands[0].arguments[0].name, 'name');
 });
+
+test('file descriptors: registration errors', () => {
+  const cli = () => new Cli({ name: 't', env: {} });
+  assert.throws(() => cli().fd(2, 'out', 'X'), /Invalid file descriptor 2/);
+  assert.throws(() => cli().fd(3.5, 'out', 'X'), /Invalid file descriptor 3.5/);
+  assert.throws(() => cli().fd(3, /** @type {any} */ ('both'), 'X'), /Unknown fd direction 'both'/);
+  assert.throws(() => cli().fd(3, 'out', 'X', '', '7'), /Invalid fd role '7'/);
+  assert.throws(() => cli().fd(3, 'out', 'X').fd(3, 'in', 'Y'), /Duplicate file descriptor 3/);
+  assert.throws(() => cli().fd(3, 'out', 'X', '', 'log').fd(4, 'out', 'Y', '', 'log'), /Duplicate fd role 'log'/);
+  assert.doesNotThrow(() => cli().fd(3, 'out', 'X').fd(4, 'out', 'Y'));
+});
+
+test('file descriptors: schema accepts an object or JSON text', () => {
+  const cli = new Cli({ name: 't', env: {} })
+    .fd(3, 'out', 'A', 'application/json', 'meta', { type: 'object' })
+    .fd(4, 'in', 'B', '', '', '{"type":"string"}');
+  const fds = JSON.parse(cli.jsonSchema()).fds;
+  assert.deepEqual(fds, [
+    { fd: 3, direction: 'out', role: 'meta', description: 'A', contentType: 'application/json', schema: { type: 'object' } },
+    { fd: 4, direction: 'in', role: '', description: 'B', contentType: '', schema: { type: 'string' } },
+  ]);
+});
+
+test('file descriptors: emit writes only to descriptors listed in CLYOPS_FDS', async () => {
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const fsm = await import('node:fs');
+  const dir = fsm.mkdtempSync(path.join(os.tmpdir(), 'clyops-fd-'));
+  const file = path.join(dir, 'out');
+  const fd = fsm.openSync(file, 'w');
+  try {
+    const make = (listed) => {
+      const c = new Cli({ name: 't', env: { CLYOPS_FDS: listed } }).fd(fd, 'out', 'Progress', '', 'progress');
+      c.fd(999, 'in', 'Extra');
+      assert.deepEqual(c.parse([]), { status: 'ok' });
+      return c;
+    };
+    const unlisted = make('');
+    assert.equal(unlisted.fdOpen('progress'), null);
+    unlisted.emit('progress', { pct: 1 });
+    const cli = make(`${fd}, 999`);
+    assert.equal(cli.fdOpen('progress'), fd);
+    assert.equal(cli.fdOpen(fd), fd);
+    assert.equal(cli.fdOpen(999), null, 'listed but not open');
+    cli.emit('progress', { pct: 50 });
+    cli.emit(String(fd), 'plain text');
+    cli.emit('progress', 'ends with newline\n');
+    assert.throws(() => cli.emit('nope', 'x'), /No file descriptor declared for 'nope'/);
+    assert.throws(() => cli.emit(999, 'x'), /File descriptor 999 is not an output/);
+  } finally {
+    fsm.closeSync(fd);
+  }
+  assert.equal(fsm.readFileSync(file, 'utf8'), '{"pct":50}\nplain text\nends with newline\n');
+  fsm.rmSync(dir, { recursive: true });
+});
+
+test('file descriptors: commands inherit, nearest declaration wins, help lists their own', () => {
+  const cli = new Cli({ name: 'm', env: {} }).fd(3, 'out', 'Progress', 'application/x-ndjson', 'progress');
+  const db = cli.command('db', 'Database');
+  db.command('migrate', 'Migrate').fd(4, 'out', 'Migration progress', '', 'progress');
+  db.command('status', 'Status');
+  cli.parse(['db', 'status']);
+  assert.equal(cli['findFd']('progress').fd, 3);
+  cli.parse(['db', 'migrate']);
+  assert.equal(cli['findFd']('progress').fd, 4);
+  assert.equal(cli['findFd'](3).fd, 3);
+  assert.match(cli.usage(), /\nOutput fd 4 \[progress\]: Migration progress\n/);
+  assert.doesNotMatch(cli.usage(), /fd 3/);
+});

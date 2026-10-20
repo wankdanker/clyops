@@ -226,6 +226,13 @@
     "stdout": {
       "$ref": "#/$defs/stream"
     },
+    "fds": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fd"
+      },
+      "description": "Declared file descriptors above 2 (spec sections 1.3 and 14), in registration order; absent in output from versions before they existed."
+    },
     "commands": {
       "type": "array",
       "items": {
@@ -264,6 +271,52 @@
           }
         }
       ]
+    },
+    "fd": {
+      "description": "A declared file descriptor (spec section 1.3).",
+      "type": "object",
+      "required": [
+        "fd",
+        "direction",
+        "role",
+        "description",
+        "contentType",
+        "schema"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "fd": {
+          "type": "integer",
+          "minimum": 3
+        },
+        "direction": {
+          "enum": [
+            "in",
+            "out"
+          ],
+          "description": "out: the program writes it; in: the program reads it."
+        },
+        "role": {
+          "type": "string",
+          "pattern": "^(|.*[^0-9].*)$",
+          "description": "meta, progress, log, result (spec section 14), another agreed name, or empty."
+        },
+        "description": {
+          "type": "string"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "MIME type, or empty."
+        },
+        "schema": {
+          "description": "JSON Schema each document or line matches, or null.",
+          "type": [
+            "object",
+            "boolean",
+            "null"
+          ]
+        }
+      }
     },
     "command": {
       "type": "object",
@@ -484,6 +537,13 @@
         },
         "stdout": {
           "$ref": "#/$defs/stream"
+        },
+        "fds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fd"
+          },
+          "description": "Declared file descriptors above 2 (spec sections 1.3 and 14), in registration order; absent in output from versions before they existed."
         },
         "commands": {
           "type": "array",

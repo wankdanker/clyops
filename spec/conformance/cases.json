@@ -2225,5 +2225,158 @@
         "One of --webhook, --email is required"
       ]
     }
+  },
+  {
+    "name": "fd: closed descriptors are skipped",
+    "args": [
+      "in.txt"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 3
+      }
+    }
+  },
+  {
+    "name": "fd: meta and progress written to open descriptors",
+    "args": [
+      "in.txt"
+    ],
+    "fds": {
+      "3": "out",
+      "4": "out"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 3
+      },
+      "fd": {
+        "3": "{\"extra\":false}\n",
+        "4": "{\"pct\":100}\n"
+      }
+    }
+  },
+  {
+    "name": "fd: an open input descriptor is found",
+    "args": [
+      "in.txt"
+    ],
+    "fds": {
+      "3": "out",
+      "5": "x\n"
+    },
+    "expect": {
+      "exit": 0,
+      "fd": {
+        "3": "{\"extra\":true}\n"
+      }
+    }
+  },
+  {
+    "name": "fd: only the open descriptor is written",
+    "args": [
+      "in.txt"
+    ],
+    "fds": {
+      "4": "out"
+    },
+    "expect": {
+      "exit": 0,
+      "fd": {
+        "4": "{\"pct\":100}\n"
+      }
+    }
+  },
+  {
+    "name": "fd: nothing is written when help is shown",
+    "args": [
+      "--help"
+    ],
+    "fds": {
+      "3": "out",
+      "4": "out"
+    },
+    "expect": {
+      "exit": 0,
+      "fd": {
+        "3": "",
+        "4": ""
+      }
+    }
+  },
+  {
+    "name": "fd: a command inherits the program's descriptor",
+    "program": "tasks",
+    "args": [
+      "db",
+      "status"
+    ],
+    "fds": {
+      "3": "out",
+      "4": "out"
+    },
+    "expect": {
+      "exit": 0,
+      "fd": {
+        "3": "{\"stage\":\"done\"}\n",
+        "4": ""
+      }
+    }
+  },
+  {
+    "name": "fd: a command's own role overrides the program's",
+    "program": "tasks",
+    "args": [
+      "db",
+      "migrate"
+    ],
+    "fds": {
+      "3": "out",
+      "4": "out"
+    },
+    "expect": {
+      "exit": 0,
+      "fd": {
+        "3": "",
+        "4": "{\"stage\":\"done\"}\n"
+      }
+    }
+  },
+  {
+    "name": "fd: an open descriptor missing from CLYOPS_FDS is left alone",
+    "args": [
+      "in.txt"
+    ],
+    "fds": {
+      "3": "out",
+      "4": "out"
+    },
+    "env": {
+      "CLYOPS_FDS": "4"
+    },
+    "expect": {
+      "exit": 0,
+      "fd": {
+        "3": "",
+        "4": "{\"pct\":100}\n"
+      }
+    }
+  },
+  {
+    "name": "fd: a listed descriptor that isn't open is skipped",
+    "args": [
+      "in.txt"
+    ],
+    "env": {
+      "CLYOPS_FDS": "3,4,5"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "COUNT": 3
+      }
+    }
   }
 ]

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { Cli } from '../../js/dist/esm/index.js';
-import { formFields, formSchema, toJsonSchema, constraintIssues, withoutSecrets } from '../dist/index.js';
+import { formFields, formSchema, toJsonSchema, constraintIssues, withoutSecrets, effectiveFds } from '../dist/index.js';
 
 function program() {
   const cli = new Cli({ name: 'forms' });
@@ -78,4 +78,19 @@ test('browser entry builds without Node built-ins or framework dependencies', as
   const output = await build({ entryPoints: [new URL('../src/index.ts', import.meta.url).pathname], bundle: true, platform: 'browser', format: 'esm', write: false, metafile: true });
   assert.ok(Object.keys(output.metafile.inputs).every(file => !file.includes('node_modules')));
   assert.ok(output.outputFiles[0].text.includes('toJsonSchema'));
+});
+
+test('effectiveFds: nearest declaration wins by number, and takes over a role', () => {
+  const cli = new Cli({ name: 'fds', env: {} })
+    .fd(3, 'out', 'Progress', 'application/x-ndjson', 'progress')
+    .fd(5, 'out', 'Log', '', 'log');
+  const db = cli.command('db', 'Database');
+  db.command('migrate', 'Migrate').fd(4, 'out', 'Migration progress', '', 'progress').fd(5, 'in', 'Plan');
+  const schema = JSON.parse(cli.jsonSchema());
+  assert.deepEqual(effectiveFds(schema).map((d) => [d.fd, d.role]), [[3, 'progress'], [5, 'log']]);
+  assert.deepEqual(effectiveFds(schema, ['db']).map((d) => [d.fd, d.role]), [[3, 'progress'], [5, 'log']]);
+  assert.deepEqual(effectiveFds(schema, ['db', 'migrate']).map((d) => [d.fd, d.role, d.direction]),
+    [[3, '', 'out'], [4, 'progress', 'out'], [5, '', 'in']]);
+  assert.deepEqual(formSchema(schema)['x-clyops'].fds, schema.fds);
+  assert.deepEqual(effectiveFds({ ...schema, fds: undefined }), []);
 });
