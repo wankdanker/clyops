@@ -362,7 +362,11 @@ public class Cli {
     private List<String> effects = List.of();
     private Map<String, Object> stdin;
     private Map<String, Object> stdout;
-    private final List<Map<String, Object>> fds = new ArrayList<>();
+    private final List<Map<String, Object>> roles = new ArrayList<>();
+    // CLYOPS_FDS as read once (spec section 14); null until then.
+    private Map<String, Integer> fdMap;
+    private static final Pattern ROLE_NAME = Pattern.compile("[A-Za-z][A-Za-z0-9_.-]*");
+    private static final Pattern FD_ENTRY = Pattern.compile("([A-Za-z][A-Za-z0-9_.-]*):([0-9]{1,9})");
     // Streams to the runner's descriptors, kept open for the life of the process.
     private static final Map<Integer, OutputStream> FD_STREAMS = new ConcurrentHashMap<>();
     private static final Set<Integer> FD_WARNED = ConcurrentHashMap.newKeySet();
@@ -440,87 +444,83 @@ public class Cli {
         return m;
     }
 
-    /** Declare a file descriptor above 2 the program writes ({@code "out"}) or reads ({@code "in"}) (spec section 1.3). */
-    public Cli fd(int fd, String direction, String description) { return fd(fd, direction, description, "", "", null); }
-
-    /** Declare a file descriptor with its MIME type. */
-    public Cli fd(int fd, String direction, String description, String contentType) {
-        return fd(fd, direction, description, contentType, "", null);
-    }
-
-    /** Declare a file descriptor with its MIME type and role (meta, progress, log, result or another agreed name). */
-    public Cli fd(int fd, String direction, String description, String contentType, String role) {
-        return fd(fd, direction, description, contentType, role, null);
-    }
-
     /**
-     * Declare a file descriptor with its MIME type, role and a JSON Schema, as JSON text, for each
-     * document or line ({@code null} for none).
+     * Declare a role (spec section 1.3): a stream the program writes ({@code "out"}) or reads
+     * ({@code "in"}) on a descriptor its runner chooses. {@code name} is meta, progress, log, result or
+     * another agreed name.
      */
-    public Cli fd(int fd, String direction, String description, String contentType, String role, String schema) {
-        if (fd < 3) throw new IllegalArgumentException("Invalid file descriptor " + fd);
+    public Cli role(String name, String direction, String description) { return role(name, direction, description, "", null); }
+
+    /** Declare a role with its MIME type. */
+    public Cli role(String name, String direction, String description, String contentType) {
+        return role(name, direction, description, contentType, null);
+    }
+
+    /** Declare a role with its MIME type and a JSON Schema, as JSON text, for each document or line ({@code null} for none). */
+    public Cli role(String name, String direction, String description, String contentType, String schema) {
+        if (!ROLE_NAME.matcher(name).matches()) throw new IllegalArgumentException("Invalid role name '" + name + "'");
         if (!direction.equals("in") && !direction.equals("out")) {
-            throw new IllegalArgumentException("Unknown fd direction '" + direction + "'");
+            throw new IllegalArgumentException("Unknown role direction '" + direction + "'");
         }
-        if (role.matches("[0-9]+")) throw new IllegalArgumentException("Invalid fd role '" + role + "'");
-        for (Map<String, Object> d : fds) {
-            if ((int) d.get("fd") == fd) throw new IllegalArgumentException("Duplicate file descriptor " + fd);
-            if (!role.isEmpty() && role.equals(d.get("role"))) throw new IllegalArgumentException("Duplicate fd role '" + role + "'");
+        for (Map<String, Object> r : roles) {
+            if (name.equals(r.get("name"))) throw new IllegalArgumentException("Duplicate role '" + name + "'");
         }
-        Map<String, Object> d = new LinkedHashMap<>();
-        d.put("fd", fd);
-        d.put("direction", direction);
-        d.put("role", role);
-        d.put("description", description);
-        d.put("contentType", contentType);
-        d.put("schema", schema == null || schema.isEmpty() ? null : new Json.Raw(schema));
-        fds.add(d);
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("name", name);
+        r.put("direction", direction);
+        r.put("description", description);
+        r.put("contentType", contentType);
+        r.put("schema", schema == null || schema.isEmpty() ? null : new Json.Raw(schema));
+        roles.add(r);
         return this;
     }
 
-    /** The declared descriptor for a role or number, searching the selected command then its ancestors. */
-    private Map<String, Object> findFd(String target) {
-        boolean byNumber = target.matches("[0-9]+");
-        int number = -1;
-        if (byNumber) {
-            try {
-                number = Integer.parseInt(target);
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        }
+    /** The declared role, searching the selected command then its ancestors. */
+    private Map<String, Object> findRole(String name) {
         for (Cli node : chain()) {
-            for (Map<String, Object> d : node.fds) {
-                if (byNumber ? (int) d.get("fd") == number : target.equals(d.get("role"))) return d;
-            }
+            for (Map<String, Object> r : node.roles) if (name.equals(r.get("name"))) return r;
         }
         return null;
     }
 
     /**
-     * The descriptor number for a declared role or number when the runner opened it (listed in
-     * CLYOPS_FDS) and it is open, else -1 (spec section 14).
+     * CLYOPS_FDS, read once on the program. Java can't remove it from its own environment: a program
+     * starting others removes it from {@code ProcessBuilder.environment()} or sets {@link #forwardFds}.
      */
-    public int fdOpen(String target) {
-        Map<String, Object> d = findFd(target);
-        if (d == null) return -1;
-        int fd = (int) d.get("fd");
-        boolean listed = Arrays.stream(env.getOrDefault("CLYOPS_FDS", "").split(",")).map(String::trim).anyMatch(String.valueOf(fd)::equals);
-        return listed && Files.exists(Paths.get("/dev/fd/" + fd)) ? fd : -1;
+    private Map<String, Integer> fdMapping() {
+        Cli top = this;
+        while (top.parent != null) top = top.parent;
+        if (top.fdMap != null) return top.fdMap;
+        Map<String, Integer> map = new HashMap<>();
+        for (String raw : top.env.getOrDefault("CLYOPS_FDS", "").split(",")) {
+            String entry = raw.trim();
+            if (entry.isEmpty()) continue;
+            Matcher m = FD_ENTRY.matcher(entry);
+            if (m.matches() && Integer.parseInt(m.group(2)) >= 2) map.put(m.group(1), Integer.parseInt(m.group(2)));
+            else Log.warn("Ignoring CLYOPS_FDS entry '%s'", entry);
+        }
+        top.fdMap = map;
+        return map;
     }
 
-    /** {@link #fdOpen(String)} for a descriptor number. */
-    public int fdOpen(int fd) { return fdOpen(String.valueOf(fd)); }
+    /** The descriptor CLYOPS_FDS maps to {@code name}, when it is open, else -1. */
+    private int mappedFd(String name) {
+        Integer fd = fdMapping().get(name);
+        return fd != null && Files.exists(Paths.get("/dev/fd/" + fd)) ? fd : -1;
+    }
+
+    /** The descriptor for a declared role when CLYOPS_FDS maps it and it is open, else -1 (spec section 14). */
+    public int fdOpen(String name) { return findRole(name) != null ? mappedFd(name) : -1; }
 
     /**
-     * Write {@code text} and a newline (unless it ends with one) to a declared "out" descriptor (spec
-     * section 14). Does nothing when it isn't open; write errors are ignored.
+     * Write {@code text} and a newline (unless it ends with one) to a declared "out" role (spec
+     * section 14). Does nothing when the runner didn't map it; write errors are ignored.
      */
-    public void emit(String target, String text) {
-        Map<String, Object> d = findFd(target);
-        if (d == null) throw new IllegalArgumentException("No file descriptor declared for '" + target + "'");
-        if (!"out".equals(d.get("direction"))) throw new IllegalArgumentException("File descriptor " + d.get("fd") + " is not an output");
-        int fd = fdOpen((int) d.get("fd"));
+    public void emit(String name, String text) {
+        Map<String, Object> r = findRole(name);
+        if (r == null) throw new IllegalArgumentException("Unknown role '" + name + "'");
+        if (!"out".equals(r.get("direction"))) throw new IllegalArgumentException("Role '" + name + "' is not an output");
+        int fd = mappedFd(name);
         if (fd < 0) return;
         String line = text.endsWith("\n") ? text : text + "\n";
         try {
@@ -531,12 +531,19 @@ public class Cli {
                 out.flush();
             }
         } catch (IOException e) {
-            // The reader went away; the descriptor is optional, so the program carries on.
+            // The reader went away; a role is optional, so the program carries on.
         }
     }
 
-    /** {@link #emit(String, String)} for a descriptor number. */
-    public void emit(int fd, String text) { emit(String.valueOf(fd), text); }
+    /** The CLYOPS_FDS value passing these roles on to a program this one starts (spec section 14). */
+    public String forwardFds(String... names) {
+        List<String> out = new ArrayList<>();
+        for (String n : names) {
+            int fd = mappedFd(n);
+            if (fd >= 0) out.add(n + ":" + fd);
+        }
+        return String.join(",", out);
+    }
 
     /**
      * A stream to descriptor {@code fd}. With {@code --add-opens java.base/java.io=ALL-UNNAMED} it
@@ -736,6 +743,7 @@ public class Cli {
         config = new LinkedHashMap<>();
         values = new Values();
         selected = this;
+        fdMapping();
         ensureHelp();
 
         String scanError = null;
@@ -1164,12 +1172,10 @@ public class Cli {
             if (!((String) decl.get("contentType")).isEmpty()) line += " (" + decl.get("contentType") + ")";
             io.add(line);
         }
-        for (Map<String, Object> d : node.fds) {
-            String line = ("in".equals(d.get("direction")) ? "Input" : "Output") + " fd " + d.get("fd");
-            if (!((String) d.get("role")).isEmpty()) line += " [" + d.get("role") + "]";
-            line += ":";
-            if (!((String) d.get("description")).isEmpty()) line += " " + d.get("description");
-            if (!((String) d.get("contentType")).isEmpty()) line += " (" + d.get("contentType") + ")";
+        for (Map<String, Object> r : node.roles) {
+            String line = ("in".equals(r.get("direction")) ? "Input" : "Output") + " [" + r.get("name") + "]:";
+            if (!((String) r.get("description")).isEmpty()) line += " " + r.get("description");
+            if (!((String) r.get("contentType")).isEmpty()) line += " (" + r.get("contentType") + ")";
             io.add(line);
         }
         if (!io.isEmpty()) sections.add(io);
@@ -1317,7 +1323,7 @@ public class Cli {
         out.put("constraints", constraints);
         out.put("stdin", stdin);
         out.put("stdout", stdout);
-        out.put("fds", fds.stream().map(LinkedHashMap::new).toList());
+        out.put("roles", roles.stream().map(LinkedHashMap::new).toList());
         out.put("commands", children.stream().map(Cli::schemaNode).toList());
         return out;
     }

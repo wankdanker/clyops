@@ -151,38 +151,46 @@ class CliTest {
     }
 
     @Test
-    void fdRegistrationErrors() {
+    void roleRegistrationErrors() {
         Map<String, Runnable> cases = new java.util.LinkedHashMap<>();
-        cases.put("Invalid file descriptor 2", () -> new Cli("t").fd(2, "out", "X"));
-        cases.put("Unknown fd direction 'both'", () -> new Cli("t").fd(3, "both", "X"));
-        cases.put("Invalid fd role '7'", () -> new Cli("t").fd(3, "out", "X", "", "7"));
-        cases.put("Duplicate file descriptor 3", () -> new Cli("t").fd(3, "out", "X").fd(3, "in", "Y"));
-        cases.put("Duplicate fd role 'log'", () -> new Cli("t").fd(3, "out", "X", "", "log").fd(4, "out", "Y", "", "log"));
+        cases.put("Invalid role name '7up'", () -> new Cli("t").role("7up", "out", "X"));
+        cases.put("Invalid role name 'a:b'", () -> new Cli("t").role("a:b", "out", "X"));
+        cases.put("Unknown role direction 'both'", () -> new Cli("t").role("log", "both", "X"));
+        cases.put("Duplicate role 'log'", () -> new Cli("t").role("log", "out", "X").role("log", "in", "Y"));
         cases.forEach((message, register) ->
             assertEquals(message, assertThrows(IllegalArgumentException.class, register::run).getMessage()));
     }
 
     @Test
-    void fdSchemaIsEmbeddedJson() {
-        Cli cli = new Cli("t").setEnv(Map.of()).fd(3, "out", "A", "application/json", "meta", "{\"type\":\"object\"}").fd(4, "in", "B");
+    void roleSchemaIsEmbeddedJson() {
+        Cli cli = new Cli("t").setEnv(Map.of()).role("meta", "out", "A", "application/json", "{\"type\":\"object\"}").role("extra", "in", "B");
         String compact = cli.jsonSchema().replaceAll("\\s+", "");
-        assertTrue(compact.contains("\"fds\":[{\"fd\":3,\"direction\":\"out\",\"role\":\"meta\",\"description\":\"A\",\"contentType\":\"application/json\",\"schema\":{\"type\":\"object\"}},{\"fd\":4,\"direction\":\"in\",\"role\":\"\",\"description\":\"B\",\"contentType\":\"\",\"schema\":null}]"), compact);
+        assertTrue(compact.contains("\"roles\":[{\"name\":\"meta\",\"direction\":\"out\",\"description\":\"A\",\"contentType\":\"application/json\",\"schema\":{\"type\":\"object\"}},{\"name\":\"extra\",\"direction\":\"in\",\"description\":\"B\",\"contentType\":\"\",\"schema\":null}]"), compact);
     }
 
     @Test
-    void fdHelpersFollowTheSelectedCommand() {
-        Cli cli = new Cli("m").setEnv(Map.of("CLYOPS_FDS", "999")).fd(3, "out", "Progress", "application/x-ndjson", "progress");
+    void roleHelpersFollowTheMappingAndSelectedCommand() {
+        Cli cli = new Cli("m").setEnv(Map.of("CLYOPS_FDS", "progress:2, plan:2, extra:999")).role("progress", "out", "Progress", "application/x-ndjson");
         Cli db = cli.command("db", "Database");
-        db.command("migrate", "Migrate").fd(4, "out", "Migration progress", "", "progress").fd(999, "in", "Plan");
+        db.command("migrate", "Migrate").role("plan", "out", "Migration plan").role("extra", "in", "Plan file");
         db.command("status", "Status");
+        assertEquals("ok", cli.parse("db", "status").status());
+        assertEquals(2, cli.fdOpen("progress"));
+        assertEquals(-1, cli.fdOpen("plan"), "declared on a sibling");
         assertEquals("ok", cli.parse("db", "migrate").status());
+        assertEquals(2, cli.fdOpen("plan"));
+        assertEquals(-1, cli.fdOpen("extra"), "mapped but not open");
+        assertEquals("progress:2,plan:2", cli.forwardFds("progress", "plan", "extra", "nope"));
         String usage = cli.usage();
-        assertTrue(usage.contains("\nOutput fd 4 [progress]: Migration progress\n"), usage);
-        assertTrue(!usage.contains("fd 3"));
-        assertEquals(-1, cli.fdOpen("progress"), "unlisted");
-        assertEquals(-1, cli.fdOpen(999), "listed but not open");
-        cli.emit("progress", "nothing happens");
-        assertEquals("No file descriptor declared for 'log'", assertThrows(IllegalArgumentException.class, () -> cli.emit("log", "x")).getMessage());
-        assertEquals("File descriptor 999 is not an output", assertThrows(IllegalArgumentException.class, () -> cli.emit(999, "x")).getMessage());
+        assertTrue(usage.contains("\nOutput [plan]: Migration plan\n"), usage);
+        assertTrue(!usage.contains("[progress]"));
+        assertEquals("Unknown role 'log'", assertThrows(IllegalArgumentException.class, () -> cli.emit("log", "x")).getMessage());
+        assertEquals("Role 'extra' is not an output", assertThrows(IllegalArgumentException.class, () -> cli.emit("extra", "x")).getMessage());
+        Cli unmapped = new Cli("t").setEnv(Map.of()).role("progress", "out", "Progress");
+        unmapped.parse();
+        assertEquals(-1, unmapped.fdOpen("progress"));
+        assertEquals("", unmapped.forwardFds("progress"));
+        unmapped.emit("progress", "nothing happens");
     }
+
 }
