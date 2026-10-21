@@ -510,16 +510,17 @@ test('roles: a job\'s progress is on its record and its events', async () => {
 
 test('roles: streamed output carries the meta as a header', async () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'clyops-api-meta-')));
-  writeFileSync(join(root, 'clip'), `#!/usr/bin/env bash
-source ${join(repo, 'packages/bash/clyops.sh')}
-clyops_name clip
-clyops_description "Binary output with metadata"
-clyops_stdout "Audio" audio/wav
-clyops_role meta out "The clip's name" application/json
-clyops_run "$@"
-clyops_emit meta '{"name":"clip.wav","size":4}'
-printf 'RIFF'
+  // In Node, not Bash: macOS runners ship bash 3.2, which the Bash library doesn't support.
+  writeFileSync(join(root, 'clip.cjs'), `const { Cli } = require(${JSON.stringify(join(repo, 'packages/js/dist/cjs/index.js'))});
+const cli = new Cli({ name: 'clip' });
+cli.setDescription('Binary output with metadata');
+cli.setStdout('Audio', 'audio/wav');
+cli.role('meta', 'out', "The clip's name", 'application/json');
+cli.run();
+cli.emit('meta', { name: 'clip.wav', size: 4 });
+process.stdout.write('RIFF');
 `);
+  writeFileSync(join(root, 'clip'), `#!/bin/sh\n# clyops-tool\nexec node ${join(root, 'clip.cjs')} "$@"\n`);
   chmodSync(join(root, 'clip'), 0o755);
   const { app } = await createApi({ root, cwd: root });
   const s = app.listen(0);

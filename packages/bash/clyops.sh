@@ -239,8 +239,13 @@ clyops_emit() {
     _clyops_mapped_fd "$1" || return 0
     local fd="$_r" text="$2"
     [[ "$text" == *$'\n' ]] || text+=$'\n'
-    # >&fd before 2>/dev/null, so a role mapped to stderr still reaches it.
-    ( trap '' PIPE; printf '%s' "$text" >&"$fd" 2>/dev/null ) || true
+    # Copy fd before silencing stderr, so a role mapped to stderr (fd 2) still reaches it.
+    (
+        trap '' PIPE
+        exec {_c_out}>&"$fd"
+        exec 2>/dev/null
+        printf '%s' "$text" >&"$_c_out"
+    ) || true
 }
 
 # Usage: clyops_forward_fds <role>...

@@ -105,7 +105,7 @@ check "role registration errors" "Invalid role name '7up'|Invalid role name 'a:b
     for reg in 'clyops_role 7up out X' 'clyops_role a:b out X' 'clyops_role log both X' \
         'clyops_role log out X; clyops_role log in Y'; do
         run "$reg" | sed 's/.*\] //'
-    done | paste -sd'|')"
+    done | paste -sd'|' -)"
 
 check "emit and forward_fds follow the CLYOPS_FDS mapping" '{"pct":50}|plain|ends|progress:7,log:7|unset' "$(
     tmp="$(mktemp)"; trap 'rm -f "$tmp"' RETURN
@@ -121,10 +121,10 @@ check "emit and forward_fds follow the CLYOPS_FDS mapping" '{"pct":50}|plain|end
 
 check "emit to an undeclared role or an input is a programming error" "Unknown role 'nope'|Role 'extra' is not an output" "$({
     run 'clyops_role extra in X; clyops_run; clyops_emit nope x' | sed 's/.*\] //'
-    run 'clyops_role extra in X; clyops_run; clyops_emit extra x' | sed 's/.*\] //'; } | paste -sd'|')"
+    run 'clyops_role extra in X; clyops_run; clyops_emit extra x' | sed 's/.*\] //'; } | paste -sd'|' -)"
 
 check "malformed CLYOPS_FDS entries warn" "Ignoring CLYOPS_FDS entry 'meta'|Ignoring CLYOPS_FDS entry 'progress:1'" "$(
-    CLYOPS_FDS="meta, progress:1" run 'clyops_role progress out P; clyops_run' | sed 's/.*\] //' | paste -sd'|')"
+    CLYOPS_FDS="meta, progress:1" run 'clyops_role progress out P; clyops_run' | sed 's/.*\] //' | paste -sd'|' -)"
 
 check "roles: commands inherit, help lists their own" "2||2|Output [plan]: Migration plan|0" "$({ CLYOPS_FDS=progress:2,plan:2 run '
     clyops_role progress out "Progress"
@@ -136,7 +136,7 @@ check "roles: commands inherit, help lists their own" "2||2|Output [plan]: Migra
     clyops_role progress out "Progress"
     clyops_command db "Database"; clyops_command "db migrate" "Migrate"; clyops_role plan out "Migration plan"
     clyops_run "$@"; clyops_fd_open plan
-    clyops_usage | grep "\[plan\]"; clyops_usage | grep -c "\[progress\]" || true' db migrate; } | paste -sd'|')"
+    clyops_usage | grep "\[plan\]"; clyops_usage | grep -c "\[progress\]" || true' db migrate; } | paste -sd'|' -)"
 
 if (( failures )); then echo "$failures failed"; exit 1; fi
 echo "all passed"
