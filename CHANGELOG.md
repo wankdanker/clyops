@@ -5,40 +5,59 @@ section here.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-20
+
+### Roles on file descriptors
+
+- Tools can offer streams beyond stdin, stdout and stderr by declaring roles
+  (spec sections 1.3 and 14): `role(name, in|out, description, contentType, schema)`
+  in all nine packages, listed as `roles` in `--help-json-schema` and in help
+  (`Output [progress]: …`). The well-known `meta`, `progress`, `log` and `result`
+  mean the same to every runner; progress lines may carry `pct`, `done`/`total`,
+  `stage` and `message`.
+- The runner chooses the descriptors and maps them in `CLYOPS_FDS`
+  (`meta:3,progress:4`; `progress:2` puts progress on stderr). `emit(name, value)`,
+  `fdOpen(name)` and `forwardFds(name...)` use the mapping and do nothing without
+  it, so a tool still runs with only stdio. Libraries read `CLYOPS_FDS` once and
+  remove it from the environment, and warn when a mapped role's descriptor isn't
+  open (usually a launcher that dropped it).
+- clyops-tools: `run`/`runTool` take `roles`, wiring each to the next descriptor
+  from 3 and setting `CLYOPS_FDS`; only roles a tool declares are wired.
+- clyops-jobs: a tool's progress goes on the job record (`progress`, `stage`)
+  without history entries, and its `meta` on the run.
+- clyops-api: `meta` and `progress` in the JSON envelope and on job records,
+  `GET /jobs/:id/events` (server-sent events), and an `X-Clyops-Meta` header on
+  streamed output.
+- clyops-mcp: progress becomes MCP progress notifications when the request has a
+  progress token; `meta` comes back in the result's `_meta`.
+- Desktop and web runners show a progress bar and the metadata.
+- Java writes a role through `/dev/fd/N`; for a socket (as Node's `child_process`
+  pipes are) start the JVM with `--add-opens java.base/java.io=ALL-UNNAMED`.
+
+### Agent skills and project website
+
 - Agent skills in `skills/`: `clyops-build` (writing tools, with a verified
   example per language), `clyops-use` (running tools safely from a shell via
   `--help-json-schema`) and `clyops-skillify` (generating project skills from a
-  repository's tools, docs and source, with a schema-to-Markdown renderer).
+  repository's tools, docs and source, with a schema-to-Markdown renderer that
+  lists each command's roles).
 - `llms.txt` at the site root (clyops.io/llms.txt) indexing the spec, guides,
   apps and agent skills for AI agents, and an `AGENTS.md` for contributors.
-- Roles on file descriptors (spec sections 1.3 and 14): `role(name, in|out, description,
-  contentType, schema)` beside stdin/stdout, listed as `roles` in `--help-json-schema` and
-  in help. Well-known `meta`, `progress`, `log` and `result`. The runner chooses each
-  descriptor and maps it in `CLYOPS_FDS` (`meta:3,progress:4`, or `progress:2` for
-  stderr); `emit(name, value)`, `fdOpen(name)` and `forwardFds(name...)` use the mapping
-  and do nothing without it. Libraries remove `CLYOPS_FDS` from the environment after
-  reading it.
-- Runners wire up roles: clyops-tools `run`/`runTool` take `roles` (each gets fd 3, 4, ...
-  and `CLYOPS_FDS`); clyops-jobs puts `progress` on the job record and returns `meta`;
-  clyops-api adds `meta`/`progress` to the envelope and job records, `GET /jobs/:id/events`
-  (server-sent events) and an `X-Clyops-Meta` header on streamed output; clyops-mcp turns
-  progress into MCP progress notifications and returns `meta` in `_meta`; the desktop and
-  web runners show a progress bar and the metadata. The spec names the progress fields
-  runners understand: `pct`, `done`/`total`, `stage`, `message`.
-- After parsing, a role the program declares that `CLYOPS_FDS` maps to a descriptor that
-  isn't open is reported with a warning (a launcher likely dropped it).
-- Web runner: a live background job offers Cancel again (job statuses are `pending` and
-  `processing`, as the API sends them).
 - Static browser Linux lab running the unchanged Bash/Python examples with real
   FFmpeg, curl, pipes and shell completion. Includes file transfers and a local
   HTTP upload server inside the guest; assets load on demand from GitHub Pages.
+- A real Python browser playground on the static homepage, with help, validation,
+  schemas, stdin, command history and completion. Prominent Bash/Zsh/Fish setup.
+- Clone-and-run Bash/Python example tools with bundled sample data, FFmpeg/curl
+  wrappers that preview by default, and API/MCP/dispatcher walkthroughs.
+
+### Fixes
+
+- Web runner: a running background job offers Cancel again (job statuses are
+  `pending` and `processing`, as the API sends them).
 - The browser playground labels Bash files as source-only and explains how to
   run them locally instead of reporting an ambiguous Python-tools error.
   Example wrappers stop immediately if their Bash library cannot initialize.
-- Clone-and-run Bash/Python example tools with bundled sample data, FFmpeg/curl
-  wrappers that preview by default, and API/MCP/dispatcher walkthroughs.
-- A real Python browser playground on the static homepage, with help, validation,
-  schemas, stdin, command history and completion. Prominent Bash/Zsh/Fish setup.
 
 ## [0.4.0] - 2026-10-11
 

@@ -8,7 +8,7 @@ Requires **Bash 4.3+**. [Complete API reference](/reference/bash.html) · [Share
 ## Install and run
 
 ```sh
-curl -fsSLo clyops.sh https://raw.githubusercontent.com/wankdanker/clyops/v0.4.0/packages/bash/clyops.sh
+curl -fsSLo clyops.sh https://raw.githubusercontent.com/wankdanker/clyops/v0.5.0/packages/bash/clyops.sh
 ```
 
 Save the following as `quickstart.sh`:
