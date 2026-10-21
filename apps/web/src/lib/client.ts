@@ -6,10 +6,14 @@ export interface RunResult {
   ok: boolean; exitCode: number | null; stdout: string; stderr: string;
   timedOut: boolean; signal: string | null; durationMs: number;
   json?: unknown; stdoutEncoding?: 'base64'; stdoutUrl?: string; command?: string[];
+  /** The tool's meta role (spec section 14), parsed, and the last update on its progress role. */
+  meta?: unknown; progress?: Record<string, unknown>;
 }
 export interface Job {
-  job_id: string; function: string; status: 'queued' | 'running' | 'done' | 'error';
+  job_id: string; function: string; status: 'pending' | 'processing' | 'done' | 'error';
   error?: string | null; result?: RunResult; created_at?: string; stage?: string | null;
+  /** The latest update on the tool's progress role while it runs. */
+  progress?: Record<string, unknown> | null;
 }
 
 /** Normalize a connection URL without allowing embedded credentials or fragments. */
