@@ -503,6 +503,19 @@ public class Cli {
         return map;
     }
 
+    /** Warn about each role the selected chain declares that CLYOPS_FDS maps to a closed descriptor. */
+    private void warnUnopenedRoles() {
+        Set<String> seen = new HashSet<>();
+        for (Cli node : chain()) {
+            for (Map<String, Object> r : node.roles) {
+                String name = (String) r.get("name");
+                if (!seen.add(name)) continue;
+                Integer fd = fdMapping().get(name);
+                if (fd != null && mappedFd(name) < 0) Log.warn("CLYOPS_FDS maps '%s' to %d, but descriptor %d isn't open", name, fd, fd);
+            }
+        }
+    }
+
     /** The descriptor CLYOPS_FDS maps to {@code name}, when it is open, else -1. */
     private int mappedFd(String name) {
         Integer fd = fdMapping().get(name);
@@ -780,6 +793,7 @@ public class Cli {
         if (!missing.isEmpty()) return ParseResult.error("Missing required argument(s): " + String.join(" ", missing));
         String conflict = checkConstraints();
         if (conflict != null) return ParseResult.error(conflict);
+        warnUnopenedRoles();
         return ParseResult.ok();
     }
 

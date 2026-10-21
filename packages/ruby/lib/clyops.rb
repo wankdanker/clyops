@@ -689,6 +689,7 @@ module Clyops
       conflict = check_constraints
       return ParseResult.new("error", conflict) if conflict
 
+      warn_unopened_roles
       ParseResult.new("ok")
     end
 
@@ -1030,6 +1031,21 @@ module Clyops
         end
         ENV.delete("CLYOPS_FDS") if raw && ENV["CLYOPS_FDS"] == raw
         map
+      end
+    end
+
+    # Warn about each role the selected chain declares that CLYOPS_FDS maps to a closed descriptor.
+    def warn_unopened_roles
+      seen = {}
+      chain.each do |node|
+        node.roles.each do |r|
+          name = r["name"]
+          next if seen[name]
+
+          seen[name] = true
+          fd = fd_mapping[name]
+          Clyops.warn("CLYOPS_FDS maps '#{name}' to #{fd}, but descriptor #{fd} isn't open") if fd && !mapped_fd(name)
+        end
       end
     end
 

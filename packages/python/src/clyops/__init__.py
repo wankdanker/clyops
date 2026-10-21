@@ -500,6 +500,19 @@ class Cli:
             return None
         return num
 
+    def _warn_unopened_roles(self) -> None:
+        """Warn about each role the selected chain declares that CLYOPS_FDS maps to a closed descriptor."""
+        seen = set()
+        for node in self._chain():
+            for r in node._roles:
+                name = str(r["name"])
+                if name in seen:
+                    continue
+                seen.add(name)
+                num = self._fd_mapping().get(name)
+                if num is not None and self._mapped_fd(name) is None:
+                    warn(f"CLYOPS_FDS maps '{name}' to {num}, but descriptor {num} isn't open")
+
     def fd_open(self, name: str) -> Optional[int]:
         """The descriptor for a declared role when CLYOPS_FDS maps it and it is open, else None
         (spec section 14)."""
@@ -717,6 +730,7 @@ class Cli:
         conflict = self._check_constraints()
         if conflict:
             return ParseResult("error", conflict)
+        self._warn_unopened_roles()
         return ParseResult("ok")
 
     def _check_constraints(self) -> Optional[str]:

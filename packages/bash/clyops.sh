@@ -206,6 +206,21 @@ _clyops_mapped_fd() {
     _r="$fd"
 }
 
+# Warn about each role the selected chain declares that CLYOPS_FDS maps to a closed descriptor.
+_clyops_warn_unopened_roles() {
+    local i name fd
+    declare -A _c_seen=()
+    for (( i = 0; i < ${#_CLYOPS_ROLE_NAME[@]}; i++ )); do
+        name="${_CLYOPS_ROLE_NAME[i]}"
+        [[ -v "_c_seen[$name]" ]] && continue
+        _clyops_find_role "$name" || continue  # declared on another branch of the commands
+        _c_seen[$name]=1
+        fd="${_CLYOPS_FDMAP[$name]:-}"
+        [[ -n "$fd" ]] && ! _clyops_mapped_fd "$name" && warn "CLYOPS_FDS maps '$name' to $fd, but descriptor $fd isn't open"
+    done
+    return 0
+}
+
 # Usage: clyops_fd_open <role>
 # Prints the descriptor for a declared role and succeeds when CLYOPS_FDS maps it and it is open
 # (spec section 14); fails silently otherwise.
@@ -894,6 +909,7 @@ clyops_parse() {
     _clyops_check_constraints || return 1
 
     _clyops_assign
+    _clyops_warn_unopened_roles
     return 0
 }
 

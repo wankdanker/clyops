@@ -2258,7 +2258,10 @@
       "fd": {
         "3": "{\"extra\":false}\n",
         "4": "{\"pct\":100}\n"
-      }
+      },
+      "stderrNot": [
+        "CLYOPS_FDS"
+      ]
     }
   },
   {
@@ -2336,18 +2339,22 @@
     }
   },
   {
-    "name": "fd: a mapped descriptor that isn't open is skipped",
+    "name": "fd: a mapped descriptor that isn't open is skipped with a warning",
     "args": [
       "in.txt"
     ],
     "env": {
-      "CLYOPS_FDS": "meta:3,progress:4,extra:5"
+      "CLYOPS_FDS": "meta:43,progress:44,extra:45"
     },
     "expect": {
       "exit": 0,
       "values": {
         "COUNT": 3
-      }
+      },
+      "stderr": [
+        "CLYOPS_FDS maps 'meta' to 43, but descriptor 43 isn't open",
+        "CLYOPS_FDS maps 'extra' to 45, but descriptor 45 isn't open"
+      ]
     }
   },
   {
@@ -2360,14 +2367,17 @@
       "5": "out"
     },
     "env": {
-      "CLYOPS_FDS": "log:5,progress:4"
+      "CLYOPS_FDS": "log:5,progress:4,other:8"
     },
     "expect": {
       "exit": 0,
       "fd": {
         "4": "{\"pct\":100}\n",
         "5": ""
-      }
+      },
+      "stderrNot": [
+        "CLYOPS_FDS"
+      ]
     }
   },
   {

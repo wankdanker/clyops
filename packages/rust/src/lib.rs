@@ -1007,6 +1007,22 @@ impl Cli {
         (cfg!(unix) && Path::new(&format!("/dev/fd/{fd}")).exists()).then_some(fd)
     }
 
+    /// Warn about each role the selected chain declares that `CLYOPS_FDS` maps to a closed descriptor.
+    fn warn_unopened_roles(&self) {
+        let mut seen = HashSet::new();
+        for node in self.chain() {
+            for role in &node.roles {
+                if !seen.insert(role.name.as_str()) {
+                    continue;
+                }
+                let mapped = self.fd_map.as_ref().and_then(|m| m.get(&role.name)).copied();
+                if let Some(fd) = mapped.filter(|_| self.mapped_fd(&role.name).is_none()) {
+                    warn(&format!("CLYOPS_FDS maps '{}' to {fd}, but descriptor {fd} isn't open", role.name));
+                }
+            }
+        }
+    }
+
     /// The descriptor for a declared role when `CLYOPS_FDS` maps it and it is open, else `None`
     /// (spec section 14).
     pub fn fd_open(&self, name: &str) -> Option<i32> {
@@ -1275,7 +1291,10 @@ impl Cli {
         }
         match self.check_constraints() {
             Some(e) => Parsed::err(e),
-            None => Parsed::Ok,
+            None => {
+                self.warn_unopened_roles();
+                Parsed::Ok
+            }
         }
     }
 

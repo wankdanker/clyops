@@ -515,6 +515,21 @@ export class Cli {
     }
   }
 
+  /** Warn about each role the selected chain declares that CLYOPS_FDS maps to a closed descriptor. */
+  private warnUnopenedRoles(): void {
+    const seen = new Set<string>();
+    for (const node of this.chain()) {
+      for (const role of node.roles) {
+        if (seen.has(role.name)) continue;
+        seen.add(role.name);
+        const fd = this.fdMapping().get(role.name);
+        if (fd !== undefined && this.mappedFd(role.name) === null) {
+          warn("CLYOPS_FDS maps '%s' to %d, but descriptor %d isn't open", role.name, fd, fd);
+        }
+      }
+    }
+  }
+
   /** The descriptor for a declared role when CLYOPS_FDS maps it and it is open, else null (spec section 14). */
   fdOpen(name: string): number | null {
     return this.findRole(name) ? this.mappedFd(name) : null;
@@ -743,6 +758,7 @@ export class Cli {
 
     const conflict = this.checkConstraints();
     if (conflict) return { status: 'error', error: conflict, showUsage: true };
+    this.warnUnopenedRoles();
     return { status: 'ok' };
   }
 

@@ -19,6 +19,8 @@ section here.
   progress into MCP progress notifications and returns `meta` in `_meta`; the desktop and
   web runners show a progress bar and the metadata. The spec names the progress fields
   runners understand: `pct`, `done`/`total`, `stage`, `message`.
+- After parsing, a role the program declares that `CLYOPS_FDS` maps to a descriptor that
+  isn't open is reported with a warning (a launcher likely dropped it).
 - Web runner: a live background job offers Cancel again (job statuses are `pending` and
   `processing`, as the API sends them).
 - Static browser Linux lab running the unchanged Bash/Python examples with real

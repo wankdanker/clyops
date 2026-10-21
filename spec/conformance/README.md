@@ -42,6 +42,7 @@ python3 tools/conformance.py js -k config   # cases whose name contains "config"
     "sources": { "count": "config" },  // subset match
     "stdout": "@help.txt",             // "@file" = golden file; else exact text
     "stderr": ["substring", "…"],      // each must appear in stderr
+    "stderrNot": ["substring"],        // none may appear in stderr
     "fd": { "3": "{\"extra\":true}\n" } // exact text written to each opened "out" fd
   }
 }

@@ -759,7 +759,15 @@ entry. Names the program doesn't declare are ignored silently, so one mapping
 can serve several programs.
 
 Without `CLYOPS_FDS`, or for a role it doesn't name, the program writes and
-reads no extra descriptors: it must work with only stdin, stdout and stderr. A
+reads no extra descriptors: it must work with only stdin, stdout and stderr.
+After a successful parse, each role the selected command or its ancestors
+declare that `CLYOPS_FDS` maps to a descriptor that isn't open is reported
+once with a warning (`CLYOPS_FDS maps 'NAME' to FD, but descriptor FD isn't
+open`, section 11): usually a launcher between the runner and the program
+dropped it. This is best effort: a runtime that opens descriptors of its own
+at startup (Node, the JVM, Go) can take a dropped number, which then looks
+open, and the program's writes go there. A launcher must therefore `exec` the
+program, or pass the mapped descriptors on, never close them. A
 descriptor merely being open proves nothing, since language runtimes (Node's
 event loop, the JVM, Go) open low-numbered descriptors of their own.
 

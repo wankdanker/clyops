@@ -119,6 +119,9 @@ def run_case(cmd, case, verbose):
         for needle in expect.get("stderr", []):
             if needle not in proc.stderr:
                 errors.append(f"stderr lacks {needle!r}")
+        for needle in expect.get("stderrNot", []):
+            if needle in proc.stderr:
+                errors.append(f"stderr has {needle!r}")
 
         for num, want in expect.get("fd", {}).items():
             with open(os.path.join(tmp, f".fd{num}"), newline="") as fh:

@@ -482,6 +482,21 @@ static int mapped_fd(const char* name) {
     return -1;
 }
 
+/* Warn about each role the selected chain declares that CLYOPS_FDS maps to a closed descriptor. */
+static void warn_unopened_roles(const clyops_t* cli) {
+    read_fd_mapping();
+    for (const clyops_t* c = cli->selected; c; c = c == cli ? NULL : c->parent) {
+        for (size_t i = 0; i < c->nroles; i++) {
+            const char* name = c->roles[i].name;
+            if (find_role(cli, name) != &c->roles[i]) continue; /* a nearer level declares it */
+            for (size_t k = 0; k < g_fd_names.len; k++) {
+                if (streq(g_fd_names.v[k], name) && mapped_fd(name) < 0)
+                    clyops_warn("CLYOPS_FDS maps '%s' to %d, but descriptor %d isn't open", name, g_fd_numbers[k], g_fd_numbers[k]);
+            }
+        }
+    }
+}
+
 int clyops_fd_open(const clyops_t* cli, const char* name) {
     return name && find_role(cli, name) ? mapped_fd(name) : -1;
 }
@@ -1292,6 +1307,7 @@ clyops_status_t clyops_parse(clyops_t* cli, int argc, char** argv) {
         set_error(cli, conflict);
         return CLYOPS_ERROR;
     }
+    warn_unopened_roles(cli);
     return CLYOPS_OK;
 }
 

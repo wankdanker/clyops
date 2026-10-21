@@ -656,6 +656,23 @@ func (c *Cli) mappedFd(name string) int {
 	return -1
 }
 
+// warnUnopenedRoles warns about each role the selected chain declares that CLYOPS_FDS maps to a
+// closed descriptor (spec section 14).
+func (c *Cli) warnUnopenedRoles() {
+	seen := map[string]bool{}
+	for _, node := range c.chain() {
+		for _, r := range node.roles {
+			if seen[r.Name] {
+				continue
+			}
+			seen[r.Name] = true
+			if fd, ok := c.fdMapping()[r.Name]; ok && c.mappedFd(r.Name) < 0 {
+				Warn("CLYOPS_FDS maps '%s' to %d, but descriptor %d isn't open", r.Name, fd, fd)
+			}
+		}
+	}
+}
+
 // FdOpen is the descriptor for a declared role when CLYOPS_FDS maps it and it is open, else -1
 // (spec section 14).
 func (c *Cli) FdOpen(name string) int {
@@ -983,6 +1000,7 @@ func (c *Cli) Parse(argv []string) ParseResult {
 	if err := c.checkConstraints(); err != "" {
 		return ParseResult{Status: "error", Error: err, ShowUsage: true}
 	}
+	c.warnUnopenedRoles()
 	return ParseResult{Status: "ok"}
 }
 
