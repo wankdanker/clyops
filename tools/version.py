@@ -44,6 +44,9 @@ FILES = [
     ("docs/languages/java.md", r'clyops-(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)\.jar'),
     ("docs/languages/go.md", r'packages/go@v([0-9A-Za-z.-]+)'),
     ("docs/languages/bash.md", r'/clyops/v([0-9A-Za-z.-]+)/'),
+    ("skills/clyops-build/reference/languages/java.md", r'clyops-(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)\.jar'),
+    ("skills/clyops-build/reference/languages/go.md", r'packages/go@v([0-9A-Za-z.-]+)'),
+    ("skills/clyops-build/reference/languages/bash.md", r'/clyops/v([0-9A-Za-z.-]+)/'),
 ]
 
 
