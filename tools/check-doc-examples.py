@@ -44,7 +44,7 @@ def main():
         packed.mkdir()
         run(["pnpm", "--filter", "!clyops-runner", "--filter", "!clyops-web", "-r", "pack", "--pack-destination", packed])
         artifacts = sorted(packed.glob("*.tgz"))
-        assert len(artifacts) == 6, artifacts
+        assert len(artifacts) == 7, artifacts
         dependencies = {}
         for artifact in artifacts:
             with tarfile.open(artifact) as archive:
@@ -76,7 +76,7 @@ def main():
         exercise(["node", str(consumer / "quickstart.cjs")], env)
         exercise(["node", str(consumer / "compiled/quickstart.js")], env)
         # This also proves declarations for the adapters resolve in an installed consumer.
-        print("All six packed Node packages retain types; consumer typing passed.")
+        print("All seven packed Node packages retain types; consumer typing passed.")
 
         run([sys.executable, "-m", "build", "--wheel", "--no-isolation", "packages/python", "--outdir", packed])
         wheel = next(packed.glob("*.whl"))
