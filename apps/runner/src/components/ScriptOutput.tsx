@@ -5,7 +5,7 @@ import Ansi from 'ansi-to-react';
 import { RunningScript } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './Card';
 import { Button } from './Button';
-import { formatDate } from '../lib/utils';
+import { formatDate, progressView } from '../lib/utils';
 
 interface ScriptOutputProps {
   script: RunningScript;
@@ -74,6 +74,13 @@ export function ScriptOutput({ script, onClear }: ScriptOutputProps) {
             Args: {script.args.join(' ')}
           </div>
         )}
+        {script.progress && <ProgressBar update={script.progress} finished={script.finishedAt !== undefined} />}
+        {script.meta !== undefined && (
+          <details className="text-xs mt-2">
+            <summary className="cursor-pointer text-muted-foreground">Metadata</summary>
+            <pre className="font-mono bg-muted px-2 py-1 rounded mt-1 overflow-x-auto">{JSON.stringify(script.meta, null, 2)}</pre>
+          </details>
+        )}
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden p-0">
         <div
@@ -94,6 +101,8 @@ export function ScriptOutput({ script, onClear }: ScriptOutputProps) {
                     ? 'text-red-500 font-semibold'
                     : line.type === 'info'
                     ? 'text-blue-400'
+                    : line.type === 'log' || line.type === 'result'
+                    ? 'text-muted-foreground'
                     : ''
                 }`}
               >
@@ -123,5 +132,21 @@ export function ScriptOutput({ script, onClear }: ScriptOutputProps) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** The tool's progress role (spec section 14): a bar when the update has a number, and its label. */
+function ProgressBar({ update, finished }: { update: Record<string, unknown>; finished: boolean }) {
+  const { fraction, label } = progressView(update);
+  return (
+    <div className="mt-2" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={fraction === undefined ? undefined : Math.round(fraction * 100)} aria-label={label ?? 'Progress'}>
+      <div className="flex justify-between text-xs text-muted-foreground mb-1">
+        <span>{label ?? (finished ? 'Finished' : 'Working')}</span>
+        {fraction !== undefined && <span>{Math.round(fraction * 100)}%</span>}
+      </div>
+      <div className="h-1.5 w-full rounded bg-muted overflow-hidden">
+        <div className={`h-full bg-primary transition-all ${fraction === undefined && !finished ? 'animate-pulse w-full opacity-40' : ''}`} style={fraction === undefined ? undefined : { width: `${fraction * 100}%` }} />
+      </div>
+    </div>
   );
 }

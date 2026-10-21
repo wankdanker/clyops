@@ -18,6 +18,10 @@ it, and streams the output, so any program built with any clyops package gets a 
   tool asks before it runs. Options that conflict, or that need another option, are flagged.
 - **stdin and stdout:** a tool that reads stdin gets a text box (or a file to read it from); one
   that writes binary output (an image, audio) gets a "save output to" field.
+- **Progress and metadata:** a tool that declares the `progress` role
+  ([spec §14](../../spec/SPEC.md#14-roles-on-file-descriptors)) gets a progress bar with its
+  `stage` or `message`, and its `meta` document is shown beside the output; `log` and `result`
+  lines join the output.
 
 ## Install
 

@@ -370,3 +370,31 @@ export function constraintIssues(schema: ScriptSchema, values: Record<string, un
   const supplied = Object.fromEntries(Object.entries(values).filter(([, value]) => value !== ''));
   return sharedConstraintIssues(schema, supplied, 'declared').map(issue => issue.message);
 }
+
+/** The well-known output roles (spec section 14) the runner shows, among those a schema declares at any level. */
+const SHOWN_ROLES = ['meta', 'progress', 'log', 'result'];
+export function displayedRoles(schema: ScriptSchemaBody): string[] {
+  const names = new Set<string>();
+  const visit = (body: ScriptSchemaBody) => {
+    for (const r of body.roles ?? []) if (r.direction === 'out' && SHOWN_ROLES.includes(r.name)) names.add(r.name);
+    for (const c of body.commands ?? []) visit(c);
+  };
+  visit(schema);
+  return SHOWN_ROLES.filter((n) => names.has(n));
+}
+
+/**
+ * A progress update (spec section 14) as a fraction from 0 to 1, from `pct` or `done`/`total`, and
+ * its label (`message`, else `stage`). The fraction is undefined when the update has no number.
+ */
+export function progressView(update: Record<string, unknown> | undefined): { fraction?: number; label?: string } {
+  if (!update) return {};
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+  const pct = num(update.pct);
+  const done = num(update.done);
+  const total = num(update.total);
+  const raw = pct !== undefined ? pct / 100 : done !== undefined && total ? done / total : undefined;
+  const fraction = raw === undefined ? undefined : Math.min(1, Math.max(0, raw));
+  const label = typeof update.message === 'string' ? update.message : typeof update.stage === 'string' ? update.stage : undefined;
+  return { ...(fraction !== undefined ? { fraction } : {}), ...(label !== undefined ? { label } : {}) };
+}

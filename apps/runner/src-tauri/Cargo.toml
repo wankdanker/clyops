@@ -19,5 +19,8 @@ uuid = { version = "1.6", features = ["v4"] }
 chrono = "0.4"
 tauri-plugin-clipboard-manager = "2.3.2"
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [features]
 custom-protocol = ["tauri/custom-protocol"]

@@ -6,6 +6,7 @@ import { ScriptInfo, ScriptSchema, RunningScript, ScriptOutputLine, FormValues, 
 import { ScriptList } from './components/ScriptList';
 import { ScriptForm, type RunIo } from './components/ScriptForm';
 import { ScriptOutput } from './components/ScriptOutput';
+import { displayedRoles } from './lib/utils';
 import { SettingsModal } from './components/SettingsModal';
 import { Card, CardContent } from './components/Card';
 import { Button } from './components/Button';
@@ -103,6 +104,7 @@ function App() {
         stdin: io.stdin ?? null,
         stdinFile: io.stdinFile ?? null,
         stdoutFile: io.stdoutFile ?? null,
+        roles: scriptSchema ? displayedRoles(scriptSchema) : [],
       });
 
       const newRunningScript: RunningScript = {
@@ -135,13 +137,27 @@ function App() {
     console.log('Setting up listeners for script:', scriptId);
     
     // Listen for output
-    const outputUnlisten = await listen<{ id: string; type: string; data: string }>(
+    const outputUnlisten = await listen<{ id: string; type: string; data: string; role?: string }>(
       `output_${scriptId}`,
       (event) => {
-        console.log('Received output event:', event.payload);
-        const { type, data } = event.payload;
+        const { type, data, role } = event.payload;
         setRunningScripts((prev) =>
           prev.map((script) => {
+            if (script.id === scriptId && type === 'role') {
+              // progress and meta update the run; log and result lines join its output.
+              if (role === 'progress' || role === 'meta') {
+                let value: unknown;
+                try {
+                  value = JSON.parse(data);
+                } catch {
+                  return script;
+                }
+                if (role === 'meta') return { ...script, meta: value };
+                return value && typeof value === 'object' && !Array.isArray(value) ? { ...script, progress: value as Record<string, unknown> } : script;
+              }
+              const line: ScriptOutputLine = { type: role === 'result' ? 'result' : 'log', data, timestamp: new Date() };
+              return { ...script, output: [...script.output, line].slice(-MAX_OUTPUT_LINES) };
+            }
             if (script.id === scriptId) {
               const newLine: ScriptOutputLine = {
                 type: type as 'stdout' | 'stderr',
