@@ -8,8 +8,8 @@ Requires **Java 17+**. [Complete API reference](/reference/java/index.html) · [
 ## Install and run
 
 ```sh
-javac -cp clyops-0.5.0.jar DocsDemo.java
-java -cp .:clyops-0.5.0.jar DocsDemo
+javac -cp clyops-0.6.0.jar DocsDemo.java
+java -cp .:clyops-0.6.0.jar DocsDemo
 ```
 
 Download matching JARs from the [GitHub release](https://github.com/wankdanker/clyops/releases). On Windows, use `;` instead of `:` in the classpath. The compile command assumes the source file below has been saved beside the downloaded JAR.
@@ -34,11 +34,11 @@ public class DocsDemo {
 ```
 
 ```sh
-java -cp .:clyops-0.5.0.jar DocsDemo --name Ada --count 2 --verbose
+java -cp .:clyops-0.6.0.jar DocsDemo --name Ada --count 2 --verbose
 # Ada 2 true
-java -cp .:clyops-0.5.0.jar DocsDemo --help
-java -cp .:clyops-0.5.0.jar DocsDemo --help-json-schema
-java -cp .:clyops-0.5.0.jar DocsDemo --count invalid
+java -cp .:clyops-0.6.0.jar DocsDemo --help
+java -cp .:clyops-0.6.0.jar DocsDemo --help-json-schema
+java -cp .:clyops-0.6.0.jar DocsDemo --count invalid
 # Validation error; exit status 1
 ```
 

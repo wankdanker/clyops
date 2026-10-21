@@ -6,7 +6,7 @@ One sourceable file, no dependencies.
 ## Install
 
 ```sh
-curl -fsSLo clyops.sh https://raw.githubusercontent.com/wankdanker/clyops/v0.5.0/packages/bash/clyops.sh
+curl -fsSLo clyops.sh https://raw.githubusercontent.com/wankdanker/clyops/v0.6.0/packages/bash/clyops.sh
 ```
 
 Pin the release tag the project uses. Source it relative to the script so the

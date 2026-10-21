@@ -5,11 +5,18 @@ section here.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-21
+
+### Job progress from stderr
+
 - clyops-api: a running async job's `stage` is its tool's latest stderr line
   (trimmed, at most 300 characters, updated at most once a second), so a tool
   reports progress to `GET /jobs/<id>` by printing status lines to stderr; the
   job's `history` keeps the stages it passed through (a repeated line is not a new
   stage). A tool that declares a `progress` role sets its stage there instead.
+
+### Documentation from schemas
+
 - clyops-doc (npm: `clyops-doc`): documentation from any tool's `--help-json-schema`, as a
   man page (`man(7)` macros, groff- and mandoc-clean), Markdown or standalone HTML.
   `--name` for dispatcher paths, `--section`, `--version`, `--date` (or
