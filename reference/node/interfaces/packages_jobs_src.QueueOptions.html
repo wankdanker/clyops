@@ -16,7 +16,7 @@
 </div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">QueueOptions</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#concurrency">concurrency</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#keep">keep</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#onchange">onChange</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">record</span><span class="tsd-signature-symbol">:</span> <a href="packages_jobs_src.JobRecord.html" class="tsd-signature-type tsd-kind-interface">JobRecord</a><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#ondrop">onDrop</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">record</span><span class="tsd-signature-symbol">:</span> <a href="packages_jobs_src.JobRecord.html" class="tsd-signature-type tsd-kind-interface">JobRecord</a><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#prefix">prefix</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/2bb239e2d78789b57c9157c05c66ecd521a6b102/packages/jobs/src/queue.ts#L20">packages/jobs/src/queue.ts:20</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/a9ebf9ad3806b42a36d0b090a3e1618dc129fec3/packages/jobs/src/queue.ts#L20">packages/jobs/src/queue.ts:20</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -39,35 +39,35 @@
 <div class="tsd-comment tsd-typography"><p>Jobs run at the same time (default: the number of CPUs).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/2bb239e2d78789b57c9157c05c66ecd521a6b102/packages/jobs/src/queue.ts#L22">packages/jobs/src/queue.ts:22</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/a9ebf9ad3806b42a36d0b090a3e1618dc129fec3/packages/jobs/src/queue.ts#L22">packages/jobs/src/queue.ts:22</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="keep"><code class="tsd-tag">Optional</code><span>keep</span><a href="#keep" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">keep</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>Finished jobs kept for lookup (default 1000, oldest dropped first).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/2bb239e2d78789b57c9157c05c66ecd521a6b102/packages/jobs/src/queue.ts#L26">packages/jobs/src/queue.ts:26</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/a9ebf9ad3806b42a36d0b090a3e1618dc129fec3/packages/jobs/src/queue.ts#L26">packages/jobs/src/queue.ts:26</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="onchange"><code class="tsd-tag">Optional</code><span>on<wbr/>Change</span><a href="#onchange" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">onChange</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">record</span><span class="tsd-signature-symbol">:</span> <a href="packages_jobs_src.JobRecord.html" class="tsd-signature-type tsd-kind-interface">JobRecord</a><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-comment tsd-typography"><p>Called on every change, e.g. to persist records.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/2bb239e2d78789b57c9157c05c66ecd521a6b102/packages/jobs/src/queue.ts#L28">packages/jobs/src/queue.ts:28</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/a9ebf9ad3806b42a36d0b090a3e1618dc129fec3/packages/jobs/src/queue.ts#L28">packages/jobs/src/queue.ts:28</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="ondrop"><code class="tsd-tag">Optional</code><span>on<wbr/>Drop</span><a href="#ondrop" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">onDrop</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">record</span><span class="tsd-signature-symbol">:</span> <a href="packages_jobs_src.JobRecord.html" class="tsd-signature-type tsd-kind-interface">JobRecord</a><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-comment tsd-typography"><p>Called when a finished job is dropped (beyond <code>keep</code>), e.g. to remove its files.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/2bb239e2d78789b57c9157c05c66ecd521a6b102/packages/jobs/src/queue.ts#L30">packages/jobs/src/queue.ts:30</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/a9ebf9ad3806b42a36d0b090a3e1618dc129fec3/packages/jobs/src/queue.ts#L30">packages/jobs/src/queue.ts:30</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="prefix"><code class="tsd-tag">Optional</code><span>prefix</span><a href="#prefix" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">prefix</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>Prefix for job ids (default 'job').</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/2bb239e2d78789b57c9157c05c66ecd521a6b102/packages/jobs/src/queue.ts#L24">packages/jobs/src/queue.ts:24</a></li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/a9ebf9ad3806b42a36d0b090a3e1618dc129fec3/packages/jobs/src/queue.ts#L24">packages/jobs/src/queue.ts:24</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">

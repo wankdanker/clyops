@@ -9,7 +9,7 @@
 </head>
 <body data-search-index="/search-index.json">
   <a class="skip" href="#content">Skip to content</a>
-  <header><a href="/"><strong>clyops</strong></a><span>Documentation · 0.5.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <header><a href="/"><strong>clyops</strong></a><span>Documentation · 0.6.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
   <div class="shell">
     <nav aria-label="Documentation">
       <a href="/guide.html">Concepts and behavior</a>
@@ -146,7 +146,7 @@ field types in TypeScript, Python or Ruby.</p>
 <code>uuid</code>, <code>date:YYYY-MM-DD</code>, <code>path</code>, <code>file:exists</code>, <code>file:readable</code>, <code>file:writable</code>,
 <code>dir:exists</code> and <code>dir:writable</code>. Parameterized rules include <code>int:1-10</code>,
 <code>float:0-1</code>, <code>string:1-100</code>, <code>choice:red,green,blue</code> and <code>regex:PATTERN</code>.
-See <a href="https://github.com/wankdanker/clyops/blob/2bb239e2d78789b57c9157c05c66ecd521a6b102/spec/SPEC.md#5-validation-rules">spec section 5</a> for ranges and exact behavior.</p>
+See <a href="https://github.com/wankdanker/clyops/blob/a9ebf9ad3806b42a36d0b090a3e1618dc129fec3/spec/SPEC.md#5-validation-rules">spec section 5</a> for ranges and exact behavior.</p>
 <p>Standalone <code>validate</code> helpers return a typed value or the native validation
 error/result. Unknown registration rules and duplicate names are programming
 errors. Bad CLI values are parse errors. These are separate error paths.</p>
@@ -174,7 +174,7 @@ select the program's keys; unknown keys are errors.</p>
 the config file containing the value; default/environment paths resolve against
 the CLI root. Paths are normalized after precedence. <code>-</code> denotes stdin where the
 application supports it. Path validation does not itself open/read files for the
-application. See <a href="https://github.com/wankdanker/clyops/blob/2bb239e2d78789b57c9157c05c66ecd521a6b102/spec/SPEC.md#6-paths">spec section 6</a>.</p>
+application. See <a href="https://github.com/wankdanker/clyops/blob/a9ebf9ad3806b42a36d0b090a3e1618dc129fec3/spec/SPEC.md#6-paths">spec section 6</a>.</p>
 <h2 id="nested-commands-and-constraints">Nested commands and constraints</h2>
 <pre><code class="language-javascript">const db = cli.command('db', 'Database tasks');
 const migrate = db.command('migrate', 'Apply migrations');

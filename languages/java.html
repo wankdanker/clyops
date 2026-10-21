@@ -9,7 +9,7 @@
 </head>
 <body data-search-index="/search-index.json">
   <a class="skip" href="#content">Skip to content</a>
-  <header><a href="/"><strong>clyops</strong></a><span>Documentation · 0.5.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <header><a href="/"><strong>clyops</strong></a><span>Documentation · 0.6.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
   <div class="shell">
     <nav aria-label="Documentation">
       <a href="/guide.html">Concepts and behavior</a>
@@ -30,8 +30,8 @@
     <main id="content"><h1 id="java">Java</h1>
 <p>Requires <strong>Java 17+</strong>. <a href="/reference/java/index.html">Complete API reference</a> · <a href="/guide.html">Shared behavior</a></p>
 <h2 id="install-and-run">Install and run</h2>
-<pre><code class="language-sh">javac -cp clyops-0.5.0.jar DocsDemo.java
-java -cp .:clyops-0.5.0.jar DocsDemo
+<pre><code class="language-sh">javac -cp clyops-0.6.0.jar DocsDemo.java
+java -cp .:clyops-0.6.0.jar DocsDemo
 </code></pre>
 <p>Download matching JARs from the <a href="https://github.com/wankdanker/clyops/releases">GitHub release</a>. On Windows, use <code>;</code> instead of <code>:</code> in the classpath. The compile command assumes the source file below has been saved beside the downloaded JAR.</p>
 <p>Save the following as <code>DocsDemo.java</code>:</p>
@@ -50,11 +50,11 @@ public class DocsDemo {
     }
 }
 </code></pre>
-<pre><code class="language-sh">java -cp .:clyops-0.5.0.jar DocsDemo --name Ada --count 2 --verbose
+<pre><code class="language-sh">java -cp .:clyops-0.6.0.jar DocsDemo --name Ada --count 2 --verbose
 # Ada 2 true
-java -cp .:clyops-0.5.0.jar DocsDemo --help
-java -cp .:clyops-0.5.0.jar DocsDemo --help-json-schema
-java -cp .:clyops-0.5.0.jar DocsDemo --count invalid
+java -cp .:clyops-0.6.0.jar DocsDemo --help
+java -cp .:clyops-0.6.0.jar DocsDemo --help-json-schema
+java -cp .:clyops-0.6.0.jar DocsDemo --count invalid
 # Validation error; exit status 1
 </code></pre>
 <h2 id="editor-support-and-resolved-values">Editor support and resolved values</h2>
@@ -82,7 +82,7 @@ a program that starts others removes it from <code>ProcessBuilder.environment()<
 sets it to <code>forwardFds(...)</code>.</p>
 <p>Commands share the program's options (accepted before or after the command words) and config file;
 each has its own help (<code>mytool db migrate --help</code>), schema and completion. See the
-<a href="https://github.com/wankdanker/clyops/blob/2bb239e2d78789b57c9157c05c66ecd521a6b102/spec/SPEC.md">spec</a> sections 1.3 to 1.7.</p>
+<a href="https://github.com/wankdanker/clyops/blob/a9ebf9ad3806b42a36d0b090a3e1618dc129fec3/spec/SPEC.md">spec</a> sections 1.3 to 1.7.</p>
 <h2 id="parsing-and-errors">Parsing and errors</h2>
 <p>Use <code>run</code> for a standalone program: it displays help/schema/completion and exits for those requests, or exits with status 1 on invalid input. Use the non-exiting <code>parse</code> variant in libraries and tests; check its outcome before reading resolved values. Registration errors (duplicate names, unknown rules, or commands mixed with positionals) are programming errors, distinct from invalid user input. See the native reference for the language's result and error types.</p>
 <h2 id="more-recipes">More recipes</h2>

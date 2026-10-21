@@ -9,7 +9,7 @@ cli.Opt(&quot;VERBOSE&quot;, &quot;verbose&quot;, &quot;v&quot;, &quot;flag&quot
 v := cli.Run()
 fmt.Println(v.String(&quot;input&quot;), v.Int(&quot;PORT&quot;), v.Bool(&quot;VERBOSE&quot;))
 </pre>
-<section id="Version"><h2>Version</h2><pre><code>const Version = &#34;0.5.0&#34;</code></pre><p>Version is the clyops version this package implements.
+<section id="Version"><h2>Version</h2><pre><code>const Version = &#34;0.6.0&#34;</code></pre><p>Version is the clyops version this package implements.
 </section><section id="DescribeRule"><h2>DescribeRule</h2><pre><code>func DescribeRule(rule string) string</code></pre><p>DescribeRule is the help text for a validation rule (spec section 5).
 </section><section id="Die"><h2>Die</h2><pre><code>func Die(code int, format string, args ...any)</code></pre><p>Die logs an error (never suppressed) and exits with code.
 </section><section id="Error"><h2>Error</h2><pre><code>func Error(format string, args ...any)</code></pre><p>Error logs an error to stderr.
