@@ -40,7 +40,8 @@ search dirs.
 for default/env paths), `config(option, prefixes)`, `requireCommand(cmd,
 description, installHint)`, `pathSearch(long, dirs)`, `effects(...)`,
 `stdin(description, contentType)`, `stdout(description, contentType)`,
-relationships and commands.
+`role(name, in|out, description, contentType, schema)`, relationships and
+commands.
 
 * **Effects**: `read-only` (changes nothing), `idempotent` (twice = once),
   `destructive` (deletes or overwrites), `network` (talks to the outside
@@ -48,6 +49,13 @@ relationships and commands.
 * **stdin/stdout**: `contentType` is a MIME type; stdin may list several
   (`audio/wav,audio/flac`). Undeclared stdin = not read; undeclared stdout =
   text.
+* **Roles** (§14): extra streams on descriptors the *runner* chooses, never a
+  fixed fd number. Well-known names: `meta` (one JSON document about stdout,
+  written before it), `progress` (one JSON object per line; `pct`,
+  `done`/`total`, `stage`, `message`), `log`, `result`. Write with
+  `emit(name, value)` after parsing; it does nothing unless the runner mapped
+  the role in `CLYOPS_FDS` (`meta:3,progress:4`), so the tool still works with
+  only stdio. By hand: `CLYOPS_FDS=progress:2 mytool` shows progress on stderr.
 
 Registration mistakes (unknown rule, duplicate long/short name, positional after
 a variadic, unknown effect, relationship naming an unregistered option, commands
@@ -159,7 +167,8 @@ bare relative names.
 
 Top level: `clyops` (1), `script`, `description`, `epilog`, `arguments[]`,
 `options[]`, `requiredCommands[]`, `effects[]`, `constraints[]`, `stdin`,
-`stdout`, `commands[]`. Each option has `name`, `shortName`, `variableName`,
+`stdout`, `roles[]` (`name`, `direction`, `description`, `contentType`,
+`schema`), `commands[]`. Each option has `name`, `shortName`, `variableName`,
 `description`, `default`, `group`, `type` (`boolean|integer|number|choice|path|string`),
 `isFlag`, `isArray`, `required`, `validation`, `choices`, `secret`. Each argument
 has `name`, `description`, `required`, `isVariadic`, `default`, `validation`.

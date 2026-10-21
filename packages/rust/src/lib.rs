@@ -140,6 +140,8 @@ enum Json {
     Arr(Vec<Json>),
     Obj(Vec<(&'static str, Json)>),
     Map(Vec<(String, Json)>),
+    // JSON text written as given (a declared fd schema).
+    Raw(String),
 }
 
 fn json_str(s: &str, out: &mut String) {
@@ -167,6 +169,7 @@ impl Json {
             Json::Null => out.push_str("null"),
             Json::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
             Json::Num(n) => out.push_str(n),
+            Json::Raw(text) => out.push_str(text),
             Json::Str(s) => json_str(s, out),
             Json::Arr(items) if items.is_empty() => out.push_str("[]"),
             Json::Arr(items) => {
@@ -752,6 +755,30 @@ impl Parsed {
     }
 }
 
+/// A declared role: a stream on a descriptor the runner chooses (spec sections 1.3 and 14).
+#[derive(Debug, Clone)]
+struct RoleDecl {
+    name: String,
+    output: bool,
+    description: String,
+    content_type: String,
+    schema: Option<String>,
+}
+
+/// Handle returned by [`Cli::role`] for its optional schema on the same line.
+pub struct RoleRef<'a> {
+    cli: &'a mut Cli,
+    index: usize,
+}
+
+impl<'a> RoleRef<'a> {
+    /// JSON Schema, as JSON text, that each document or line of the role matches.
+    pub fn schema(self, schema: &str) -> Self {
+        self.cli.roles[self.index].schema = Some(schema.to_string());
+        self
+    }
+}
+
 /// Handle returned by [`Cli::opt`] and friends for optional settings on the same line.
 pub struct OptRef<'a> {
     cli: &'a mut Cli,
@@ -822,6 +849,9 @@ pub struct Cli {
     effects: Vec<String>,
     stdin: Option<(String, String)>,
     stdout: Option<(String, String)>,
+    roles: Vec<RoleDecl>,
+    // CLYOPS_FDS as read by the first parse (spec section 14).
+    fd_map: Option<HashMap<String, i32>>,
     constraints: Vec<(&'static str, Vec<String>)>,
     children: Vec<Cli>,
     word: String,
@@ -862,6 +892,8 @@ impl Cli {
             effects: Vec::new(),
             stdin: None,
             stdout: None,
+            roles: Vec::new(),
+            fd_map: None,
             constraints: Vec::new(),
             children: Vec::new(),
             word: String::new(),
@@ -921,6 +953,104 @@ impl Cli {
         self.stdout = Some((description.into(), content_type.into()));
         self
     }
+    /// Declare a role (spec section 1.3): a stream the program writes (`"out"`) or reads (`"in"`) on a
+    /// descriptor its runner chooses; set its schema on the returned handle. `name` is `meta`,
+    /// `progress`, `log`, `result` or another agreed name. Panics on an invalid or duplicate name, or
+    /// another direction.
+    pub fn role(&mut self, name: &str, direction: &str, description: &str, content_type: &str) -> RoleRef<'_> {
+        let valid = name.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
+            && name.chars().all(|c| c.is_ascii_alphanumeric() || "_.-".contains(c));
+        if !valid {
+            panic!("Invalid role name '{name}'");
+        }
+        if direction != "in" && direction != "out" {
+            panic!("Unknown role direction '{direction}'");
+        }
+        if self.roles.iter().any(|r| r.name == name) {
+            panic!("Duplicate role '{name}'");
+        }
+        self.roles.push(RoleDecl {
+            name: name.into(),
+            output: direction == "out",
+            description: description.into(),
+            content_type: content_type.into(),
+            schema: None,
+        });
+        let index = self.roles.len() - 1;
+        RoleRef { cli: self, index }
+    }
+
+    /// The declared role, searching the selected command then its ancestors.
+    fn find_role(&self, name: &str) -> Option<&RoleDecl> {
+        self.chain().into_iter().find_map(|node| node.roles.iter().find(|r| r.name == name))
+    }
+
+    /// Read `CLYOPS_FDS` on the first parse, then remove it from the process environment.
+    fn read_fd_mapping(&mut self) {
+        if self.fd_map.is_some() {
+            return;
+        }
+        let raw = self.env.get("CLYOPS_FDS").cloned();
+        self.fd_map = Some(parse_fd_mapping(raw.as_deref().unwrap_or(""), true));
+        if raw.is_some() && std::env::var("CLYOPS_FDS").ok() == raw {
+            std::env::remove_var("CLYOPS_FDS");
+        }
+    }
+
+    /// The descriptor `CLYOPS_FDS` maps to `name`, when it is open.
+    fn mapped_fd(&self, name: &str) -> Option<i32> {
+        // Before a parse, read the environment without keeping it.
+        let fd = match &self.fd_map {
+            Some(map) => *map.get(name)?,
+            None => *parse_fd_mapping(self.env.get("CLYOPS_FDS").map(String::as_str).unwrap_or(""), false).get(name)?,
+        };
+        (cfg!(unix) && Path::new(&format!("/dev/fd/{fd}")).exists()).then_some(fd)
+    }
+
+    /// Warn about each role the selected chain declares that `CLYOPS_FDS` maps to a closed descriptor.
+    fn warn_unopened_roles(&self) {
+        let mut seen = HashSet::new();
+        for node in self.chain() {
+            for role in &node.roles {
+                if !seen.insert(role.name.as_str()) {
+                    continue;
+                }
+                let mapped = self.fd_map.as_ref().and_then(|m| m.get(&role.name)).copied();
+                if let Some(fd) = mapped.filter(|_| self.mapped_fd(&role.name).is_none()) {
+                    warn(&format!("CLYOPS_FDS maps '{}' to {fd}, but descriptor {fd} isn't open", role.name));
+                }
+            }
+        }
+    }
+
+    /// The descriptor for a declared role when `CLYOPS_FDS` maps it and it is open, else `None`
+    /// (spec section 14).
+    pub fn fd_open(&self, name: &str) -> Option<i32> {
+        self.find_role(name)?;
+        self.mapped_fd(name)
+    }
+
+    /// Write `text` and a newline (unless it ends with one) to a declared `"out"` role (spec section
+    /// 14). Does nothing when the runner didn't map it; write errors are ignored. Panics when `name`
+    /// isn't declared or is an input.
+    pub fn emit(&self, name: &str, text: &str) {
+        let decl = self.find_role(name).unwrap_or_else(|| panic!("Unknown role '{name}'"));
+        if !decl.output {
+            panic!("Role '{name}' is not an output");
+        }
+        let Some(fd) = self.mapped_fd(name) else { return };
+        let mut line = text.to_string();
+        if !line.ends_with('\n') {
+            line.push('\n');
+        }
+        write_fd(fd, line.as_bytes());
+    }
+
+    /// The `CLYOPS_FDS` value passing these roles on to a program this one starts (spec section 14).
+    pub fn forward_fds(&self, names: &[&str]) -> String {
+        names.iter().filter_map(|n| self.mapped_fd(n).map(|fd| format!("{n}:{fd}"))).collect::<Vec<_>>().join(",")
+    }
+
     /// At most one of these options may be given.
     pub fn exclusive(&mut self, longs: &[&str]) -> &mut Self {
         self.add_constraint("exclusive", longs.iter().copied())
@@ -1116,6 +1246,7 @@ impl Cli {
         self.config.clear();
         self.values = Values::default();
         self.selected.clear();
+        self.read_fd_mapping();
         self.ensure_help();
 
         let mut result = self.scan(&argv);
@@ -1160,7 +1291,10 @@ impl Cli {
         }
         match self.check_constraints() {
             Some(e) => Parsed::err(e),
-            None => Parsed::Ok,
+            None => {
+                self.warn_unopened_roles();
+                Parsed::Ok
+            }
         }
     }
 
@@ -1635,8 +1769,18 @@ impl Cli {
             sections.push(wrap_text(&node.description, max_width));
         }
 
-        let io: Vec<String> = [("Input:", &node.stdin), ("Output:", &node.stdout)]
+        let fd_lines: Vec<(String, Option<(String, String)>)> = node
+            .roles
             .iter()
+            .map(|r| {
+                let label = format!("{} [{}]:", if r.output { "Output" } else { "Input" }, r.name);
+                (label, Some((r.description.clone(), r.content_type.clone())))
+            })
+            .collect();
+        let streams = [("Input:".to_string(), node.stdin.clone()), ("Output:".to_string(), node.stdout.clone())];
+        let io: Vec<String> = streams
+            .iter()
+            .chain(fd_lines.iter())
             .filter_map(|(label, decl)| {
                 let (d, t) = decl.as_ref()?;
                 let mut line = label.to_string();
@@ -1853,6 +1997,23 @@ impl Cli {
             ),
             ("stdin", stream(&self.stdin)),
             ("stdout", stream(&self.stdout)),
+            (
+                "roles",
+                Json::Arr(
+                    self.roles
+                        .iter()
+                        .map(|r| {
+                            Json::Obj(vec![
+                                ("name", s(&r.name)),
+                                ("direction", s(if r.output { "out" } else { "in" })),
+                                ("description", s(&r.description)),
+                                ("contentType", s(&r.content_type)),
+                                ("schema", r.schema.clone().map(Json::Raw).unwrap_or(Json::Null)),
+                            ])
+                        })
+                        .collect(),
+                ),
+            ),
             ("commands", Json::Arr(self.children.iter().map(|c| Json::Obj(c.schema_node())).collect())),
         ]);
         fields
@@ -1921,4 +2082,39 @@ impl Cli {
         }
         out
     }
+}
+
+/// Write all of `bytes` to an open descriptor the runner owns, without closing it. Errors (the reader
+/// went away) are ignored: a declared descriptor is optional.
+#[cfg(unix)]
+fn write_fd(fd: i32, bytes: &[u8]) {
+    use std::io::Write;
+    use std::os::fd::FromRawFd;
+    // SAFETY: mapped_fd checked the descriptor is open; ManuallyDrop leaves it open for the next call.
+    let mut file = std::mem::ManuallyDrop::new(unsafe { std::fs::File::from_raw_fd(fd) });
+    let _ = file.write_all(bytes);
+}
+
+#[cfg(not(unix))]
+fn write_fd(_fd: i32, _bytes: &[u8]) {}
+
+/// Parse `CLYOPS_FDS` (`name:fd` entries, spec section 14), warning about malformed ones when `warn_bad`.
+fn parse_fd_mapping(raw: &str, warn_bad: bool) -> HashMap<String, i32> {
+    let mut map = HashMap::new();
+    for entry in raw.split(',').map(str::trim).filter(|e| !e.is_empty()) {
+        let parsed = entry.split_once(':').and_then(|(name, fd)| {
+            let valid = name.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
+                && name.chars().all(|c| c.is_ascii_alphanumeric() || "_.-".contains(c));
+            let fd = fd.parse::<i32>().ok().filter(|n| *n >= 2 && fd.bytes().all(|b| b.is_ascii_digit()))?;
+            valid.then(|| (name.to_string(), fd))
+        });
+        match parsed {
+            Some((name, fd)) => {
+                map.insert(name, fd);
+            }
+            None if warn_bad => warn(&format!("Ignoring CLYOPS_FDS entry '{entry}'")),
+            None => {}
+        }
+    }
+    map
 }

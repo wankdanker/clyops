@@ -1,7 +1,7 @@
 // An in-memory job queue: run tasks with a concurrency limit and keep their
 // records and results, for a server that hands out job ids.
 import { availableParallelism } from 'node:os';
-import { newJobId, newJobRecord, transitionJobRecord, type JobRecord } from './records.js';
+import { newJobId, newJobRecord, transitionJobRecord, updateJobProgress, type JobRecord } from './records.js';
 import { timestampIso } from './util.js';
 
 /** A queued task, its current record, completion promise, optional result, and cancellation method. */
@@ -44,7 +44,11 @@ export class JobQueue<R = unknown> {
    * Queue `task` as a job of `functionName`. The task gets an AbortSignal and
    * a `stage` setter for progress; its return value is the job's result.
    */
-  add(functionName: string, task: (ctx: { /** Termination signal, or null for an ordinary exit. RunOptions uses an AbortSignal for cancellation. */ signal: AbortSignal; /** Current progress stage, or null when unspecified. */ stage: (stage: string) => void }) => Promise<R>, fields: Record<string, unknown> = {}): Job<R> {
+  add(functionName: string, task: (ctx: {
+    /** Termination signal, or null for an ordinary exit. RunOptions uses an AbortSignal for cancellation. */ signal: AbortSignal;
+    /** Current progress stage, or null when unspecified. */ stage: (stage: string) => void;
+    /** Record a progress update, e.g. runScriptFunction's onProgress (no history entry). */ progress: (update: Record<string, unknown>) => void;
+  }) => Promise<R>, fields: Record<string, unknown> = {}): Job<R> {
     const id = newJobId(functionName, this.opts.prefix ?? 'job');
     const abort = new AbortController();
     const job = { record: newJobRecord({ jobId: id, functionName, fields }) } as Job<R>;
@@ -58,7 +62,15 @@ export class JobQueue<R = unknown> {
       try {
         abort.signal.throwIfAborted();
         update({ status: 'processing' });
-        const result = await task({ signal: abort.signal, stage: (stage) => update({ status: 'processing', stage }) });
+        const result = await task({
+          signal: abort.signal,
+          stage: (stage) => update({ status: 'processing', stage }),
+          progress: (p) => {
+            if (job.record.status !== 'processing') return;
+            job.record = updateJobProgress(job.record, p);
+            this.opts.onChange?.(job.record);
+          },
+        });
         job.result = result;
         // A cancelled task that still returns (a killed tool) is cancelled all the same.
         abort.signal.throwIfAborted();

@@ -405,9 +405,72 @@ fn parse_schema(json: &str, script_path: &str) -> Result<ScriptSchema, String> {
     Ok(schema)
 }
 
+/// The most roles one run wires up (spec section 14).
+const MAX_ROLES: usize = 16;
+
+/// Each wired role's read end, by name, and the write ends the parent closes after spawning.
+type RolePipes = (Vec<(String, std::fs::File)>, Vec<i32>);
+
+/// Wire `roles` (spec section 14) for `cmd`: a pipe per role, its write end placed at descriptor 3,
+/// 4, ... in the child and named in `CLYOPS_FDS`. Returns the read ends by role, and the write ends
+/// the parent closes once the child is spawned.
+#[cfg(unix)]
+fn wire_roles(cmd: &mut Command, roles: &[String]) -> Result<RolePipes, String> {
+    use std::os::fd::FromRawFd;
+    use std::os::unix::process::CommandExt;
+    if roles.len() > MAX_ROLES {
+        return Err(format!("At most {MAX_ROLES} roles"));
+    }
+    let mut readers = Vec::new();
+    let mut writers = Vec::new();
+    for name in roles {
+        let mut fds = [0 as libc::c_int; 2];
+        // SAFETY: pipe() fills both descriptors; both are marked close-on-exec at once.
+        if unsafe { libc::pipe(fds.as_mut_ptr()) } != 0 {
+            for fd in &writers {
+                unsafe { libc::close(*fd) };
+            }
+            return Err(format!("Could not create a pipe: {}", std::io::Error::last_os_error()));
+        }
+        for fd in fds {
+            unsafe { libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC) };
+        }
+        // SAFETY: fds[0] is a fresh descriptor this File now owns.
+        readers.push((name.clone(), unsafe { std::fs::File::from_raw_fd(fds[0]) }));
+        writers.push(fds[1]);
+    }
+    let mapping: Vec<String> = roles.iter().enumerate().map(|(i, n)| format!("{n}:{}", i + 3)).collect();
+    cmd.env("CLYOPS_FDS", mapping.join(","));
+    let mut sources = [0 as libc::c_int; MAX_ROLES];
+    sources[..writers.len()].copy_from_slice(&writers);
+    let count = writers.len();
+    // SAFETY: runs between fork and exec, using only fcntl and dup2 and no allocation. Every write
+    // end is first moved above the targets, so placing one can't close another; dup2's copies are
+    // inherited, the close-on-exec originals and moved copies are not.
+    unsafe {
+        cmd.pre_exec(move || {
+            let mut moved = [0 as libc::c_int; MAX_ROLES];
+            for (slot, &fd) in moved.iter_mut().zip(&sources[..count]) {
+                *slot = libc::fcntl(fd, libc::F_DUPFD_CLOEXEC, 100);
+                if *slot < 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+            }
+            for (i, &fd) in moved[..count].iter().enumerate() {
+                if libc::dup2(fd, (i + 3) as libc::c_int) < 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+            }
+            Ok(())
+        });
+    }
+    Ok((readers, writers))
+}
+
 /// Runs a tool. Its stdin is `stdin` (text) or the file `stdin_file`, else
 /// closed; with `stdout_file`, stdout is written there (binary output) instead
-/// of being streamed to the window line by line.
+/// of being streamed to the window line by line. `roles` are the output roles to
+/// wire up (spec section 14); their lines reach the window as `role` events.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 async fn run_script(
@@ -416,6 +479,7 @@ async fn run_script(
     stdin: Option<String>,
     stdin_file: Option<String>,
     stdout_file: Option<String>,
+    roles: Option<Vec<String>>,
     process_manager: State<'_, ProcessManager>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
@@ -431,14 +495,42 @@ async fn run_script(
         .ok_or("Invalid script path")?;
 
     let has_stdin = stdin.is_some() || stdin_file.is_some();
-    let mut child = Command::new(&script_path)
-        .args(&args)
+    let mut cmd = Command::new(&script_path);
+    cmd.args(&args)
         .current_dir(script_dir)
+        // Our own mapping, if any, is never passed on.
+        .env_remove("CLYOPS_FDS")
         .stdin(if has_stdin { Stdio::piped() } else { Stdio::null() })
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("Failed to spawn process: {}", e))?;
+        .stderr(Stdio::piped());
+    #[cfg(unix)]
+    let (role_readers, role_writers) = wire_roles(&mut cmd, roles.as_deref().unwrap_or(&[]))?;
+    #[cfg(not(unix))]
+    let (role_readers, role_writers): RolePipes = {
+        let _ = roles;
+        (Vec::new(), Vec::new())
+    };
+    let spawned = cmd.spawn();
+    // The child has its copies; ours must close so the readers see EOF when it exits.
+    #[cfg(unix)]
+    for fd in role_writers {
+        unsafe { libc::close(fd) };
+    }
+    #[cfg(not(unix))]
+    let _ = role_writers;
+    let mut child = spawned.map_err(|e| format!("Failed to spawn process: {}", e))?;
+
+    // Each role's lines go to the window as they come.
+    for (role, file) in role_readers {
+        let id_clone = id.clone();
+        let app_clone = app.clone();
+        thread::spawn(move || {
+            let event_name = format!("output_{}", id_clone);
+            for line in BufReader::new(file).lines().map_while(Result::ok) {
+                let _ = app_clone.emit(&event_name, serde_json::json!({ "id": id_clone, "type": "role", "role": role, "data": line }));
+            }
+        });
+    }
 
     // Feed stdin from its own thread; dropping the pipe closes it.
     if let Some(mut pipe) = child.stdin.take() {
@@ -844,5 +936,33 @@ mod tests {
     #[test]
     fn rejects_non_clyops_output() {
         assert!(parse_schema(r#"{"script": "x"}"#, "/x").unwrap_err().starts_with("Not a clyops tool"));
+    }
+}
+
+#[cfg(all(test, unix))]
+mod role_tests {
+    use super::*;
+    use std::io::Read;
+
+    #[test]
+    fn wire_roles_places_each_role_and_names_it() {
+        let mut cmd = Command::new("sh");
+        cmd.args(["-c", r#"echo "$CLYOPS_FDS"; echo meta-line >&3; printf 'a\nb\n' >&4"#]).stdout(Stdio::piped());
+        let (readers, writers) = wire_roles(&mut cmd, &["meta".into(), "progress".into()]).unwrap();
+        let child = cmd.spawn().unwrap();
+        for fd in writers {
+            unsafe { libc::close(fd) };
+        }
+        let out = child.wait_with_output().unwrap();
+        assert_eq!(String::from_utf8_lossy(&out.stdout), "meta:3,progress:4\n");
+        let got: Vec<(String, String)> = readers
+            .into_iter()
+            .map(|(name, mut file)| {
+                let mut text = String::new();
+                file.read_to_string(&mut text).unwrap();
+                (name, text)
+            })
+            .collect();
+        assert_eq!(got, vec![("meta".into(), "meta-line\n".into()), ("progress".into(), "a\nb\n".into())]);
     }
 }

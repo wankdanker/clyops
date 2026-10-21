@@ -47,3 +47,19 @@ export function resultBlob(stdout: string, encoding: string | undefined, content
   if (encoding === 'base64') return new Blob([Uint8Array.from(atob(stdout), char => char.charCodeAt(0))], { type: contentType });
   return new Blob([stdout], { type: contentType });
 }
+
+/**
+ * A progress update (spec section 14) as a fraction from 0 to 1, from `pct` or `done`/`total`, and
+ * its label (`message`, else `stage`). The fraction is undefined when the update has no number.
+ */
+export function progressView(update: Record<string, unknown> | null | undefined): { fraction?: number; label?: string } {
+  if (!update) return {};
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+  const pct = num(update.pct);
+  const done = num(update.done);
+  const total = num(update.total);
+  const raw = pct !== undefined ? pct / 100 : done !== undefined && total ? done / total : undefined;
+  const fraction = raw === undefined ? undefined : Math.min(1, Math.max(0, raw));
+  const label = typeof update.message === 'string' ? update.message : typeof update.stage === 'string' ? update.stage : undefined;
+  return { ...(fraction !== undefined ? { fraction } : {}), ...(label !== undefined ? { label } : {}) };
+}

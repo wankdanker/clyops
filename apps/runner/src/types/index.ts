@@ -21,12 +21,16 @@ export interface RunningScript {
   args: string[];
   startedAt: Date;
   output: ScriptOutputLine[];
+  /** The latest update on the tool's `progress` role (spec section 14). */
+  progress?: Record<string, unknown>;
+  /** The tool's `meta` document. */
+  meta?: unknown;
   exitCode?: number;
   finishedAt?: Date;
 }
 
 export interface ScriptOutputLine {
-  type: 'stdout' | 'stderr' | 'info' | 'error';
+  type: 'stdout' | 'stderr' | 'info' | 'error' | 'log' | 'result';
   data: string;
   timestamp: Date;
 }

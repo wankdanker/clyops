@@ -9,6 +9,7 @@ fn main() {
     cli.description("Commands demo for the clyops conformance suite.");
     cli.epilog("Run 'tasks <command> --help' for a command's options.");
     cli.opt("VERBOSE", "verbose", "v", "flag", "Verbose output").group("Global");
+    cli.role("progress", "out", "Progress, one JSON object per line", "application/x-ndjson");
 
     let db = cli.command("db", "Database tasks");
     db.opt("DB_URL", "url", "u", "sqlite:app.db", "Database URL").group("Database");
@@ -16,6 +17,7 @@ fn main() {
     migrate.arg("target", "Target version", "latest", "");
     migrate.opt("DRY_RUN", "dry-run", "n", "flag", "Show what would run");
     migrate.effects(&["destructive"]);
+    migrate.role("plan", "out", "Migration plan", "text/plain");
     db.command("status", "Show migration status").effects(&["read-only"]);
 
     let send = cli.command("send", "Send a message");
@@ -27,5 +29,6 @@ fn main() {
     send.stdin("Attachment", "application/octet-stream");
 
     cli.run();
+    cli.emit("progress", r#"{"stage":"done"}"#);
     println!("{{\"values\": {}}}", cli.values_json());
 }

@@ -2,6 +2,8 @@ Usage: tasks <command> [OPTIONS]
 
 Commands demo for the clyops conformance suite.
 
+Output [progress]: Progress, one JSON object per line (application/x-ndjson)
+
 Commands:
   db                            Database tasks
   send                          Send a message

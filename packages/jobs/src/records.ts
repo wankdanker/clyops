@@ -28,6 +28,8 @@ export interface JobRecord {
   error: string | null;
   /** Storage key of the result, or null when absent. */
   result_key: string | null;
+  /** The latest update from the tool's `progress` role (spec section 14), when it has one. */
+  progress?: Record<string, unknown> | null;
   /** Earlier job states, newest first. */
   history: { /** Lifecycle state or HTTP input-error status, according to the containing type. */ status: JobStatus; /** Current progress stage, or null when unspecified. */ stage: string | null; /** ISO timestamp of the last transition. */ updated_at: string }[];
   [field: string]: unknown;
@@ -73,4 +75,13 @@ export function transitionJobRecord(
     error: change.error || null,
     result_key: change.resultKey || null,
   };
+}
+
+/**
+ * Record a progress update (spec section 14) without a history entry, so frequent updates don't
+ * grow it: `progress` is the update, and its `stage`, when it has one, becomes the record's.
+ */
+export function updateJobProgress(record: JobRecord, progress: Record<string, unknown>, now?: string): JobRecord {
+  const stage = typeof progress.stage === 'string' ? progress.stage : record.stage;
+  return { ...record, progress, stage, updated_at: now ?? timestampIso() };
 }

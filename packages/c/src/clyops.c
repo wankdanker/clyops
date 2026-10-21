@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <regex.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -212,6 +213,11 @@ typedef struct {
 
 typedef struct { char *key, *value, *dir; } cfg_t;
 
+typedef struct {
+    int out;
+    char *name, *desc, *type, *schema; /* schema NULL when not given */
+} role_t;
+
 struct clyops {
     char *name, *root, *cwd, *root_abs, *description, *epilog, *config_option;
     svec prefixes;
@@ -228,6 +234,8 @@ struct clyops {
     svec effects;
     char *stdin_desc, *stdin_type, *stdout_desc, *stdout_type; /* NULL desc: undeclared */
     svec con_type, con_opts; /* relationships: type and space-separated long names */
+    role_t* roles; /* declared roles (spec section 14) */
+    size_t nroles, caproles;
     clyops_t** kids;
     size_t nkids, capkids;
     clyops_t* parent;
@@ -314,6 +322,11 @@ void clyops_free(clyops_t* cli) {
         free(a->name); free(a->desc); free(a->dflt); free(a->rule);
         sv_free(&a->list);
     }
+    for (size_t i = 0; i < cli->nroles; i++) {
+        role_t* r = &cli->roles[i];
+        free(r->name); free(r->desc); free(r->type); free(r->schema);
+    }
+    free(cli->roles);
     for (size_t i = 0; i < cli->nkids; i++) clyops_free(cli->kids[i]);
     free(cli->kids); free(cli->chain); sv_free(&cli->words);
     free(cli->opts); free(cli->args); free(cli->cfg);
@@ -388,6 +401,140 @@ void clyops_set_effects(clyops_t* cli, const char* const* effects) {
 void clyops_stdin(clyops_t* cli, const char* description, const char* content_type) {
     set_str(&cli->stdin_desc, description);
     set_str(&cli->stdin_type, content_type);
+}
+
+static int valid_role_name(const char* s) {
+    if (!s || !isalpha((unsigned char)*s)) return 0;
+    for (; *s; s++) if (!isalnum((unsigned char)*s) && !strchr("_.-", *s)) return 0;
+    return 1;
+}
+
+void clyops_add_role(clyops_t* cli, const char* name, const char* direction, clyops_role_meta_t meta) {
+    if (!valid_role_name(name)) clyops_die(2, "Invalid role name '%s'", name ? name : "");
+    if (!streq(direction, "in") && !streq(direction, "out")) clyops_die(2, "Unknown role direction '%s'", direction ? direction : "");
+    for (size_t i = 0; i < cli->nroles; i++)
+        if (streq(cli->roles[i].name, name)) clyops_die(2, "Duplicate role '%s'", name);
+    if (cli->nroles == cli->caproles) {
+        cli->caproles = cli->caproles ? cli->caproles * 2 : 4;
+        cli->roles = realloc(cli->roles, cli->caproles * sizeof *cli->roles);
+        if (!cli->roles) { fputs("clyops: out of memory\n", stderr); exit(70); }
+    }
+    role_t* r = &cli->roles[cli->nroles++];
+    r->out = streq(direction, "out");
+    r->name = xstrdup(name);
+    r->desc = xstrdup(meta.description ? meta.description : "");
+    r->type = xstrdup(meta.content_type ? meta.content_type : "");
+    r->schema = empty(meta.schema) ? NULL : xstrdup(meta.schema);
+}
+
+/* The declared role, searching the selected command then its ancestors. */
+static const role_t* find_role(const clyops_t* cli, const char* name) {
+    for (const clyops_t* c = cli->selected; c; c = c == cli ? NULL : c->parent)
+        for (size_t i = 0; i < c->nroles; i++)
+            if (streq(c->roles[i].name, name)) return &c->roles[i];
+    return NULL;
+}
+
+/* CLYOPS_FDS as read once per process (spec section 14): role names and their descriptors. */
+static svec g_fd_names;
+static int* g_fd_numbers;
+static int g_fd_read;
+
+static void read_fd_mapping(void) {
+    if (g_fd_read) return;
+    g_fd_read = 1;
+    const char* raw = getenv("CLYOPS_FDS");
+    if (!raw) return;
+    char* copy = xstrdup(raw);
+    for (char* entry = strtok(copy, ","); entry; entry = strtok(NULL, ",")) {
+        while (isspace((unsigned char)*entry)) entry++;
+        char* end = entry + strlen(entry);
+        while (end > entry && isspace((unsigned char)end[-1])) *--end = '\0';
+        if (!*entry) continue;
+        char* colon = strchr(entry, ':');
+        char* num_end = NULL;
+        long fd = -1;
+        if (colon && colon[1] && isdigit((unsigned char)colon[1])) fd = strtol(colon + 1, &num_end, 10);
+        if (colon) *colon = '\0';
+        int ok = colon && num_end && !*num_end && fd >= 2 && fd <= INT_MAX && valid_role_name(entry);
+        if (colon) *colon = ':';
+        if (!ok) { clyops_warn("Ignoring CLYOPS_FDS entry '%s'", entry); continue; }
+        *colon = '\0';
+        size_t i = 0;
+        while (i < g_fd_names.len && !streq(g_fd_names.v[i], entry)) i++;
+        if (i == g_fd_names.len) {
+            sv_push(&g_fd_names, xstrdup(entry));
+            g_fd_numbers = realloc(g_fd_numbers, g_fd_names.len * sizeof *g_fd_numbers);
+            if (!g_fd_numbers) { fputs("clyops: out of memory\n", stderr); exit(70); }
+        }
+        g_fd_numbers[i] = (int)fd;
+    }
+    free(copy);
+    unsetenv("CLYOPS_FDS");
+}
+
+/* The descriptor CLYOPS_FDS maps to `name`, when it is open; -1 otherwise. */
+static int mapped_fd(const char* name) {
+    read_fd_mapping();
+    struct stat st;
+    for (size_t i = 0; i < g_fd_names.len; i++)
+        if (streq(g_fd_names.v[i], name)) return fstat(g_fd_numbers[i], &st) == 0 ? g_fd_numbers[i] : -1;
+    return -1;
+}
+
+/* Warn about each role the selected chain declares that CLYOPS_FDS maps to a closed descriptor. */
+static void warn_unopened_roles(const clyops_t* cli) {
+    read_fd_mapping();
+    for (const clyops_t* c = cli->selected; c; c = c == cli ? NULL : c->parent) {
+        for (size_t i = 0; i < c->nroles; i++) {
+            const char* name = c->roles[i].name;
+            if (find_role(cli, name) != &c->roles[i]) continue; /* a nearer level declares it */
+            for (size_t k = 0; k < g_fd_names.len; k++) {
+                if (streq(g_fd_names.v[k], name) && mapped_fd(name) < 0)
+                    clyops_warn("CLYOPS_FDS maps '%s' to %d, but descriptor %d isn't open", name, g_fd_numbers[k], g_fd_numbers[k]);
+            }
+        }
+    }
+}
+
+int clyops_fd_open(const clyops_t* cli, const char* name) {
+    return name && find_role(cli, name) ? mapped_fd(name) : -1;
+}
+
+void clyops_emit(const clyops_t* cli, const char* name, const char* text) {
+    const role_t* r = name ? find_role(cli, name) : NULL;
+    if (!r) clyops_die(2, "Unknown role '%s'", name ? name : "");
+    if (!r->out) clyops_die(2, "Role '%s' is not an output", name);
+    int fd = mapped_fd(name);
+    if (fd < 0) return;
+    text = text ? text : "";
+    size_t len = strlen(text);
+    /* One write per line (spec section 14), so lines from processes sharing a pipe don't interleave. */
+    char* line = xalloc(len + 2);
+    memcpy(line, text, len);
+    if (!len || text[len - 1] != '\n') line[len++] = '\n';
+    /* Write errors (the reader went away) are ignored, so SIGPIPE is ignored for the write. */
+    struct sigaction ign = { 0 }, old;
+    ign.sa_handler = SIG_IGN;
+    sigaction(SIGPIPE, &ign, &old);
+    for (size_t off = 0; off < len;) {
+        ssize_t w = write(fd, line + off, len - off);
+        if (w < 0 && errno == EINTR) continue;
+        if (w <= 0) break;
+        off += (size_t)w;
+    }
+    sigaction(SIGPIPE, &old, NULL);
+    free(line);
+}
+
+char* clyops_forward_fds_list(const clyops_t* cli, const char* const* names) {
+    (void)cli;
+    sbuf b = { 0 };
+    for (; names && *names; names++) {
+        int fd = mapped_fd(*names);
+        if (fd >= 0) sb_printf(&b, "%s%s:%d", b.len ? "," : "", *names, fd);
+    }
+    return b.s ? b.s : xstrdup("");
 }
 
 void clyops_stdout(clyops_t* cli, const char* description, const char* content_type) {
@@ -1108,6 +1255,7 @@ static char* check_constraints(const clyops_t* cli) {
 }
 
 clyops_status_t clyops_parse(clyops_t* cli, int argc, char** argv) {
+    read_fd_mapping();
     reset_parse(cli);
     ensure_help(cli);
     cli->selected = cli;
@@ -1159,6 +1307,7 @@ clyops_status_t clyops_parse(clyops_t* cli, int argc, char** argv) {
         set_error(cli, conflict);
         return CLYOPS_ERROR;
     }
+    warn_unopened_roles(cli);
     return CLYOPS_OK;
 }
 
@@ -1517,7 +1666,7 @@ char* clyops_usage(clyops_t* cli) {
         sv_free(&lines);
     }
 
-    if (node->stdin_desc || node->stdout_desc) sb_putc(&b, '\n');
+    if (node->stdin_desc || node->stdout_desc || node->nroles) sb_putc(&b, '\n');
     for (int k = 0; k < 2; k++) {
         const char* d = k ? node->stdout_desc : node->stdin_desc;
         const char* t = k ? node->stdout_type : node->stdin_type;
@@ -1525,6 +1674,13 @@ char* clyops_usage(clyops_t* cli) {
         sb_put(&b, k ? "Output:" : "Input:");
         if (*d) sb_printf(&b, " %s", d);
         if (*t) sb_printf(&b, " (%s)", t);
+        sb_putc(&b, '\n');
+    }
+    for (size_t i = 0; i < node->nroles; i++) {
+        const role_t* r = &node->roles[i];
+        sb_printf(&b, "%s [%s]:", r->out ? "Output" : "Input", r->name);
+        if (*r->desc) sb_printf(&b, " %s", r->desc);
+        if (*r->type) sb_printf(&b, " (%s)", r->type);
         sb_putc(&b, '\n');
     }
 
@@ -1728,7 +1884,20 @@ static void schema_node(sbuf* b, const clyops_t* cli) {
     json_stream(b, cli->stdin_desc, cli->stdin_type);
     sb_put(b, ",\n  \"stdout\": ");
     json_stream(b, cli->stdout_desc, cli->stdout_type);
-    sb_put(b, ",\n  \"commands\": [");
+    sb_put(b, ",\n  \"roles\": [");
+    for (size_t i = 0; i < cli->nroles; i++) {
+        const role_t* r = &cli->roles[i];
+        sb_put(b, i ? ", {\"name\": " : "{\"name\": ");
+        json_str(b, r->name);
+        sb_printf(b, ", \"direction\": \"%s\", \"description\": ", r->out ? "out" : "in");
+        json_str(b, r->desc);
+        sb_put(b, ", \"contentType\": ");
+        json_str(b, r->type);
+        sb_put(b, ", \"schema\": ");
+        sb_put(b, r->schema ? r->schema : "null");
+        sb_putc(b, '}');
+    }
+    sb_put(b, "],\n  \"commands\": [");
     for (size_t i = 0; i < cli->nkids; i++) {
         sb_put(b, i ? ", {\n  \"name\": " : "{\n  \"name\": ");
         json_str(b, cli->kids[i]->word);

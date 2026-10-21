@@ -10,7 +10,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import express from 'express';
 import { loadTools } from 'clyops-tools';
-import { mcpHttpHandler } from '../dist/index.js';
+import { mcpHttpHandler, mcpProgress } from '../dist/index.js';
 
 const repo = fileURLToPath(new URL('../../..', import.meta.url));
 const cli = fileURLToPath(new URL('../dist/cli.js', import.meta.url));
@@ -39,6 +39,13 @@ async function exercise(client) {
   assert.equal(ok.structuredContent.values.COUNT, 4);
   assert.deepEqual(ok.structuredContent.values.TAG, ['a']);
   assert.match(ok.content[0].text, /"COUNT": 4/);
+
+  // The progress role becomes progress notifications; meta lands in the result's _meta.
+  const notes = [];
+  const tracked = await client.callTool({ name: 'media_demo', arguments: { input: 'in.txt' } }, undefined, { onprogress: (p) => notes.push(p) });
+  assert.equal(tracked.isError, false);
+  assert.deepEqual(notes, [{ progress: 100, total: 100 }]);
+  assert.deepEqual(tracked._meta['clyops.io/meta'], { extra: false });
 
   const failed = await client.callTool({ name: 'media_demo', arguments: { input: 'in.txt', src: 'missing.txt' } });
   assert.equal(failed.isError, true);
@@ -203,4 +210,12 @@ test('stdio positional-order option reaches tool execution', async () => {
     assert.equal(result.isError, false);
     assert.deepEqual(JSON.parse(readFileSync(audit, 'utf8')).command.slice(1), ['--count', '4', 'in.txt']);
   } finally { await client.close(); }
+});
+
+test('mcpProgress maps progress updates onto MCP notifications', () => {
+  assert.deepEqual(mcpProgress({ pct: 40, stage: 'encode' }, -Infinity), { progress: 40, total: 100, message: 'encode' });
+  assert.deepEqual(mcpProgress({ done: 3, total: 9, message: 'file 3', stage: 'copy' }, 2), { progress: 3, total: 9, message: 'file 3' });
+  assert.deepEqual(mcpProgress({ done: 3 }, 1), { progress: 3 });
+  assert.equal(mcpProgress({ pct: 40 }, 40), undefined, 'progress must increase');
+  assert.equal(mcpProgress({ stage: 'warming up' }, -Infinity), undefined, 'no number');
 });

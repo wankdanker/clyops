@@ -4,10 +4,11 @@ import {
   allowed, InputError, isTextType, loadTools, runTool, startTool, tail, toJsonSchema, watchTools,
   type AuditEntry, type Command, type Group, type RunResult, type Tool, type ToolFilter, type ToolResult, type ToolRunOptions,
 } from 'clyops-tools';
-import { JobQueue, type JobRecord } from 'clyops-jobs';
+import { JobQueue, parseRoleJson, type JobRecord } from 'clyops-jobs';
 import { mcpHttpHandler } from 'clyops-mcp';
 import busboy from 'busboy';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
+import { EventEmitter } from 'node:events';
 import { createReadStream, createWriteStream, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
@@ -89,6 +90,9 @@ const RunResponseSchema = z.object({
   durationMs: z.number(),
   command: z.array(z.string()),
   json: z.unknown().optional(),
+  roles: z.record(z.string(), z.string()).optional().openapi({ description: 'What each output role the tool declares wrote (spec section 14)' }),
+  meta: z.unknown().optional().openapi({ description: 'The tool\'s `meta` role, parsed' }),
+  progress: z.record(z.string(), z.unknown()).optional().openapi({ description: 'The last update on its `progress` role' }),
 });
 
 const JobSchema = z.object({
@@ -106,7 +110,7 @@ const JobSchema = z.object({
 const ErrorSchema = z.object({ error: z.string(), issues: z.unknown().optional() });
 const json = (schema: z.ZodType, description: string) => ({ description, content: { 'application/json': { schema } } });
 
-type ApiResult = ToolResult & { stdoutEncoding?: 'base64'; stdoutUrl?: string };
+type ApiResult = ToolResult & { stdoutEncoding?: 'base64'; stdoutUrl?: string; meta?: unknown; progress?: Record<string, unknown> };
 
 /** A tool's declared binary stdout type, if any (spec section 1.3). */
 function binaryStdout(tool: Tool): string | undefined {
@@ -125,10 +129,36 @@ function streams(tool: Tool, req: Request): boolean {
 }
 
 /** The envelope as JSON: binary stdout base64-encoded. */
-function envelope(result: ToolResult): ApiResult {
+function envelope(result: ToolResult, progress?: Record<string, unknown>): ApiResult {
   const { stdoutBuffer, ...rest } = result;
-  return stdoutBuffer ? { ...rest, stdout: stdoutBuffer.toString('base64'), stdoutEncoding: 'base64' } : rest;
+  const meta = parseRoleJson(result.roles?.meta);
+  const roles = { ...(meta !== undefined ? { meta } : {}), ...(progress ? { progress } : {}) };
+  return stdoutBuffer ? { ...rest, ...roles, stdout: stdoutBuffer.toString('base64'), stdoutEncoding: 'base64' } : { ...rest, ...roles };
 }
+
+/**
+ * The well-known roles (spec section 14) wired for a run: `meta` collected, and each `progress`
+ * object passed to `onProgress`. startTool drops whichever the tool doesn't declare.
+ */
+function roleOptions(onProgress: (update: Record<string, unknown>) => void, onMeta?: (line: string) => void): ToolRunOptions['roles'] {
+  return {
+    meta: { onLine: onMeta },
+    progress: {
+      onLine: (line) => {
+        const update = parseRoleJson(line);
+        if (update && typeof update === 'object' && !Array.isArray(update)) onProgress(update as Record<string, unknown>);
+      },
+    },
+  };
+}
+
+/** JSON as an ASCII header value. */
+function headerJson(value: unknown): string {
+  return JSON.stringify(value).replace(/[^\x20-\x7e]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+}
+
+/** How long a streamed response waits for a tool's meta line after its first byte of stdout. */
+const META_WAIT_MS = 100;
 
 /** A header-safe one-line summary of stderr, for the trailer. */
 function stderrTrailer(stderr: string): string {
@@ -232,8 +262,11 @@ export async function createApi(opts: ApiOptions) {
   const maxBody = opts.maxBody ?? 10 << 20;
   // A job's files (spooled stdin, uploads, binary stdout) live until it is dropped.
   const jobDirs = new Map<string, string>();
+  // Every job record change, by job id, for GET /jobs/:id/events.
+  const events = new EventEmitter().setMaxListeners(0);
   const queue = new JobQueue<ApiResult>({
     concurrency: opts.concurrency,
+    onChange: (record) => events.emit(record.job_id, record),
     onDrop: (record) => {
       const dir = jobDirs.get(record.job_id);
       if (dir) rmSync(dir, { recursive: true, force: true });
@@ -246,7 +279,7 @@ export async function createApi(opts: ApiOptions) {
   // Everything documented in OpenAPI lives on a router rebuilt for each set of tools.
   let api: ReturnType<typeof buildRoutes>;
   const swap = (loaded: { tree: Group; tools: Tool[] }) => (api = buildRoutes(opts, ctx, loaded.tree, withPaths(loaded.tools)));
-  const ctx = { queue, jobDirs, maxBody };
+  const ctx = { queue, jobDirs, maxBody, events };
   const watcher = opts.watch
     ? await watchTools(opts.root, { name: opts.name, filter: opts.filter, onError, onChange: (loaded) => opts.onReload?.(swap(loaded)) })
     : undefined;
@@ -321,7 +354,7 @@ export async function createApi(opts: ApiOptions) {
   };
 }
 
-type Ctx = { queue: JobQueue<ApiResult>; jobDirs: Map<string, string>; maxBody: number };
+type Ctx = { queue: JobQueue<ApiResult>; jobDirs: Map<string, string>; maxBody: number; events: EventEmitter };
 
 /** A POST with a non-JSON body: validate the query (or the args part), then run with the body as stdin. */
 async function runBody(opts: ApiOptions, ctx: Ctx, tool: ApiTool, req: Request, res: Response): Promise<void> {
@@ -371,14 +404,16 @@ async function respond(opts: ApiOptions, ctx: Ctx, tool: ApiTool, input: Record<
   if (req.query.async === 'true') {
     const jobDir = dir ?? mkdtempSync(join(tmpdir(), 'clyops-api-'));
     const toFile = streams(tool, req);
-    const job = ctx.queue.add(tool.words.join(' '), async ({ signal }) => {
+    const job = ctx.queue.add(tool.words.join(' '), async ({ signal, progress }) => {
       let result: ApiResult;
+      let last: Record<string, unknown> | undefined;
+      const roles = roleOptions((update) => { last = update; progress(update); });
       if (toFile) {
-        const started = startTool(tool, input, { ...base, signal, stdin: open(), stdout: 'stream' });
+        const started = startTool(tool, input, { ...base, signal, roles, stdin: open(), stdout: 'stream' });
         const [r] = await Promise.all([started.result, pipeline(started.stdout, createWriteStream(join(jobDir, 'stdout')))]);
-        result = { ...r, ok: r.exitCode === 0 && !r.timedOut && !r.signal, stdoutUrl: `/jobs/${job.record.job_id}/stdout` };
+        result = { ...envelope({ ...r, ok: r.exitCode === 0 && !r.timedOut && !r.signal }, last), stdoutUrl: `/jobs/${job.record.job_id}/stdout` };
       } else {
-        result = envelope(await runTool(tool, input, { ...base, signal, stdin: open(), stdout: binaryStdout(tool) ? 'buffer' : 'text' }));
+        result = envelope(await runTool(tool, input, { ...base, signal, roles, stdin: open(), stdout: binaryStdout(tool) ? 'buffer' : 'text' }), last);
       }
       audit(result);
       return result;
@@ -392,16 +427,25 @@ async function respond(opts: ApiOptions, ctx: Ctx, tool: ApiTool, input: Record<
   const abort = new AbortController();
   res.on('close', () => !res.writableEnded && abort.abort());
   if (!streams(tool, req)) {
-    const result = await runTool(tool, input, { ...base, signal: abort.signal, stdin: open(), stdout: binaryStdout(tool) ? 'buffer' : 'text' });
+    let last: Record<string, unknown> | undefined;
+    const roles = roleOptions((update) => { last = update; });
+    const result = await runTool(tool, input, { ...base, signal: abort.signal, roles, stdin: open(), stdout: binaryStdout(tool) ? 'buffer' : 'text' });
     audit(result);
-    res.json(envelope(result));
+    res.json(envelope(result, last));
     return;
   }
 
   // Stream stdout as it comes. The exit status isn't known when the headers
   // go out, so it follows as a trailer; a failure before any output is still
   // a JSON error.
-  const started = startTool(tool, input, { ...base, signal: abort.signal, stdin: open(), stdout: 'stream' });
+  // A tool writes its meta before stdout, but on another pipe: give it a moment to arrive, so it
+  // can go out as a header with the first byte.
+  let metaLine: string | undefined;
+  let metaArrived: () => void = () => undefined;
+  const metaReady = new Promise<void>((resolve) => { metaArrived = resolve; });
+  const roles = roleOptions(() => undefined, (line) => { metaLine ??= line; metaArrived(); });
+  const declaresMeta = Boolean(tool.schema.roles?.some((r) => r.name === 'meta' && r.direction === 'out'));
+  const started = startTool(tool, input, { ...base, signal: abort.signal, roles, stdin: open(), stdout: 'stream' });
   const out = started.stdout;
   const first = await new Promise<Buffer | null>((resolve) => {
     out.once('data', (chunk: Buffer) => {
@@ -417,8 +461,11 @@ async function respond(opts: ApiOptions, ctx: Ctx, tool: ApiTool, input: Record<
     res.status(200).type(binaryStdout(tool) ?? 'application/octet-stream').end();
     return;
   }
+  if (declaresMeta) await Promise.race([metaReady, new Promise((resolve) => setTimeout(resolve, META_WAIT_MS))]);
+  const meta = parseRoleJson(metaLine);
   res.status(200);
   res.setHeader('Content-Type', binaryStdout(tool) ?? 'application/octet-stream');
+  if (meta !== undefined) res.setHeader('X-Clyops-Meta', headerJson(meta));
   res.setHeader('Trailer', 'X-Clyops-Exit-Code, X-Clyops-Stderr');
   res.write(first);
   out.pipe(res, { end: false });
@@ -557,6 +604,36 @@ function buildRoutes(opts: ApiOptions, ctx: Ctx, tree: Group, tools: ApiTool[]) 
       const job = find(req, res);
       if (!job) return void res.status(404).json({ error: `no job ${req.params.id}` });
       res.json(jobView(job.record, job.result));
+    },
+  );
+  router.get(
+    {
+      path: '/jobs/:id/events',
+      summary: 'A job\'s changes as server-sent events, its progress among them',
+      tags: ['jobs'],
+      params: JobParams,
+      responses: {
+        200: { description: 'One `job` event per change of the record (with `progress` from the tool\'s progress role), ending with the finished job and its result', content: { 'text/event-stream': { schema: z.string() } } },
+        404: json(ErrorSchema, 'No such job'),
+      },
+    },
+    (req: Request, res: Response) => {
+      const job = find(req, res);
+      if (!job) return void res.status(404).json({ error: `no job ${req.params.id}` });
+      const id = job.record.job_id;
+      res.status(200).set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+      res.flushHeaders();
+      const send = (record: JobRecord) => {
+        const finishedJob = record.status === 'done' || record.status === 'error';
+        res.write(`event: job\ndata: ${JSON.stringify(jobView(record, finishedJob ? job.result : undefined))}\n\n`);
+        if (finishedJob) {
+          ctx.events.off(id, send);
+          res.end();
+        }
+      };
+      ctx.events.on(id, send);
+      res.on('close', () => ctx.events.off(id, send));
+      send(job.record);
     },
   );
   router.get(

@@ -7,6 +7,9 @@ import java.util.Map;
 final class Json {
     private Json() {}
 
+    /** JSON text written as given (a declared fd schema). */
+    record Raw(String text) {}
+
     static String write(Object value) {
         StringBuilder out = new StringBuilder();
         write(out, value, "");
@@ -16,6 +19,8 @@ final class Json {
     private static void write(StringBuilder out, Object value, String indent) {
         if (value == null) {
             out.append("null");
+        } else if (value instanceof Raw raw) {
+            out.append(raw.text());
         } else if (value instanceof String s) {
             string(out, s);
         } else if (value instanceof Boolean || value instanceof Number) {

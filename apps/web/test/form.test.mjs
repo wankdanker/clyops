@@ -7,7 +7,7 @@ async function module(file) {
   const compiled = await build({ entryPoints: [new URL('../src/lib/'+file, import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'node' });
   return import('data:text/javascript;base64,'+Buffer.from(compiled.outputFiles[0].text).toString('base64'));
 }
-const { controlValue, inputErrors, template, restoreTemplate, resultBlob } = await module('form.ts');
+const { controlValue, inputErrors, template, restoreTemplate, resultBlob, progressView } = await module('form.ts');
 const { ApiClient, apiBase } = await module('client.ts');
 const { ansiSegments, ansiText } = await module('ansi.ts');
 
@@ -46,4 +46,11 @@ test('connections reject embedded credentials and foreign endpoints', async () =
 });
 test('binary output decoding preserves bytes', async () => {
   assert.deepEqual([...new Uint8Array(await resultBlob('AAH/', 'base64', 'application/octet-stream').arrayBuffer())], [0,1,255]);
+});
+
+test('progress updates become a fraction and a label', () => {
+  assert.deepEqual(progressView({ pct: 40, stage: 'encode' }), { fraction: 0.4, label: 'encode' });
+  assert.deepEqual(progressView({ done: 1, total: 4, message: 'file 1' }), { fraction: 0.25, label: 'file 1' });
+  assert.deepEqual(progressView({ pct: -5 }), { fraction: 0 });
+  assert.deepEqual(progressView(null), {});
 });

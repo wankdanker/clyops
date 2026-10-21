@@ -86,6 +86,22 @@ with a streamed body keeps it in a file until it runs; a job with binary output 
 file served at `GET /jobs/<id>/stdout` (its result has `stdoutUrl`). A job's files are removed when
 it is dropped.
 
+**Progress and metadata.** When a tool declares the `progress` or `meta`
+[roles](https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md#14-roles-on-file-descriptors),
+the server wires them up. The JSON envelope has `meta` (parsed), the last `progress` update and the
+raw text of each role in `roles`; a job's record has its latest `progress` (and its `stage`) while
+it runs. `GET /jobs/<id>/events` streams the record as server-sent events, one `job` event per
+change, ending with the finished job and its result:
+
+```sh
+curl -N localhost:8080/jobs/job-1f2e3d4c5b6a/events
+# event: job
+# data: {"job_id":"...","status":"processing","progress":{"pct":40,"stage":"encode"},...}
+```
+
+Streamed output sends the tool's `meta` as an `X-Clyops-Meta` header (JSON), waiting up to 100 ms
+after the first byte for it to arrive.
+
 ## Web runner
 
 Open `/ui/` for the packaged static SvelteKit runner. It builds typed forms from
@@ -110,6 +126,7 @@ successfully listening.
 | `GET /tools/<words>` | A tool's clyops schema and the JSON Schema of its input |
 | `POST /tools/<words>[?async=true]` | Run it |
 | `GET /jobs`, `GET /jobs/<id>`, `DELETE /jobs/<id>` | Async jobs |
+| `GET /jobs/<id>/events` | A job's changes and progress, as server-sent events |
 | `GET /jobs/<id>/stdout` | A finished job's binary output |
 | `POST /mcp` | The same tools over MCP (streamable HTTP, stateless) for agents; see [clyops-mcp](../mcp). `--no-mcp` turns it off. |
 

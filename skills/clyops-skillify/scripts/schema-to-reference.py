@@ -63,7 +63,7 @@ def _usage(words, arguments):
     return " ".join(parts + ["[OPTIONS]"])
 
 
-def _section(level, words, node, options, effects, stdin, stdout, constraints, required):
+def _section(level, words, node, options, effects, stdin, stdout, constraints, required, roles=()):
     """Render one runnable tool (a program without commands, or a leaf command)."""
     out = [f"{'#' * level} `{' '.join(words)}`", ""]
     if node.get("description"):
@@ -74,6 +74,10 @@ def _section(level, words, node, options, effects, stdin, stdout, constraints, r
         facts.append(f"- **stdin:** {stdin['description']} (`{stdin['contentType']}`)")
     if stdout:
         facts.append(f"- **stdout:** {stdout['description']} (`{stdout['contentType']}`)")
+    for r in roles:
+        kind = f", `{r['contentType']}`" if r.get("contentType") else ""
+        facts.append(f"- **Role `{r['name']}`** ({r['direction']}{kind}): {r['description']}"
+                     + (f" (see it with `CLYOPS_FDS={r['name']}:2`)" if r["direction"] == "out" else ""))
     for c in constraints:
         names = ", ".join(f"`--{o}`" for o in c["options"])
         facts.append({"exclusive": f"- **At most one of:** {names}",
@@ -96,7 +100,7 @@ def render(schema, invocation):
 
     `invocation` is how the tool is run (e.g. `mytool media to-pcm` through a
     dispatcher). A program with commands gets one section per leaf command,
-    with inherited options, the nearest declared effects/stdin/stdout, and
+    with inherited options, the nearest declared effects/stdin/stdout, its roles, and
     every constraint and required command on the way (spec section 13).
     """
     if schema.get("clyops") != 1:
@@ -105,21 +109,23 @@ def render(schema, invocation):
     if schema.get("epilog"):
         lines += [schema["epilog"].rstrip(), ""]
 
-    def walk(node, words, inherited, effects, stdin, stdout, constraints, required):
+    def walk(node, words, inherited, effects, stdin, stdout, constraints, required, roles):
         options = list(node["options"]) + inherited
+        # The nearest declaration of each role name wins (spec section 14).
+        roles = {**roles, **{r["name"]: r for r in node.get("roles", [])}}
         effects = node.get("effects") or effects
         stdin = node.get("stdin") or stdin
         stdout = node.get("stdout") or stdout
         constraints = constraints + node.get("constraints", [])
         required = required + node.get("requiredCommands", [])
         if not node.get("commands"):
-            return _section(2, words, node, options, effects, stdin, stdout, constraints, required)
+            return _section(2, words, node, options, effects, stdin, stdout, constraints, required, list(roles.values()))
         out = []
         for child in node["commands"]:
-            out += walk(child, words + [child["name"]], options, effects, stdin, stdout, constraints, required)
+            out += walk(child, words + [child["name"]], options, effects, stdin, stdout, constraints, required, roles)
         return out
 
-    lines += walk(schema, invocation.split(), [], [], None, None, [], [])
+    lines += walk(schema, invocation.split(), [], [], None, None, [], [], {})
     return "\n".join(lines).rstrip() + "\n"
 
 

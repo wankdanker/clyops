@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import {
   JobQueue, buildFunctionCommand, buildResultRecord, configureLogging, copyConfiguredArtifacts, deepMerge, findFilesByArtifactPattern,
   globToRegex, newJobId, newJobRecord, renderConfigValue, renderResultMap, renderTemplateString, resolveConfigPath, resolveFunctionConfig,
-  runScriptFunction, transitionJobRecord,
+  runScriptFunction, transitionJobRecord, updateJobProgress,
 } from '../dist/index.js';
 
 const repo = fileURLToPath(new URL('../../..', import.meta.url));
@@ -214,4 +214,31 @@ test('function positional order is configurable and supports legacy wrappers', a
   assert.deepEqual((await buildFunctionCommand(fn, opts, schema)).slice(1), ['--count', '2', '--', '-clip.wav']);
   fn.definition.positionals_order = 'sideways';
   await assert.rejects(buildFunctionCommand(fn, opts, schema), /order must be first or last/);
+});
+
+test('roles: a function run reports progress and returns meta', async () => {
+  const root = workspace();
+  const config = { functions: { demo: { script: 'scripts/demo.sh', positionals: ['in.txt'] } } };
+  const fn = resolveFunctionConfig(root, config, 'demo');
+  const updates = [];
+  const result = await runScriptFunction(fn, { configRoot: root, env, cwd: root, onProgress: (u) => updates.push(u) });
+  assert.equal(result.exitCode, 0, result.stderr);
+  assert.deepEqual(updates, [{ pct: 100 }]);
+  assert.deepEqual(result.progress, { pct: 100 });
+  assert.deepEqual(result.meta, { extra: false });
+});
+
+test('roles: progress updates the record without history entries', async () => {
+  const record = newJobRecord({ jobId: 'j', functionName: 'f', now: 't0' });
+  const next = updateJobProgress(updateJobProgress(record, { pct: 10 }, 't1'), { pct: 50, stage: 'encode' }, 't2');
+  assert.deepEqual(next.progress, { pct: 50, stage: 'encode' });
+  assert.equal(next.stage, 'encode');
+  assert.equal(next.updated_at, 't2');
+  assert.deepEqual(next.history, []);
+  const seen = [];
+  const queue = new JobQueue({ concurrency: 1, onChange: (r) => seen.push([r.status, r.progress?.pct ?? null]) });
+  const job = queue.add('f', async ({ progress }) => { progress({ pct: 25 }); progress({ pct: 75 }); return 'ok'; });
+  assert.equal(await job.done, 'ok');
+  assert.deepEqual(job.record.progress, { pct: 75 });
+  assert.deepEqual(seen, [['pending', null], ['processing', null], ['processing', 25], ['processing', 75], ['done', 75]]);
 });

@@ -139,6 +139,41 @@ Effects are `read-only`, `idempotent`, `destructive` and `network`.
 stdin/stdout declarations describe your program; your code performs the actual
 I/O. Schemas carry these declarations for API/MCP/desktop consumers.
 
+## Roles on file descriptors
+
+A program can offer streams beyond stdin, stdout and stderr, such as progress or
+metadata, by declaring roles. The runner that starts it decides which it wants and
+on which descriptors:
+
+```javascript
+cli.role('meta', 'out', 'Transfer metadata, before the output', 'application/json');
+cli.role('progress', 'out', 'Progress, one JSON object per line', 'application/x-ndjson');
+cli.run();
+cli.emit('meta', { name: 'clip.mp4' });
+cli.emit('progress', { pct: 50 });
+```
+
+The names `meta`, `progress`, `log` and `result` mean the same to every runner;
+any other name is free text. Roles show in help (`Output [progress]: …`) and as
+`roles` in the schema, on the level they are registered on; commands inherit their
+ancestors'.
+
+The runner puts each descriptor at its number before starting the program and
+lists the mapping in `CLYOPS_FDS`. Without it, `emit` does nothing, so a program
+run by hand needs only stdin, stdout and stderr. To see progress in a terminal:
+
+```sh
+CLYOPS_FDS=progress:2 mytool input.wav           # progress on stderr
+CLYOPS_FDS=progress:4 mytool input.wav 4>log.ndjson
+```
+
+The library reads `CLYOPS_FDS` once and removes it from the environment, so
+programs yours starts don't inherit it by accident. To share a stream with one,
+keep its descriptor open in the child and set the child's `CLYOPS_FDS` to
+`forwardFds('progress')`. Streams of lines (`progress`, `log`) share well; `meta`
+and `result` describe one program's output. `fdOpen` returns a role's descriptor
+(or none), for reading an `in` role or writing raw bytes.
+
 ## Help, schema and shell completion
 
 See [Bash, Zsh and Fish setup](completion.md) for startup files, PATH, sample tools

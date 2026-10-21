@@ -2,7 +2,7 @@
 import { watch } from 'node:fs';
 import { commands, discover, type Command, type Group } from './discover.js';
 import { redactArgv, toArgv, type Input } from './argv.js';
-import { start, type RunOptions, type RunResult, type Started } from './run.js';
+import { start, type RoleOption, type RunOptions, type RunResult, type Started } from './run.js';
 import { loadSchema, type Schema, type SchemaBody } from './schema.js';
 
 /** A probed executable or leaf command, with its effective inherited schema. */
@@ -86,6 +86,8 @@ export function expandCommands(cmd: Command, schema: Schema): Tool[] {
       constraints: chain.flatMap((s) => s.constraints ?? []),
       stdin: nearest((s) => s.stdin) ?? null,
       stdout: nearest((s) => s.stdout) ?? null,
+      // The nearest declaration of each role name wins (spec section 14).
+      roles: [...new Map(chain.flatMap((s) => s.roles ?? []).map((r) => [r.name, r])).values()],
       commands: [],
     };
     out.push({ ...cmd, name: words[words.length - 1], words: [...cmd.words, ...words], schema: flat, description: describe(node), subcommand: words });
@@ -198,9 +200,20 @@ export interface ToolRunOptions extends RunOptions {
 export function startTool(tool: Tool, input: Input, opts: ToolRunOptions = {}): Started & { /** Executed command words, including executable and arguments. */ command: string[] } {
   const { argv, env } = toArgv(tool.schema, input, { within: opts.within, cwd: opts.cwd, secretEnv: opts.secretsInEnv !== false, positionals: opts.positionalsOrder });
   const full = [...(tool.subcommand ?? []), ...argv];
-  const started = start(tool.file, full, { ...opts, env: Object.keys(env).length ? { ...(opts.env ?? process.env), ...env } : opts.env });
+  const roles = opts.roles && declaredRoles(tool, opts.roles);
+  const started = start(tool.file, full, { ...opts, roles, env: Object.keys(env).length ? { ...(opts.env ?? process.env), ...env } : opts.env });
   const command = [tool.file, ...redactArgv(tool.schema, full)];
   return { ...started, command, result: started.result.then((r) => ({ ...r, command })) };
+}
+
+/**
+ * The requested roles a tool declares in that direction (an input role needs `input`); the rest are
+ * dropped, so a runner can ask every tool for `progress` and only wire it where it exists.
+ */
+export function declaredRoles(tool: { /** Effective schema returned by the executable and inherited command options. */ schema: SchemaBody }, requested: Record<string, RoleOption>): Record<string, RoleOption> {
+  const declared = new Map((tool.schema.roles ?? []).map((r) => [r.name, r.direction]));
+  return Object.fromEntries(Object.entries(requested).filter(([name, role]) =>
+    declared.get(name) === (role.input === undefined ? 'out' : 'in')));
 }
 
 /** Run a tool with JSON input (spec section 13), collecting its output. */

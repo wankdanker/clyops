@@ -24,6 +24,7 @@
   {:else}<h3>stdout</h3><AnsiOutput text={result.stdout || '(no output)'} {colors} label="stdout"/><button type="button" class="quiet" onclick={download}>Download stdout ↓</button>{/if}
   {#if result.stderr}<h3>stderr</h3><AnsiOutput text={result.stderr} {colors} stderr label="stderr"/>{/if}
   {#if downloadError}<p class="error" role="alert">{downloadError}</p>{/if}
+  {#if result.meta !== undefined}<details><summary>Metadata</summary><pre>{JSON.stringify(result.meta, null, 2)}</pre></details>{/if}
   {#if result.json !== undefined}<details><summary>Parsed JSON</summary><pre>{JSON.stringify(result.json, null, 2)}</pre></details>{/if}
   <p class="result-duration">{Math.round(result.durationMs ?? 0)} ms</p>
 </section>

@@ -93,6 +93,7 @@ _FIXED_RULES = {
 _HOSTNAME = r"[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*"
 
 
+_ROLE_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.-]*")
 _EFFECTS = ("read-only", "idempotent", "destructive", "network")
 
 
@@ -402,6 +403,8 @@ class Cli:
         self._effects: List[str] = []
         self._stdin: Optional[Dict[str, str]] = None
         self._stdout: Optional[Dict[str, str]] = None
+        self._roles: List[Dict[str, object]] = []
+        self._fd_map: Optional[Dict[str, int]] = None  # CLYOPS_FDS as read once (spec section 14)
         self._constraints: List[Dict[str, object]] = []
         self._children: List["Cli"] = []
         self._parent: Optional["Cli"] = None
@@ -438,6 +441,112 @@ class Cli:
         """What the program writes on stdout; undeclared means text."""
         self._stdout = {"description": description, "contentType": content_type}
         return self
+
+    def role(self, name: str, direction: str, description: str, content_type: str = "",
+             schema: object = None) -> "Cli":
+        """Declare a role (spec section 1.3): a stream the program writes ("out") or reads ("in") on a
+        descriptor its runner chooses. `name` is meta, progress, log, result or another agreed name;
+        `schema` is a JSON Schema (dict or JSON text) for each document or line."""
+        if not _ROLE_NAME.fullmatch(name):
+            raise ValueError(f"Invalid role name '{name}'")
+        if direction not in ("in", "out"):
+            raise ValueError(f"Unknown role direction '{direction}'")
+        if any(r["name"] == name for r in self._roles):
+            raise ValueError(f"Duplicate role '{name}'")
+        if isinstance(schema, str):
+            schema = json.loads(schema)
+        self._roles.append({"name": name, "direction": direction, "description": description,
+                            "contentType": content_type, "schema": schema})
+        return self
+
+    def _find_role(self, name: str) -> Optional[Dict[str, object]]:
+        """The declared role, searching the selected command then its ancestors."""
+        for node in self._chain():
+            for r in node._roles:
+                if r["name"] == name:
+                    return r
+        return None
+
+    def _fd_mapping(self) -> Dict[str, int]:
+        """CLYOPS_FDS, read once on the program and then removed from the process environment."""
+        top = self
+        while top._parent is not None:
+            top = top._parent
+        if top._fd_map is not None:
+            return top._fd_map
+        mapping: Dict[str, int] = {}
+        raw = top.env.get("CLYOPS_FDS")
+        for entry in (e.strip() for e in (raw or "").split(",")):
+            if not entry:
+                continue
+            m = re.fullmatch(r"([A-Za-z][A-Za-z0-9_.-]*):([0-9]+)", entry)
+            if m is None or int(m.group(2)) < 2:
+                warn(f"Ignoring CLYOPS_FDS entry '{entry}'")
+            else:
+                mapping[m.group(1)] = int(m.group(2))
+        if raw is not None and os.environ.get("CLYOPS_FDS") == raw:
+            del os.environ["CLYOPS_FDS"]
+        top._fd_map = mapping
+        return mapping
+
+    def _mapped_fd(self, name: str) -> Optional[int]:
+        """The descriptor CLYOPS_FDS maps to `name`, when it is open."""
+        num = self._fd_mapping().get(name)
+        if num is None or os.name != "posix":
+            return None
+        try:
+            os.fstat(num)
+        except OSError:
+            return None
+        return num
+
+    def _warn_unopened_roles(self) -> None:
+        """Warn about each role the selected chain declares that CLYOPS_FDS maps to a closed descriptor."""
+        seen = set()
+        for node in self._chain():
+            for r in node._roles:
+                name = str(r["name"])
+                if name in seen:
+                    continue
+                seen.add(name)
+                num = self._fd_mapping().get(name)
+                if num is not None and self._mapped_fd(name) is None:
+                    warn(f"CLYOPS_FDS maps '{name}' to {num}, but descriptor {num} isn't open")
+
+    def fd_open(self, name: str) -> Optional[int]:
+        """The descriptor for a declared role when CLYOPS_FDS maps it and it is open, else None
+        (spec section 14)."""
+        return self._mapped_fd(name) if self._find_role(name) is not None else None
+
+    def emit(self, name: str, value: object) -> None:
+        """Write a line to a declared "out" role (spec section 14): a string as is, anything else as
+        compact JSON, then a newline. Does nothing when the runner didn't map it."""
+        decl = self._find_role(name)
+        if decl is None:
+            raise ValueError(f"Unknown role '{name}'")
+        if decl["direction"] != "out":
+            raise ValueError(f"Role '{name}' is not an output")
+        num = self._mapped_fd(name)
+        if num is None:
+            return
+        text = value if isinstance(value, str) else json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+        if not text.endswith("\n"):
+            text += "\n"
+        data = text.encode("utf-8")
+        try:
+            while data:
+                data = data[os.write(num, data):]
+        except OSError:
+            pass  # The reader went away; a role is optional, so the program carries on.
+
+    def forward_fds(self, *names: str) -> str:
+        """The CLYOPS_FDS value passing these roles on to a program this one starts (spec section 14)."""
+        out = []
+        for name in names:
+            num = self._mapped_fd(name)
+            if num is not None:
+                out.append(f"{name}:{num}")
+        return ",".join(out)
 
     def exclusive(self, *longs: str) -> "Cli":
         """At most one of these options may be given."""
@@ -581,6 +690,7 @@ class Cli:
         self._raw, self._arg_raw, self._sources, self._config = {}, {}, {}, {}
         self.values = Values()
         self._selected = self
+        self._fd_mapping()
         self._ensure_help()
 
         try:
@@ -620,6 +730,7 @@ class Cli:
         conflict = self._check_constraints()
         if conflict:
             return ParseResult("error", conflict)
+        self._warn_unopened_roles()
         return ParseResult("ok")
 
     def _check_constraints(self) -> Optional[str]:
@@ -969,6 +1080,10 @@ class Cli:
             if decl is not None:
                 ctype = decl["contentType"]
                 io.append(" ".join(x for x in (label, decl["description"], ctype and f"({ctype})") if x))
+        for r in node._roles:
+            label = f"{'Input' if r['direction'] == 'in' else 'Output'} [{r['name']}]:"
+            ctype = str(r["contentType"])
+            io.append(" ".join(x for x in (label, str(r["description"]), ctype and f"({ctype})") if x))
         if io:
             sections.append(io)
 
@@ -1067,6 +1182,7 @@ class Cli:
             "constraints": self._constraints,
             "stdin": self._stdin,
             "stdout": self._stdout,
+            "roles": [dict(r) for r in self._roles],
             "commands": [c._schema_node() for c in self._children],
         }
 

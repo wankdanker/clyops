@@ -7,6 +7,7 @@ const cli = new Cli({ name: 'tasks', root: process.env.DEMO_ROOT });
 cli.setDescription('Commands demo for the clyops conformance suite.');
 cli.setEpilog("Run 'tasks <command> --help' for a command's options.");
 cli.opt('VERBOSE', 'verbose', 'v', 'flag', 'Verbose output', 'Global');
+cli.role('progress', 'out', 'Progress, one JSON object per line', 'application/x-ndjson');
 
 const db = cli.command('db', 'Database tasks');
 db.opt('DB_URL', 'url', 'u', 'sqlite:app.db', 'Database URL', 'Database');
@@ -14,6 +15,7 @@ const migrate = db.command('migrate', 'Apply migrations');
 migrate.arg('target', 'Target version', 'latest');
 migrate.opt('DRY_RUN', 'dry-run', 'n', 'flag', 'Show what would run');
 migrate.setEffects('destructive');
+migrate.role('plan', 'out', 'Migration plan', 'text/plain');
 const status = db.command('status', 'Show migration status');
 status.setEffects('read-only');
 
@@ -26,4 +28,5 @@ send.setEffects('network');
 send.setStdin('Attachment', 'application/octet-stream');
 
 cli.run();
+cli.emit('progress', '{"stage":"done"}');
 process.stdout.write(JSON.stringify({ values: JSON.parse(cli.valuesJson()) }, null, 2) + '\n');

@@ -22,6 +22,8 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var index_exports = {};
 __export(index_exports, {
   constraintIssues: () => constraintIssues,
+  effectiveRoles: () => effectiveRoles,
+  fdsEnv: () => fdsEnv,
   formFields: () => formFields,
   formSchema: () => formSchema,
   inputKey: () => inputKey,
@@ -194,11 +196,31 @@ function isTextType(contentType = "") {
   return !type || type.startsWith("text/") || type === "application/json" || type.endsWith("+json") || type === "application/xml";
 }
 function formSchema(schema) {
-  return { ...toJsonSchema(schema), "x-clyops": { constraints: schema.constraints ?? [], effects: schema.effects ?? [], stdin: schema.stdin ?? null, stdout: schema.stdout ?? null } };
+  return { ...toJsonSchema(schema), "x-clyops": { constraints: schema.constraints ?? [], effects: schema.effects ?? [], stdin: schema.stdin ?? null, stdout: schema.stdout ?? null, roles: schema.roles ?? [] } };
+}
+
+// packages/schema/src/roles.ts
+function effectiveRoles(schema, path = []) {
+  const levels = [schema];
+  let node = schema;
+  for (const word of path) {
+    const next = node.commands?.find((c) => c.name === word);
+    if (!next) break;
+    levels.push(next);
+    node = next;
+  }
+  const byName = /* @__PURE__ */ new Map();
+  for (const level of levels) for (const role of level.roles ?? []) byName.set(role.name, { ...role });
+  return [...byName.values()];
+}
+function fdsEnv(mapping) {
+  return Object.entries(mapping).map(([name, fd]) => `${name}:${fd}`).join(",");
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   constraintIssues,
+  effectiveRoles,
+  fdsEnv,
   formFields,
   formSchema,
   inputKey,

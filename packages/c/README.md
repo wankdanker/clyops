@@ -47,6 +47,7 @@ clyops_effects(migrate, "destructive");      /* read-only, idempotent, destructi
 clyops_opt(cli, "TOKEN", "token", "", .description = "API token", .rule = "secret"); /* masked in help and values JSON */
 clyops_exclusive(cli, "json", "quiet");      /* also clyops_requires(cli, "a", "b"), clyops_one_of(...) */
 clyops_stdin(cli, "Audio to transcribe", "audio/wav");  /* and clyops_stdout(cli, description, type) */
+clyops_role(cli, "progress", "out", .description = "Progress");  /* then clyops_emit(cli, "progress", "{...}") */
 clyops_run(cli, argc, argv);                 /* clyops_get_at(cli, "command", 0) == "db" */
 ```
 

@@ -13,6 +13,9 @@ int main(int argc, char** argv) {
     clyops_effects(cli, "idempotent", "network");
     clyops_stdin(cli, "Lines to process", "text/plain");
     clyops_stdout(cli, "The resolved values", "application/json");
+    clyops_role(cli, "meta", "out", .description = "Run metadata, before the values", .content_type = "application/json");
+    clyops_role(cli, "progress", "out", .description = "Progress, one JSON object per line", .content_type = "application/x-ndjson", .schema = "{\"type\":\"object\",\"properties\":{\"pct\":{\"type\":\"number\"}}}");
+    clyops_role(cli, "extra", "in", .description = "Extra lines to process", .content_type = "text/plain");
 
     clyops_arg(cli, "input", .description = "Input file", .rule = "path");
     clyops_arg(cli, "mode", .description = "Processing mode", .default_value = "fast", .rule = "choice:fast,slow");
@@ -51,6 +54,8 @@ int main(int argc, char** argv) {
     clyops_requires(cli, "dest", "src");
 
     clyops_run(cli, argc, argv);
+    clyops_emit(cli, "meta", clyops_fd_open(cli, "extra") >= 0 ? "{\"extra\":true}" : "{\"extra\":false}");
+    clyops_emit(cli, "progress", "{\"pct\":100}");
 
     static const char* longs[] = {"config", "verbose", "quiet", "color", "out", "notes", "count", "ratio", "enabled", "tag",
         "no-cache", "key", "host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "data-dir",

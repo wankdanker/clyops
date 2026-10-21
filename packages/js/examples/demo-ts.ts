@@ -9,6 +9,10 @@ cli.requireCommand('sh', 'POSIX shell', 'install dash');
 cli.setEffects('idempotent', 'network');
 cli.setStdin('Lines to process', 'text/plain');
 cli.setStdout('The resolved values', 'application/json');
+cli.role('meta', 'out', 'Run metadata, before the values', 'application/json');
+cli.role('progress', 'out', 'Progress, one JSON object per line', 'application/x-ndjson',
+  '{"type":"object","properties":{"pct":{"type":"number"}}}');
+cli.role('extra', 'in', 'Extra lines to process', 'text/plain');
 
 cli.arg('input', 'Input file', '', 'path');
 cli.arg('mode', 'Processing mode', 'fast', 'choice:fast,slow');
@@ -47,6 +51,8 @@ cli.exclusive('endpoint', 'addr');
 cli.requires('dest', 'src');
 
 cli.run();
+cli.emit('meta', cli.fdOpen('extra') !== null ? '{"extra":true}' : '{"extra":false}');
+cli.emit('progress', '{"pct":100}');
 
 const longs = ['config', 'verbose', 'quiet', 'color', 'out', 'notes', 'count', 'ratio', 'enabled', 'tag', 'no-cache', 'key',
   'host', 'port', 'endpoint', 'addr', 'id', 'email', 'date', 'code', 'level', 'size', 'data-dir', 'src', 'dest', 'include', 'help'];

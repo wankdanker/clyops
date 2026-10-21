@@ -41,6 +41,7 @@ __export(index_exports, {
   newJobId: () => newJobId,
   newJobRecord: () => newJobRecord,
   objectValue: () => objectValue,
+  parseRoleJson: () => parseRoleJson,
   pathParts: () => pathParts,
   readJson: () => readJson,
   renderConfigValue: () => renderConfigValue,
@@ -56,6 +57,7 @@ __export(index_exports, {
   timestampIso: () => timestampIso,
   transitionJobRecord: () => transitionJobRecord,
   truthy: () => truthy,
+  updateJobProgress: () => updateJobProgress,
   writeJson: () => writeJson
 });
 module.exports = __toCommonJS(index_exports);
@@ -342,6 +344,7 @@ function redactArgv(schema, argv) {
 var import_node_child_process2 = require("node:child_process");
 var import_node_stream = require("node:stream");
 var import_node_string_decoder = require("node:string_decoder");
+var ROLE_NAME = /^[A-Za-z][A-Za-z0-9_.-]*$/;
 var ABORT_GRACE_MS = 200;
 var STOP_WAIT_MS = 1e3;
 function terminateTree(child, signal) {
@@ -364,10 +367,15 @@ function terminateTree(child, signal) {
 }
 function start(file, argv, opts = {}) {
   const started = Date.now();
+  const roles = process.platform === "win32" ? [] : Object.entries(opts.roles ?? {});
+  for (const [name] of roles) if (!ROLE_NAME.test(name)) throw new Error(`Invalid role name '${name}'`);
+  const env = { ...opts.env ?? process.env };
+  delete env.CLYOPS_FDS;
+  if (roles.length) env.CLYOPS_FDS = roles.map(([name], i) => `${name}:${i + 3}`).join(",");
   const child = (0, import_node_child_process2.spawn)(file, argv, {
     cwd: opts.cwd,
-    env: opts.env ?? process.env,
-    stdio: [opts.stdin === void 0 ? "ignore" : "pipe", "pipe", "pipe"],
+    env,
+    stdio: [opts.stdin === void 0 ? "ignore" : "pipe", "pipe", "pipe", ...roles.map(() => "pipe")],
     // POSIX detached children lead a new session/group, still with owned pipes.
     detached: process.platform !== "win32",
     windowsHide: true
@@ -394,6 +402,26 @@ function start(file, argv, opts = {}) {
   const mode = opts.stdout ?? "text";
   const stdout = mode === "stream" ? () => Buffer.alloc(0) : collect(childOut, opts.onStdout);
   const stderr = collect(childErr, opts.onStderr);
+  const roleOut = [];
+  const roleIn = [];
+  roles.forEach(([name, role], i) => {
+    const stream = child.stdio[i + 3];
+    if (role.input !== void 0) {
+      roleIn.push({ stream, input: role.input });
+      return;
+    }
+    let partial = "";
+    const lines = role.onLine && ((chunk) => {
+      const parts = (partial + chunk).split("\n");
+      partial = parts.pop() ?? "";
+      for (const line of parts) role.onLine?.(line);
+    });
+    stream.once("end", () => {
+      if (partial) role.onLine?.(partial);
+      partial = "";
+    });
+    roleOut.push({ name, stream, text: collect(stream, lines || void 0) });
+  });
   const result = new Promise((resolve5, reject) => {
     let timedOut = false;
     let failure;
@@ -422,6 +450,10 @@ function start(file, argv, opts = {}) {
         }
       }
       child.stdin?.destroy();
+      for (const { stream, input } of roleIn) {
+        if (input instanceof import_node_stream.Readable) input.unpipe(stream);
+        stream.destroy();
+      }
     };
     const finish = async (exitCode, signal) => {
       if (settled) return;
@@ -447,6 +479,7 @@ function start(file, argv, opts = {}) {
         ...mode === "buffer" ? { stdoutBuffer: out } : {},
         stderr: stderr().toString("utf8"),
         ...truncated ? { truncated } : {},
+        ...roleOut.length ? { roles: Object.fromEntries(roleOut.map((r) => [r.name, r.text().toString("utf8")])) } : {},
         durationMs: Date.now() - started
       });
     };
@@ -463,7 +496,7 @@ function start(file, argv, opts = {}) {
       }
       deadline = setTimeout(() => {
         treeStopped = terminateTree(child, "SIGKILL");
-        for (const stream of [childOut, childErr]) {
+        for (const stream of [childOut, childErr, ...roleOut.map((r) => r.stream)]) {
           if (!stream.destroyed) {
             stream.once("end", () => stream.destroy());
             stream.push(null);
@@ -504,6 +537,13 @@ function start(file, argv, opts = {}) {
         else source.pipe(child.stdin);
       } else child.stdin.end(opts.stdin);
     }
+    for (const { stream, input } of roleIn) {
+      stream.on("error", () => void 0).resume();
+      if (input instanceof import_node_stream.Readable) {
+        input.on("error", inputError);
+        input.pipe(stream);
+      } else stream.end(input);
+    }
     if (opts.signal?.aborted) abort();
   });
   return { child, stdout: childOut, result };
@@ -513,6 +553,12 @@ function tail(text, lines = 40) {
 }
 function shellQuote(args) {
   return args.map((a) => /^[A-Za-z0-9_@%+=:,./-]+$/.test(a) ? a : `'${a.replace(/'/g, "'\\''")}'`).join(" ");
+}
+
+// packages/tools/src/tools.ts
+function declaredRoles(tool, requested) {
+  const declared = new Map((tool.schema.roles ?? []).map((r) => [r.name, r.direction]));
+  return Object.fromEntries(Object.entries(requested).filter(([name, role]) => declared.get(name) === (role.input === void 0 ? "out" : "in")));
 }
 
 // packages/jobs/src/functions.ts
@@ -562,6 +608,14 @@ async function buildFunctionCommand(fn, opts, schema) {
   for (const key of unknown) LOGGER.warn("[%s] ignoring config key %s; no matching CLI option in schema", name, key);
   return [fn.script, ...argv];
 }
+function parseRoleJson(text) {
+  if (!text?.trim()) return void 0;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return void 0;
+  }
+}
 function streamPath(template, opts, base) {
   if (!template) return void 0;
   const rendered = opts.context ? renderTemplateString(template, opts.context) : template;
@@ -575,6 +629,19 @@ async function runScriptFunction(fn, opts) {
   const workDir = opts.context?.paths?.work_dir;
   const stdinPath = streamPath(fn.definition.stdin, opts, opts.configRoot);
   const stdoutPath = streamPath(fn.definition.stdout, opts, workDir ?? opts.configRoot);
+  let progress;
+  const roles = {
+    progress: {
+      onLine: (line) => {
+        const update = parseRoleJson(line);
+        if (!update || typeof update !== "object" || Array.isArray(update)) return;
+        progress = update;
+        opts.onProgress?.(progress);
+      }
+    },
+    meta: {},
+    log: { onLine: opts.onLog }
+  };
   const started = start(file, argv, {
     cwd: opts.cwd,
     env: opts.env,
@@ -582,7 +649,8 @@ async function runScriptFunction(fn, opts) {
     signal: opts.signal,
     onStderr: opts.onStderr,
     stdin: stdinPath ? (0, import_node_fs4.createReadStream)(stdinPath) : void 0,
-    stdout: stdoutPath ? "stream" : "text"
+    stdout: stdoutPath ? "stream" : "text",
+    roles: declaredRoles({ schema }, roles)
   });
   let written;
   if (stdoutPath) {
@@ -590,7 +658,8 @@ async function runScriptFunction(fn, opts) {
     written = (0, import_promises.finished)(started.stdout.pipe((0, import_node_fs4.createWriteStream)(stdoutPath)));
   }
   const [result] = await Promise.all([started.result, written]);
-  return { ...result, command, stderrTail: tail(result.stderr) };
+  const meta = parseRoleJson(result.roles?.meta);
+  return { ...result, command, stderrTail: tail(result.stderr), ...meta !== void 0 ? { meta } : {}, ...progress ? { progress } : {} };
 }
 function buildResultRecord(p) {
   return {
@@ -736,6 +805,10 @@ function transitionJobRecord(record, change) {
     result_key: change.resultKey || null
   };
 }
+function updateJobProgress(record, progress, now) {
+  const stage = typeof progress.stage === "string" ? progress.stage : record.stage;
+  return { ...record, progress, stage, updated_at: now ?? timestampIso() };
+}
 
 // packages/jobs/src/queue.ts
 var import_node_os = require("node:os");
@@ -767,7 +840,15 @@ var JobQueue = class {
       try {
         abort.signal.throwIfAborted();
         update({ status: "processing" });
-        const result = await task({ signal: abort.signal, stage: (stage) => update({ status: "processing", stage }) });
+        const result = await task({
+          signal: abort.signal,
+          stage: (stage) => update({ status: "processing", stage }),
+          progress: (p) => {
+            if (job.record.status !== "processing") return;
+            job.record = updateJobProgress(job.record, p);
+            this.opts.onChange?.(job.record);
+          }
+        });
         job.result = result;
         abort.signal.throwIfAborted();
         update({ status: "done", completedAt: timestampIso() });
@@ -835,6 +916,7 @@ var JobQueue = class {
   newJobId,
   newJobRecord,
   objectValue,
+  parseRoleJson,
   pathParts,
   readJson,
   renderConfigValue,
@@ -850,5 +932,6 @@ var JobQueue = class {
   timestampIso,
   transitionJobRecord,
   truthy,
+  updateJobProgress,
   writeJson
 });

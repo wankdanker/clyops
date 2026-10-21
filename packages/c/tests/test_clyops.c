@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #include "clyops.h"
 
@@ -130,7 +132,140 @@ static void test_commands(void) {
     clyops_free(cli);
 }
 
+/* Run `fn` in a child with stderr captured; true when it exits 2 printing `message`. */
+static int dies_with(void (*fn)(void), const char* message) {
+    int pipefd[2];
+    if (pipe(pipefd) != 0) return 0;
+    pid_t pid = fork();
+    if (pid == 0) {
+        dup2(pipefd[1], STDERR_FILENO);
+        close(pipefd[0]);
+        fn();
+        _exit(0);
+    }
+    close(pipefd[1]);
+    char buf[512] = {0};
+    size_t len = 0;
+    ssize_t n;
+    while (len < sizeof buf - 1 && (n = read(pipefd[0], buf + len, sizeof buf - 1 - len)) > 0) len += (size_t)n;
+    close(pipefd[0]);
+    int status = 0;
+    waitpid(pid, &status, 0);
+    return WIFEXITED(status) && WEXITSTATUS(status) == 2 && strstr(buf, message) != NULL;
+}
+
+static void role_bad_name(void) { clyops_role(clyops_new("t"), "7up", "out", .description = "X"); }
+static void role_colon(void) { clyops_role(clyops_new("t"), "a:b", "out", .description = "X"); }
+static void role_direction(void) { clyops_role(clyops_new("t"), "log", "both", .description = "X"); }
+static void role_duplicate(void) {
+    clyops_t* cli = clyops_new("t");
+    clyops_role(cli, "log", "out", .description = "X");
+    clyops_role(cli, "log", "in", .description = "Y");
+}
+static void role_emit_unknown(void) { clyops_emit(clyops_new("t"), "nope", "x"); }
+static void role_emit_input(void) {
+    clyops_t* cli = clyops_new("t");
+    clyops_role(cli, "extra", "in", .description = "X");
+    clyops_emit(cli, "extra", "x");
+}
+
+/* Run `fn` in a child (the mapping is read once per process); true when its checks all passed. */
+static int in_child(void (*fn)(void)) {
+    fflush(NULL);
+    pid_t pid = fork();
+    if (pid == 0) {
+        failures = 0;
+        fn();
+        _exit(failures ? 1 : 0);
+    }
+    int status = 0;
+    waitpid(pid, &status, 0);
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+static void child_mapping(void) {
+    FILE* tmp = tmpfile();
+    int fd = fileno(tmp);
+    char mapping[64], forwarded[64];
+    snprintf(mapping, sizeof mapping, " progress:%d , extra:999, log:%d", fd, fd);
+    setenv("CLYOPS_FDS", mapping, 1);
+    clyops_t* cli = clyops_new("t");
+    clyops_role(cli, "progress", "out", .description = "Progress", .schema = "{\"type\":\"object\"}");
+    clyops_role(cli, "extra", "in", .description = "Extra");
+    char* none[] = {NULL};
+    CHECK(clyops_parse(cli, 0, none) == CLYOPS_OK);
+    CHECK(getenv("CLYOPS_FDS") == NULL);
+    CHECK(clyops_fd_open(cli, "progress") == fd);
+    CHECK(clyops_fd_open(cli, "extra") == -1);
+    CHECK(clyops_fd_open(cli, "log") == -1);
+    clyops_emit(cli, "progress", "{\"pct\":50}");
+    clyops_emit(cli, "progress", "plain text");
+    clyops_emit(cli, "progress", "ends with newline\n");
+    char* fw = clyops_forward_fds(cli, "progress", "extra", "log", "nope");
+    snprintf(forwarded, sizeof forwarded, "progress:%d,log:%d", fd, fd);
+    CHECK(strcmp(fw, forwarded) == 0);
+    free(fw);
+    char got[128] = {0};
+    rewind(tmp);
+    CHECK(fread(got, 1, sizeof got - 1, tmp) > 0);
+    CHECK(strcmp(got, "{\"pct\":50}\nplain text\nends with newline\n") == 0);
+    fclose(tmp);
+    char* schema = clyops_json_schema(cli);
+    CHECK(strstr(schema, "{\"name\": \"progress\", \"direction\": \"out\", \"description\": \"Progress\", \"contentType\": \"\", \"schema\": {\"type\":\"object\"}}") != NULL);
+    free(schema);
+    clyops_free(cli);
+}
+
+static void child_unmapped(void) {
+    unsetenv("CLYOPS_FDS");
+    clyops_t* cli = clyops_new("t");
+    clyops_role(cli, "progress", "out", .description = "Progress");
+    char* none[] = {NULL};
+    CHECK(clyops_parse(cli, 0, none) == CLYOPS_OK);
+    CHECK(clyops_fd_open(cli, "progress") == -1);
+    clyops_emit(cli, "progress", "nothing happens");
+    char* fw = clyops_forward_fds(cli, "progress");
+    CHECK(strcmp(fw, "") == 0);
+    free(fw);
+    clyops_free(cli);
+}
+
+static void child_scope(void) {
+    setenv("CLYOPS_FDS", "progress:2,plan:2", 1);
+    clyops_t* cli = clyops_new("m");
+    clyops_role(cli, "progress", "out", .description = "Progress");
+    clyops_t* db = clyops_command(cli, "db", "Database");
+    clyops_t* migrate = clyops_command(db, "migrate", "Migrate");
+    clyops_role(migrate, "plan", "out", .description = "Migration plan");
+    clyops_command(db, "status", "Status");
+    char* status[] = {"db", "status"};
+    CHECK(clyops_parse(cli, 2, status) == CLYOPS_OK);
+    CHECK(clyops_fd_open(cli, "progress") == 2);
+    CHECK(clyops_fd_open(cli, "plan") == -1);
+    char* argv[] = {"db", "migrate"};
+    CHECK(clyops_parse(cli, 2, argv) == CLYOPS_OK);
+    CHECK(clyops_fd_open(cli, "plan") == 2);
+    char* usage = clyops_usage(cli);
+    CHECK(strstr(usage, "\nOutput [plan]: Migration plan\n") != NULL);
+    CHECK(strstr(usage, "[progress]") == NULL);
+    free(usage);
+    clyops_free(cli);
+}
+
+static void test_roles(void) {
+    CHECK(dies_with(role_bad_name, "Invalid role name '7up'"));
+    CHECK(dies_with(role_colon, "Invalid role name 'a:b'"));
+    CHECK(dies_with(role_direction, "Unknown role direction 'both'"));
+    CHECK(dies_with(role_duplicate, "Duplicate role 'log'"));
+    CHECK(dies_with(role_emit_unknown, "Unknown role 'nope'"));
+    CHECK(dies_with(role_emit_input, "Role 'extra' is not an output"));
+    CHECK(in_child(child_mapping));
+    CHECK(in_child(child_unmapped));
+    CHECK(in_child(child_scope));
+}
+
 int main(void) {
+    test_roles(); /* first: the CLYOPS_FDS mapping is read by the first parse in a process */
     test_typed_values();
     test_errors_and_help();
     test_environment();

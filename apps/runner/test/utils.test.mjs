@@ -5,7 +5,7 @@ import { Cli } from '../../../packages/js/dist/esm/index.js';
 
 // Exercise the real frontend module, including its formatting helpers.
 const compiled = await build({ entryPoints: [new URL('../src/lib/utils.ts', import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'node' });
-const { buildCommandArgs, formatCommandLine, parseCommandLine, initialFormValues } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString('base64')}`);
+const { buildCommandArgs, formatCommandLine, parseCommandLine, initialFormValues, displayedRoles, progressView } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString('base64')}`);
 
 function cli() {
   const cli = new Cli();
@@ -78,4 +78,19 @@ test('copied argument text preserves shell metacharacters and empty values', () 
   const formatted = formatCommandLine('/tmp/tool', args);
   assert.ok(formatted.includes("'$HOME"));
   assert.deepEqual(parseCommandLine(formatted, schema), { input: args[0], tag: [''] });
+});
+
+test('roles: the runner asks for the well-known output roles a schema declares', () => {
+  const tasks = new Cli({ name: 'tasks', env: {} }).role('progress', 'out', 'Progress').role('extra', 'in', 'Extra').role('custom', 'out', 'Other');
+  tasks.command('db', 'Database').role('meta', 'out', 'Meta').role('log', 'in', 'Not an output');
+  assert.deepEqual(displayedRoles(JSON.parse(tasks.jsonSchema())), ['meta', 'progress']);
+  assert.deepEqual(displayedRoles(JSON.parse(cli().jsonSchema())), []);
+});
+
+test('roles: progress updates become a fraction and a label', () => {
+  assert.deepEqual(progressView({ pct: 40, stage: 'encode' }), { fraction: 0.4, label: 'encode' });
+  assert.deepEqual(progressView({ done: 3, total: 4, message: 'file 3', stage: 'copy' }), { fraction: 0.75, label: 'file 3' });
+  assert.deepEqual(progressView({ pct: 140 }), { fraction: 1 });
+  assert.deepEqual(progressView({ done: 3 }), {});
+  assert.deepEqual(progressView(undefined), {});
 });

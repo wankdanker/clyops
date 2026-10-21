@@ -7,6 +7,9 @@ schema and resolved values.
 
 Input: Lines to process (text/plain)
 Output: The resolved values (application/json)
+Output [meta]: Run metadata, before the values (application/json)
+Output [progress]: Progress, one JSON object per line (application/x-ndjson)
+Input [extra]: Extra lines to process (text/plain)
 
 Positional Arguments:
   input                         Input file (accepts: path)

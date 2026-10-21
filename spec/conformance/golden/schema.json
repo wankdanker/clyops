@@ -475,5 +475,35 @@
     "description": "The resolved values",
     "contentType": "application/json"
   },
+  "roles": [
+    {
+      "name": "meta",
+      "direction": "out",
+      "description": "Run metadata, before the values",
+      "contentType": "application/json",
+      "schema": null
+    },
+    {
+      "name": "progress",
+      "direction": "out",
+      "description": "Progress, one JSON object per line",
+      "contentType": "application/x-ndjson",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "pct": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    {
+      "name": "extra",
+      "direction": "in",
+      "description": "Extra lines to process",
+      "contentType": "text/plain",
+      "schema": null
+    }
+  ],
   "commands": []
 }

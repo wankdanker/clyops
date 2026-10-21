@@ -2,6 +2,8 @@ Usage: tasks db migrate [<target>] [OPTIONS]
 
 Apply migrations
 
+Output [plan]: Migration plan (text/plain)
+
 Positional Arguments:
   target                        Target version (default: latest)
 

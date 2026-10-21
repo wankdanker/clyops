@@ -181,6 +181,7 @@ complete -c __CLYOPS_PROG__ -f -a '(__clyops___CLYOPS_FUNC___complete)'
 
 // packages/js/src/index.ts
 var EFFECTS = ["read-only", "idempotent", "destructive", "network"];
+var ROLE_NAME = /^[A-Za-z][A-Za-z0-9_.-]*$/;
 var COLORS = {
   info: "\x1B[1;37m",
   warning: "\x1B[0;33m",
@@ -491,6 +492,9 @@ var Cli = class _Cli {
   effects = [];
   stdinDecl = null;
   stdoutDecl = null;
+  roles = [];
+  // CLYOPS_FDS as read once (spec section 14), on the program.
+  fdMap;
   constraints = [];
   children = [];
   parent;
@@ -536,6 +540,96 @@ var Cli = class _Cli {
   setStdout(description, contentType = "") {
     this.stdoutDecl = { description, contentType };
     return this;
+  }
+  /**
+   * Declare a role (spec section 1.3): a stream the program writes (`out`) or reads (`in`) on a
+   * descriptor its runner chooses. `name` is `meta`, `progress`, `log`, `result` or another agreed
+   * name; `schema` is a JSON Schema (object or JSON text) for each document or line.
+   */
+  role(name, direction, description, contentType = "", schema) {
+    if (!ROLE_NAME.test(name)) throw new Error(`Invalid role name '${name}'`);
+    if (direction !== "in" && direction !== "out") throw new Error(`Unknown role direction '${direction}'`);
+    if (this.roles.some((r) => r.name === name)) throw new Error(`Duplicate role '${name}'`);
+    const parsed = typeof schema === "string" ? JSON.parse(schema) : schema;
+    this.roles.push({ name, direction, description, contentType, schema: parsed ?? null });
+    return this;
+  }
+  /** The declared role, searching the selected command then its ancestors. */
+  findRole(name) {
+    for (const node of this.chain()) {
+      const decl = node.roles.find((r) => r.name === name);
+      if (decl) return decl;
+    }
+    return void 0;
+  }
+  /** CLYOPS_FDS, read once on the program and then removed from the process environment. */
+  fdMapping() {
+    let top = this;
+    while (top.parent) top = top.parent;
+    if (top.fdMap) return top.fdMap;
+    const map = /* @__PURE__ */ new Map();
+    const raw = top.env.CLYOPS_FDS;
+    for (const entry of (raw ?? "").split(",").map((s) => s.trim()).filter(Boolean)) {
+      const m = /^([A-Za-z][A-Za-z0-9_.-]*):([0-9]+)$/.exec(entry);
+      if (!m || Number(m[2]) < 2) warn("Ignoring CLYOPS_FDS entry '%s'", entry);
+      else map.set(m[1], Number(m[2]));
+    }
+    if (raw !== void 0 && process.env.CLYOPS_FDS === raw) delete process.env.CLYOPS_FDS;
+    top.fdMap = map;
+    return map;
+  }
+  /** The descriptor `CLYOPS_FDS` maps to `name`, when it is open. */
+  mappedFd(name) {
+    const fd = this.fdMapping().get(name);
+    if (fd === void 0 || process.platform === "win32") return null;
+    try {
+      fs.fstatSync(fd);
+      return fd;
+    } catch {
+      return null;
+    }
+  }
+  /** Warn about each role the selected chain declares that CLYOPS_FDS maps to a closed descriptor. */
+  warnUnopenedRoles() {
+    const seen = /* @__PURE__ */ new Set();
+    for (const node of this.chain()) {
+      for (const role of node.roles) {
+        if (seen.has(role.name)) continue;
+        seen.add(role.name);
+        const fd = this.fdMapping().get(role.name);
+        if (fd !== void 0 && this.mappedFd(role.name) === null) {
+          warn("CLYOPS_FDS maps '%s' to %d, but descriptor %d isn't open", role.name, fd, fd);
+        }
+      }
+    }
+  }
+  /** The descriptor for a declared role when CLYOPS_FDS maps it and it is open, else null (spec section 14). */
+  fdOpen(name) {
+    return this.findRole(name) ? this.mappedFd(name) : null;
+  }
+  /**
+   * Write a line to a declared `out` role (spec section 14): a string as is, anything else as compact
+   * JSON, then a newline. Does nothing when the runner didn't map it.
+   */
+  emit(name, value) {
+    const decl = this.findRole(name);
+    if (!decl) throw new Error(`Unknown role '${name}'`);
+    if (decl.direction !== "out") throw new Error(`Role '${name}' is not an output`);
+    const fd = this.mappedFd(name);
+    if (fd === null) return;
+    let text = typeof value === "string" ? value : JSON.stringify(value);
+    if (!text.endsWith("\n")) text += "\n";
+    try {
+      fs.writeSync(fd, text);
+    } catch {
+    }
+  }
+  /** The CLYOPS_FDS value passing these roles on to a program this one starts (spec section 14). */
+  forwardFds(...names) {
+    return names.flatMap((n) => {
+      const fd = this.mappedFd(n);
+      return fd === null ? [] : [`${n}:${fd}`];
+    }).join(",");
   }
   /** At most one of these options may be given. */
   exclusive(...longs) {
@@ -726,6 +820,7 @@ var Cli = class _Cli {
     this.configValues.clear();
     this.values = /* @__PURE__ */ Object.create(null);
     this.selected = this;
+    this.fdMapping();
     this.ensureHelp();
     let err = this.scan(argv);
     if (!err && this.configOption) err = this.loadConfig();
@@ -756,6 +851,7 @@ var Cli = class _Cli {
     }
     const conflict = this.checkConstraints();
     if (conflict) return { status: "error", error: conflict, showUsage: true };
+    this.warnUnopenedRoles();
     return { status: "ok" };
   }
   /** Spec section 1.6: the first relationship that fails, from the program down. */
@@ -1089,7 +1185,11 @@ var Cli = class _Cli {
     sections.push([usageLine + " [OPTIONS]"]);
     if (node.description) sections.push(wrapText(node.description, maxWidth));
     const stream = (label, s) => [label, s.description, s.contentType && `(${s.contentType})`].filter(Boolean).join(" ");
-    const io = [node.stdinDecl && stream("Input:", node.stdinDecl), node.stdoutDecl && stream("Output:", node.stdoutDecl)];
+    const io = [
+      node.stdinDecl && stream("Input:", node.stdinDecl),
+      node.stdoutDecl && stream("Output:", node.stdoutDecl),
+      ...node.roles.map((r) => stream(`${r.direction === "in" ? "Input" : "Output"} [${r.name}]:`, r))
+    ];
     if (io.some(Boolean)) sections.push(io.filter((l) => Boolean(l)));
     if (node.children.length > 0) sections.push(["Commands:", ...node.children.flatMap((c) => row(c.word, c.description))]);
     if (node.args.length > 0) {
@@ -1186,6 +1286,13 @@ var Cli = class _Cli {
       constraints: this.constraints,
       stdin: this.stdinDecl,
       stdout: this.stdoutDecl,
+      roles: this.roles.map((r) => ({
+        name: r.name,
+        direction: r.direction,
+        description: r.description,
+        contentType: r.contentType,
+        schema: r.schema
+      })),
       commands: this.children.map((c) => c.schemaNode())
     };
   }

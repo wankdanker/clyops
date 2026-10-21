@@ -120,5 +120,5 @@ export function isTextType(contentType = ''): boolean {
 
 /** Attach relationship and execution metadata without changing request-validation semantics. */
 export function formSchema(schema: Schema): JsonSchema {
-  return { ...toJsonSchema(schema), 'x-clyops': { constraints: schema.constraints ?? [], effects: schema.effects ?? [], stdin: schema.stdin ?? null, stdout: schema.stdout ?? null } };
+  return { ...toJsonSchema(schema), 'x-clyops': { constraints: schema.constraints ?? [], effects: schema.effects ?? [], stdin: schema.stdin ?? null, stdout: schema.stdout ?? null, roles: schema.roles ?? [] } };
 }

@@ -1,7 +1,11 @@
 package io.github.wankdanker.clyops;
 
 import java.io.File;
+import java.io.FileDescriptor;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.lang.reflect.Field;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -18,6 +22,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -357,6 +362,14 @@ public class Cli {
     private List<String> effects = List.of();
     private Map<String, Object> stdin;
     private Map<String, Object> stdout;
+    private final List<Map<String, Object>> roles = new ArrayList<>();
+    // CLYOPS_FDS as read once (spec section 14); null until then.
+    private Map<String, Integer> fdMap;
+    private static final Pattern ROLE_NAME = Pattern.compile("[A-Za-z][A-Za-z0-9_.-]*");
+    private static final Pattern FD_ENTRY = Pattern.compile("([A-Za-z][A-Za-z0-9_.-]*):([0-9]{1,9})");
+    // Streams to the runner's descriptors, kept open for the life of the process.
+    private static final Map<Integer, OutputStream> FD_STREAMS = new ConcurrentHashMap<>();
+    private static final Set<Integer> FD_WARNED = ConcurrentHashMap.newKeySet();
     private final List<Map<String, Object>> constraints = new ArrayList<>();
     private final List<Cli> children = new ArrayList<>();
     private Cli parent;
@@ -429,6 +442,144 @@ public class Cli {
         m.put("description", description);
         m.put("contentType", contentType);
         return m;
+    }
+
+    /**
+     * Declare a role (spec section 1.3): a stream the program writes ({@code "out"}) or reads
+     * ({@code "in"}) on a descriptor its runner chooses. {@code name} is meta, progress, log, result or
+     * another agreed name.
+     */
+    public Cli role(String name, String direction, String description) { return role(name, direction, description, "", null); }
+
+    /** Declare a role with its MIME type. */
+    public Cli role(String name, String direction, String description, String contentType) {
+        return role(name, direction, description, contentType, null);
+    }
+
+    /** Declare a role with its MIME type and a JSON Schema, as JSON text, for each document or line ({@code null} for none). */
+    public Cli role(String name, String direction, String description, String contentType, String schema) {
+        if (!ROLE_NAME.matcher(name).matches()) throw new IllegalArgumentException("Invalid role name '" + name + "'");
+        if (!direction.equals("in") && !direction.equals("out")) {
+            throw new IllegalArgumentException("Unknown role direction '" + direction + "'");
+        }
+        for (Map<String, Object> r : roles) {
+            if (name.equals(r.get("name"))) throw new IllegalArgumentException("Duplicate role '" + name + "'");
+        }
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("name", name);
+        r.put("direction", direction);
+        r.put("description", description);
+        r.put("contentType", contentType);
+        r.put("schema", schema == null || schema.isEmpty() ? null : new Json.Raw(schema));
+        roles.add(r);
+        return this;
+    }
+
+    /** The declared role, searching the selected command then its ancestors. */
+    private Map<String, Object> findRole(String name) {
+        for (Cli node : chain()) {
+            for (Map<String, Object> r : node.roles) if (name.equals(r.get("name"))) return r;
+        }
+        return null;
+    }
+
+    /**
+     * CLYOPS_FDS, read once on the program. Java can't remove it from its own environment: a program
+     * starting others removes it from {@code ProcessBuilder.environment()} or sets {@link #forwardFds}.
+     */
+    private Map<String, Integer> fdMapping() {
+        Cli top = this;
+        while (top.parent != null) top = top.parent;
+        if (top.fdMap != null) return top.fdMap;
+        Map<String, Integer> map = new HashMap<>();
+        for (String raw : top.env.getOrDefault("CLYOPS_FDS", "").split(",")) {
+            String entry = raw.trim();
+            if (entry.isEmpty()) continue;
+            Matcher m = FD_ENTRY.matcher(entry);
+            if (m.matches() && Integer.parseInt(m.group(2)) >= 2) map.put(m.group(1), Integer.parseInt(m.group(2)));
+            else Log.warn("Ignoring CLYOPS_FDS entry '%s'", entry);
+        }
+        top.fdMap = map;
+        return map;
+    }
+
+    /** Warn about each role the selected chain declares that CLYOPS_FDS maps to a closed descriptor. */
+    private void warnUnopenedRoles() {
+        Set<String> seen = new HashSet<>();
+        for (Cli node : chain()) {
+            for (Map<String, Object> r : node.roles) {
+                String name = (String) r.get("name");
+                if (!seen.add(name)) continue;
+                Integer fd = fdMapping().get(name);
+                if (fd != null && mappedFd(name) < 0) Log.warn("CLYOPS_FDS maps '%s' to %d, but descriptor %d isn't open", name, fd, fd);
+            }
+        }
+    }
+
+    /** The descriptor CLYOPS_FDS maps to {@code name}, when it is open, else -1. */
+    private int mappedFd(String name) {
+        Integer fd = fdMapping().get(name);
+        return fd != null && Files.exists(Paths.get("/dev/fd/" + fd)) ? fd : -1;
+    }
+
+    /** The descriptor for a declared role when CLYOPS_FDS maps it and it is open, else -1 (spec section 14). */
+    public int fdOpen(String name) { return findRole(name) != null ? mappedFd(name) : -1; }
+
+    /**
+     * Write {@code text} and a newline (unless it ends with one) to a declared "out" role (spec
+     * section 14). Does nothing when the runner didn't map it; write errors are ignored.
+     */
+    public void emit(String name, String text) {
+        Map<String, Object> r = findRole(name);
+        if (r == null) throw new IllegalArgumentException("Unknown role '" + name + "'");
+        if (!"out".equals(r.get("direction"))) throw new IllegalArgumentException("Role '" + name + "' is not an output");
+        int fd = mappedFd(name);
+        if (fd < 0) return;
+        String line = text.endsWith("\n") ? text : text + "\n";
+        try {
+            OutputStream out = FD_STREAMS.computeIfAbsent(fd, Cli::openFd);
+            if (out == null) return;
+            synchronized (out) {
+                out.write(line.getBytes(StandardCharsets.UTF_8));
+                out.flush();
+            }
+        } catch (IOException e) {
+            // The reader went away; a role is optional, so the program carries on.
+        }
+    }
+
+    /** The CLYOPS_FDS value passing these roles on to a program this one starts (spec section 14). */
+    public String forwardFds(String... names) {
+        List<String> out = new ArrayList<>();
+        for (String n : names) {
+            int fd = mappedFd(n);
+            if (fd >= 0) out.add(n + ":" + fd);
+        }
+        return String.join(",", out);
+    }
+
+    /**
+     * A stream to descriptor {@code fd}. With {@code --add-opens java.base/java.io=ALL-UNNAMED} it
+     * writes to the descriptor itself; otherwise it reopens {@code /dev/fd/N} for appending, which
+     * works for pipes and files but not sockets.
+     */
+    private static OutputStream openFd(int fd) {
+        try {
+            FileDescriptor descriptor = new FileDescriptor();
+            Field field = FileDescriptor.class.getDeclaredField("fd");
+            field.setAccessible(true);
+            field.setInt(descriptor, fd);
+            return new FileOutputStream(descriptor);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            try {
+                return new FileOutputStream("/dev/fd/" + fd, true);
+            } catch (IOException e2) {
+                if (FD_WARNED.add(fd)) {
+                    Log.warn("Cannot write to file descriptor %d (a socket?): run java with --add-opens java.base/java.io=ALL-UNNAMED", fd);
+                }
+                return null;
+            }
+        }
     }
 
     /** At most one of these options may be given. */
@@ -605,6 +756,7 @@ public class Cli {
         config = new LinkedHashMap<>();
         values = new Values();
         selected = this;
+        fdMapping();
         ensureHelp();
 
         String scanError = null;
@@ -641,6 +793,7 @@ public class Cli {
         if (!missing.isEmpty()) return ParseResult.error("Missing required argument(s): " + String.join(" ", missing));
         String conflict = checkConstraints();
         if (conflict != null) return ParseResult.error(conflict);
+        warnUnopenedRoles();
         return ParseResult.ok();
     }
 
@@ -1033,6 +1186,12 @@ public class Cli {
             if (!((String) decl.get("contentType")).isEmpty()) line += " (" + decl.get("contentType") + ")";
             io.add(line);
         }
+        for (Map<String, Object> r : node.roles) {
+            String line = ("in".equals(r.get("direction")) ? "Input" : "Output") + " [" + r.get("name") + "]:";
+            if (!((String) r.get("description")).isEmpty()) line += " " + r.get("description");
+            if (!((String) r.get("contentType")).isEmpty()) line += " (" + r.get("contentType") + ")";
+            io.add(line);
+        }
         if (!io.isEmpty()) sections.add(io);
 
         if (!node.children.isEmpty()) {
@@ -1178,6 +1337,7 @@ public class Cli {
         out.put("constraints", constraints);
         out.put("stdin", stdin);
         out.put("stdout", stdout);
+        out.put("roles", roles.stream().map(LinkedHashMap::new).toList());
         out.put("commands", children.stream().map(Cli::schemaNode).toList());
         return out;
     }

@@ -41,6 +41,15 @@
   "constraints": [],
   "stdin": null,
   "stdout": null,
+  "roles": [
+    {
+      "name": "progress",
+      "direction": "out",
+      "description": "Progress, one JSON object per line",
+      "contentType": "application/x-ndjson",
+      "schema": null
+    }
+  ],
   "commands": [
     {
       "name": "db",
@@ -69,6 +78,7 @@
       "constraints": [],
       "stdin": null,
       "stdout": null,
+      "roles": [],
       "commands": [
         {
           "name": "migrate",
@@ -108,6 +118,15 @@
           "constraints": [],
           "stdin": null,
           "stdout": null,
+          "roles": [
+            {
+              "name": "plan",
+              "direction": "out",
+              "description": "Migration plan",
+              "contentType": "text/plain",
+              "schema": null
+            }
+          ],
           "commands": []
         },
         {
@@ -123,6 +142,7 @@
           "constraints": [],
           "stdin": null,
           "stdout": null,
+          "roles": [],
           "commands": []
         }
       ]
@@ -191,6 +211,7 @@
         "contentType": "application/octet-stream"
       },
       "stdout": null,
+      "roles": [],
       "commands": []
     }
   ]

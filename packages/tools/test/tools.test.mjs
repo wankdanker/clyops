@@ -419,3 +419,62 @@ test('toArgv renders and validates bare flags', () => {
   assert.deepEqual(controlled.argv, []);
   assert.deepEqual(controlled.controlled, ['verbose']);
 });
+
+test('roles: run wires each to a descriptor and says so in CLYOPS_FDS', async () => {
+  const demo = join(repo, 'packages/js/examples/demo.cjs');
+  const lines = [];
+  const result = await run('node', [demo, 'in.txt'], {
+    env: { ...process.env, KEY: 'x', CLYOPS_FDS: 'meta:9' }, // the runner's own mapping is never passed on
+    roles: { progress: { onLine: (l) => lines.push(l) }, meta: {}, extra: { input: 'x\n' } },
+  });
+  assert.equal(result.exitCode, 0, result.stderr);
+  assert.deepEqual(result.roles, { progress: '{"pct":100}\n', meta: '{"extra":true}\n' });
+  assert.deepEqual(lines, ['{"pct":100}']);
+  const plain = await run('node', [demo, 'in.txt'], { env: { ...process.env, KEY: 'x', CLYOPS_FDS: 'progress:2' } });
+  assert.equal(plain.roles, undefined);
+  assert.doesNotMatch(plain.stderr, /pct/, 'a CLYOPS_FDS in env is stripped');
+  assert.throws(() => run('node', [demo], { roles: { 'a:b': {} } }), /Invalid role name 'a:b'/);
+});
+
+test('roles: a partial last line is still delivered, and a run that writes nothing collects nothing', async () => {
+  const lines = [];
+  const result = await run('sh', ['-c', 'printf "one\\ntwo" >&3'], { roles: { log: { onLine: (l) => lines.push(l) } } });
+  assert.deepEqual(lines, ['one', 'two']);
+  assert.equal(result.roles.log, 'one\ntwo');
+  const quiet = await run('sh', ['-c', 'echo "$CLYOPS_FDS"'], { roles: { log: {}, plan: { input: 'unread' } } });
+  assert.equal(quiet.stdout, 'log:3,plan:4\n');
+  assert.deepEqual(quiet.roles, { log: '' });
+});
+
+test('roles: timeouts end role streams too', async () => {
+  const result = await run('sh', ['-c', 'echo start >&3; sleep 30'], { timeoutMs: 200, roles: { log: {} } });
+  assert.equal(result.timedOut, true);
+  assert.equal(result.roles.log, 'start\n');
+});
+
+test('roles: startTool wires only what the tool declares, in that direction', async () => {
+  const root = tree();
+  try {
+    const { tools } = await loadTools(root);
+    const demo = tools.find((t) => t.words.join(' ') === 'demo');
+    assert.deepEqual(demo.schema.roles.map((r) => r.name), ['meta', 'progress', 'extra']);
+    const progress = [];
+    const result = await runTool(demo, { input: 'in.txt' }, {
+      env: { ...process.env, KEY: 'x' },
+      roles: { progress: { onLine: (l) => progress.push(JSON.parse(l)) }, log: {}, meta: { input: 'wrong direction' } },
+    });
+    assert.equal(result.ok, true, result.stderr);
+    assert.deepEqual(progress, [{ pct: 100 }]);
+    assert.deepEqual(result.roles, { progress: '{"pct":100}\n' });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('roles: expandCommands gives a command its own and its ancestors\' roles', () => {
+  const cmd = { name: 'tasks', words: ['tasks'], file: '/x/tasks', kind: 'tool' };
+  const tools = expandCommands(cmd, tasksGolden);
+  const roles = (words) => tools.find((t) => t.subcommand.join(' ') === words).schema.roles.map((r) => r.name);
+  assert.deepEqual(roles('db migrate'), ['progress', 'plan']);
+  assert.deepEqual(roles('db status'), ['progress']);
+});

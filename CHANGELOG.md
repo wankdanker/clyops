@@ -11,6 +11,24 @@ section here.
   repository's tools, docs and source, with a schema-to-Markdown renderer).
 - `llms.txt` at the site root (clyops.io/llms.txt) indexing the spec, guides,
   apps and agent skills for AI agents, and an `AGENTS.md` for contributors.
+- Roles on file descriptors (spec sections 1.3 and 14): `role(name, in|out, description,
+  contentType, schema)` beside stdin/stdout, listed as `roles` in `--help-json-schema` and
+  in help. Well-known `meta`, `progress`, `log` and `result`. The runner chooses each
+  descriptor and maps it in `CLYOPS_FDS` (`meta:3,progress:4`, or `progress:2` for
+  stderr); `emit(name, value)`, `fdOpen(name)` and `forwardFds(name...)` use the mapping
+  and do nothing without it. Libraries remove `CLYOPS_FDS` from the environment after
+  reading it.
+- Runners wire up roles: clyops-tools `run`/`runTool` take `roles` (each gets fd 3, 4, ...
+  and `CLYOPS_FDS`); clyops-jobs puts `progress` on the job record and returns `meta`;
+  clyops-api adds `meta`/`progress` to the envelope and job records, `GET /jobs/:id/events`
+  (server-sent events) and an `X-Clyops-Meta` header on streamed output; clyops-mcp turns
+  progress into MCP progress notifications and returns `meta` in `_meta`; the desktop and
+  web runners show a progress bar and the metadata. The spec names the progress fields
+  runners understand: `pct`, `done`/`total`, `stage`, `message`.
+- After parsing, a role the program declares that `CLYOPS_FDS` maps to a descriptor that
+  isn't open is reported with a warning (a launcher likely dropped it).
+- Web runner: a live background job offers Cancel again (job statuses are `pending` and
+  `processing`, as the API sends them).
 - Static browser Linux lab running the unchanged Bash/Python examples with real
   FFmpeg, curl, pipes and shell completion. Includes file transfers and a local
   HTTP upload server inside the guest; assets load on demand from GitHub Pages.

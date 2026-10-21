@@ -92,13 +92,25 @@ resolves to a list.
   `contentType` is a MIME type (`audio/wav`); for stdin it may be a
   comma-separated list of accepted types (`audio/wav,audio/flac`). Undeclared
   stdin means the program doesn't read it; undeclared stdout means text.
+* `role(NAME, DIRECTION, description, contentType, schema)`: a stream the
+  program writes (`DIRECTION` `out`) or reads (`in`) on a file descriptor
+  beyond stdin, stdout and stderr (section 14). The program names what the
+  stream carries; the runner that starts it chooses the descriptor. `NAME` is
+  one of the well-known `meta`, `progress`, `log` and `result` (section 14) or
+  any other name a runner that knows the program agrees on, and matches
+  `[A-Za-z][A-Za-z0-9_.-]*`. `schema` is an optional JSON Schema, as JSON text
+  or the language's native object, that each document or line matches. Roles
+  are listed in registration order.
 * Option relationships (1.6) and commands (1.7).
 
 Registering an unknown validation rule, a duplicate long/short name, a
 positional argument after a variadic, an unknown effect (`Unknown effect 'E'`),
 a relationship naming an option that isn't registered (`Unknown option --NAME
-in constraint`), or mixing commands and positional arguments on one level
-(`Cannot mix commands and positional arguments`) is a programming error,
+in constraint`), mixing commands and positional arguments on one level
+(`Cannot mix commands and positional arguments`), a role name
+not matching the pattern (`Invalid role name 'R'`), a role registered twice on
+a level (`Duplicate role 'R'`) or a direction other than `in` or `out`
+(`Unknown role direction 'D'`) is a programming error,
 reported at registration time in the language's usual way (exception, panic, or
 a message and exit status 2 in Bash and C), e.g. `Unknown validation rule 'R'
 for --NAME`.
@@ -354,7 +366,9 @@ Help is that of the selected command (1.7): `mytool db --help` describes
    default) or ` [<name>...]` (variadic), then ` [OPTIONS]`.
 2. **Description** (if any), word-wrapped at `MAXW`.
 3. **Input and output** (if declared): `Input: DESCRIPTION (TYPE)` and
-   `Output: DESCRIPTION (TYPE)` lines, leaving out an empty description or type.
+   `Output: DESCRIPTION (TYPE)` lines, then one line per role in registration
+   order, `Input [NAME]: DESCRIPTION (TYPE)` or `Output [NAME]: DESCRIPTION
+   (TYPE)`. An empty description or type is left out.
 4. **`Commands:`** (if any), one row per command: its name and description.
 5. **`Positional Arguments:`** (if any), one row per argument.
 6. **`Required Commands:`** (if any) of the chain, from the program down, one
@@ -414,10 +428,13 @@ line of its own).
   ],
   "stdin": { "description": "", "contentType": "" },
   "stdout": null,
+  "roles": [
+    { "name": "meta", "direction": "out", "description": "", "contentType": "", "schema": null }
+  ],
   "commands": [
     { "name": "", "description": "", "epilog": "", "arguments": [], "options": [],
       "requiredCommands": [], "effects": [], "constraints": [], "stdin": null, "stdout": null,
-      "commands": [] }
+      "roles": [], "commands": [] }
   ]
 }
 ```
@@ -429,7 +446,9 @@ line of its own).
 `effects` lists the declared effects (1.3) in the order given; `constraints`
 the relationships (1.6) in registration order, `type` being `exclusive`,
 `requires` or `oneOf` and `options` the long names; `stdin` and `stdout` are
-`null` unless declared. `commands` holds each command (1.7) with the same
+`null` unless declared. `roles` lists the declared roles (1.3) in
+registration order, `schema` being `null` when not given; a consumer reading
+the output of an older version without `roles` treats it as empty. `commands` holds each command (1.7) with the same
 fields as the program, `name` in place of `clyops` and `script`, and only its
 own options. Output is indented with two spaces. [schema.json](schema.json) is the formal JSON Schema of this output.
 
@@ -707,3 +726,84 @@ a required option from its environment or a config file. Each pair of
 `exclusive` options becomes an `allOf` entry `{"not": {"required": [A, B], …}}`
 (a flag given as `false` or a `null` value doesn't count); the other
 relationships are left to the tool, like required options.
+
+## 14. Roles on file descriptors
+
+A program declares the streams it can write or read beyond stdin, stdout and
+stderr as roles (1.3). The runner that starts it decides which roles it wants
+and on which descriptors, and says so in `CLYOPS_FDS`.
+
+**Well-known roles.** Four names mean the same to every runner:
+
+* `meta`: one JSON document describing the main output (stdout), written
+  before the first byte of it, e.g. a file name or content length;
+* `progress`: newline-delimited JSON objects, one per update. Runners
+  understand these optional fields and keep any others: `pct` (0 to 100),
+  `done` and `total` (counts of work, e.g. bytes or files), `stage` (a short
+  name for the current step) and `message` (text for a person);
+* `log`: structured log lines, kept apart from the human-readable stderr;
+* `result`: the machine-readable result, when stdout carries something else.
+
+Any other name is free text for runners that know the program.
+
+**`CLYOPS_FDS`** maps roles to descriptors: comma-separated `NAME:FD` entries,
+whitespace around them ignored, e.g. `meta:3,progress:4`. The runner puts each
+descriptor at its number before starting the program, e.g. with `dup2`, the
+`stdio` array of Node's `spawn` or Go's `ExtraFiles`; the kernel keeps the
+numbers across `exec`, and as the descriptors are already open the program's
+runtime can't take those numbers for itself. `FD` is 2 or more, so a role can
+share stderr (`CLYOPS_FDS=progress:2 mytool` shows progress on the terminal).
+An entry that isn't `NAME:FD`, or maps to 0 or 1, is ignored with a warning
+(`Ignoring CLYOPS_FDS entry 'E'`, section 11); a name given twice uses the last
+entry. Names the program doesn't declare are ignored silently, so one mapping
+can serve several programs.
+
+Without `CLYOPS_FDS`, or for a role it doesn't name, the program writes and
+reads no extra descriptors: it must work with only stdin, stdout and stderr.
+After a successful parse, each role the selected command or its ancestors
+declare that `CLYOPS_FDS` maps to a descriptor that isn't open is reported
+once with a warning (`CLYOPS_FDS maps 'NAME' to FD, but descriptor FD isn't
+open`, section 11): usually a launcher between the runner and the program
+dropped it. This is best effort: a runtime that opens descriptors of its own
+at startup (Node, the JVM, Go) can take a dropped number, which then looks
+open, and the program's writes go there. A launcher must therefore `exec` the
+program, or pass the mapped descriptors on, never close them. A
+descriptor merely being open proves nothing, since language runtimes (Node's
+event loop, the JVM, Go) open low-numbered descriptors of their own.
+
+**Reading the mapping.** Libraries read `CLYOPS_FDS` once, when parsing starts
+or at the first helper call before that, and keep the mapping for the life of
+the CLI. They then remove the variable from the process environment when it
+holds the value they read, so programs they start don't inherit descriptors by
+accident (Java cannot change its environment; a Java program removes it from
+`ProcessBuilder.environment()`). A runner also closes every descriptor above 2
+it doesn't map before starting the program.
+
+**Scope.** Declarations belong to the level they are registered on and show
+in that level's help and schema. At run time the selected command (1.7) and
+its ancestors are searched, nearest first.
+
+**Helpers.** Every package ships three, called after parsing:
+
+* `fdOpen(NAME)`: the descriptor for a declared role when `CLYOPS_FDS` maps it
+  and it is open, otherwise none (`-1`, `null` or the language's equivalent).
+  A program uses it to read an `in` role or write raw bytes.
+* `emit(NAME, VALUE)`: write `VALUE` to an `out` role, followed by a newline
+  unless it already ends with one. A string is written as is; in languages
+  with native JSON values, any other value is written as compact JSON. Each
+  call is one `write` where the platform allows, so lines of up to 4 KiB from
+  several processes sharing a pipe don't interleave. It does nothing when
+  `fdOpen` finds none and ignores write errors (the reader went away). An
+  undeclared `NAME`, or one declared `in`, is a programming error (`Unknown
+  role 'NAME'`, `Role 'NAME' is not an output`).
+* `forwardFds(NAME...)`: the `CLYOPS_FDS` value that passes the named roles on
+  to a program this one starts, `NAME:FD` for each that is mapped and open
+  (declared here or not), e.g. `progress:4`; empty when there are none. The
+  program sets it in the child's environment and keeps the descriptors open in
+  the child (Node and Python's `subprocess` close or mark them close-on-exec
+  unless told otherwise). Streams of lines, `progress` and `log`, can be
+  shared this way; `meta` and `result` describe one program's output and
+  should not be.
+
+Descriptors are a POSIX notion: where there are none (Windows), `fdOpen`
+returns none, `emit` does nothing and `forwardFds` is empty.

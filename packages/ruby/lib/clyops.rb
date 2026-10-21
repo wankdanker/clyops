@@ -87,6 +87,8 @@ module Clyops
   }.freeze
   # @private
   EFFECTS = %w[read-only idempotent destructive network].freeze
+  # Role names (spec section 1.3).
+  ROLE_NAME = /\A[A-Za-z][A-Za-z0-9_.-]*\z/
   # @private
   HOSTNAME = /\A[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\z/
 
@@ -426,6 +428,8 @@ module Clyops
       @effects = []
       @stdin = nil
       @stdout = nil
+      @roles = []
+      @fd_map_cache = nil # CLYOPS_FDS as read once (spec section 14)
       @constraints = []
       @children = []
       @parent = nil
@@ -464,6 +468,63 @@ module Clyops
     # @param content_type [String] The content type value.
     # @return [Clyops::Cli] this CLI or the new child command.
     def set_stdout(description, content_type = "") = tap { @stdout = { "description" => description, "contentType" => content_type } }
+
+    # Declare a role (spec section 1.3): a stream the program writes ("out") or reads ("in") on a
+    # descriptor its runner chooses.
+    # @param name [String] meta, progress, log, result or another agreed name.
+    # @param direction [String] "out" or "in".
+    # @param description [String] The description value.
+    # @param content_type [String] The MIME type.
+    # @param schema [Hash, String, nil] A JSON Schema (Hash or JSON text) for each document or line.
+    # @return [Clyops::Cli] this CLI or the new child command.
+    def role(name, direction, description, content_type = "", schema = nil)
+      raise DefinitionError, "Invalid role name '#{name}'" unless name.match?(ROLE_NAME)
+      raise DefinitionError, "Unknown role direction '#{direction}'" unless %w[in out].include?(direction)
+      raise DefinitionError, "Duplicate role '#{name}'" if @roles.any? { |r| r["name"] == name }
+
+      schema = JSON.parse(schema) if schema.is_a?(String)
+      @roles << { "name" => name, "direction" => direction, "description" => description,
+                  "contentType" => content_type, "schema" => schema }
+      self
+    end
+
+    # The descriptor for a declared role when CLYOPS_FDS maps it and it is open, else nil (spec section 14).
+    # @param name [String] The role name.
+    # @return [Integer, nil] the descriptor, or nil.
+    def fd_open(name)
+      find_role(name) ? mapped_fd(name) : nil
+    end
+
+    # Write a line to a declared "out" role (spec section 14): a String as is, anything else as compact
+    # JSON, then a newline. Does nothing when the runner didn't map it; write errors are ignored.
+    # @param name [String] The role name.
+    # @param value [Object] The text or JSON value to write.
+    # @return [void]
+    def emit(name, value)
+      decl = find_role(name)
+      raise DefinitionError, "Unknown role '#{name}'" unless decl
+      raise DefinitionError, "Role '#{name}' is not an output" unless decl["direction"] == "out"
+
+      fd = mapped_fd(name)
+      return unless fd
+
+      text = value.is_a?(String) ? value.dup : JSON.generate(value)
+      text << "\n" unless text.end_with?("\n")
+      begin
+        # autoclose: false leaves the runner's descriptor open when the IO is collected.
+        IO.for_fd(fd, "w", autoclose: false).syswrite(text)
+      rescue SystemCallError, IOError
+        nil # The reader went away; a role is optional, so the program carries on.
+      end
+      nil
+    end
+
+    # The CLYOPS_FDS value passing these roles on to a program this one starts (spec section 14).
+    # @param names [Array<String>] The role names.
+    # @return [String] e.g. "progress:4", or "" when none are mapped.
+    def forward_fds(*names)
+      names.filter_map { |n| (fd = mapped_fd(n)) && "#{n}:#{fd}" }.join(",")
+    end
 
     # At most one of these options may be given.
     # @param longs [Array<String>] The longs value.
@@ -595,6 +656,7 @@ module Clyops
       @config = {}
       @values = Values.new
       @selected = self
+      fd_mapping
       ensure_help
 
       scan_error = nil
@@ -627,6 +689,7 @@ module Clyops
       conflict = check_constraints
       return ParseResult.new("error", conflict) if conflict
 
+      warn_unopened_roles
       ParseResult.new("ok")
     end
 
@@ -739,6 +802,11 @@ module Clyops
 
         ctype = decl["contentType"]
         [label, decl["description"], ctype.empty? ? "" : "(#{ctype})"].reject(&:empty?).join(" ")
+      end
+      node.roles.each do |r|
+        label = "#{r["direction"] == "in" ? "Input" : "Output"} [#{r["name"]}]:"
+        ctype = r["contentType"]
+        io << [label, r["description"], ctype.empty? ? "" : "(#{ctype})"].reject(&:empty?).join(" ")
       end
       sections << io unless io.empty?
 
@@ -863,7 +931,7 @@ module Clyops
 
     protected
 
-    attr_reader :word, :parent, :children, :options, :args, :commands, :constraints, :description, :epilog, :stdin, :stdout
+    attr_reader :word, :parent, :children, :options, :args, :commands, :constraints, :description, :epilog, :stdin, :stdout, :roles
 
     def adopt(parent, word, description)
       @parent = parent
@@ -884,6 +952,8 @@ module Clyops
     end
 
     def by_long = @by_long
+    def env_value(key) = @env[key]
+    attr_accessor :fd_map_cache
     def by_short = @by_short
 
     def schema_node
@@ -915,6 +985,7 @@ module Clyops
         "constraints" => @constraints,
         "stdin" => @stdin,
         "stdout" => @stdout,
+        "roles" => @roles.map(&:dup),
         "commands" => @children.map { |c| c.schema_node }
       )
     end
@@ -933,6 +1004,61 @@ module Clyops
     end
 
     def chain_options = chain.flat_map { |n| n.options }
+
+    # The declared role, searching the selected command then its ancestors.
+    def find_role(name)
+      chain.each do |node|
+        decl = node.roles.find { |r| r["name"] == name }
+        return decl if decl
+      end
+      nil
+    end
+
+    # CLYOPS_FDS, read once on the program and then removed from the process environment.
+    def fd_mapping
+      top = self
+      top = top.parent while top.parent
+      top.fd_map_cache ||= begin
+        raw = top.env_value("CLYOPS_FDS")
+        map = {}
+        raw.to_s.split(",").map(&:strip).reject(&:empty?).each do |entry|
+          m = entry.match(/\A([A-Za-z][A-Za-z0-9_.-]*):([0-9]+)\z/)
+          if m && m[2].to_i >= 2
+            map[m[1]] = m[2].to_i
+          else
+            Clyops.warn("Ignoring CLYOPS_FDS entry '#{entry}'")
+          end
+        end
+        ENV.delete("CLYOPS_FDS") if raw && ENV["CLYOPS_FDS"] == raw
+        map
+      end
+    end
+
+    # Warn about each role the selected chain declares that CLYOPS_FDS maps to a closed descriptor.
+    def warn_unopened_roles
+      seen = {}
+      chain.each do |node|
+        node.roles.each do |r|
+          name = r["name"]
+          next if seen[name]
+
+          seen[name] = true
+          fd = fd_mapping[name]
+          Clyops.warn("CLYOPS_FDS maps '#{name}' to #{fd}, but descriptor #{fd} isn't open") if fd && !mapped_fd(name)
+        end
+      end
+    end
+
+    # The descriptor CLYOPS_FDS maps to `name`, when it is open.
+    def mapped_fd(name)
+      fd = fd_mapping[name]
+      return nil unless fd
+
+      IO.for_fd(fd, autoclose: false)
+      fd
+    rescue SystemCallError, ArgumentError, NotImplementedError
+      nil
+    end
 
     def add_constraint(type, longs)
       longs.each { |l| raise DefinitionError, "Unknown option --#{l} in constraint" unless find_option(l, false) }

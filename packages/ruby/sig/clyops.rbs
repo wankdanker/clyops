@@ -53,6 +53,10 @@ module Clyops
     def set_effects: (*String effects) -> Cli
     def set_stdin: (String description, ?String content_type) -> Cli
     def set_stdout: (String description, ?String content_type) -> Cli
+    def role: (String name, String direction, String description, ?String content_type, ?(Hash[String, untyped] | String)? schema) -> Cli
+    def fd_open: (String name) -> Integer?
+    def emit: (String name, untyped value) -> void
+    def forward_fds: (*String names) -> String
     def exclusive: (*String longs) -> Cli
     def requires: (String long, *String longs) -> Cli
     def one_of: (*String longs) -> Cli

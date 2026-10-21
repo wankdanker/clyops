@@ -115,6 +115,79 @@ class CliTest(unittest.TestCase):
         schema = json.loads(cli.json_schema())
         self.assertEqual(schema["commands"][0]["commands"][0]["options"][0]["name"], "to")
 
+    def test_role_registration_errors(self):
+        def cli():
+            return Cli(name="t", env={})
+        for build, message in [
+            (lambda: cli().role("7up", "out", "X"), "Invalid role name '7up'"),
+            (lambda: cli().role("a:b", "out", "X"), "Invalid role name 'a:b'"),
+            (lambda: cli().role("log", "both", "X"), "Unknown role direction 'both'"),
+            (lambda: cli().role("log", "out", "X").role("log", "in", "Y"), "Duplicate role 'log'"),
+        ]:
+            with self.assertRaisesRegex(ValueError, message):
+                build()
+        cli().role("progress", "out", "X").role("my.role-2_x", "in", "Y")
+
+    def test_role_schema_dict_or_text(self):
+        cli = Cli(name="t", env={}).role("meta", "out", "A", "application/json", {"type": "object"})
+        cli.role("extra", "in", "B", schema='{"type":"string"}')
+        self.assertEqual(json.loads(cli.json_schema())["roles"], [
+            {"name": "meta", "direction": "out", "description": "A", "contentType": "application/json",
+             "schema": {"type": "object"}},
+            {"name": "extra", "direction": "in", "description": "B", "contentType": "", "schema": {"type": "string"}},
+        ])
+
+    def test_role_emit_and_forward_follow_the_mapping(self):
+        import tempfile
+        with tempfile.TemporaryFile("w+") as fh:
+            fd = fh.fileno()
+
+            def make(env):
+                c = Cli(name="t", env=env).role("progress", "out", "Progress").role("extra", "in", "Extra")
+                self.assertEqual(c.parse([]).status, "ok")
+                return c
+            unmapped = make({})
+            self.assertIsNone(unmapped.fd_open("progress"))
+            unmapped.emit("progress", {"pct": 1})
+            self.assertEqual(unmapped.forward_fds("progress"), "")
+            cli = make({"CLYOPS_FDS": f"progress:{fd}, extra:999, log:{fd}"})
+            self.assertEqual(cli.fd_open("progress"), fd)
+            self.assertIsNone(cli.fd_open("extra"))
+            self.assertIsNone(cli.fd_open("log"))
+            cli.emit("progress", {"pct": 50})
+            cli.emit("progress", "plain text")
+            cli.emit("progress", "ends with newline\n")
+            self.assertEqual(cli.forward_fds("progress", "extra", "log", "nope"), f"progress:{fd},log:{fd}")
+            with self.assertRaisesRegex(ValueError, "Unknown role 'nope'"):
+                cli.emit("nope", "x")
+            with self.assertRaisesRegex(ValueError, "Role 'extra' is not an output"):
+                cli.emit("extra", "x")
+            fh.seek(0)
+            self.assertEqual(fh.read(), '{"pct":50}\nplain text\nends with newline\n')
+
+    def test_role_mapping_is_read_once_and_removed(self):
+        os.environ["CLYOPS_FDS"] = "progress:2"
+        cli = Cli(name="t").role("progress", "out", "Progress")
+        cli.parse([])
+        self.assertNotIn("CLYOPS_FDS", os.environ)
+        cli.parse([])
+        self.assertEqual(cli.fd_open("progress"), 2)
+        os.environ["CLYOPS_FDS"] = "other:5"
+        Cli(name="t", env={"CLYOPS_FDS": "progress:2"}).parse([])
+        self.assertEqual(os.environ.pop("CLYOPS_FDS"), "other:5")
+
+    def test_role_scope_and_help(self):
+        cli = Cli(name="m", env={"CLYOPS_FDS": "progress:2,plan:2"}).role("progress", "out", "Progress")
+        db = cli.command("db", "Database")
+        db.command("migrate", "Migrate").role("plan", "out", "Migration plan")
+        db.command("status", "Status")
+        cli.parse(["db", "status"])
+        self.assertEqual(cli.fd_open("progress"), 2)
+        self.assertIsNone(cli.fd_open("plan"))
+        cli.parse(["db", "migrate"])
+        self.assertEqual(cli.fd_open("plan"), 2)
+        self.assertIn("\nOutput [plan]: Migration plan\n", cli.usage())
+        self.assertNotIn("[progress]", cli.usage())
 
 if __name__ == "__main__":
     unittest.main()

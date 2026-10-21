@@ -77,7 +77,22 @@ def run_case(cmd, case, verbose):
                 env[key] = value
 
         cwd = os.path.join(tmp, case.get("cwd", ""))
-        proc = subprocess.run(cmd + case["args"], cwd=cwd, env=env, capture_output=True, text=True, timeout=60)
+        argv = cmd + case["args"]
+        fds = case.get("fds", {})
+        if fds:
+            # Open the requested descriptors with sh, as a runner would: "out" to a file read back
+            # afterwards, anything else as the content to read.
+            redirs = []
+            for num, spec in fds.items():
+                path = os.path.join(tmp, f".fd{num}")
+                if spec == "out":
+                    redirs.append(f"{num}>'{path}'")
+                else:
+                    with open(path, "w", newline="") as fh:
+                        fh.write(spec)
+                    redirs.append(f"{num}<'{path}'")
+            argv = ["sh", "-c", 'exec "$@" ' + " ".join(redirs), "sh"] + argv
+        proc = subprocess.run(argv, cwd=cwd, env=env, capture_output=True, text=True, timeout=60)
         expect = substitute(case["expect"], mapping)
         errors = []
 
@@ -104,6 +119,15 @@ def run_case(cmd, case, verbose):
         for needle in expect.get("stderr", []):
             if needle not in proc.stderr:
                 errors.append(f"stderr lacks {needle!r}")
+        for needle in expect.get("stderrNot", []):
+            if needle in proc.stderr:
+                errors.append(f"stderr has {needle!r}")
+
+        for num, want in expect.get("fd", {}).items():
+            with open(os.path.join(tmp, f".fd{num}"), newline="") as fh:
+                got = fh.read()
+            if got != want:
+                errors.append(f"fd {num}: expected {want!r}, got {got!r}")
 
         if "values" in expect or "sources" in expect:
             if proc.returncode == 0:

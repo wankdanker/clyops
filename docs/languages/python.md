@@ -52,6 +52,7 @@ cli.opt("JSON", "json", "", "flag", "JSON output")
 cli.opt("QUIET", "quiet", "", "flag", "Quiet output")
 cli.exclusive("json", "quiet")                          # also requires(a, b...) and one_of(a, b...)
 cli.set_stdin("Audio to transcribe", "audio/wav")       # and set_stdout(description, content_type)
+cli.role("progress", "out", "Progress", "application/x-ndjson")  # then cli.emit("progress", {"pct": 50})
 args = cli.run()                                        # args.command == ["db", "migrate"]
 ```
 

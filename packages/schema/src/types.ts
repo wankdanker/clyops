@@ -55,6 +55,20 @@ export interface SchemaStream {
   contentType: string;
 }
 
+/** A declared role: a stream on a descriptor the runner chooses (spec sections 1.3 and 14). */
+export interface SchemaRole {
+  /** `meta`, `progress`, `log`, `result` or another agreed name. */
+  name: string;
+  /** `out` when the tool writes it, `in` when it reads it. */
+  direction: 'in' | 'out';
+  /** Human-readable description shown in help and documentation. */
+  description: string;
+  /** Declared MIME type, or an empty string when unspecified. */
+  contentType: string;
+  /** JSON Schema each document or line matches, or null. */
+  schema: unknown;
+}
+
 /** An option relationship (spec section 1.6). */
 export interface SchemaConstraint {
   /** Declared value type or relationship kind, according to the containing interface. */
@@ -90,6 +104,8 @@ export interface SchemaBody {
   stdin?: SchemaStream | null;
   /** Declared output stream, or null/absent when undeclared (text output). */
   stdout?: SchemaStream | null;
+  /** Declared roles at this level; absent before 0.5. */
+  roles?: SchemaRole[];
   /** Nested commands with their own options, arguments, and metadata. */
   commands?: SchemaCommand[];
 }
