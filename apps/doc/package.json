@@ -1,0 +1,53 @@
+{
+  "name": "clyops-doc",
+  "version": "0.5.0",
+  "description": "Documentation (man pages, Markdown, HTML) from any clyops tool's --help-json-schema.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wankdanker/clyops.git",
+    "directory": "apps/doc"
+  },
+  "keywords": [
+    "clyops",
+    "man",
+    "manpage",
+    "documentation",
+    "markdown",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "type": "module",
+  "bin": {
+    "clyops-doc": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test test/*.test.mjs",
+    "prepublishOnly": "pnpm run build && pnpm test"
+  },
+  "dependencies": {
+    "clyops": "0.5.0",
+    "clyops-schema": "0.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  },
+  "homepage": "https://clyops.io/applications.html"
+}

@@ -325,6 +325,13 @@ each described and typed by the program's own schema, with arguments validated b
 runs. Declared effects become the MCP annotations clients use to decide when to ask before running a
 tool.
 
+## clyops-doc
+
+[apps/doc](apps/doc) turns any tool's `--help-json-schema` into documentation:
+`mytool --help-json-schema | clyops-doc > mytool.1` writes a man page, and `--format markdown` or
+`--format html` writes those instead. A program with commands gets a section per command with the
+options it inherits.
+
 ## Web runner
 
 `clyops-api --root ./scripts` also serves the static SvelteKit web runner at
@@ -374,6 +381,7 @@ packages/
 apps/
   api/                    clyops-api: a directory of tools as an HTTP API with OpenAPI (npm: clyops-api)
   mcp/                    clyops-mcp: a directory of tools as MCP tools for AI agents (npm: clyops-mcp)
+  doc/                    clyops-doc: man pages, Markdown and HTML from --help-json-schema (npm: clyops-doc)
   dispatch/               clyops-dispatch: a directory of tools as one command with subcommands
   web/                    static SvelteKit REST API runner, packaged with clyops-api
   runner/                 desktop UI for clyops tools (Tauri + React)

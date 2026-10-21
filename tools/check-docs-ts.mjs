@@ -25,7 +25,7 @@ function inspect(symbol) {
     }
   }
 }
-for (const file of ['packages/schema/src/index.ts', 'packages/js/src/index.ts', 'packages/tools/src/index.ts', 'packages/jobs/src/index.ts', 'apps/api/src/index.ts', 'apps/mcp/src/index.ts']) {
+for (const file of ['packages/schema/src/index.ts', 'packages/js/src/index.ts', 'packages/tools/src/index.ts', 'packages/jobs/src/index.ts', 'apps/api/src/index.ts', 'apps/mcp/src/index.ts', 'apps/doc/src/index.ts']) {
   const source = program.getSourceFile(file);
   for (const symbol of checker.getExportsOfModule(checker.getSymbolAtLocation(source))) inspect(symbol);
 }

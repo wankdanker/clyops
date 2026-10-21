@@ -35,6 +35,19 @@ and `result` lines in it.
 See the [runner guide](../apps/runner/README.md) for installation, usage, templates
 and frontend/native development. Its internal UI helpers are not a public package API.
 
+## Documentation (clyops-doc)
+
+`clyops-doc` reads a tool's `--help-json-schema` and writes a man page, Markdown or HTML, so any
+clyops tool gets documentation without writing it twice:
+
+```sh
+mytool --help-json-schema | clyops-doc > mytool.1
+mytool --help-json-schema | clyops-doc --format markdown --name "mytool media to-pcm" > to-pcm.md
+```
+
+A program with commands gets a section per command with the options it inherits. See the
+[clyops-doc guide](../apps/doc/README.md) for the options and what goes in each section.
+
 ## Web runner
 
 The static SvelteKit web runner is served by `clyops-api` at `/ui/`. It discovers

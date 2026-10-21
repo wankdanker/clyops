@@ -76,6 +76,22 @@ importers:
         specifier: ^5.6.0
         version: 5.9.3
 
+  apps/doc:
+    dependencies:
+      clyops:
+        specifier: 0.5.0
+        version: link:../../packages/js
+      clyops-schema:
+        specifier: 0.5.0
+        version: link:../../packages/schema
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.5
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+
   apps/mcp:
     dependencies:
       '@modelcontextprotocol/sdk':
