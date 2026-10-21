@@ -64,11 +64,40 @@ function toResult(tool: Tool, result: ToolResult): CallToolResult {
   }
   if (!content.length) content.push({ type: 'text', text: '(no output)' });
   const json = result.json;
+  const meta = parseJson(result.roles?.meta);
   return {
     content,
     isError: !result.ok,
     ...(json && typeof json === 'object' && !Array.isArray(json) ? { structuredContent: json as Record<string, unknown> } : {}),
+    // The tool's meta role (spec section 14), for clients that look.
+    ...(meta !== undefined ? { _meta: { 'clyops.io/meta': meta } } : {}),
   };
+}
+
+function parseJson(text: string | undefined): unknown {
+  if (!text?.trim()) return undefined;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * MCP progress (`notifications/progress`) for one update on a tool's progress role (spec section
+ * 14): `pct` out of 100, else `done` out of `total`, with `message` or `stage` as the message.
+ * Undefined for an update without a number, or one that doesn't move forward, as MCP requires
+ * progress to increase.
+ */
+export function mcpProgress(update: Record<string, unknown>, last: number): { progress: number; total?: number; message?: string } | undefined {
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+  const pct = num(update.pct);
+  const done = num(update.done);
+  const progress = pct ?? done;
+  if (progress === undefined || progress <= last) return undefined;
+  const total = pct !== undefined ? 100 : num(update.total);
+  const text = typeof update.message === 'string' ? update.message : typeof update.stage === 'string' ? update.stage : undefined;
+  return { progress, ...(total !== undefined ? { total } : {}), ...(text !== undefined ? { message: text } : {}) };
 }
 
 // Each tool's input schema and compiled validator, built once per tool object.
@@ -129,11 +158,23 @@ export function createMcpServer(opts: McpOptions): Server {
     const { stdin, ...input } = checked.data;
     const declared = tool.schema.stdin;
     const stdinData = declared && typeof stdin === 'string' ? (isTextType(declared.contentType) ? stdin : Buffer.from(stdin, 'base64')) : undefined;
+    // With a progress token, the tool's progress role becomes progress notifications.
+    const token = request.params._meta?.progressToken;
+    let last = -Infinity;
+    const onLine = token === undefined ? undefined : (line: string) => {
+      const update = parseJson(line);
+      if (!update || typeof update !== 'object' || Array.isArray(update)) return;
+      const note = mcpProgress(update as Record<string, unknown>, last);
+      if (!note) return;
+      last = note.progress;
+      void extra.sendNotification({ method: 'notifications/progress', params: { progressToken: token, ...note } }).catch(() => undefined);
+    };
     let result: ToolResult;
     try {
       result = await runTool(tool, declared ? input : checked.data, {
         cwd: opts.cwd, timeoutMs: opts.timeoutMs, positionalsOrder: opts.positionalsOrder, signal: extra.signal, within: opts.within, maxOutput: opts.maxOutput,
         stdin: stdinData, stdout: binaryStdout(tool) ? 'buffer' : 'text',
+        roles: { meta: {}, ...(onLine ? { progress: { onLine } } : {}) },
       });
     } catch (err) {
       if (err instanceof InputError) return { content: [{ type: 'text', text: `Invalid arguments: ${err.message}` }], isError: true };

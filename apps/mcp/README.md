@@ -48,6 +48,10 @@ message and correct itself.
   an embedded resource (a blob) for other types.
 - **Secrets.** Secret options are passed to the tool in its environment rather than on the command
   line, and shown as `***` in logs.
+- **Progress and metadata.** When the agent's request has a progress token, a tool's
+  [`progress` role](../../spec/SPEC.md#14-roles-on-file-descriptors) becomes MCP progress
+  notifications: `pct` out of 100 (or `done` out of `total`), with `message` or `stage` as the
+  message. A tool's `meta` document comes back in the result's `_meta` as `clyops.io/meta`.
 
 ```
 clyops-mcp --root DIR [--name NAME] [--cwd DIR] [--timeout SECONDS] [--no-watch]
