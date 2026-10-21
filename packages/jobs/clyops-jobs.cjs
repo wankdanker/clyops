@@ -342,6 +342,7 @@ function redactArgv(schema, argv) {
 var import_node_child_process2 = require("node:child_process");
 var import_node_stream = require("node:stream");
 var import_node_string_decoder = require("node:string_decoder");
+var ROLE_NAME = /^[A-Za-z][A-Za-z0-9_.-]*$/;
 var ABORT_GRACE_MS = 200;
 var STOP_WAIT_MS = 1e3;
 function terminateTree(child, signal) {
@@ -364,10 +365,15 @@ function terminateTree(child, signal) {
 }
 function start(file, argv, opts = {}) {
   const started = Date.now();
+  const roles = process.platform === "win32" ? [] : Object.entries(opts.roles ?? {});
+  for (const [name] of roles) if (!ROLE_NAME.test(name)) throw new Error(`Invalid role name '${name}'`);
+  const env = { ...opts.env ?? process.env };
+  delete env.CLYOPS_FDS;
+  if (roles.length) env.CLYOPS_FDS = roles.map(([name], i) => `${name}:${i + 3}`).join(",");
   const child = (0, import_node_child_process2.spawn)(file, argv, {
     cwd: opts.cwd,
-    env: opts.env ?? process.env,
-    stdio: [opts.stdin === void 0 ? "ignore" : "pipe", "pipe", "pipe"],
+    env,
+    stdio: [opts.stdin === void 0 ? "ignore" : "pipe", "pipe", "pipe", ...roles.map(() => "pipe")],
     // POSIX detached children lead a new session/group, still with owned pipes.
     detached: process.platform !== "win32",
     windowsHide: true
@@ -394,6 +400,26 @@ function start(file, argv, opts = {}) {
   const mode = opts.stdout ?? "text";
   const stdout = mode === "stream" ? () => Buffer.alloc(0) : collect(childOut, opts.onStdout);
   const stderr = collect(childErr, opts.onStderr);
+  const roleOut = [];
+  const roleIn = [];
+  roles.forEach(([name, role], i) => {
+    const stream = child.stdio[i + 3];
+    if (role.input !== void 0) {
+      roleIn.push({ stream, input: role.input });
+      return;
+    }
+    let partial = "";
+    const lines = role.onLine && ((chunk) => {
+      const parts = (partial + chunk).split("\n");
+      partial = parts.pop() ?? "";
+      for (const line of parts) role.onLine?.(line);
+    });
+    stream.once("end", () => {
+      if (partial) role.onLine?.(partial);
+      partial = "";
+    });
+    roleOut.push({ name, stream, text: collect(stream, lines || void 0) });
+  });
   const result = new Promise((resolve5, reject) => {
     let timedOut = false;
     let failure;
@@ -422,6 +448,10 @@ function start(file, argv, opts = {}) {
         }
       }
       child.stdin?.destroy();
+      for (const { stream, input } of roleIn) {
+        if (input instanceof import_node_stream.Readable) input.unpipe(stream);
+        stream.destroy();
+      }
     };
     const finish = async (exitCode, signal) => {
       if (settled) return;
@@ -447,6 +477,7 @@ function start(file, argv, opts = {}) {
         ...mode === "buffer" ? { stdoutBuffer: out } : {},
         stderr: stderr().toString("utf8"),
         ...truncated ? { truncated } : {},
+        ...roleOut.length ? { roles: Object.fromEntries(roleOut.map((r) => [r.name, r.text().toString("utf8")])) } : {},
         durationMs: Date.now() - started
       });
     };
@@ -463,7 +494,7 @@ function start(file, argv, opts = {}) {
       }
       deadline = setTimeout(() => {
         treeStopped = terminateTree(child, "SIGKILL");
-        for (const stream of [childOut, childErr]) {
+        for (const stream of [childOut, childErr, ...roleOut.map((r) => r.stream)]) {
           if (!stream.destroyed) {
             stream.once("end", () => stream.destroy());
             stream.push(null);
@@ -503,6 +534,13 @@ function start(file, argv, opts = {}) {
         if (source.errored) inputError(source.errored);
         else source.pipe(child.stdin);
       } else child.stdin.end(opts.stdin);
+    }
+    for (const { stream, input } of roleIn) {
+      stream.on("error", () => void 0).resume();
+      if (input instanceof import_node_stream.Readable) {
+        input.on("error", inputError);
+        input.pipe(stream);
+      } else stream.end(input);
     }
     if (opts.signal?.aborted) abort();
   });

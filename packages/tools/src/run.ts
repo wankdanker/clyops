@@ -3,6 +3,16 @@ import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { Readable } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
 
+/** A role (spec section 14) to wire up for one run: the tool's stream on a descriptor of its own. */
+export interface RoleOption {
+  /** Called with each line an output role writes, without its newline. */
+  onLine?: (line: string) => void;
+  /** Fed to an input role, whose descriptor is closed after it. Leave unset for an output role. */
+  input?: Readable | string | Buffer;
+}
+
+const ROLE_NAME = /^[A-Za-z][A-Za-z0-9_.-]*$/;
+
 /** Environment, working directory, input/output handling, timeout, and cancellation for an executable. */
 export interface RunOptions {
   /** Working directory used to resolve command-line paths and execute tools. */
@@ -27,6 +37,12 @@ export interface RunOptions {
   stdout?: 'text' | 'buffer' | 'stream';
   /** Keep at most this many bytes of stdout and of stderr (0 or unset: all); the rest is dropped and `truncated` set. */
   maxOutput?: number;
+  /**
+   * Roles to wire up (spec section 14), by name. Each gets the next descriptor from 3 and the tool
+   * is told in `CLYOPS_FDS`; output roles are collected into `roles` (and `maxOutput` applies to
+   * each). A `CLYOPS_FDS` in `env` is never passed on. Not on Windows, which has no descriptors.
+   */
+  roles?: Record<string, RoleOption>;
 }
 
 /** Captured process outcome. Nonzero exit codes are returned; spawn and stream errors reject the promise. */
@@ -47,6 +63,8 @@ export interface RunResult {
   stderr: string;
   /** Output beyond `maxOutput` was dropped. */
   truncated?: boolean;
+  /** What each output role in `roles` wrote, by name. */
+  roles?: Record<string, string>;
   /** Elapsed execution time in milliseconds. */
   durationMs: number;
 }
@@ -91,10 +109,16 @@ function terminateTree(child: ChildProcess, signal: NodeJS.Signals): Promise<voi
 /** Start a tool; `result` settles when it exits. */
 export function start(file: string, argv: string[], opts: RunOptions = {}): Started {
   const started = Date.now();
+  // Roles get descriptors 3, 4, ... in order: the stdio array index is the descriptor number.
+  const roles = process.platform === 'win32' ? [] : Object.entries(opts.roles ?? {});
+  for (const [name] of roles) if (!ROLE_NAME.test(name)) throw new Error(`Invalid role name '${name}'`);
+  const env = { ...(opts.env ?? process.env) };
+  delete env.CLYOPS_FDS;
+  if (roles.length) env.CLYOPS_FDS = roles.map(([name], i) => `${name}:${i + 3}`).join(',');
   const child = spawn(file, argv, {
     cwd: opts.cwd,
-    env: opts.env ?? process.env,
-    stdio: [opts.stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
+    env,
+    stdio: [opts.stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe', ...roles.map(() => 'pipe' as const)],
     // POSIX detached children lead a new session/group, still with owned pipes.
     detached: process.platform !== 'win32',
     windowsHide: true,
@@ -122,6 +146,24 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
   const mode = opts.stdout ?? 'text';
   const stdout = mode === 'stream' ? () => Buffer.alloc(0) : collect(childOut, opts.onStdout);
   const stderr = collect(childErr, opts.onStderr);
+  // Output roles: collected, and split into lines for onLine.
+  const roleOut: { name: string; stream: Readable; text: () => Buffer }[] = [];
+  const roleIn: { stream: NodeJS.WritableStream & { destroy(): void }; input: Readable | string | Buffer }[] = [];
+  roles.forEach(([name, role], i) => {
+    const stream = child.stdio[i + 3] as unknown as Readable & NodeJS.WritableStream;
+    if (role.input !== undefined) {
+      roleIn.push({ stream: stream as never, input: role.input });
+      return;
+    }
+    let partial = '';
+    const lines = role.onLine && ((chunk: string) => {
+      const parts = (partial + chunk).split('\n');
+      partial = parts.pop() ?? '';
+      for (const line of parts) role.onLine?.(line);
+    });
+    stream.once('end', () => { if (partial) role.onLine?.(partial); partial = ''; });
+    roleOut.push({ name, stream, text: collect(stream, lines || undefined) });
+  });
 
   const result = new Promise<RunResult>((resolve, reject) => {
     let timedOut = false;
@@ -153,6 +195,10 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
         }
       }
       child.stdin?.destroy();
+      for (const { stream, input } of roleIn) {
+        if (input instanceof Readable) input.unpipe(stream as never);
+        stream.destroy();
+      }
     };
     const finish = async (exitCode: number | null, signal: NodeJS.Signals | null) => {
       if (settled) return;
@@ -177,6 +223,7 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
         ...(mode === 'buffer' ? { stdoutBuffer: out } : {}),
         stderr: stderr().toString('utf8'),
         ...(truncated ? { truncated } : {}),
+        ...(roleOut.length ? { roles: Object.fromEntries(roleOut.map((r) => [r.name, r.text().toString('utf8')])) } : {}),
         durationMs: Date.now() - started,
       });
     };
@@ -193,7 +240,7 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
       // if a descendant has deliberately left our process group.
       deadline = setTimeout(() => {
         treeStopped = terminateTree(child, 'SIGKILL');
-        for (const stream of [childOut, childErr]) {
+        for (const stream of [childOut, childErr, ...roleOut.map((r) => r.stream)]) {
           // Give stream consumers EOF so their output files/HTTP responses
           // finish too. Close the owned pipe after buffered data is drained.
           if (!stream.destroyed) {
@@ -230,6 +277,15 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
         if (source.errored) inputError(source.errored);
         else source.pipe(child.stdin);
       } else child.stdin.end(opts.stdin);
+    }
+    for (const { stream, input } of roleIn) {
+      // Like stdin: a tool not reading its input role is still a successful run. Extra stdio pipes
+      // are duplex sockets: drain the unused read side so it closes and the child's close fires.
+      (stream as unknown as Readable).on('error', () => undefined).resume();
+      if (input instanceof Readable) {
+        input.on('error', inputError);
+        input.pipe(stream as never);
+      } else stream.end(input);
     }
     if (opts.signal?.aborted) abort();
   });

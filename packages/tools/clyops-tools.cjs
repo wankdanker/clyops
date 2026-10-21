@@ -28,6 +28,7 @@ __export(index_exports, {
   classify: () => classify,
   commandName: () => commandName,
   commands: () => commands,
+  declaredRoles: () => declaredRoles,
   discover: () => discover,
   expandCommands: () => expandCommands,
   inputKey: () => inputKey,
@@ -527,6 +528,7 @@ function redactArgv(schema, argv) {
 var import_node_child_process2 = require("node:child_process");
 var import_node_stream = require("node:stream");
 var import_node_string_decoder = require("node:string_decoder");
+var ROLE_NAME = /^[A-Za-z][A-Za-z0-9_.-]*$/;
 var ABORT_GRACE_MS = 200;
 var STOP_WAIT_MS = 1e3;
 function terminateTree(child, signal) {
@@ -549,10 +551,15 @@ function terminateTree(child, signal) {
 }
 function start(file, argv, opts = {}) {
   const started = Date.now();
+  const roles = process.platform === "win32" ? [] : Object.entries(opts.roles ?? {});
+  for (const [name] of roles) if (!ROLE_NAME.test(name)) throw new Error(`Invalid role name '${name}'`);
+  const env = { ...opts.env ?? process.env };
+  delete env.CLYOPS_FDS;
+  if (roles.length) env.CLYOPS_FDS = roles.map(([name], i) => `${name}:${i + 3}`).join(",");
   const child = (0, import_node_child_process2.spawn)(file, argv, {
     cwd: opts.cwd,
-    env: opts.env ?? process.env,
-    stdio: [opts.stdin === void 0 ? "ignore" : "pipe", "pipe", "pipe"],
+    env,
+    stdio: [opts.stdin === void 0 ? "ignore" : "pipe", "pipe", "pipe", ...roles.map(() => "pipe")],
     // POSIX detached children lead a new session/group, still with owned pipes.
     detached: process.platform !== "win32",
     windowsHide: true
@@ -579,6 +586,26 @@ function start(file, argv, opts = {}) {
   const mode = opts.stdout ?? "text";
   const stdout = mode === "stream" ? () => Buffer.alloc(0) : collect(childOut, opts.onStdout);
   const stderr = collect(childErr, opts.onStderr);
+  const roleOut = [];
+  const roleIn = [];
+  roles.forEach(([name, role], i) => {
+    const stream = child.stdio[i + 3];
+    if (role.input !== void 0) {
+      roleIn.push({ stream, input: role.input });
+      return;
+    }
+    let partial = "";
+    const lines = role.onLine && ((chunk) => {
+      const parts = (partial + chunk).split("\n");
+      partial = parts.pop() ?? "";
+      for (const line of parts) role.onLine?.(line);
+    });
+    stream.once("end", () => {
+      if (partial) role.onLine?.(partial);
+      partial = "";
+    });
+    roleOut.push({ name, stream, text: collect(stream, lines || void 0) });
+  });
   const result = new Promise((resolve3, reject) => {
     let timedOut = false;
     let failure;
@@ -607,6 +634,10 @@ function start(file, argv, opts = {}) {
         }
       }
       child.stdin?.destroy();
+      for (const { stream, input } of roleIn) {
+        if (input instanceof import_node_stream.Readable) input.unpipe(stream);
+        stream.destroy();
+      }
     };
     const finish = async (exitCode, signal) => {
       if (settled) return;
@@ -632,6 +663,7 @@ function start(file, argv, opts = {}) {
         ...mode === "buffer" ? { stdoutBuffer: out } : {},
         stderr: stderr().toString("utf8"),
         ...truncated ? { truncated } : {},
+        ...roleOut.length ? { roles: Object.fromEntries(roleOut.map((r) => [r.name, r.text().toString("utf8")])) } : {},
         durationMs: Date.now() - started
       });
     };
@@ -648,7 +680,7 @@ function start(file, argv, opts = {}) {
       }
       deadline = setTimeout(() => {
         treeStopped = terminateTree(child, "SIGKILL");
-        for (const stream of [childOut, childErr]) {
+        for (const stream of [childOut, childErr, ...roleOut.map((r) => r.stream)]) {
           if (!stream.destroyed) {
             stream.once("end", () => stream.destroy());
             stream.push(null);
@@ -688,6 +720,13 @@ function start(file, argv, opts = {}) {
         if (source.errored) inputError(source.errored);
         else source.pipe(child.stdin);
       } else child.stdin.end(opts.stdin);
+    }
+    for (const { stream, input } of roleIn) {
+      stream.on("error", () => void 0).resume();
+      if (input instanceof import_node_stream.Readable) {
+        input.on("error", inputError);
+        input.pipe(stream);
+      } else stream.end(input);
     }
     if (opts.signal?.aborted) abort();
   });
@@ -745,6 +784,8 @@ function expandCommands(cmd, schema) {
       constraints: chain.flatMap((s) => s.constraints ?? []),
       stdin: nearest((s) => s.stdin) ?? null,
       stdout: nearest((s) => s.stdout) ?? null,
+      // The nearest declaration of each role name wins (spec section 14).
+      roles: [...new Map(chain.flatMap((s) => s.roles ?? []).map((r) => [r.name, r])).values()],
       commands: []
     };
     out.push({ ...cmd, name: words[words.length - 1], words: [...cmd.words, ...words], schema: flat, description: describe(node), subcommand: words });
@@ -800,9 +841,14 @@ async function watchTools(root, opts = {}) {
 function startTool(tool, input, opts = {}) {
   const { argv, env } = toArgv(tool.schema, input, { within: opts.within, cwd: opts.cwd, secretEnv: opts.secretsInEnv !== false, positionals: opts.positionalsOrder });
   const full = [...tool.subcommand ?? [], ...argv];
-  const started = start(tool.file, full, { ...opts, env: Object.keys(env).length ? { ...opts.env ?? process.env, ...env } : opts.env });
+  const roles = opts.roles && declaredRoles(tool, opts.roles);
+  const started = start(tool.file, full, { ...opts, roles, env: Object.keys(env).length ? { ...opts.env ?? process.env, ...env } : opts.env });
   const command = [tool.file, ...redactArgv(tool.schema, full)];
   return { ...started, command, result: started.result.then((r) => ({ ...r, command })) };
+}
+function declaredRoles(tool, requested) {
+  const declared = new Map((tool.schema.roles ?? []).map((r) => [r.name, r.direction]));
+  return Object.fromEntries(Object.entries(requested).filter(([name, role]) => declared.get(name) === (role.input === void 0 ? "out" : "in")));
 }
 async function runTool(tool, input, opts = {}) {
   if (opts.stdout === "stream") throw new Error("runTool() collects stdout; use startTool() for stdout: 'stream'");
@@ -838,6 +884,7 @@ function auditLog(target) {
   classify,
   commandName,
   commands,
+  declaredRoles,
   discover,
   expandCommands,
   inputKey,

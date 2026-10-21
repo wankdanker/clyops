@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
 import { usesClyops } from './detection.js';
 
-export type { SchemaArgument, SchemaOption, Effect, SchemaStream, SchemaConstraint, SchemaBody, SchemaCommand, Schema } from 'clyops-schema';
+export type { SchemaArgument, SchemaOption, Effect, SchemaStream, SchemaRole, SchemaConstraint, SchemaBody, SchemaCommand, Schema } from 'clyops-schema';
 import type { Schema } from 'clyops-schema';
 
 /** What an executable is, judged from its contents (spec section 12). */
