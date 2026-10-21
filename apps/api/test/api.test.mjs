@@ -485,3 +485,53 @@ test('an async streamed wrapper that times out is not reported as successful', a
     assert.ok(record.result.durationMs < 1500);
   } finally { close(); server.closeAllConnections(); server.close(); }
 });
+
+test('roles: the envelope has the tool\'s meta and last progress', async () => {
+  const body = await (await post('/tools/media/demo', { input: 'in.txt' })).json();
+  assert.equal(body.ok, true, body.stderr);
+  assert.deepEqual(body.meta, { extra: false });
+  assert.deepEqual(body.progress, { pct: 100 });
+  assert.deepEqual(body.roles, { meta: '{"extra":false}\n', progress: '{"pct":100}\n' });
+});
+
+test('roles: a job\'s progress is on its record and its events', async () => {
+  const queued = await (await post('/tools/media/demo?async=true', { input: 'in.txt' })).json();
+  const res = await fetch(`${base}/jobs/${queued.job_id}/events`);
+  assert.match(res.headers.get('content-type'), /^text\/event-stream/);
+  const events = (await res.text()).split('\n\n').filter(Boolean).map((e) => JSON.parse(e.split('\n').find((l) => l.startsWith('data: ')).slice(6)));
+  const last = events[events.length - 1];
+  assert.equal(last.status, 'done');
+  assert.deepEqual(last.progress, { pct: 100 });
+  assert.deepEqual(last.result.meta, { extra: false });
+  const record = await (await fetch(`${base}/jobs/${queued.job_id}`)).json();
+  assert.deepEqual(record.progress, { pct: 100 });
+  assert.equal((await fetch(`${base}/jobs/nope/events`)).status, 404);
+});
+
+test('roles: streamed output carries the meta as a header', async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'clyops-api-meta-')));
+  writeFileSync(join(root, 'clip'), `#!/usr/bin/env bash
+source ${join(repo, 'packages/bash/clyops.sh')}
+clyops_name clip
+clyops_description "Binary output with metadata"
+clyops_stdout "Audio" audio/wav
+clyops_role meta out "The clip's name" application/json
+clyops_run "$@"
+clyops_emit meta '{"name":"clip.wav","size":4}'
+printf 'RIFF'
+`);
+  chmodSync(join(root, 'clip'), 0o755);
+  const { app } = await createApi({ root, cwd: root });
+  const s = app.listen(0);
+  try {
+    const res = await fetch(`http://127.0.0.1:${s.address().port}/tools/clip`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-type'), 'audio/wav');
+    assert.deepEqual(JSON.parse(res.headers.get('x-clyops-meta')), { name: 'clip.wav', size: 4 });
+    assert.equal(await res.text(), 'RIFF');
+  } finally {
+    s.closeAllConnections();
+    s.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
