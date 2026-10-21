@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Node tools, jobs, API and MCP · clyops</title>
+  <link rel="stylesheet" href="/versions/v0.5.0/assets/docs.css">
+  <script defer src="/versions/v0.5.0/assets/search.js"></script>
+</head>
+<body data-search-index="/versions/v0.5.0/search-index.json">
+  <a class="skip" href="#content">Skip to content</a>
+  <header><a href="/versions/v0.5.0/"><strong>clyops</strong></a><span>Documentation · 0.5.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <div class="shell">
+    <nav aria-label="Documentation">
+      <a href="/versions/v0.5.0/guide.html">Concepts and behavior</a>
+      <a href="/versions/v0.5.0/reference.html">API references</a>
+      <a href="/versions/v0.5.0/examples.html">Clone-and-run examples</a>
+      <a href="/versions/v0.5.0/linux-lab.html">Linux lab in your browser</a>
+      <a href="/versions/v0.5.0/completion.html">Bash, Zsh and Fish completion</a>
+      <h2>Languages</h2>
+      <a href="/versions/v0.5.0/languages/javascript.html">JavaScript / TypeScript</a><a href="/versions/v0.5.0/languages/python.html">Python</a><a href="/versions/v0.5.0/languages/rust.html">Rust</a><a href="/versions/v0.5.0/languages/go.html">Go</a><a href="/versions/v0.5.0/languages/java.html">Java</a><a href="/versions/v0.5.0/languages/ruby.html">Ruby</a><a href="/versions/v0.5.0/languages/c.html">C</a><a href="/versions/v0.5.0/languages/bash.html">Bash</a>
+      <h2>Tools and servers</h2>
+      <a href="/versions/v0.5.0/node-tools.html">Node tools, jobs, API and MCP</a>
+      <a href="/versions/v0.5.0/web-runner.html">Web runner and shared schema</a>
+      <a href="/versions/v0.5.0/applications.html">Dispatcher and desktop runner</a>
+      <a href="/versions/v0.5.0/maintaining.html">Maintaining the docs</a>
+      <a href="/versions/v0.5.0/versions.html">Release documentation</a>
+      <form action="/versions/v0.5.0/search.html" role="search"><label for="search">Search guides</label><input id="search" name="q" type="search"><button>Search</button></form>
+    </nav>
+    <main id="content"><h1 id="node-tools-jobs-api-and-mcp">Node tools, jobs, API and MCP</h1>
+<p>These packages expose native TypeScript declarations. Tools and jobs support
+CommonJS and ESM; API and MCP use ESM. The
+<a href="/versions/v0.5.0/reference/node/index.html">Node reference</a> lists every published export, including
+interfaces, helpers, queue methods and server lifecycle functions.</p>
+<h2 id="discover-and-invoke-tools">Discover and invoke tools</h2>
+<pre><code class="language-sh">pnpm add clyops-tools
+</code></pre>
+<pre><code class="language-javascript">const { loadTools, runTool } = require('clyops-tools');
+const loaded = await loadTools('/path/to/tools');
+const tool = loaded.tools.find(t =&gt; t.words.join(' ') === 'send');
+if (!tool) throw new Error('send was not discovered');
+const result = await runTool(tool, { SRC: 'input.txt', host: 'example.com' }, {
+  timeoutMs: 5000,
+});
+if (!result.ok) console.error(result.stderr);
+</code></pre>
+<p>Run this inside an async function in CommonJS, or use ESM imports and top-level
+await. <code>discover</code> builds the tree without execution; <code>loadSchema</code> probes recognized
+tools; <code>loadTools</code> loads schemas and expands leaf commands. <code>watchTools</code> reloads
+changed tools and has <code>current()</code> and <code>close()</code>; close it during shutdown.</p>
+<p><code>toArgv</code> maps input using the tool schema. It reports unknown/controlled keys;
+callers decide whether those are errors. Positionals come first by default;
+dash-prefixed values follow options and <code>--</code>. <code>positionals: 'last'</code> changes their
+order. <code>secretEnv</code> passes scalar secrets in the environment; <code>within</code> restricts
+path input. <code>toJsonSchema</code> describes accepted input; <code>redactArgv</code> masks secrets
+in displayed commands. See <a href="https://github.com/wankdanker/clyops/blob/436efc0cd234df3c474cc01c28ee867eb75adc75/spec/SPEC.md#13-json-input-toargv">spec section 13</a>.</p>
+<h2 id="streams-cancellation-and-errors">Streams, cancellation and errors</h2>
+<p><code>run(file, argv, options)</code> resolves a <code>RunResult</code>; nonzero exit codes are outcomes,
+while spawn/input/output stream errors reject. <code>start</code> additionally returns the
+child and readable stdout. <code>stdin</code> accepts text, Buffer or Readable.
+<code>stdout: 'buffer'</code> captures binary data; <code>'stream'</code> exposes it for consumption.
+Use <code>timeoutMs</code>, <code>signal</code> and <code>maxOutput</code> to bound execution. Await the result
+promise, consume streamed stdout, and handle rejected promises. Timeout/abort
+terminates the process tree and cleans up streams.</p>
+<p><code>roles</code> wires up a tool's <a href="/versions/v0.5.0/guide.html#roles-on-file-descriptors">roles</a> for one run:
+each named role gets the next descriptor from 3, the tool is told in <code>CLYOPS_FDS</code>,
+output roles are collected into the result's <code>roles</code> and passed line by line to
+<code>onLine</code>, and input roles are fed like stdin. <code>startTool</code> and <code>runTool</code> keep only
+the roles a tool declares, so asking every tool for <code>progress</code> is safe:</p>
+<pre><code class="language-javascript">const result = await runTool(tool, input, { roles: { progress: { onLine: (l) =&gt; show(JSON.parse(l)) }, meta: {} } });
+result.roles?.meta; // the tool's meta document, as text
+</code></pre>
+<p><code>runTool</code> adds schema mapping, secret handling and <code>ok</code>. Filters (<code>allow</code>, <code>deny</code>,
+<code>readOnly</code>) and path boundaries should match the application's intended access.
+<code>auditLog</code> provides an append-only JSONL audit writer. See the
+<a href="https://github.com/wankdanker/clyops/blob/436efc0cd234df3c474cc01c28ee867eb75adc75/packages/tools/README.md">tools package guide</a>.</p>
+<h2 id="jobs-and-templates">Jobs and templates</h2>
+<pre><code class="language-sh">pnpm add clyops-jobs
+</code></pre>
+<pre><code class="language-javascript">const { JobQueue } = require('clyops-jobs');
+const queue = new JobQueue({ concurrency: 2, keep: 100 });
+const job = queue.add('example', async ({ signal, stage }) =&gt; {
+  signal.throwIfAborted();
+  stage('working');
+  return { message: 'done' };
+});
+console.log(await job.done);
+console.log(queue.get(job.record.job_id)?.record.status);
+</code></pre>
+<p><code>resolveFunctionConfig</code> resolves a configured script and merges defaults/overrides;
+<code>buildFunctionCommand</code> renders arguments; <code>runScriptFunction</code> executes it with
+optional stdin/stdout files. A function run wires the tool's <code>progress</code>, <code>meta</code> and
+<code>log</code> roles (<code>onProgress</code>, the run's <code>meta</code>), and queue tasks record progress with
+<code>progress(update)</code>. Templates use dotted paths in <code>${expression}</code> or
+<code>{{expression}}</code>. Boolean templates are validated after rendering.</p>
+<p>Artifact helpers discover, inspect and copy output files. Record helpers create
+and transition serializable job states. <code>JobQueue.add</code> returns a cancellation
+method and a <code>done</code> promise; <code>get</code> and <code>list</code> expose retained work. Cancellation
+is recorded as an error with <code>cancelled</code>; <code>onDrop</code> lets the host clean retained
+files. The queue is in memory, so durable storage is the host's responsibility.
+See <a href="https://github.com/wankdanker/clyops/blob/436efc0cd234df3c474cc01c28ee867eb75adc75/packages/jobs/README.md">job configuration and artifacts</a>.</p>
+<h2 id="http-api">HTTP API</h2>
+<pre><code class="language-sh">pnpm add clyops-api
+pnpm exec clyops-api --root ./tools --port 8080 --read-only
+</code></pre>
+<pre><code class="language-javascript">import { createApi } from 'clyops-api';
+const api = await createApi({ root: './tools', watch: true, timeoutMs: 5000 });
+const server = api.app.listen(8080);
+// During shutdown: server.close(); api.close();
+</code></pre>
+<p>The API serves a <a href="/versions/v0.5.0/web-runner.html">static web runner</a> at <code>/ui/</code>; <code>ui: false</code> or
+<code>--no-ui</code> disables it. The API exposes tool endpoints, OpenAPI, asynchronous job records and optional
+MCP transport. Options include named scoped keys, filters, path boundaries,
+body/output limits, concurrency, audit and hot reload. Binary output and streamed
+stdin have transport-specific conventions. A tool's <code>meta</code> and <code>progress</code> roles show
+up in the JSON envelope, on job records, as <code>GET /jobs/&lt;id&gt;/events</code> server-sent
+events and as an <code>X-Clyops-Meta</code> header on streamed output; see the <a href="https://github.com/wankdanker/clyops/blob/436efc0cd234df3c474cc01c28ee867eb75adc75/apps/api/README.md">HTTP guide</a>
+for routes and examples. <code>toZod</code> is the exported input-validator adapter.</p>
+<h2 id="mcp">MCP</h2>
+<pre><code class="language-sh">pnpm add clyops-mcp
+pnpm exec clyops-mcp --root ./tools
+</code></pre>
+<p><code>createMcpServer</code> adapts loaded tools to an MCP server; <code>mcpHttpHandler</code> installs
+streamable HTTP transport in an HTTP host; <code>toolName</code> derives exposed names.
+Effects become annotations. The server exposes declared stdin and represents
+binary output as image/audio/blob results. A tool's <code>progress</code> role becomes MCP
+progress notifications when the request has a progress token, and its <code>meta</code> comes
+back in the result's <code>_meta</code>. See the <a href="https://github.com/wankdanker/clyops/blob/436efc0cd234df3c474cc01c28ee867eb75adc75/apps/mcp/README.md">MCP guide</a>
+for transport setup and lifecycle responsibilities.</p>
+</main>
+  </div>
+  <footer>Guides are Markdown. API references come from the published source interfaces.</footer>
+</body>
+</html>

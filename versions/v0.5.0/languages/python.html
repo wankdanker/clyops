@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Python · clyops</title>
+  <link rel="stylesheet" href="/versions/v0.5.0/assets/docs.css">
+  <script defer src="/versions/v0.5.0/assets/search.js"></script>
+</head>
+<body data-search-index="/versions/v0.5.0/search-index.json">
+  <a class="skip" href="#content">Skip to content</a>
+  <header><a href="/versions/v0.5.0/"><strong>clyops</strong></a><span>Documentation · 0.5.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <div class="shell">
+    <nav aria-label="Documentation">
+      <a href="/versions/v0.5.0/guide.html">Concepts and behavior</a>
+      <a href="/versions/v0.5.0/reference.html">API references</a>
+      <a href="/versions/v0.5.0/examples.html">Clone-and-run examples</a>
+      <a href="/versions/v0.5.0/linux-lab.html">Linux lab in your browser</a>
+      <a href="/versions/v0.5.0/completion.html">Bash, Zsh and Fish completion</a>
+      <h2>Languages</h2>
+      <a href="/versions/v0.5.0/languages/javascript.html">JavaScript / TypeScript</a><a href="/versions/v0.5.0/languages/python.html">Python</a><a href="/versions/v0.5.0/languages/rust.html">Rust</a><a href="/versions/v0.5.0/languages/go.html">Go</a><a href="/versions/v0.5.0/languages/java.html">Java</a><a href="/versions/v0.5.0/languages/ruby.html">Ruby</a><a href="/versions/v0.5.0/languages/c.html">C</a><a href="/versions/v0.5.0/languages/bash.html">Bash</a>
+      <h2>Tools and servers</h2>
+      <a href="/versions/v0.5.0/node-tools.html">Node tools, jobs, API and MCP</a>
+      <a href="/versions/v0.5.0/web-runner.html">Web runner and shared schema</a>
+      <a href="/versions/v0.5.0/applications.html">Dispatcher and desktop runner</a>
+      <a href="/versions/v0.5.0/maintaining.html">Maintaining the docs</a>
+      <a href="/versions/v0.5.0/versions.html">Release documentation</a>
+      <form action="/versions/v0.5.0/search.html" role="search"><label for="search">Search guides</label><input id="search" name="q" type="search"><button>Search</button></form>
+    </nav>
+    <main id="content"><h1 id="python">Python</h1>
+<p>Requires <strong>Python 3.9+</strong>. <a href="/versions/v0.5.0/reference/python/clyops.html">Complete API reference</a> · <a href="/versions/v0.5.0/guide.html">Shared behavior</a></p>
+<h2 id="install-and-run">Install and run</h2>
+<pre><code class="language-sh">python -m pip install clyops
+</code></pre>
+<p>Save the following as <code>quickstart.py</code>:</p>
+<!-- example: quickstart.py -->
+<pre><code class="language-python">from clyops import Cli
+
+cli = Cli(name=&quot;docs-demo&quot;)
+cli.opt(&quot;NAME&quot;, &quot;name&quot;, &quot;n&quot;, &quot;World&quot;, &quot;Who to greet&quot;)
+cli.opt(&quot;COUNT&quot;, &quot;count&quot;, &quot;c&quot;, &quot;1&quot;, &quot;Repeat count&quot;, rule=&quot;int:1-3&quot;)
+cli.opt(&quot;VERBOSE&quot;, &quot;verbose&quot;, &quot;v&quot;, &quot;flag&quot;, &quot;Verbose output&quot;)
+args = cli.run()
+print(f&quot;{args.NAME} {args.COUNT} {str(args.VERBOSE).lower()}&quot;)
+</code></pre>
+<pre><code class="language-sh">python quickstart.py --name Ada --count 2 --verbose
+# Ada 2 true
+python quickstart.py --help
+python quickstart.py --help-json-schema
+python quickstart.py --count invalid
+# Validation error; exit status 1
+</code></pre>
+<h2 id="editor-support-and-resolved-values">Editor support and resolved values</h2>
+<p>PyCharm, Pylance and mypy can read the inline annotations. The wheel contains <code>py.typed</code>. Resolved values have a scalar/list/None union; dynamic attribute names are not inferred from runtime registrations. Narrow values before numeric work, or map them into your own typed application model.</p>
+<h2 id="commands-relationships-secrets-effects-and-io">Commands, relationships, secrets, effects and I/O</h2>
+<p>Add these registrations before calling <code>run</code>. A CLI level has either subcommands or positional arguments.</p>
+<pre><code class="language-python">db = cli.command(&quot;db&quot;, &quot;Database tasks&quot;)                # a command: mytool db ...
+migrate = db.command(&quot;migrate&quot;, &quot;Apply migrations&quot;)     # mytool db migrate
+migrate.opt(&quot;TO&quot;, &quot;to&quot;, &quot;&quot;, &quot;optional&quot;, &quot;Target version&quot;, rule=&quot;int&quot;)
+migrate.set_effects(&quot;destructive&quot;)                      # read-only, idempotent, destructive, network
+cli.opt(&quot;TOKEN&quot;, &quot;token&quot;, &quot;t&quot;, &quot;&quot;, &quot;API token&quot;, &quot;Auth&quot;, &quot;secret&quot;)  # masked in help and values_json()
+cli.opt(&quot;JSON&quot;, &quot;json&quot;, &quot;&quot;, &quot;flag&quot;, &quot;JSON output&quot;)
+cli.opt(&quot;QUIET&quot;, &quot;quiet&quot;, &quot;&quot;, &quot;flag&quot;, &quot;Quiet output&quot;)
+cli.exclusive(&quot;json&quot;, &quot;quiet&quot;)                          # also requires(a, b...) and one_of(a, b...)
+cli.set_stdin(&quot;Audio to transcribe&quot;, &quot;audio/wav&quot;)       # and set_stdout(description, content_type)
+cli.role(&quot;progress&quot;, &quot;out&quot;, &quot;Progress&quot;, &quot;application/x-ndjson&quot;)  # then cli.emit(&quot;progress&quot;, {&quot;pct&quot;: 50})
+args = cli.run()                                        # args.command == [&quot;db&quot;, &quot;migrate&quot;]
+</code></pre>
+<p><code>cli.command_path</code> is the selected command words. Commands share the program's options (accepted before or after the command words) and config file;
+each has its own help (<code>mytool db migrate --help</code>), schema and completion. See the
+<a href="https://github.com/wankdanker/clyops/blob/436efc0cd234df3c474cc01c28ee867eb75adc75/spec/SPEC.md">spec</a> sections 1.3 to 1.7.</p>
+<h2 id="parsing-and-errors">Parsing and errors</h2>
+<p>Use <code>run</code> for a standalone program: it displays help/schema/completion and exits for those requests, or exits with status 1 on invalid input. Use the non-exiting <code>parse</code> variant in libraries and tests; check its outcome before reading resolved values. Registration errors (duplicate names, unknown rules, or commands mixed with positionals) are programming errors, distinct from invalid user input. See the native reference for the language's result and error types.</p>
+<h2 id="more-recipes">More recipes</h2>
+<p><a href="/versions/v0.5.0/guide.html">The common guide</a> covers repeatable options, variadics, validation, config files, paths, secrets, constraints, I/O, completion and provenance. The complete reference above covers each public method and helper, including its native signature. Runnable demo and commands examples also live in the package's <code>examples</code> directory.</p>
+</main>
+  </div>
+  <footer>Guides are Markdown. API references come from the published source interfaces.</footer>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clone-and-run example tools · clyops</title>
+  <link rel="stylesheet" href="/versions/v0.5.0/assets/docs.css">
+  <script defer src="/versions/v0.5.0/assets/search.js"></script>
+</head>
+<body data-search-index="/versions/v0.5.0/search-index.json">
+  <a class="skip" href="#content">Skip to content</a>
+  <header><a href="/versions/v0.5.0/"><strong>clyops</strong></a><span>Documentation · 0.5.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <div class="shell">
+    <nav aria-label="Documentation">
+      <a href="/versions/v0.5.0/guide.html">Concepts and behavior</a>
+      <a href="/versions/v0.5.0/reference.html">API references</a>
+      <a href="/versions/v0.5.0/examples.html">Clone-and-run examples</a>
+      <a href="/versions/v0.5.0/linux-lab.html">Linux lab in your browser</a>
+      <a href="/versions/v0.5.0/completion.html">Bash, Zsh and Fish completion</a>
+      <h2>Languages</h2>
+      <a href="/versions/v0.5.0/languages/javascript.html">JavaScript / TypeScript</a><a href="/versions/v0.5.0/languages/python.html">Python</a><a href="/versions/v0.5.0/languages/rust.html">Rust</a><a href="/versions/v0.5.0/languages/go.html">Go</a><a href="/versions/v0.5.0/languages/java.html">Java</a><a href="/versions/v0.5.0/languages/ruby.html">Ruby</a><a href="/versions/v0.5.0/languages/c.html">C</a><a href="/versions/v0.5.0/languages/bash.html">Bash</a>
+      <h2>Tools and servers</h2>
+      <a href="/versions/v0.5.0/node-tools.html">Node tools, jobs, API and MCP</a>
+      <a href="/versions/v0.5.0/web-runner.html">Web runner and shared schema</a>
+      <a href="/versions/v0.5.0/applications.html">Dispatcher and desktop runner</a>
+      <a href="/versions/v0.5.0/maintaining.html">Maintaining the docs</a>
+      <a href="/versions/v0.5.0/versions.html">Release documentation</a>
+      <form action="/versions/v0.5.0/search.html" role="search"><label for="search">Search guides</label><input id="search" name="q" type="search"><button>Search</button></form>
+    </nav>
+    <main id="content"><h1 id="clone-and-run-example-tools">Clone-and-run example tools</h1>
+<p>The repository includes a mixed <a href="https://github.com/wankdanker/clyops/tree/436efc0cd234df3c474cc01c28ee867eb75adc75/examples/scripts">scripts directory</a> that
+works immediately after cloning. The Python tools use only the standard library;
+the Bash wrappers use the library beside them in the checkout. You do not need
+to build clyops or install a Python package first.</p>
+<pre><code class="language-sh">git clone https://github.com/wankdanker/clyops.git
+cd clyops
+./examples/scripts/plan.py --help
+./examples/scripts/plan.py --env production --replicas 3 --tag demo
+./examples/scripts/report.py --format table
+printf '{&quot;z&quot;:2,&quot;a&quot;:1}' | ./examples/scripts/json-format.py --sort
+</code></pre>
+<p>Use Python 3.9+ and Bash 4.3+. On macOS, use a current Bash from your package
+manager; the system's Bash 3.2 is too old for the Bash library.</p>
+<h2 id="real-wrappers-useful-contracts">Real wrappers, useful contracts</h2>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Try it</th>
+<th>Features</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>plan.py</code></td>
+<td><code>--env production --replicas 3 --tag demo</code></td>
+<td>Choices, ranges, repeatable options, exclusive notification destinations</td>
+</tr>
+<tr>
+<td><code>report.py</code></td>
+<td><code>--format table --limit 75 --service worker</code></td>
+<td>File validation, CSV processing, filtering, numeric bounds</td>
+</tr>
+<tr>
+<td><code>json-format.py</code></td>
+<td><code>--input examples/data/service.json --sort</code></td>
+<td>Files or stdin, booleans, pretty/compact choice, JSON stdout</td>
+</tr>
+<tr>
+<td><code>media-info.sh</code></td>
+<td><code>examples/data/tone.wav</code></td>
+<td>FFprobe metadata inspection</td>
+</tr>
+<tr>
+<td><code>transcode.sh</code></td>
+<td><code>examples/data/tone.wav /tmp/clyops-demo.m4a</code></td>
+<td>FFmpeg command preview, quality range, encoder preset</td>
+</tr>
+<tr>
+<td><code>upload.sh</code></td>
+<td><code>examples/data/service.json --url https://example.com/upload</code></td>
+<td>curl HTTP PUT preview, secret bearer token, bounded timeout</td>
+</tr>
+</tbody>
+</table>
+<p>Prefix these tool names with <code>./examples/scripts/</code>, or add that directory to PATH.
+The media tools need FFmpeg to execute; upload needs curl. Their generated help,
+schema and completion work without those optional dependencies. Transcode and
+upload preview by default; <code>--execute</code> performs the operation. Transcode refuses
+to overwrite its output, and upload previews redact bearer tokens. The bundled
+tone/CSV/JSON keep the walkthrough self-contained.</p>
+<h2 id="the-same-scripts-in-the-web-runner">The same scripts in the web runner</h2>
+<p>From the cloned repository:</p>
+<pre><code class="language-sh">pnpm install --frozen-lockfile
+pnpm build
+node apps/api/dist/cli.js --root ./examples/scripts --port 8788
+</code></pre>
+<p>Open <code>http://127.0.0.1:8788/ui/</code>. Select a Python tool to run immediately. Choices
+become dropdowns, numeric ranges become bounded controls, and JSON-format exposes
+stdin and file upload. Upload's token uses a secret field; network/destructive
+effects prompt confirmation. Enable the wrapper's execute override to perform
+its operation. Scripts execute on the API host and use its installed tools.</p>
+<p>The scripts also work with the <a href="/versions/v0.5.0/node-tools.html#mcp">MCP server</a>,
+<a href="/versions/v0.5.0/applications.html">dispatcher and desktop runner</a>.
+See the <a href="https://github.com/wankdanker/clyops/blob/436efc0cd234df3c474cc01c28ee867eb75adc75/examples/README.md">example directory README</a> for the full commands.</p>
+<h2 id="browser-playground">Browser playground</h2>
+<p>The <a href="/versions/v0.5.0/linux-lab.html">Linux lab</a> runs all six scripts in a real Bash shell with
+FFmpeg, curl, Python, pipes and completion. Transcode the bundled audio, upload
+it to the guest's HTTP server, and download the result. You can add your own
+small files; the workspace resets when you stop the lab. All execution stays
+inside the browser, with no external network relay.</p>
+<p>The <a href="/versions/v0.5.0/#playground">homepage playground</a> executes the real Python library and
+<code>plan.py</code>, <code>report.py</code>, and <code>json-format.py</code> sources using
+<a href="https://pyodide.org/en/stable/usage/webworker.html">Pyodide</a>. It loads Python only
+when you press Start; the first load needs a network connection to the pinned
+Pyodide CDN. Execution and the sample filesystem stay in a Web Worker in your tab.</p>
+<p>Try <code>plan.py --help</code>, <code>plan.py --replicas 99</code>, <code>report.py --format table</code>, or
+<code>plan.py --help-json-schema</code>. <code>cat examples/scripts/plan.py</code> shows the source.
+Tab completes commands/options/choices from the actual completion protocol;
+Up/Down recall commands. The stdin panel supplies input for <code>json-format.py</code>.
+Reset terminates the worker and restores the workspace when you start again.
+<code>ls</code> labels the Bash files as source examples to run locally; <code>cat</code> lets you
+read them here, and attempting to run one explains which runtime is needed.</p>
+<p>This is a Python command playground, with <code>help</code>, <code>ls</code>, <code>cat</code>, <code>pwd</code> and <code>clear</code>.
+It has no host shell, Bash, FFmpeg, curl, pipes or live agent connection. Run the
+<a href="/versions/v0.5.0/linux-lab.html">Linux lab</a>, local scripts or API for those workflows. The animated hero remains an
+<a href="/versions/v0.5.0/demo.html">illustrative walkthrough</a>; the playground performs real executions.</p>
+</main>
+  </div>
+  <footer>Guides are Markdown. API references come from the published source interfaces.</footer>
+</body>
+</html>
