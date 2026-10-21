@@ -63,14 +63,24 @@ record = transitionJobRecord(record, { status: 'done', completedAt: timestampIso
 `runScriptFunction` options: `configRoot` (relative path options resolve against it),
 `context`, `controlled` (options the trigger sets itself, default `['help']`), `defaultPositional`
 (a template for the first argument when the config gives none, e.g. `'${media.path}'`),
-`timeoutMs`, `env`, `cwd`, `signal`, `onStderr`. Its `command` shows secret options as `***`.
+`timeoutMs`, `env`, `cwd`, `signal`, `onStderr`, `onProgress`, `onLog`. Its `command` shows secret options as `***`.
+
+When the tool declares the well-known [roles](https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md#14-roles-on-file-descriptors),
+the run wires them up: each `progress` object goes to `onProgress` (and the last one is the run's
+`progress`), `log` lines to `onLog`, and the `meta` document is parsed into the run's `meta`.
+`updateJobProgress(record, update)` puts an update on a record as `progress` (and its `stage`, if
+any) without a history entry; the queue's tasks get it as `progress(update)`:
+
+```js
+queue.add('transcribe', ({ signal, progress }) => runScriptFunction(fn, { configRoot, context, signal, onProgress: progress }));
+```
 `configureLogging({module, warn, verbose})` routes warnings about config keys that match no option.
 
 ## Job records
 
 ```
 { job_id, ...fields, function, status, stage, started_at, updated_at, completed_at, error,
-  result_key, history }
+  result_key, progress?, history }
 ```
 
 `status` moves `pending` → `processing` → `done` | `error`. `newJobId(seed, prefix = 'job')`,

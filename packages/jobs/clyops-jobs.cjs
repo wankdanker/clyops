@@ -41,6 +41,7 @@ __export(index_exports, {
   newJobId: () => newJobId,
   newJobRecord: () => newJobRecord,
   objectValue: () => objectValue,
+  parseRoleJson: () => parseRoleJson,
   pathParts: () => pathParts,
   readJson: () => readJson,
   renderConfigValue: () => renderConfigValue,
@@ -56,6 +57,7 @@ __export(index_exports, {
   timestampIso: () => timestampIso,
   transitionJobRecord: () => transitionJobRecord,
   truthy: () => truthy,
+  updateJobProgress: () => updateJobProgress,
   writeJson: () => writeJson
 });
 module.exports = __toCommonJS(index_exports);
@@ -553,6 +555,12 @@ function shellQuote(args) {
   return args.map((a) => /^[A-Za-z0-9_@%+=:,./-]+$/.test(a) ? a : `'${a.replace(/'/g, "'\\''")}'`).join(" ");
 }
 
+// packages/tools/src/tools.ts
+function declaredRoles(tool, requested) {
+  const declared = new Map((tool.schema.roles ?? []).map((r) => [r.name, r.direction]));
+  return Object.fromEntries(Object.entries(requested).filter(([name, role]) => declared.get(name) === (role.input === void 0 ? "out" : "in")));
+}
+
 // packages/jobs/src/functions.ts
 var import_node_fs4 = require("node:fs");
 var import_promises = require("node:stream/promises");
@@ -600,6 +608,14 @@ async function buildFunctionCommand(fn, opts, schema) {
   for (const key of unknown) LOGGER.warn("[%s] ignoring config key %s; no matching CLI option in schema", name, key);
   return [fn.script, ...argv];
 }
+function parseRoleJson(text) {
+  if (!text?.trim()) return void 0;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return void 0;
+  }
+}
 function streamPath(template, opts, base) {
   if (!template) return void 0;
   const rendered = opts.context ? renderTemplateString(template, opts.context) : template;
@@ -613,6 +629,19 @@ async function runScriptFunction(fn, opts) {
   const workDir = opts.context?.paths?.work_dir;
   const stdinPath = streamPath(fn.definition.stdin, opts, opts.configRoot);
   const stdoutPath = streamPath(fn.definition.stdout, opts, workDir ?? opts.configRoot);
+  let progress;
+  const roles = {
+    progress: {
+      onLine: (line) => {
+        const update = parseRoleJson(line);
+        if (!update || typeof update !== "object" || Array.isArray(update)) return;
+        progress = update;
+        opts.onProgress?.(progress);
+      }
+    },
+    meta: {},
+    log: { onLine: opts.onLog }
+  };
   const started = start(file, argv, {
     cwd: opts.cwd,
     env: opts.env,
@@ -620,7 +649,8 @@ async function runScriptFunction(fn, opts) {
     signal: opts.signal,
     onStderr: opts.onStderr,
     stdin: stdinPath ? (0, import_node_fs4.createReadStream)(stdinPath) : void 0,
-    stdout: stdoutPath ? "stream" : "text"
+    stdout: stdoutPath ? "stream" : "text",
+    roles: declaredRoles({ schema }, roles)
   });
   let written;
   if (stdoutPath) {
@@ -628,7 +658,8 @@ async function runScriptFunction(fn, opts) {
     written = (0, import_promises.finished)(started.stdout.pipe((0, import_node_fs4.createWriteStream)(stdoutPath)));
   }
   const [result] = await Promise.all([started.result, written]);
-  return { ...result, command, stderrTail: tail(result.stderr) };
+  const meta = parseRoleJson(result.roles?.meta);
+  return { ...result, command, stderrTail: tail(result.stderr), ...meta !== void 0 ? { meta } : {}, ...progress ? { progress } : {} };
 }
 function buildResultRecord(p) {
   return {
@@ -774,6 +805,10 @@ function transitionJobRecord(record, change) {
     result_key: change.resultKey || null
   };
 }
+function updateJobProgress(record, progress, now) {
+  const stage = typeof progress.stage === "string" ? progress.stage : record.stage;
+  return { ...record, progress, stage, updated_at: now ?? timestampIso() };
+}
 
 // packages/jobs/src/queue.ts
 var import_node_os = require("node:os");
@@ -805,7 +840,15 @@ var JobQueue = class {
       try {
         abort.signal.throwIfAborted();
         update({ status: "processing" });
-        const result = await task({ signal: abort.signal, stage: (stage) => update({ status: "processing", stage }) });
+        const result = await task({
+          signal: abort.signal,
+          stage: (stage) => update({ status: "processing", stage }),
+          progress: (p) => {
+            if (job.record.status !== "processing") return;
+            job.record = updateJobProgress(job.record, p);
+            this.opts.onChange?.(job.record);
+          }
+        });
         job.result = result;
         abort.signal.throwIfAborted();
         update({ status: "done", completedAt: timestampIso() });
@@ -873,6 +916,7 @@ var JobQueue = class {
   newJobId,
   newJobRecord,
   objectValue,
+  parseRoleJson,
   pathParts,
   readJson,
   renderConfigValue,
@@ -888,5 +932,6 @@ var JobQueue = class {
   timestampIso,
   transitionJobRecord,
   truthy,
+  updateJobProgress,
   writeJson
 });

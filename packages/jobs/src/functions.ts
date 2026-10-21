@@ -7,7 +7,7 @@
 // Tool options are mapped onto the tool's command line through its
 // --help-json-schema (spec section 13), after `${dot.path}` / `{{dot.path}}`
 // templates are rendered against a context the trigger builds.
-import { inputKeys, loadSchema, redactArgv, start, shellQuote, tail, toArgv, type RunResult, type Schema } from 'clyops-tools';
+import { declaredRoles, inputKeys, loadSchema, redactArgv, start, shellQuote, tail, toArgv, type RoleOption, type RunResult, type Schema } from 'clyops-tools';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { finished } from 'node:stream/promises';
 import { basename, dirname, isAbsolute, resolve } from 'node:path';
@@ -130,6 +130,20 @@ export async function buildFunctionCommand(fn: ResolvedFunction, opts: CommandOp
 export interface FunctionRun extends RunResult {
   /** The last 40 lines of stderr without color codes. */
   stderrTail: string[];
+  /** The tool's `meta` role (spec section 14), parsed, when it declares one and wrote JSON. */
+  meta?: unknown;
+  /** The last update on its `progress` role. */
+  progress?: Record<string, unknown>;
+}
+
+/** A role's collected text as JSON, or undefined when it is empty or isn't JSON. */
+export function parseRoleJson(text: string | undefined): unknown {
+  if (!text?.trim()) return undefined;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
 }
 
 /** A function's `stdin` or `stdout` template rendered, a relative one against `base`. */
@@ -146,7 +160,15 @@ function streamPath(template: string | undefined, opts: CommandOptions, base: st
  */
 export async function runScriptFunction(
   fn: ResolvedFunction,
-  opts: CommandOptions & { timeoutMs?: number; /** Environment supplied to the process or read for option defaults. */ env?: NodeJS.ProcessEnv; /** Working directory used to resolve command-line paths and execute tools. */ cwd?: string; /** AbortSignal used to cancel execution and terminate the tool process tree. */ signal?: AbortSignal; /** Called for each decoded stderr chunk. */ onStderr?: (chunk: string) => void },
+  opts: CommandOptions & {
+    timeoutMs?: number;
+    /** Environment supplied to the process or read for option defaults. */ env?: NodeJS.ProcessEnv;
+    /** Working directory used to resolve command-line paths and execute tools. */ cwd?: string;
+    /** AbortSignal used to cancel execution and terminate the tool process tree. */ signal?: AbortSignal;
+    /** Called for each decoded stderr chunk. */ onStderr?: (chunk: string) => void;
+    /** Called with each object the tool writes on its `progress` role (spec section 14). */ onProgress?: (update: Record<string, unknown>) => void;
+    /** Called with each line the tool writes on its `log` role. */ onLog?: (line: string) => void;
+  },
 ): Promise<FunctionRun> {
   const schema = await loadSchema(fn.script);
   const [file, ...argv] = await buildFunctionCommand(fn, opts, schema);
@@ -156,10 +178,25 @@ export async function runScriptFunction(
   const workDir = (opts.context?.paths as { work_dir?: string } | undefined)?.work_dir;
   const stdinPath = streamPath(fn.definition.stdin, opts, opts.configRoot);
   const stdoutPath = streamPath(fn.definition.stdout, opts, workDir ?? opts.configRoot);
+  // Wire the well-known roles the tool declares: progress onto the record, meta into the run.
+  let progress: Record<string, unknown> | undefined;
+  const roles: Record<string, RoleOption> = {
+    progress: {
+      onLine: (line) => {
+        const update = parseRoleJson(line);
+        if (!update || typeof update !== 'object' || Array.isArray(update)) return;
+        progress = update as Record<string, unknown>;
+        opts.onProgress?.(progress);
+      },
+    },
+    meta: {},
+    log: { onLine: opts.onLog },
+  };
   const started = start(file, argv, {
     cwd: opts.cwd, env: opts.env, timeoutMs: opts.timeoutMs, signal: opts.signal, onStderr: opts.onStderr,
     stdin: stdinPath ? createReadStream(stdinPath) : undefined,
     stdout: stdoutPath ? 'stream' : 'text',
+    roles: declaredRoles({ schema }, roles),
   });
   let written: Promise<void> | undefined;
   if (stdoutPath) {
@@ -167,7 +204,8 @@ export async function runScriptFunction(
     written = finished(started.stdout.pipe(createWriteStream(stdoutPath)));
   }
   const [result] = await Promise.all([started.result, written]);
-  return { ...result, command, stderrTail: tail(result.stderr) };
+  const meta = parseRoleJson(result.roles?.meta);
+  return { ...result, command, stderrTail: tail(result.stderr), ...(meta !== undefined ? { meta } : {}), ...(progress ? { progress } : {}) };
 }
 
 /** The result record every function shares, plus its rendered `result` map. */

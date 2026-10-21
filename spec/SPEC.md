@@ -737,7 +737,10 @@ and on which descriptors, and says so in `CLYOPS_FDS`.
 
 * `meta`: one JSON document describing the main output (stdout), written
   before the first byte of it, e.g. a file name or content length;
-* `progress`: newline-delimited JSON objects, one per update;
+* `progress`: newline-delimited JSON objects, one per update. Runners
+  understand these optional fields and keep any others: `pct` (0 to 100),
+  `done` and `total` (counts of work, e.g. bytes or files), `stage` (a short
+  name for the current step) and `message` (text for a person);
 * `log`: structured log lines, kept apart from the human-readable stderr;
 * `result`: the machine-readable result, when stdout carries something else.
 
