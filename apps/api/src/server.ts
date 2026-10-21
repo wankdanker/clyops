@@ -387,6 +387,44 @@ async function runBody(opts: ApiOptions, ctx: Ctx, tool: ApiTool, req: Request, 
 }
 
 /**
+ * A running job's `stage` follows its tool's stderr: the latest non-empty line (trimmed, at most 300
+ * characters), at most once a second, so a tool reports progress by printing status lines.
+ */
+function stderrStage(stage: (stage: string) => void): { onStderr: (chunk: string) => void; stop: () => void } {
+  let partial = '';
+  let last = 0;
+  let current: string | null = null;
+  let pending: string | null = null;
+  let timer: NodeJS.Timeout | undefined;
+  const flush = () => {
+    timer = undefined;
+    // A line repeated (a tool re-printing its status) is not a new stage, nor a history entry.
+    if (pending !== null && pending !== current) {
+      last = Date.now();
+      current = pending;
+      stage(pending);
+    }
+    pending = null;
+  };
+  return {
+    onStderr(chunk) {
+      const lines = (partial + chunk).split(/\r\n|\r|\n/);
+      partial = lines.pop() ?? '';
+      const line = lines.reverse().find((l) => l.trim());
+      if (!line) return;
+      pending = line.trim().slice(0, 300);
+      const wait = 1000 - (Date.now() - last);
+      if (wait <= 0) flush();
+      else timer ??= setTimeout(flush, wait);
+    },
+    stop() {
+      clearTimeout(timer);
+      timer = undefined;
+    },
+  };
+}
+
+/**
  * Run a tool for a request and answer: a job (`?async=true`), the raw
  * stdout stream, or the JSON envelope. `stdin` is a file path (opened when
  * the tool starts) or a stream. A job owns `dir` and removes it when dropped.
@@ -404,16 +442,24 @@ async function respond(opts: ApiOptions, ctx: Ctx, tool: ApiTool, input: Record<
   if (req.query.async === 'true') {
     const jobDir = dir ?? mkdtempSync(join(tmpdir(), 'clyops-api-'));
     const toFile = streams(tool, req);
-    const job = ctx.queue.add(tool.words.join(' '), async ({ signal, progress }) => {
+    const job = ctx.queue.add(tool.words.join(' '), async ({ signal, progress, stage }) => {
       let result: ApiResult;
       let last: Record<string, unknown> | undefined;
       const roles = roleOptions((update) => { last = update; progress(update); });
-      if (toFile) {
-        const started = startTool(tool, input, { ...base, signal, roles, stdin: open(), stdout: 'stream' });
-        const [r] = await Promise.all([started.result, pipeline(started.stdout, createWriteStream(join(jobDir, 'stdout')))]);
-        result = { ...envelope({ ...r, ok: r.exitCode === 0 && !r.timedOut && !r.signal }, last), stdoutUrl: `/jobs/${job.record.job_id}/stdout` };
-      } else {
-        result = envelope(await runTool(tool, input, { ...base, signal, roles, stdin: open(), stdout: binaryStdout(tool) ? 'buffer' : 'text' }), last);
+      // A tool with a progress role reports its own stage; for any other, the stage follows stderr.
+      const declaresProgress = Boolean(tool.schema.roles?.some((r) => r.name === 'progress' && r.direction === 'out'));
+      const fromStderr = declaresProgress ? undefined : stderrStage(stage);
+      const onStderr = fromStderr?.onStderr;
+      try {
+        if (toFile) {
+          const started = startTool(tool, input, { ...base, signal, roles, onStderr, stdin: open(), stdout: 'stream' });
+          const [r] = await Promise.all([started.result, pipeline(started.stdout, createWriteStream(join(jobDir, 'stdout')))]);
+          result = { ...envelope({ ...r, ok: r.exitCode === 0 && !r.timedOut && !r.signal }, last), stdoutUrl: `/jobs/${job.record.job_id}/stdout` };
+        } else {
+          result = envelope(await runTool(tool, input, { ...base, signal, roles, onStderr, stdin: open(), stdout: binaryStdout(tool) ? 'buffer' : 'text' }), last);
+        }
+      } finally {
+        fromStderr?.stop();
       }
       audit(result);
       return result;

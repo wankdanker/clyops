@@ -536,3 +536,65 @@ process.stdout.write('RIFF');
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('a running job reports its tool\'s latest stderr line as its stage', { timeout: 30_000 }, async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'clyops-api-')));
+  // Its own schema, without a progress role (the conformance demo declares one, which takes over the stage).
+  writeFileSync(join(root, 'chatty-schema.cjs'), `const { Cli } = require(${JSON.stringify(join(repo, 'packages/js/dist/cjs/index.js'))});
+new Cli({ name: 'chatty' }).arg('input', 'Input', '').run();
+`);
+  writeFileSync(join(root, 'chatty'), '#!/bin/sh\n# clyops-tool\n[ "$1" = --help-json-schema ] && exec node ' +
+    `${join(root, 'chatty-schema.cjs')} --help-json-schema\n` +
+    'echo "loading models" >&2; sleep 1.2; echo "loading models" >&2; sleep 0.3; printf "chunk 1/2\\nchunk 2/2" >&2; sleep 0.2; echo >&2; sleep 1.5\n');
+  chmodSync(join(root, 'chatty'), 0o755);
+  const s = await serve({ root, cwd: root });
+  try {
+    const { job_id: id } = await (await fetch(`${s.at}/tools/chatty?async=true`, { method: 'POST',
+      headers: { 'content-type': 'application/json' }, body: '{"input":"x"}' })).json();
+    const seen = new Set();
+    let job;
+    for (let i = 0; i < 100 && job?.status !== 'done' && job?.status !== 'error'; i += 1) {
+      await new Promise((r) => setTimeout(r, 100));
+      job = await (await fetch(`${s.at}/jobs/${id}`)).json();
+      if (job.status === 'processing' && job.stage) seen.add(job.stage);
+    }
+    assert.equal(job.status, 'done');
+    assert.ok(seen.has('loading models') && seen.has('chunk 2/2'), [...seen].join(' | '));
+    assert.ok(job.history.some((h) => h.stage === 'chunk 2/2'));
+    assert.equal(job.history.filter((h) => h.stage === 'loading models').length, 1, 'a repeated line is one stage');
+  } finally {
+    s.close();
+  }
+});
+
+test('a tool with a progress role sets its own stage; its stderr does not', { timeout: 30_000 }, async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'clyops-api-')));
+  writeFileSync(join(root, 'roled.cjs'), `const { Cli } = require(${JSON.stringify(join(repo, 'packages/js/dist/cjs/index.js'))});
+const cli = new Cli({ name: 'roled' });
+cli.role('progress', 'out', 'Progress', 'application/x-ndjson');
+cli.run();
+process.stderr.write('noise on stderr\\n');
+cli.emit('progress', { stage: 'encode', pct: 50 });
+setTimeout(() => {}, 1200);
+`);
+  writeFileSync(join(root, 'roled'), `#!/bin/sh\n# clyops-tool\nexec node ${join(root, 'roled.cjs')} "$@"\n`);
+  chmodSync(join(root, 'roled'), 0o755);
+  const s = await serve({ root, cwd: root });
+  try {
+    const { job_id: id } = await (await fetch(`${s.at}/tools/roled?async=true`, { method: 'POST',
+      headers: { 'content-type': 'application/json' }, body: '{}' })).json();
+    let job;
+    const stages = new Set();
+    for (let i = 0; i < 100 && job?.status !== 'done' && job?.status !== 'error'; i += 1) {
+      await new Promise((r) => setTimeout(r, 100));
+      job = await (await fetch(`${s.at}/jobs/${id}`)).json();
+      if (job.stage) stages.add(job.stage);
+    }
+    assert.equal(job.status, 'done');
+    assert.deepEqual([...stages], ['encode']);
+    assert.ok(!job.history.some((h) => h.stage === 'noise on stderr'));
+  } finally {
+    s.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
