@@ -69,8 +69,10 @@ not saved, and restoring a template clears secret fields.
 ## Execution and jobs
 
 Run synchronously for a result, or submit a background job and follow its status.
-The runner polls the existing job endpoints and supports cancellation. Output is
-shown when the job finishes; this interface does not promise live log streaming.
+The runner polls the existing job endpoints and supports cancellation. A job whose
+tool declares a `progress` role shows a progress bar while it runs; output is shown
+when the job finishes, with the tool's `meta` beside it. This interface does not
+promise live log streaming.
 stdout and stderr render ANSI colors (basic, 256-color and truecolor) and styles
 by default. Uncheck **ANSI colors** for plain text without escape sequences.
 Output remains escaped text; terminal hyperlinks and cursor instructions are

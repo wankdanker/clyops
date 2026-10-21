@@ -47,6 +47,17 @@ Use `timeoutMs`, `signal` and `maxOutput` to bound execution. Await the result
 promise, consume streamed stdout, and handle rejected promises. Timeout/abort
 terminates the process tree and cleans up streams.
 
+`roles` wires up a tool's [roles](guide.md#roles-on-file-descriptors) for one run:
+each named role gets the next descriptor from 3, the tool is told in `CLYOPS_FDS`,
+output roles are collected into the result's `roles` and passed line by line to
+`onLine`, and input roles are fed like stdin. `startTool` and `runTool` keep only
+the roles a tool declares, so asking every tool for `progress` is safe:
+
+```javascript
+const result = await runTool(tool, input, { roles: { progress: { onLine: (l) => show(JSON.parse(l)) }, meta: {} } });
+result.roles?.meta; // the tool's meta document, as text
+```
+
 `runTool` adds schema mapping, secret handling and `ok`. Filters (`allow`, `deny`,
 `readOnly`) and path boundaries should match the application's intended access.
 `auditLog` provides an append-only JSONL audit writer. See the
@@ -72,7 +83,9 @@ console.log(queue.get(job.record.job_id)?.record.status);
 
 `resolveFunctionConfig` resolves a configured script and merges defaults/overrides;
 `buildFunctionCommand` renders arguments; `runScriptFunction` executes it with
-optional stdin/stdout files. Templates use dotted paths in `${expression}` or
+optional stdin/stdout files. A function run wires the tool's `progress`, `meta` and
+`log` roles (`onProgress`, the run's `meta`), and queue tasks record progress with
+`progress(update)`. Templates use dotted paths in `${expression}` or
 `{{expression}}`. Boolean templates are validated after rendering.
 
 Artifact helpers discover, inspect and copy output files. Record helpers create
@@ -100,7 +113,9 @@ The API serves a [static web runner](web-runner.md) at `/ui/`; `ui: false` or
 `--no-ui` disables it. The API exposes tool endpoints, OpenAPI, asynchronous job records and optional
 MCP transport. Options include named scoped keys, filters, path boundaries,
 body/output limits, concurrency, audit and hot reload. Binary output and streamed
-stdin have transport-specific conventions; see the [HTTP guide](../apps/api/README.md)
+stdin have transport-specific conventions. A tool's `meta` and `progress` roles show
+up in the JSON envelope, on job records, as `GET /jobs/<id>/events` server-sent
+events and as an `X-Clyops-Meta` header on streamed output; see the [HTTP guide](../apps/api/README.md)
 for routes and examples. `toZod` is the exported input-validator adapter.
 
 ## MCP
@@ -113,5 +128,7 @@ pnpm exec clyops-mcp --root ./tools
 `createMcpServer` adapts loaded tools to an MCP server; `mcpHttpHandler` installs
 streamable HTTP transport in an HTTP host; `toolName` derives exposed names.
 Effects become annotations. The server exposes declared stdin and represents
-binary output as image/audio/blob results. See the [MCP guide](../apps/mcp/README.md)
+binary output as image/audio/blob results. A tool's `progress` role becomes MCP
+progress notifications when the request has a progress token, and its `meta` comes
+back in the result's `_meta`. See the [MCP guide](../apps/mcp/README.md)
 for transport setup and lifecycle responsibilities.

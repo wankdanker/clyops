@@ -28,7 +28,9 @@ a command-line interface, rather than an installed library API.
 The runner lists tools and generates forms from their schemas, including commands,
 secrets, constraints, effect badges and declared stdin/stdout. Unchecked flags
 explicitly override enabled config/environment values. Templates preserve false
-and zero values and omit secrets. Destructive tools require confirmation.
+and zero values and omit secrets. Destructive tools require confirmation. A tool's
+`progress` role shows as a progress bar, its `meta` beside the output, and `log`
+and `result` lines in it.
 
 See the [runner guide](../apps/runner/README.md) for installation, usage, templates
 and frontend/native development. Its internal UI helpers are not a public package API.
