@@ -117,8 +117,10 @@ non-secret overrides in this browser, scoped by API and tool. Files and stdin ar
 not saved, and restoring a template clears secret fields.</p>
 <h2 id="execution-and-jobs">Execution and jobs</h2>
 <p>Run synchronously for a result, or submit a background job and follow its status.
-The runner polls the existing job endpoints and supports cancellation. Output is
-shown when the job finishes; this interface does not promise live log streaming.
+The runner polls the existing job endpoints and supports cancellation. A job whose
+tool declares a <code>progress</code> role shows a progress bar while it runs; output is shown
+when the job finishes, with the tool's <code>meta</code> beside it. This interface does not
+promise live log streaming.
 stdout and stderr render ANSI colors (basic, 256-color and truecolor) and styles
 by default. Uncheck <strong>ANSI colors</strong> for plain text without escape sequences.
 Output remains escaped text; terminal hyperlinks and cursor instructions are
@@ -143,7 +145,7 @@ the default uses the API/MCP input keys. <code>formSchema</code> adds clyops met
 changing request validation. The API and MCP retain their existing clyops-tools
 imports, which re-export the shared converter for compatibility. The desktop
 editor now uses it too, and numeric fields share the range conversion.</p>
-<p>Build/type/test commands and browser checks are in the <a href="https://github.com/wankdanker/clyops/blob/168f18dc528ab7d53c22375eb19729246fe66bf1/apps/web/README.md">app README</a>.</p>
+<p>Build/type/test commands and browser checks are in the <a href="https://github.com/wankdanker/clyops/blob/b4049373c4580d6fba00daea743a03b3776d5eb7/apps/web/README.md">app README</a>.</p>
 </main>
   </div>
   <footer>Guides are Markdown. API references come from the published source interfaces.</footer>

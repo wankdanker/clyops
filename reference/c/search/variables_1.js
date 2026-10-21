@@ -1,5 +1,4 @@
 var searchData=
 [
-  ['default_5fvalue_0',['default_value',['../structclyops__meta__t.html#abe9c620bbbc45be005148ab4ff223ae0',1,'clyops_meta_t']]],
-  ['description_1',['description',['../structclyops__meta__t.html#a229305c8b6bddb1103f99afc02990f49',1,'clyops_meta_t']]]
+  ['content_5ftype_0',['content_type',['../structclyops__role__meta__t.html#acdb1efbeebc46fb51e3cab7e6cbecfd0',1,'clyops_role_meta_t']]]
 ];

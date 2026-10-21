@@ -123,57 +123,82 @@ loadScripts(document, 'script');</script>
 <div class="block">When <code>lng</code> is given, the others must be too.</div>
 </div>
 <div class="col-first odd-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
-<div class="col-second odd-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setConfig(java.lang.String,java.lang.String)" class="member-name-link">setConfig</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;option,
- <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;prefixes)</code></div>
+<div class="col-second odd-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#role(java.lang.String,java.lang.String,java.lang.String)" class="member-name-link">role</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;name,
+ <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;direction,
+ <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;description)</code></div>
 <div class="col-last odd-row-color">
+<div class="block">Declare a role (spec section 1.3): a stream the program writes (<code>"out"</code>) or reads
+ (<code>"in"</code>) on a descriptor its runner chooses.</div>
+</div>
+<div class="col-first even-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
+<div class="col-second even-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#role(java.lang.String,java.lang.String,java.lang.String,java.lang.String)" class="member-name-link">role</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;name,
+ <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;direction,
+ <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;description,
+ <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;contentType)</code></div>
+<div class="col-last even-row-color">
+<div class="block">Declare a role with its MIME type.</div>
+</div>
+<div class="col-first odd-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
+<div class="col-second odd-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#role(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String)" class="member-name-link">role</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;name,
+ <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;direction,
+ <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;description,
+ <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;contentType,
+ <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;schema)</code></div>
+<div class="col-last odd-row-color">
+<div class="block">Declare a role with its MIME type and a JSON Schema, as JSON text, for each document or line (<code>null</code> for none).</div>
+</div>
+<div class="col-first even-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
+<div class="col-second even-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setConfig(java.lang.String,java.lang.String)" class="member-name-link">setConfig</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;option,
+ <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;prefixes)</code></div>
+<div class="col-last even-row-color">
 <div class="block"><code>option</code> holds the config file path; <code>prefixes</code> is comma-separated.</div>
 </div>
-<div class="col-first even-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
-<div class="col-second even-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setCwd(java.lang.String)" class="member-name-link">setCwd</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;cwd)</code></div>
-<div class="col-last even-row-color">
+<div class="col-first odd-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
+<div class="col-second odd-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setCwd(java.lang.String)" class="member-name-link">setCwd</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;cwd)</code></div>
+<div class="col-last odd-row-color">
 <div class="block">Base for command-line path values (default: the working directory).</div>
 </div>
-<div class="col-first odd-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
-<div class="col-second odd-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setDescription(java.lang.String)" class="member-name-link">setDescription</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;text)</code></div>
-<div class="col-last odd-row-color">
+<div class="col-first even-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
+<div class="col-second even-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setDescription(java.lang.String)" class="member-name-link">setDescription</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;text)</code></div>
+<div class="col-last even-row-color">
 <div class="block">Set the help description and return this CLI.</div>
 </div>
-<div class="col-first even-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
-<div class="col-second even-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setEffects(java.lang.String...)" class="member-name-link">setEffects</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>...&nbsp;effects)</code></div>
-<div class="col-last even-row-color">
+<div class="col-first odd-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
+<div class="col-second odd-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setEffects(java.lang.String...)" class="member-name-link">setEffects</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>...&nbsp;effects)</code></div>
+<div class="col-last odd-row-color">
 <div class="block">What running the program does: read-only, idempotent, destructive, network.</div>
 </div>
-<div class="col-first odd-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
-<div class="col-second odd-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setEnv(java.util.Map)" class="member-name-link">setEnv</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/Map.html" title="class or interface in java.util" class="external-link">Map</a>&lt;<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>,<wbr><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;&nbsp;env)</code></div>
-<div class="col-last odd-row-color">
+<div class="col-first even-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
+<div class="col-second even-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setEnv(java.util.Map)" class="member-name-link">setEnv</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/Map.html" title="class or interface in java.util" class="external-link">Map</a>&lt;<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>,<wbr><a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;&nbsp;env)</code></div>
+<div class="col-last even-row-color">
 <div class="block">The environment to read (default: the process environment).</div>
 </div>
-<div class="col-first even-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
-<div class="col-second even-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setEpilog(java.lang.String)" class="member-name-link">setEpilog</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;text)</code></div>
-<div class="col-last even-row-color">
+<div class="col-first odd-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
+<div class="col-second odd-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setEpilog(java.lang.String)" class="member-name-link">setEpilog</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;text)</code></div>
+<div class="col-last odd-row-color">
 <div class="block">Set the final help text and return this CLI.</div>
 </div>
-<div class="col-first odd-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
-<div class="col-second odd-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setPathSearch(java.lang.String,java.lang.String)" class="member-name-link">setPathSearch</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;lng,
+<div class="col-first even-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
+<div class="col-second even-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setPathSearch(java.lang.String,java.lang.String)" class="member-name-link">setPathSearch</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;lng,
  <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;dirs)</code></div>
-<div class="col-last odd-row-color">
+<div class="col-last even-row-color">
 <div class="block">Fallback directories (colon-separated, relative to the root) for bare relative values of a path option.</div>
 </div>
-<div class="col-first even-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
-<div class="col-second even-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setRoot(java.lang.String)" class="member-name-link">setRoot</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;root)</code></div>
-<div class="col-last even-row-color">
+<div class="col-first odd-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
+<div class="col-second odd-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setRoot(java.lang.String)" class="member-name-link">setRoot</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;root)</code></div>
+<div class="col-last odd-row-color">
 <div class="block">Base for default path values (default: the working directory); relative to the working directory.</div>
 </div>
-<div class="col-first odd-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
-<div class="col-second odd-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setStdin(java.lang.String,java.lang.String)" class="member-name-link">setStdin</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;description,
- <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;contentType)</code></div>
-<div class="col-last odd-row-color">
-<div class="block">What the program reads on stdin; <code>contentType</code> is a MIME type or a comma-separated list.</div>
-</div>
 <div class="col-first even-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
-<div class="col-second even-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setStdout(java.lang.String,java.lang.String)" class="member-name-link">setStdout</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;description,
+<div class="col-second even-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setStdin(java.lang.String,java.lang.String)" class="member-name-link">setStdin</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;description,
  <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;contentType)</code></div>
 <div class="col-last even-row-color">
+<div class="block">What the program reads on stdin; <code>contentType</code> is a MIME type or a comma-separated list.</div>
+</div>
+<div class="col-first odd-row-color"><code><a href="../Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></code></div>
+<div class="col-second odd-row-color"><span class="type-name-label">Cli.</span><code><a href="../Cli.html#setStdout(java.lang.String,java.lang.String)" class="member-name-link">setStdout</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;description,
+ <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;contentType)</code></div>
+<div class="col-last odd-row-color">
 <div class="block">What the program writes on stdout; undeclared means text.</div>
 </div>
 </div>

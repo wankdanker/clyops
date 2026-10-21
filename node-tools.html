@@ -53,7 +53,7 @@ callers decide whether those are errors. Positionals come first by default;
 dash-prefixed values follow options and <code>--</code>. <code>positionals: 'last'</code> changes their
 order. <code>secretEnv</code> passes scalar secrets in the environment; <code>within</code> restricts
 path input. <code>toJsonSchema</code> describes accepted input; <code>redactArgv</code> masks secrets
-in displayed commands. See <a href="https://github.com/wankdanker/clyops/blob/168f18dc528ab7d53c22375eb19729246fe66bf1/spec/SPEC.md#13-json-input-toargv">spec section 13</a>.</p>
+in displayed commands. See <a href="https://github.com/wankdanker/clyops/blob/b4049373c4580d6fba00daea743a03b3776d5eb7/spec/SPEC.md#13-json-input-toargv">spec section 13</a>.</p>
 <h2 id="streams-cancellation-and-errors">Streams, cancellation and errors</h2>
 <p><code>run(file, argv, options)</code> resolves a <code>RunResult</code>; nonzero exit codes are outcomes,
 while spawn/input/output stream errors reject. <code>start</code> additionally returns the
@@ -62,10 +62,18 @@ child and readable stdout. <code>stdin</code> accepts text, Buffer or Readable.
 Use <code>timeoutMs</code>, <code>signal</code> and <code>maxOutput</code> to bound execution. Await the result
 promise, consume streamed stdout, and handle rejected promises. Timeout/abort
 terminates the process tree and cleans up streams.</p>
+<p><code>roles</code> wires up a tool's <a href="/guide.html#roles-on-file-descriptors">roles</a> for one run:
+each named role gets the next descriptor from 3, the tool is told in <code>CLYOPS_FDS</code>,
+output roles are collected into the result's <code>roles</code> and passed line by line to
+<code>onLine</code>, and input roles are fed like stdin. <code>startTool</code> and <code>runTool</code> keep only
+the roles a tool declares, so asking every tool for <code>progress</code> is safe:</p>
+<pre><code class="language-javascript">const result = await runTool(tool, input, { roles: { progress: { onLine: (l) =&gt; show(JSON.parse(l)) }, meta: {} } });
+result.roles?.meta; // the tool's meta document, as text
+</code></pre>
 <p><code>runTool</code> adds schema mapping, secret handling and <code>ok</code>. Filters (<code>allow</code>, <code>deny</code>,
 <code>readOnly</code>) and path boundaries should match the application's intended access.
 <code>auditLog</code> provides an append-only JSONL audit writer. See the
-<a href="https://github.com/wankdanker/clyops/blob/168f18dc528ab7d53c22375eb19729246fe66bf1/packages/tools/README.md">tools package guide</a>.</p>
+<a href="https://github.com/wankdanker/clyops/blob/b4049373c4580d6fba00daea743a03b3776d5eb7/packages/tools/README.md">tools package guide</a>.</p>
 <h2 id="jobs-and-templates">Jobs and templates</h2>
 <pre><code class="language-sh">pnpm add clyops-jobs
 </code></pre>
@@ -81,14 +89,16 @@ console.log(queue.get(job.record.job_id)?.record.status);
 </code></pre>
 <p><code>resolveFunctionConfig</code> resolves a configured script and merges defaults/overrides;
 <code>buildFunctionCommand</code> renders arguments; <code>runScriptFunction</code> executes it with
-optional stdin/stdout files. Templates use dotted paths in <code>${expression}</code> or
+optional stdin/stdout files. A function run wires the tool's <code>progress</code>, <code>meta</code> and
+<code>log</code> roles (<code>onProgress</code>, the run's <code>meta</code>), and queue tasks record progress with
+<code>progress(update)</code>. Templates use dotted paths in <code>${expression}</code> or
 <code>{{expression}}</code>. Boolean templates are validated after rendering.</p>
 <p>Artifact helpers discover, inspect and copy output files. Record helpers create
 and transition serializable job states. <code>JobQueue.add</code> returns a cancellation
 method and a <code>done</code> promise; <code>get</code> and <code>list</code> expose retained work. Cancellation
 is recorded as an error with <code>cancelled</code>; <code>onDrop</code> lets the host clean retained
 files. The queue is in memory, so durable storage is the host's responsibility.
-See <a href="https://github.com/wankdanker/clyops/blob/168f18dc528ab7d53c22375eb19729246fe66bf1/packages/jobs/README.md">job configuration and artifacts</a>.</p>
+See <a href="https://github.com/wankdanker/clyops/blob/b4049373c4580d6fba00daea743a03b3776d5eb7/packages/jobs/README.md">job configuration and artifacts</a>.</p>
 <h2 id="http-api">HTTP API</h2>
 <pre><code class="language-sh">pnpm add clyops-api
 pnpm exec clyops-api --root ./tools --port 8080 --read-only
@@ -102,7 +112,9 @@ const server = api.app.listen(8080);
 <code>--no-ui</code> disables it. The API exposes tool endpoints, OpenAPI, asynchronous job records and optional
 MCP transport. Options include named scoped keys, filters, path boundaries,
 body/output limits, concurrency, audit and hot reload. Binary output and streamed
-stdin have transport-specific conventions; see the <a href="https://github.com/wankdanker/clyops/blob/168f18dc528ab7d53c22375eb19729246fe66bf1/apps/api/README.md">HTTP guide</a>
+stdin have transport-specific conventions. A tool's <code>meta</code> and <code>progress</code> roles show
+up in the JSON envelope, on job records, as <code>GET /jobs/&lt;id&gt;/events</code> server-sent
+events and as an <code>X-Clyops-Meta</code> header on streamed output; see the <a href="https://github.com/wankdanker/clyops/blob/b4049373c4580d6fba00daea743a03b3776d5eb7/apps/api/README.md">HTTP guide</a>
 for routes and examples. <code>toZod</code> is the exported input-validator adapter.</p>
 <h2 id="mcp">MCP</h2>
 <pre><code class="language-sh">pnpm add clyops-mcp
@@ -111,7 +123,9 @@ pnpm exec clyops-mcp --root ./tools
 <p><code>createMcpServer</code> adapts loaded tools to an MCP server; <code>mcpHttpHandler</code> installs
 streamable HTTP transport in an HTTP host; <code>toolName</code> derives exposed names.
 Effects become annotations. The server exposes declared stdin and represents
-binary output as image/audio/blob results. See the <a href="https://github.com/wankdanker/clyops/blob/168f18dc528ab7d53c22375eb19729246fe66bf1/apps/mcp/README.md">MCP guide</a>
+binary output as image/audio/blob results. A tool's <code>progress</code> role becomes MCP
+progress notifications when the request has a progress token, and its <code>meta</code> comes
+back in the result's <code>_meta</code>. See the <a href="https://github.com/wankdanker/clyops/blob/b4049373c4580d6fba00daea743a03b3776d5eb7/apps/mcp/README.md">MCP guide</a>
 for transport setup and lifecycle responsibilities.</p>
 </main>
   </div>

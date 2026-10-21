@@ -57,6 +57,21 @@ Registers a command (spec section 1.7); later registrations belong to it.
 <p>Usage: clyops_stdin <description> [content-type]   /   clyops_stdout <description> [content-type]</p>
 <h2 id="clyops_stdout"><code>clyops_stdout</code></h2>
 <p>Usage: clyops_stdout <description> [content-type]. Declare output metadata.</p>
+<h2 id="clyops_role"><code>clyops_role</code></h2>
+<p>Usage: clyops_role <name> &lt;in|out&gt; <description> [content-type] [schema-json]
+Declare a role (spec section 1.3): a stream on a descriptor the runner chooses. name: meta,
+progress, log, result or another agreed name; schema-json: a JSON Schema each document or line matches.</p>
+<h2 id="clyops_fd_open"><code>clyops_fd_open</code></h2>
+<p>Usage: clyops_fd_open <role>
+Prints the descriptor for a declared role and succeeds when CLYOPS_FDS maps it and it is open
+(spec section 14); fails silently otherwise.</p>
+<h2 id="clyops_emit"><code>clyops_emit</code></h2>
+<p>Usage: clyops_emit <role> <text>
+Write text and a newline (unless it ends with one) to a declared &quot;out&quot; role (spec section 14).
+Does nothing when the runner didn't map it; write errors are ignored.</p>
+<h2 id="clyops_forward_fds"><code>clyops_forward_fds</code></h2>
+<p>Usage: clyops_forward_fds <role>...
+Prints the CLYOPS_FDS value passing these roles on to a program this one starts (spec section 14).</p>
 <h2 id="clyops_exclusive"><code>clyops_exclusive</code></h2>
 <p>Usage: clyops_exclusive <long>...  /  clyops_requires <long> <long>...  /  clyops_one_of <long>...</p>
 <h2 id="clyops_requires"><code>clyops_requires</code></h2>

@@ -146,7 +146,7 @@ field types in TypeScript, Python or Ruby.</p>
 <code>uuid</code>, <code>date:YYYY-MM-DD</code>, <code>path</code>, <code>file:exists</code>, <code>file:readable</code>, <code>file:writable</code>,
 <code>dir:exists</code> and <code>dir:writable</code>. Parameterized rules include <code>int:1-10</code>,
 <code>float:0-1</code>, <code>string:1-100</code>, <code>choice:red,green,blue</code> and <code>regex:PATTERN</code>.
-See <a href="https://github.com/wankdanker/clyops/blob/168f18dc528ab7d53c22375eb19729246fe66bf1/spec/SPEC.md#5-validation-rules">spec section 5</a> for ranges and exact behavior.</p>
+See <a href="https://github.com/wankdanker/clyops/blob/b4049373c4580d6fba00daea743a03b3776d5eb7/spec/SPEC.md#5-validation-rules">spec section 5</a> for ranges and exact behavior.</p>
 <p>Standalone <code>validate</code> helpers return a typed value or the native validation
 error/result. Unknown registration rules and duplicate names are programming
 errors. Bad CLI values are parse errors. These are separate error paths.</p>
@@ -174,7 +174,7 @@ select the program's keys; unknown keys are errors.</p>
 the config file containing the value; default/environment paths resolve against
 the CLI root. Paths are normalized after precedence. <code>-</code> denotes stdin where the
 application supports it. Path validation does not itself open/read files for the
-application. See <a href="https://github.com/wankdanker/clyops/blob/168f18dc528ab7d53c22375eb19729246fe66bf1/spec/SPEC.md#6-paths">spec section 6</a>.</p>
+application. See <a href="https://github.com/wankdanker/clyops/blob/b4049373c4580d6fba00daea743a03b3776d5eb7/spec/SPEC.md#6-paths">spec section 6</a>.</p>
 <h2 id="nested-commands-and-constraints">Nested commands and constraints</h2>
 <pre><code class="language-javascript">const db = cli.command('db', 'Database tasks');
 const migrate = db.command('migrate', 'Apply migrations');
@@ -201,6 +201,32 @@ application still receives the real value. Avoid printing it yourself.
 Effects are <code>read-only</code>, <code>idempotent</code>, <code>destructive</code> and <code>network</code>.
 stdin/stdout declarations describe your program; your code performs the actual
 I/O. Schemas carry these declarations for API/MCP/desktop consumers.</p>
+<h2 id="roles-on-file-descriptors">Roles on file descriptors</h2>
+<p>A program can offer streams beyond stdin, stdout and stderr, such as progress or
+metadata, by declaring roles. The runner that starts it decides which it wants and
+on which descriptors:</p>
+<pre><code class="language-javascript">cli.role('meta', 'out', 'Transfer metadata, before the output', 'application/json');
+cli.role('progress', 'out', 'Progress, one JSON object per line', 'application/x-ndjson');
+cli.run();
+cli.emit('meta', { name: 'clip.mp4' });
+cli.emit('progress', { pct: 50 });
+</code></pre>
+<p>The names <code>meta</code>, <code>progress</code>, <code>log</code> and <code>result</code> mean the same to every runner;
+any other name is free text. Roles show in help (<code>Output [progress]: …</code>) and as
+<code>roles</code> in the schema, on the level they are registered on; commands inherit their
+ancestors'.</p>
+<p>The runner puts each descriptor at its number before starting the program and
+lists the mapping in <code>CLYOPS_FDS</code>. Without it, <code>emit</code> does nothing, so a program
+run by hand needs only stdin, stdout and stderr. To see progress in a terminal:</p>
+<pre><code class="language-sh">CLYOPS_FDS=progress:2 mytool input.wav           # progress on stderr
+CLYOPS_FDS=progress:4 mytool input.wav 4&gt;log.ndjson
+</code></pre>
+<p>The library reads <code>CLYOPS_FDS</code> once and removes it from the environment, so
+programs yours starts don't inherit it by accident. To share a stream with one,
+keep its descriptor open in the child and set the child's <code>CLYOPS_FDS</code> to
+<code>forwardFds('progress')</code>. Streams of lines (<code>progress</code>, <code>log</code>) share well; <code>meta</code>
+and <code>result</code> describe one program's output. <code>fdOpen</code> returns a role's descriptor
+(or none), for reading an <code>in</code> role or writing raw bytes.</p>
 <h2 id="help-schema-and-shell-completion">Help, schema and shell completion</h2>
 <p>See <a href="/completion.html">Bash, Zsh and Fish setup</a> for startup files, PATH, sample tools
 and completing a whole directory with the dispatcher.</p>

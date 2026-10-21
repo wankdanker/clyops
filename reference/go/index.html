@@ -43,7 +43,14 @@ follows them.
 </section><section id="Cli.CompletionScript"><h2>Cli.CompletionScript</h2><pre><code>func (c *Cli) CompletionScript(shell string) (script string, ok bool)</code></pre><p>CompletionScript is the shell script that enables completion for this
 program (spec section 9): eval &quot;$(prog --completion bash)&quot;. ok is false for
 an unknown shell.
+</section><section id="Cli.Emit"><h2>Cli.Emit</h2><pre><code>func (c *Cli) Emit(name string, value any)</code></pre><p>Emit writes value and a newline (unless it ends with one) to a declared &quot;out&quot; role (spec section
+14): a string as is, anything else as compact JSON. It does nothing when the runner didn&apos;t map the
+role and ignores write errors. It panics when name isn&apos;t declared or is an input.
 </section><section id="Cli.Exclusive"><h2>Cli.Exclusive</h2><pre><code>func (c *Cli) Exclusive(longs ...string) *Cli</code></pre><p>Exclusive says at most one of these options may be given.
+</section><section id="Cli.FdOpen"><h2>Cli.FdOpen</h2><pre><code>func (c *Cli) FdOpen(name string) int</code></pre><p>FdOpen is the descriptor for a declared role when CLYOPS_FDS maps it and it is open, else -1
+(spec section 14).
+</section><section id="Cli.ForwardFds"><h2>Cli.ForwardFds</h2><pre><code>func (c *Cli) ForwardFds(names ...string) string</code></pre><p>ForwardFds is the CLYOPS_FDS value passing these roles on to a program this one starts (spec
+section 14). Set it in the child&apos;s environment and pass the descriptors in ExtraFiles.
 </section><section id="Cli.Get"><h2>Cli.Get</h2><pre><code>func (c *Cli) Get(name string) any</code></pre><p>Get is a resolved value by option variable or argument name.
 </section><section id="Cli.IsExplicitlySet"><h2>Cli.IsExplicitlySet</h2><pre><code>func (c *Cli) IsExplicitlySet(long string) bool</code></pre><p>IsExplicitlySet reports whether the option came from the command line, a config file or the environment.
 </section><section id="Cli.IsSet"><h2>Cli.IsSet</h2><pre><code>func (c *Cli) IsSet(long string) bool</code></pre><p>IsSet reports whether the option was given on the command line.
@@ -55,6 +62,9 @@ groupAndRule is an optional group (default &quot;Options&quot;) and validation r
 </section><section id="Cli.Parse"><h2>Cli.Parse</h2><pre><code>func (c *Cli) Parse(argv []string) ParseResult</code></pre><p>Parse parses argv without exiting. Values are in c.Values when Status is &quot;ok&quot;.
 </section><section id="Cli.RequireCommand"><h2>Cli.RequireCommand</h2><pre><code>func (c *Cli) RequireCommand(name, description, installHint string) *Cli</code></pre><p>RequireCommand declares an external command the program needs.
 </section><section id="Cli.Requires"><h2>Cli.Requires</h2><pre><code>func (c *Cli) Requires(long string, longs ...string) *Cli</code></pre><p>Requires says that when long is given, the others must be too.
+</section><section id="Cli.Role"><h2>Cli.Role</h2><pre><code>func (c *Cli) Role(name, direction, description, contentType string, schema any) *Cli</code></pre><p>Role declares a role (spec section 1.3): a stream the program writes (&quot;out&quot;) or reads (&quot;in&quot;) on a
+descriptor its runner chooses. name is meta, progress, log, result or another agreed name; schema is
+a JSON Schema for each document or line: JSON text as a string, any other value marshalled, or nil.
 </section><section id="Cli.Run"><h2>Cli.Run</h2><pre><code>func (c *Cli) Run() Values</code></pre><p>Run parses os.Args like a CLI: it handles --help, --help-json-schema,
 --completion and --bash-completion, prints errors and exits on failure,
 and returns the values.

@@ -49,7 +49,7 @@ loadScripts(document, 'script');</script>
 <div class="header">
 <h1>Index</h1>
 </div>
-<a href="#I:A">A</a>&nbsp;<a href="#I:C">C</a>&nbsp;<a href="#I:D">D</a>&nbsp;<a href="#I:E">E</a>&nbsp;<a href="#I:G">G</a>&nbsp;<a href="#I:H">H</a>&nbsp;<a href="#I:I">I</a>&nbsp;<a href="#I:J">J</a>&nbsp;<a href="#I:L">L</a>&nbsp;<a href="#I:N">N</a>&nbsp;<a href="#I:O">O</a>&nbsp;<a href="#I:P">P</a>&nbsp;<a href="#I:R">R</a>&nbsp;<a href="#I:S">S</a>&nbsp;<a href="#I:T">T</a>&nbsp;<a href="#I:U">U</a>&nbsp;<a href="#I:V">V</a>&nbsp;<a href="#I:W">W</a>&nbsp;<br><a href="allclasses-index.html">All&nbsp;Classes&nbsp;and&nbsp;Interfaces</a><span class="vertical-separator">|</span><a href="allpackages-index.html">All&nbsp;Packages</a><span class="vertical-separator">|</span><a href="constant-values.html">Constant&nbsp;Field&nbsp;Values</a><span class="vertical-separator">|</span><a href="serialized-form.html">Serialized&nbsp;Form</a>
+<a href="#I:A">A</a>&nbsp;<a href="#I:C">C</a>&nbsp;<a href="#I:D">D</a>&nbsp;<a href="#I:E">E</a>&nbsp;<a href="#I:F">F</a>&nbsp;<a href="#I:G">G</a>&nbsp;<a href="#I:H">H</a>&nbsp;<a href="#I:I">I</a>&nbsp;<a href="#I:J">J</a>&nbsp;<a href="#I:L">L</a>&nbsp;<a href="#I:N">N</a>&nbsp;<a href="#I:O">O</a>&nbsp;<a href="#I:P">P</a>&nbsp;<a href="#I:R">R</a>&nbsp;<a href="#I:S">S</a>&nbsp;<a href="#I:T">T</a>&nbsp;<a href="#I:U">U</a>&nbsp;<a href="#I:V">V</a>&nbsp;<a href="#I:W">W</a>&nbsp;<br><a href="allclasses-index.html">All&nbsp;Classes&nbsp;and&nbsp;Interfaces</a><span class="vertical-separator">|</span><a href="allpackages-index.html">All&nbsp;Packages</a><span class="vertical-separator">|</span><a href="constant-values.html">Constant&nbsp;Field&nbsp;Values</a><span class="vertical-separator">|</span><a href="serialized-form.html">Serialized&nbsp;Form</a>
 <h2 class="title" id="I:A">A</h2>
 <dl class="index">
 <dt><a href="io/github/wankdanker/clyops/Cli.html#arg(java.lang.String,java.lang.String,java.lang.String,java.lang.String...)" class="member-name-link">arg(String, String, String, String...)</a> - Method in class io.github.wankdanker.clyops.<a href="io/github/wankdanker/clyops/Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></dt>
@@ -111,6 +111,11 @@ loadScripts(document, 'script');</script>
 </dl>
 <h2 class="title" id="I:E">E</h2>
 <dl class="index">
+<dt><a href="io/github/wankdanker/clyops/Cli.html#emit(java.lang.String,java.lang.String)" class="member-name-link">emit(String, String)</a> - Method in class io.github.wankdanker.clyops.<a href="io/github/wankdanker/clyops/Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></dt>
+<dd>
+<div class="block">Write <code>text</code> and a newline (unless it ends with one) to a declared "out" role (spec
+ section 14).</div>
+</dd>
 <dt><a href="io/github/wankdanker/clyops/ParseResult.html#equals(java.lang.Object)" class="member-name-link">equals(Object)</a> - Method in record class io.github.wankdanker.clyops.<a href="io/github/wankdanker/clyops/ParseResult.html" title="class in io.github.wankdanker.clyops">ParseResult</a></dt>
 <dd>
 <div class="block">Indicates whether some other object is "equal to" this one.</div>
@@ -126,6 +131,17 @@ loadScripts(document, 'script');</script>
 <dt><a href="io/github/wankdanker/clyops/Cli.html#exclusive(java.lang.String...)" class="member-name-link">exclusive(String...)</a> - Method in class io.github.wankdanker.clyops.<a href="io/github/wankdanker/clyops/Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></dt>
 <dd>
 <div class="block">At most one of these options may be given.</div>
+</dd>
+</dl>
+<h2 class="title" id="I:F">F</h2>
+<dl class="index">
+<dt><a href="io/github/wankdanker/clyops/Cli.html#fdOpen(java.lang.String)" class="member-name-link">fdOpen(String)</a> - Method in class io.github.wankdanker.clyops.<a href="io/github/wankdanker/clyops/Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></dt>
+<dd>
+<div class="block">The descriptor for a declared role when CLYOPS_FDS maps it and it is open, else -1 (spec section 14).</div>
+</dd>
+<dt><a href="io/github/wankdanker/clyops/Cli.html#forwardFds(java.lang.String...)" class="member-name-link">forwardFds(String...)</a> - Method in class io.github.wankdanker.clyops.<a href="io/github/wankdanker/clyops/Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></dt>
+<dd>
+<div class="block">The CLYOPS_FDS value passing these roles on to a program this one starts (spec section 14).</div>
 </dd>
 </dl>
 <h2 class="title" id="I:G">G</h2>
@@ -251,6 +267,19 @@ loadScripts(document, 'script');</script>
 <dt><a href="io/github/wankdanker/clyops/Cli.html#resolvePath(java.lang.String,java.lang.String,java.util.List)" class="member-name-link">resolvePath(String, String, List&lt;String&gt;)</a> - Static method in class io.github.wankdanker.clyops.<a href="io/github/wankdanker/clyops/Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></dt>
 <dd>
 <div class="block">Resolve a path value against <code>base</code> (spec section 6), trying <code>searchDirs</code> for bare names.</div>
+</dd>
+<dt><a href="io/github/wankdanker/clyops/Cli.html#role(java.lang.String,java.lang.String,java.lang.String)" class="member-name-link">role(String, String, String)</a> - Method in class io.github.wankdanker.clyops.<a href="io/github/wankdanker/clyops/Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></dt>
+<dd>
+<div class="block">Declare a role (spec section 1.3): a stream the program writes (<code>"out"</code>) or reads
+ (<code>"in"</code>) on a descriptor its runner chooses.</div>
+</dd>
+<dt><a href="io/github/wankdanker/clyops/Cli.html#role(java.lang.String,java.lang.String,java.lang.String,java.lang.String)" class="member-name-link">role(String, String, String, String)</a> - Method in class io.github.wankdanker.clyops.<a href="io/github/wankdanker/clyops/Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></dt>
+<dd>
+<div class="block">Declare a role with its MIME type.</div>
+</dd>
+<dt><a href="io/github/wankdanker/clyops/Cli.html#role(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String)" class="member-name-link">role(String, String, String, String, String)</a> - Method in class io.github.wankdanker.clyops.<a href="io/github/wankdanker/clyops/Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></dt>
+<dd>
+<div class="block">Declare a role with its MIME type and a JSON Schema, as JSON text, for each document or line (<code>null</code> for none).</div>
 </dd>
 <dt><a href="io/github/wankdanker/clyops/Cli.html#run(java.lang.String...)" class="member-name-link">run(String...)</a> - Method in class io.github.wankdanker.clyops.<a href="io/github/wankdanker/clyops/Cli.html" title="class in io.github.wankdanker.clyops">Cli</a></dt>
 <dd>
@@ -380,7 +409,7 @@ loadScripts(document, 'script');</script>
 <div class="block">Greedy word wrap that keeps existing line breaks (spec section 7).</div>
 </dd>
 </dl>
-<a href="#I:A">A</a>&nbsp;<a href="#I:C">C</a>&nbsp;<a href="#I:D">D</a>&nbsp;<a href="#I:E">E</a>&nbsp;<a href="#I:G">G</a>&nbsp;<a href="#I:H">H</a>&nbsp;<a href="#I:I">I</a>&nbsp;<a href="#I:J">J</a>&nbsp;<a href="#I:L">L</a>&nbsp;<a href="#I:N">N</a>&nbsp;<a href="#I:O">O</a>&nbsp;<a href="#I:P">P</a>&nbsp;<a href="#I:R">R</a>&nbsp;<a href="#I:S">S</a>&nbsp;<a href="#I:T">T</a>&nbsp;<a href="#I:U">U</a>&nbsp;<a href="#I:V">V</a>&nbsp;<a href="#I:W">W</a>&nbsp;<br><a href="allclasses-index.html">All&nbsp;Classes&nbsp;and&nbsp;Interfaces</a><span class="vertical-separator">|</span><a href="allpackages-index.html">All&nbsp;Packages</a><span class="vertical-separator">|</span><a href="constant-values.html">Constant&nbsp;Field&nbsp;Values</a><span class="vertical-separator">|</span><a href="serialized-form.html">Serialized&nbsp;Form</a></main>
+<a href="#I:A">A</a>&nbsp;<a href="#I:C">C</a>&nbsp;<a href="#I:D">D</a>&nbsp;<a href="#I:E">E</a>&nbsp;<a href="#I:F">F</a>&nbsp;<a href="#I:G">G</a>&nbsp;<a href="#I:H">H</a>&nbsp;<a href="#I:I">I</a>&nbsp;<a href="#I:J">J</a>&nbsp;<a href="#I:L">L</a>&nbsp;<a href="#I:N">N</a>&nbsp;<a href="#I:O">O</a>&nbsp;<a href="#I:P">P</a>&nbsp;<a href="#I:R">R</a>&nbsp;<a href="#I:S">S</a>&nbsp;<a href="#I:T">T</a>&nbsp;<a href="#I:U">U</a>&nbsp;<a href="#I:V">V</a>&nbsp;<a href="#I:W">W</a>&nbsp;<br><a href="allclasses-index.html">All&nbsp;Classes&nbsp;and&nbsp;Interfaces</a><span class="vertical-separator">|</span><a href="allpackages-index.html">All&nbsp;Packages</a><span class="vertical-separator">|</span><a href="constant-values.html">Constant&nbsp;Field&nbsp;Values</a><span class="vertical-separator">|</span><a href="serialized-form.html">Serialized&nbsp;Form</a></main>
 <footer role="contentinfo">
 <hr>
 <p class="legal-copy"><small>Copyright &#169; 1980. All rights reserved.</small></p>
