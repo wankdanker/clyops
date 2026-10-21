@@ -4,6 +4,7 @@ packages:
   - packages/tools
   - packages/jobs
   - apps/mcp
+  - apps/doc
   - apps/api
   - apps/runner
   - apps/web

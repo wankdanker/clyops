@@ -10,6 +10,12 @@ section here.
   reports progress to `GET /jobs/<id>` by printing status lines to stderr; the
   job's `history` keeps the stages it passed through (a repeated line is not a new
   stage). A tool that declares a `progress` role sets its stage there instead.
+- clyops-doc (npm: `clyops-doc`): documentation from any tool's `--help-json-schema`, as a
+  man page (`man(7)` macros, groff- and mandoc-clean), Markdown or standalone HTML.
+  `--name` for dispatcher paths, `--section`, `--version`, `--date` (or
+  `SOURCE_DATE_EPOCH`) and `--schema FILE`. A program with commands gets a section per
+  command with what it inherits; roles, effects, relationships, environment variables
+  and exit status are documented too. It is a clyops tool, so it documents itself.
 
 ## [0.5.0] - 2026-10-20
 

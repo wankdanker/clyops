@@ -22,6 +22,9 @@
       "clyops-mcp": [
         "apps/mcp/src/index.ts"
       ],
+      "clyops-doc": [
+        "apps/doc/src/index.ts"
+      ],
       "clyops-schema": [
         "packages/schema/src/index.ts"
       ]
@@ -30,6 +33,7 @@
   "include": [
     "../packages/*/src/**/*.ts",
     "../apps/api/src/**/*.ts",
-    "../apps/mcp/src/**/*.ts"
+    "../apps/mcp/src/**/*.ts",
+    "../apps/doc/src/**/*.ts"
   ]
 }

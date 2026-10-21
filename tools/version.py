@@ -18,7 +18,7 @@ from clyops import Cli  # noqa: E402
 # every file keeps its formatting.
 TOP = r'(?m)^  "version": "([^"]+)"'
 # JS/TS workspace versions live in their package.json; pnpm links local packages.
-PUBLIC_WORKSPACES = ["packages/schema", "packages/js", "packages/tools", "packages/jobs", "apps/mcp", "apps/api"]
+PUBLIC_WORKSPACES = ["packages/schema", "packages/js", "packages/tools", "packages/jobs", "apps/mcp", "apps/api", "apps/doc"]
 FILES = [
     *[(f"{ws}/package.json", TOP) for ws in PUBLIC_WORKSPACES],
     ("packages/python/pyproject.toml", r'(?m)^version = "([^"]+)"'),
