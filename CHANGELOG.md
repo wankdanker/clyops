@@ -5,6 +5,12 @@ section here.
 
 ## [Unreleased]
 
+- clyops-api: a running async job's `stage` is its tool's latest stderr line
+  (trimmed, at most 300 characters, updated at most once a second), so a tool
+  reports progress to `GET /jobs/<id>` by printing status lines to stderr; the
+  job's `history` keeps the stages it passed through (a repeated line is not a new
+  stage). A tool that declares a `progress` role sets its stage there instead.
+
 ## [0.5.0] - 2026-10-20
 
 ### Roles on file descriptors

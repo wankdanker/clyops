@@ -81,7 +81,10 @@ curl -s -XDELETE localhost:8080/jobs/job-1f2e3d4c5b6a    # cancel
 ```
 
 Job status moves `pending` → `processing` → `done` | `error` (`error: "cancelled"` when
-cancelled). Jobs are kept in memory (the latest 1000) and run `--concurrency` at a time. A job
+cancelled). While a job runs, its `stage` is the tool's latest stderr line (trimmed, at most 300
+characters, updated at most once a second) and `history` keeps the stages it passed through, so a
+tool reports progress by printing status lines to stderr; a repeated line is not a new stage. A tool
+that declares a `progress` role (below) sets its stage there instead, and stderr is left alone. Jobs are kept in memory (the latest 1000) and run `--concurrency` at a time. A job
 with a streamed body keeps it in a file until it runs; a job with binary output writes it to a
 file served at `GET /jobs/<id>/stdout` (its result has `stdoutUrl`). A job's files are removed when
 it is dropped.
