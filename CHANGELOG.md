@@ -5,6 +5,12 @@ section here.
 
 ## [Unreleased]
 
+- Agent skills in `skills/`: `clyops-build` (writing tools, with a verified
+  example per language), `clyops-use` (running tools safely from a shell via
+  `--help-json-schema`) and `clyops-skillify` (generating project skills from a
+  repository's tools, docs and source, with a schema-to-Markdown renderer).
+- `llms.txt` at the site root (clyops.io/llms.txt) indexing the spec, guides,
+  apps and agent skills for AI agents, and an `AGENTS.md` for contributors.
 - Roles on file descriptors (spec sections 1.3 and 14): `role(name, in|out, description,
   contentType, schema)` beside stdin/stdout, listed as `roles` in `--help-json-schema` and
   in help. Well-known `meta`, `progress`, `log` and `result`. The runner chooses each
