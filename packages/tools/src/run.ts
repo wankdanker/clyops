@@ -25,7 +25,8 @@ export interface RunOptions {
   signal?: AbortSignal;
   /**
    * How long a stopped tool (abort or timeout) has after SIGTERM to clean up and exit before its
-   * process tree gets SIGKILL. Default 200.
+   * process tree gets SIGKILL. Default 200; `Infinity` waits as long as a timer can (about 24 days).
+   * On Windows the tree is stopped at once (`taskkill /F`), without a grace period.
    */
   killGraceMs?: number;
   /** Called for each decoded stdout chunk. */
@@ -86,6 +87,8 @@ export interface Started {
 
 const KILL_GRACE_MS = 200;
 const STOP_WAIT_MS = 1000;
+// setTimeout delays are 32-bit; a larger one (Infinity included) would fire at once.
+const MAX_DELAY_MS = 2 ** 31 - 1;
 
 /** Terminate only the group we created, or the Windows child process tree. */
 function terminateTree(child: ChildProcess, signal: NodeJS.Signals): Promise<void> {
@@ -129,7 +132,8 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
     windowsHide: true,
   });
   const limit = opts.maxOutput || Infinity;
-  const killGraceMs = Math.max(0, opts.killGraceMs ?? KILL_GRACE_MS);
+  const grace = Number(opts.killGraceMs ?? KILL_GRACE_MS);
+  const killGraceMs = Number.isNaN(grace) ? KILL_GRACE_MS : Math.min(Math.max(0, grace), MAX_DELAY_MS - STOP_WAIT_MS);
   let truncated = false;
   const collect = (stream: Readable, onChunk?: (chunk: string) => void) => {
     const chunks: Buffer[] = [];

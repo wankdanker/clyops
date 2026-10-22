@@ -179,6 +179,19 @@ for (const module of ['../dist/index.js', '../clyops-tools.cjs']) {
       assert.equal(existsSync(marker), false);
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
+  test(`${module}: killGraceMs Infinity waits for the cleanup instead of overflowing the timer`, { skip: process.platform === 'win32', timeout: 5000 }, async () => {
+    const root = mkdtempSync(join(tmpdir(), 'clyops-grace-'));
+    try {
+      const { marker, script } = cleanupTool(root);
+      for (const killGraceMs of [Infinity, 2 ** 40]) {
+        rmSync(marker, { force: true });
+        const result = await run('/bin/bash', [script], { timeoutMs: 300, killGraceMs });
+        assert.equal(result.exitCode, 0, `killGraceMs ${killGraceMs}`);
+        assert.equal(result.stdout, 'ready\ncleaned\n');
+        assert.equal(readFileSync(marker, 'utf8'), 'cleaned\n');
+      }
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
   test(`${module}: abort honours killGraceMs`, { skip: process.platform === 'win32', timeout: 5000 }, async () => {
     const root = mkdtempSync(join(tmpdir(), 'clyops-grace-'));
     const controller = new AbortController();

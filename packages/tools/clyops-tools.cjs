@@ -531,6 +531,7 @@ var import_node_string_decoder = require("node:string_decoder");
 var ROLE_NAME = /^[A-Za-z][A-Za-z0-9_.-]*$/;
 var KILL_GRACE_MS = 200;
 var STOP_WAIT_MS = 1e3;
+var MAX_DELAY_MS = 2 ** 31 - 1;
 function terminateTree(child, signal) {
   const pid = child.pid;
   if (!pid || pid <= 0) return Promise.resolve();
@@ -565,7 +566,8 @@ function start(file, argv, opts = {}) {
     windowsHide: true
   });
   const limit = opts.maxOutput || Infinity;
-  const killGraceMs = Math.max(0, opts.killGraceMs ?? KILL_GRACE_MS);
+  const grace = Number(opts.killGraceMs ?? KILL_GRACE_MS);
+  const killGraceMs = Number.isNaN(grace) ? KILL_GRACE_MS : Math.min(Math.max(0, grace), MAX_DELAY_MS - STOP_WAIT_MS);
   let truncated = false;
   const collect = (stream, onChunk) => {
     const chunks = [];
@@ -674,11 +676,11 @@ function start(file, argv, opts = {}) {
       clearTimeout(timer);
       treeStopped = terminateTree(child, signal);
       closeInput();
-      const grace = signal === "SIGTERM" ? killGraceMs : 0;
+      const grace2 = signal === "SIGTERM" ? killGraceMs : 0;
       if (signal === "SIGTERM") {
         escalation = setTimeout(() => {
           treeStopped = terminateTree(child, "SIGKILL");
-        }, grace);
+        }, grace2);
       }
       deadline = setTimeout(() => {
         treeStopped = terminateTree(child, "SIGKILL");
@@ -690,7 +692,7 @@ function start(file, argv, opts = {}) {
           }
         }
         void finish(child.exitCode, child.signalCode);
-      }, grace + STOP_WAIT_MS);
+      }, grace2 + STOP_WAIT_MS);
     };
     const abort = () => stop("SIGTERM");
     const inputError = (err) => {
