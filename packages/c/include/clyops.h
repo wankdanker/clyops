@@ -18,7 +18,7 @@
 #define CLYOPS_H
 
 /** Library release version. */
-#define CLYOPS_VERSION "0.8.0"
+#define CLYOPS_VERSION "0.9.0"
 
 #include <stddef.h>
 

@@ -5,6 +5,10 @@ section here.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-22
+
+### Loading large toolsets
+
 - clyops-tools: `loadTools` and `watchTools` probe tools' `--help-json-schema` 8 at a time
   instead of all at once, and give each probe 30 s instead of 5 s (`loadSchema` too), so a busy
   host no longer leaves healthy tools out; `concurrency` and `timeoutMs` change them
