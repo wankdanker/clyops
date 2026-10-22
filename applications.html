@@ -9,7 +9,7 @@
 </head>
 <body data-search-index="/search-index.json">
   <a class="skip" href="#content">Skip to content</a>
-  <header><a href="/"><strong>clyops</strong></a><span>Documentation · 0.8.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <header><a href="/"><strong>clyops</strong></a><span>Documentation · 0.9.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
   <div class="shell">
     <nav aria-label="Documentation">
       <a href="/guide.html">Concepts and behavior</a>
@@ -39,7 +39,7 @@ or denied tools. Source detection requires a supported import/source statement
 or an explicit <code># clyops-tool</code> / <code>// clyops-tool</code> header marker for wrappers.
 Binary completion markers and nested dispatcher shebangs are also supported.
 Schemas are cached by file stamp; probes have a timeout.</p>
-<p>The <a href="https://github.com/wankdanker/clyops/blob/15f990d1114d3eab7e719a70b616037be930244b/apps/dispatch/README.md">dispatcher guide</a> covers definition files,
+<p>The <a href="https://github.com/wankdanker/clyops/blob/622ea9d60a30d293d97a72f85815158b2f87bd78/apps/dispatch/README.md">dispatcher guide</a> covers definition files,
 aliases, completion, caching and filesystem behavior. This application exposes
 a command-line interface, rather than an installed library API.</p>
 <h2 id="desktop-runner">Desktop runner</h2>
@@ -49,7 +49,7 @@ explicitly override enabled config/environment values. Templates preserve false
 and zero values and omit secrets. Destructive tools require confirmation. A tool's
 <code>progress</code> role shows as a progress bar, its <code>meta</code> beside the output, and <code>log</code>
 and <code>result</code> lines in it.</p>
-<p>See the <a href="https://github.com/wankdanker/clyops/blob/15f990d1114d3eab7e719a70b616037be930244b/apps/runner/README.md">runner guide</a> for installation, usage, templates
+<p>See the <a href="https://github.com/wankdanker/clyops/blob/622ea9d60a30d293d97a72f85815158b2f87bd78/apps/runner/README.md">runner guide</a> for installation, usage, templates
 and frontend/native development. Its internal UI helpers are not a public package API.</p>
 <h2 id="documentation-clyops-doc">Documentation (clyops-doc)</h2>
 <p><code>clyops-doc</code> reads a tool's <code>--help-json-schema</code> and writes a man page, Markdown or HTML, so any
@@ -64,8 +64,8 @@ to actually write them; without it, clyops-doc only lists the files:</p>
 clyops-doc --root ./tools --name mytools --prefix ~/.local --execute       # every tool, and an index page
 </code></pre>
 <p><code>--split</code> gives each command a page of its own, git-style, and <code>--root</code> documents a whole directory
-of tools the way the dispatcher finds them. The <a href="https://github.com/wankdanker/clyops/blob/15f990d1114d3eab7e719a70b616037be930244b/apps/doc/README.md">clyops-doc guide</a> covers
-the options and what goes in each section; <a href="https://github.com/wankdanker/clyops/blob/15f990d1114d3eab7e719a70b616037be930244b/spec/SPEC.md#15-documentation-clyops-doc">spec section 15</a>
+of tools the way the dispatcher finds them. The <a href="https://github.com/wankdanker/clyops/blob/622ea9d60a30d293d97a72f85815158b2f87bd78/apps/doc/README.md">clyops-doc guide</a> covers
+the options and what goes in each section; <a href="https://github.com/wankdanker/clyops/blob/622ea9d60a30d293d97a72f85815158b2f87bd78/spec/SPEC.md#15-documentation-clyops-doc">spec section 15</a>
 is the contract.</p>
 <h2 id="web-runner">Web runner</h2>
 <p>The static SvelteKit web runner is served by <code>clyops-api</code> at <code>/ui/</code>. It discovers
