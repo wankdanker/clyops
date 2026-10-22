@@ -24,9 +24,26 @@ man -l mytool.1
 | `-V, --version` | Version shown in the header |
 | `-d, --date` | Date shown in the header, YYYY-MM-DD (default today, or `SOURCE_DATE_EPOCH` for reproducible builds) |
 | `--schema FILE` | Read the schema from a file instead of stdin |
+| `-o, --out-dir DIR` | Write page files into `DIR` (created if missing) instead of to stdout |
+| `--split` | A page per command, git-style (needs `--out-dir`) |
+| `-x, --execute` | Write the files; without it, `--out-dir` only lists them (needs `--out-dir`) |
 
 Each option can also be set as `CLYOPS_DOC_<OPTION>`. Input that isn't a clyops schema (`"clyops": 1`)
 is rejected with exit status 1.
+
+## A page per command
+
+```sh
+mytool --help-json-schema | clyops-doc --split --out-dir man1            # lists the files
+mytool --help-json-schema | clyops-doc --split --out-dir man1 --execute  # writes them
+```
+
+`mytool.1` gets the program's own options and a list of the commands, and each runnable command gets
+its own page, `mytool-db-migrate.1`, with the options it inherits and the nearest declared effects,
+stdin, stdout and roles. They refer to each other under SEE ALSO, as links in Markdown and HTML
+(`.md`, `.html`). A program without commands is one page. Files that already say the same are left
+alone, so a rerun is a no-op. Because it can write files, clyops-doc declares the `idempotent` and
+`destructive` effects, although nothing is written without `--execute`.
 
 ## What goes where
 
@@ -39,8 +56,10 @@ is rejected with exit status 1.
 | STREAMS | `stdin`, `stdout` and [roles](https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md#14-roles-on-file-descriptors) with their types |
 | NOTES | effects, option relationships and required commands |
 | ENVIRONMENT | each option's variable, the precedence rule, `CLYOPS_FDS` when there are roles, `CLYOPS_SILENT`, `CLYOPS_MAX_WIDTH` and `NO_COLOR` |
+| FILES | the config file: the option and variable naming it, its default, the line format and prefixes |
 | EXIT STATUS | 0, 1, and the tool's own |
 | EXAMPLES | `epilog` |
+| SEE ALSO | with `--split`, the other pages |
 
 Man pages use the plain `man(7)` macros, which groff and mandoc both render; text is escaped so a
 line can't start a request and option dashes are `\-`, so they copy and paste. The HTML page is
@@ -49,10 +68,11 @@ self-contained, with every value escaped.
 ## As a library
 
 ```js
-import { document, buildDoc, renderMarkdown } from 'clyops-doc';
+import { buildDoc, document, pages, renderMarkdown } from 'clyops-doc';
 
 const page = document(schema, 'man', { name: 'mytool', version: '1.2.0' });
 const md = renderMarkdown(buildDoc(schema)); // or build the document once and render it several ways
+for (const { file, content } of pages(schema, 'man')) { /* mytool.1, mytool-db-migrate.1, ... */ }
 ```
 
 ESM only, Node 20+.

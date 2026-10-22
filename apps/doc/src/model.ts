@@ -8,7 +8,8 @@ export type Block =
   | { /** A paragraph of plain text. */ kind: 'p'; text: string }
   | { /** Text shown as is, in a fixed-width font. */ kind: 'pre'; text: string }
   | { /** A list of terms, each with its description. */ kind: 'dl'; items: { term: string; text: string }[] }
-  | { /** A subsection heading, e.g. one per command. */ kind: 'h'; text: string };
+  | { /** A subsection heading, e.g. one per command. */ kind: 'h'; text: string }
+  | { /** Other pages, as SEE ALSO lists them: `page(section)`, linked in Markdown and HTML. */ kind: 'refs'; items: { page: string; section: string }[] };
 
 /** A top-level section, e.g. OPTIONS. */
 export interface Section {
@@ -22,6 +23,8 @@ export interface Section {
 export interface Doc {
   /** How the program is run, e.g. `mytool` or `mytool media to-pcm`. */
   name: string;
+  /** The page's name in the header and NAME line: `name`, or a split page's, e.g. `mytool-db-migrate`. */
+  page: string;
   /** Manual section, e.g. `1`. */
   section: string;
   /** Version shown in the header, or empty. */
@@ -44,6 +47,10 @@ export interface DocOptions {
   version?: string;
   /** Date for the header, YYYY-MM-DD (default: today). */
   date?: string;
+  /** The page's name (default: `name`); see `Doc.page`. */
+  page?: string;
+  /** Commands get pages of their own (see `pages`): list them, with a SEE ALSO, instead of documenting each. */
+  split?: boolean;
 }
 
 /** A runnable level: a program without commands, or a leaf command, with what it inherits. */
@@ -52,6 +59,8 @@ export interface Leaf {
   words: string[];
   /** The level's own description. */
   description: string;
+  /** Text after its help, e.g. examples. */
+  epilog: string;
   /** Positional arguments. */
   arguments: SchemaArgument[];
   /** Its own options, then those it inherits, nearest first. */
@@ -91,6 +100,7 @@ export function leaves(schema: Schema): Leaf[] {
     out.push({
       words,
       description: node.description,
+      epilog: node.epilog,
       arguments: node.arguments,
       options: [...chain].reverse().flatMap((s) => s.options),
       effects: nearest((s) => s.effects, (v) => v.length === 0) ?? [],
@@ -204,7 +214,8 @@ export function buildDoc(schema: Schema, opts: DocOptions = {}): Doc {
   const summary = firstSentence(schema.description || '');
   const sections: Section[] = [];
 
-  sections.push({ title: 'NAME', blocks: [{ kind: 'p', text: summary ? `${name} - ${summary}` : name }] });
+  const page = opts.page || name;
+  sections.push({ title: 'NAME', blocks: [{ kind: 'p', text: summary ? `${page} - ${summary}` : page }] });
   sections.push({ title: 'SYNOPSIS', blocks: [{ kind: 'pre', text: all.map((l) => synopsis(name, l)).join('\n') }] });
   if (schema.description) sections.push({ title: 'DESCRIPTION', blocks: schema.description.split(/\n{2,}/).map((text) => ({ kind: 'p', text })) });
 
@@ -214,6 +225,14 @@ export function buildDoc(schema: Schema, opts: DocOptions = {}): Doc {
     if (options) sections.push({ title: 'OPTIONS', blocks: [options] });
     if (streams) sections.push({ title: 'STREAMS', blocks: [streams] });
     if (notes.length) sections.push({ title: 'NOTES', blocks: notes });
+  } else if (opts.split) {
+    // The commands have pages of their own: the program's options here, and a list of the commands.
+    const own = schema.options.filter((o) => o.name !== 'help').map((o) => ({ term: optionLabel(o), text: optionText(o) }));
+    if (own.length) sections.push({ title: 'OPTIONS', blocks: [{ kind: 'p', text: 'Accepted by every command.' }, { kind: 'dl', items: own }] });
+    sections.push({
+      title: 'COMMANDS',
+      blocks: [{ kind: 'dl', items: all.map((l) => ({ term: [name, ...l.words].join(' '), text: `${sentence(l.description)}See ${pageName(name, l.words)}(${opts.section || '1'}).` })) }],
+    });
   } else {
     // One subsection per runnable command, with what it inherits.
     const blocks: Block[] = [];
@@ -232,8 +251,8 @@ export function buildDoc(schema: Schema, opts: DocOptions = {}): Doc {
 
   // Every option's variable, once, in the order first seen.
   const env = new Map<string, string>();
-  for (const leaf of all) for (const o of leaf.options) if (o.name !== 'help' && !env.has(o.variableName)) env.set(o.variableName, `Sets --${o.name}.${o.secret ? ' A secret: set it here rather than on the command line.' : ''}`);
-  const anyRoles = all.some((l) => l.roles.length);
+  for (const leaf of opts.split && !program ? [{ options: schema.options }] : all) for (const o of leaf.options) if (o.name !== 'help' && !env.has(o.variableName)) env.set(o.variableName, `Sets --${o.name}.${o.secret ? ' A secret: set it here rather than on the command line.' : ''}`);
+  const anyRoles = opts.split && !program ? Boolean(schema.roles?.length) : all.some((l) => l.roles.length);
   sections.push({
     title: 'ENVIRONMENT',
     blocks: [
@@ -265,7 +284,8 @@ export function buildDoc(schema: Schema, opts: DocOptions = {}): Doc {
     }],
   });
   if (schema.epilog) sections.push({ title: 'EXAMPLES', blocks: [{ kind: 'pre', text: schema.epilog.replace(/\n+$/, '') }] });
-  return { name, section: opts.section || '1', version: opts.version || '', date: opts.date || defaultDate(), summary, sections };
+  if (opts.split && !program) sections.push({ title: 'SEE ALSO', blocks: [{ kind: 'refs', items: all.map((l) => ({ page: pageName(name, l.words), section: opts.section || '1' })) }] });
+  return { name, page, section: opts.section || '1', version: opts.version || '', date: opts.date || defaultDate(), summary, sections };
 }
 
 // The config file (spec section 4): where it comes from and what a line looks like.
@@ -280,4 +300,25 @@ function files(config: SchemaConfig, options: SchemaOption[]): Block[] {
     { kind: 'p', text: `It sets options with one key=value per line${prefixes}. The key is an option's long name, with or without the leading --. Blank lines and lines starting with # are ignored, and @include PATH reads another file in place, relative to the one including it. Later lines override earlier ones, and an option given on the command line wins over the file.` },
     ...(example ? [{ kind: 'pre' as const, text: `${config.prefixes[0] ?? ''}${example.name}=${example.isFlag ? 'true' : example.default || 'VALUE'}` }] : []),
   ];
+}
+
+// Text as a sentence followed by a space, ending in a full stop unless it has its own; nothing for none.
+function sentence(text: string): string {
+  return text ? `${text}${/[.!?]$/.test(text) ? '' : '.'} ` : '';
+}
+
+/** A page's name: the invocation's words joined by hyphens, e.g. `mytool-db-migrate`. */
+export function pageName(name: string, words: string[] = []): string {
+  return [name, ...words].join(' ').trim().split(/\s+/).join('-');
+}
+
+/** A runnable command as a program of its own, with everything it inherits, for a page of its own. */
+export function leafSchema(schema: Schema, leaf: Leaf): Schema {
+  return {
+    clyops: 1, script: schema.script, description: leaf.description, epilog: leaf.epilog,
+    arguments: leaf.arguments, options: leaf.options, config: schema.config ?? null,
+    requiredCommands: leaf.requiredCommands, effects: leaf.effects as Schema['effects'],
+    constraints: leaf.constraints as Schema['constraints'], stdin: leaf.stdin, stdout: leaf.stdout,
+    roles: leaf.roles, commands: [],
+  };
 }
