@@ -46,6 +46,7 @@ int main(int argc, char** argv) {
     clyops_opt(cli, "DATA_DIR", "data-dir", "optional",  .short_name = 'd', .description = "Data directory",        .group = "Files",      .rule = "dir:exists");
     clyops_opt(cli, "SRC",      "src",      "optional",                     .description = "Source file",           .group = "Files",      .rule = "file:exists");
     clyops_opt(cli, "DEST",     "dest",     "optional",                     .description = "Destination file",      .group = "Files",      .rule = "file:writable");
+    clyops_opt(cli, "EXEC",     "exec",     "optional",                     .description = "Program to run",        .group = "Files",      .rule = "file:executable");
     clyops_opt_array(cli, "INCLUDE", "include",          .short_name = 'I', .description = "Include directory",     .group = "Files",      .rule = "path");
 
     clyops_config(cli, "config", "demo:,shared:");
@@ -59,7 +60,7 @@ int main(int argc, char** argv) {
 
     static const char* longs[] = {"config", "verbose", "quiet", "color", "out", "notes", "count", "ratio", "enabled", "tag",
         "no-cache", "key", "host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "data-dir",
-        "src", "dest", "include", "help"};
+        "src", "dest", "exec", "include", "help"};
     char* values = clyops_values_json(cli);
     printf("{\"values\": %s, \"sources\": {", values);
     for (size_t i = 0; i < sizeof longs / sizeof *longs; i++)

@@ -24,6 +24,7 @@ from ._completions import SCRIPTS as _COMPLETION_SCRIPTS
 
 __all__ = [
     "Cli", "Values", "ParseResult", "ValidationError", "validate", "resolve_path", "describe_rule", "wrap_text",
+    "is_executable", "is_bare_program",
     "info", "warn", "error", "success", "die", "set_silent",
 ]
 __version__ = "0.7.0"
@@ -88,7 +89,7 @@ _TRUE = ("true", "yes", "1", "on")
 _FALSE = ("false", "no", "0", "off")
 _FIXED_RULES = {
     "int", "float", "string", "path", "ip", "hostname", "url", "port", "email", "uuid", "bool",
-    "date:YYYY-MM-DD", "file:exists", "file:readable", "file:writable", "dir:exists", "dir:writable",
+    "date:YYYY-MM-DD", "file:exists", "file:readable", "file:writable", "file:executable", "dir:exists", "dir:writable",
 }
 _HOSTNAME = r"[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*"
 
@@ -132,6 +133,28 @@ def _is_path_rule(rule: str) -> bool:
     return rule == "path" or rule.startswith(("file:", "dir:"))
 
 
+def is_bare_program(value: str) -> bool:
+    """A `file:executable` value naming a program on PATH rather than a path (spec section 5)."""
+    return value != "" and "/" not in value and not (os.name == "nt" and "\\" in value)
+
+
+def _is_executable_file(path: str) -> bool:
+    # A regular file the user may run; Windows has no execute bit, so one that exists.
+    return os.path.isfile(path) and (os.name == "nt" or os.access(path, os.X_OK))
+
+
+def is_executable(value: str, env: Optional[Mapping[str, str]] = None) -> bool:
+    """Whether `value` is a program: a bare name found on PATH, or a path to an executable regular file."""
+    if not is_bare_program(value):
+        return _is_executable_file(value)
+    env = os.environ if env is None else env
+    exts = [""] + [e for e in env.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";") if e] if os.name == "nt" else [""]
+    for directory in env.get("PATH", "").split(os.pathsep):
+        if directory and any(_is_executable_file(os.path.join(directory, value + ext)) for ext in exts):
+            return True
+    return False
+
+
 def describe_rule(rule: str) -> str:
     """Help text for a validation rule (spec section 5)."""
     fixed = {
@@ -139,7 +162,7 @@ def describe_rule(rule: str) -> str:
         "hostname": "hostname", "url": "URL", "port": "port: 1-65535", "email": "email address", "uuid": "UUID",
         "bool": "true/false, yes/no, 1/0, on/off", "date:YYYY-MM-DD": "date: YYYY-MM-DD",
         "file:exists": "existing file", "file:readable": "readable file", "file:writable": "writable file",
-        "dir:exists": "existing directory", "dir:writable": "writable directory",
+        "file:executable": "executable", "dir:exists": "existing directory", "dir:writable": "writable directory",
     }
     if rule in fixed:
         return fixed[rule]
@@ -256,6 +279,9 @@ def validate(value: str, rule: str, name: str) -> Scalar:
             directory = os.path.dirname(value)
             if not (os.path.isdir(directory) and os.access(directory, os.W_OK)):
                 fail(f"directory is not writable: {directory}")
+    elif rule == "file:executable":
+        if not is_executable(value):
+            fail(f"is not an executable: {value}")
     elif rule == "dir:exists":
         if not os.path.isdir(value):
             fail(f"directory does not exist: {value}")
@@ -303,6 +329,8 @@ def wrap_text(text: str, width: int) -> List[str]:
 
 
 def _completion_kind(rule: str, search_dirs: Sequence[str]):
+    if rule == "file:executable":
+        return "command", ":".join(search_dirs)
     if rule == "path" or rule.startswith("file:"):
         return "file", ":".join(search_dirs)
     if rule.startswith("dir:"):
@@ -946,17 +974,18 @@ class Cli:
             source = self._sources[opt.long]
             base = self.cwd if source == "cli" else self._config[opt.long][1] if source == "config" else self.root
             value = self._raw[opt.long]
-            if isinstance(value, list):
-                self._raw[opt.long] = [resolve_path(v, base, opt.search_dirs) for v in value]
-            else:
-                self._raw[opt.long] = resolve_path(value, base, opt.search_dirs)
+
+            def one(v: str, rule: str = opt.rule, base: str = base, dirs: Sequence[str] = opt.search_dirs) -> str:
+                # A bare program name stays as given (spec section 6).
+                return v if rule == "file:executable" and is_bare_program(v) else resolve_path(v, base, dirs)
+            self._raw[opt.long] = [one(v) for v in value] if isinstance(value, list) else one(value)
         for arg in args:
             if _is_path_rule(arg.rule):
                 value = self._arg_raw[arg.name]
-                if isinstance(value, list):
-                    self._arg_raw[arg.name] = [resolve_path(v, self.cwd) for v in value]
-                else:
-                    self._arg_raw[arg.name] = resolve_path(value, self.cwd)
+
+                def one_arg(v: str, rule: str = arg.rule) -> str:
+                    return v if rule == "file:executable" and is_bare_program(v) else resolve_path(v, self.cwd)
+                self._arg_raw[arg.name] = [one_arg(v) for v in value] if isinstance(value, list) else one_arg(value)
 
         def convert(v: str, rule: str, name: str) -> Scalar:
             return validate(v, rule, name) if v and rule else v

@@ -96,6 +96,14 @@ _clyops_value___CLYOPS_FUNC__() {
                     [[ -d "$dir" ]] && COMPREPLY+=($(cd "$dir" && compgen $flag -- "$cur"))
                 done
             fi ;;
+        command)
+            # A program on PATH, or a path once the word has a slash.
+            if [[ "$cur" == */* ]]; then
+                compopt -o filenames 2>/dev/null
+                COMPREPLY=($(compgen -f -- "$cur"))
+            else
+                COMPREPLY=($(compgen -c -- "$cur"))
+            fi ;;
         host) COMPREPLY=($(compgen -A hostname -- "$cur")) ;;
         none) COMPREPLY=() ;;
         *) compopt -o default 2>/dev/null; COMPREPLY=() ;;
@@ -163,6 +171,7 @@ _clyops_action___CLYOPS_FUNC__() {
         choice) print -r -- "(${values//,/ })" ;;
         file) if [[ -n "$values" ]]; then print -r -- "{_files; _files -W \"(${values//:/ })\"}"; else print -r -- _files; fi ;;
         dir) if [[ -n "$values" ]]; then print -r -- "{_files -/; _files -/ -W \"(${values//:/ })\"}"; else print -r -- "_files -/"; fi ;;
+        command) print -r -- '{if [[ $PREFIX == */* ]]; then _files; else _command_names -e; fi}' ;;
         host) print -r -- _hosts ;;
         none) print -r -- " " ;;
         *) print -r -- _files ;;
@@ -191,6 +200,13 @@ function __clyops___CLYOPS_FUNC___value --argument-names kind values cur
                         string replace -- "$dir/" '' $f
                     end
                 end
+            end
+        case command
+            # A program on PATH, or a path once the word has a slash.
+            if string match -q -- '*/*' $cur
+                __fish_complete_path $cur
+            else
+                complete -C -- $cur
             end
         case dir
             __fish_complete_directories $cur

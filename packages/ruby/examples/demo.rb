@@ -45,6 +45,7 @@ cli.opt "SIZE",     "size",     "",  "optional",  "Size code",             "Vali
 cli.opt "DATA_DIR", "data-dir", "d", "optional",  "Data directory",        "Files",      "dir:exists"
 cli.opt "SRC",      "src",      "",  "optional",  "Source file",           "Files",      "file:exists"
 cli.opt "DEST",     "dest",     "",  "optional",  "Destination file",      "Files",      "file:writable"
+cli.opt "EXEC",     "exec",     "",  "optional",  "Program to run",        "Files",      "file:executable"
 cli.opt_array "INCLUDE", "include", "I",          "Include directory",     "Files",      "path"
 
 cli.set_config("config", "demo:,shared:")
@@ -57,5 +58,5 @@ cli.emit("meta", cli.fd_open("extra") ? '{"extra":true}' : '{"extra":false}')
 cli.emit("progress", '{"pct":100}')
 
 longs = %w[config verbose quiet color out notes count ratio enabled tag no-cache key host port endpoint addr id email date
-           code level size data-dir src dest include help]
+           code level size data-dir src dest exec include help]
 puts JSON.pretty_generate({ "values" => JSON.parse(cli.values_json), "sources" => longs.to_h { |l| [l, cli.source(l)] } })

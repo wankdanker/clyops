@@ -587,7 +587,7 @@ void clyops_path_search(clyops_t* cli, const char* long_name, const char* dirs) 
 
 static int known_rule(const char* r) {
     static const char* fixed[] = {"int", "float", "string", "path", "ip", "hostname", "url", "port", "email", "uuid", "bool",
-                                  "date:YYYY-MM-DD", "file:exists", "file:readable", "file:writable", "dir:exists", "dir:writable"};
+                                  "date:YYYY-MM-DD", "file:exists", "file:readable", "file:writable", "file:executable", "dir:exists", "dir:writable"};
     if (empty(r)) return 1;
     for (size_t i = 0; i < sizeof fixed / sizeof *fixed; i++) if (streq(r, fixed[i])) return 1;
     if (re_match("^int:([0-9]+-[0-9]*|-[0-9]+)$", r)) return 1;
@@ -677,6 +677,9 @@ static void ensure_help(clyops_t* cli) {
 /* ------------------------------------------------------------------------- */
 
 static int is_path_rule(const char* r) { return streq(r, "path") || starts(r, "file:") || starts(r, "dir:"); }
+/* A file:executable value naming a program on PATH rather than a path (spec section 5). */
+static int is_bare_program(const char* v) { return *v && !strchr(v, '/'); }
+static int command_available(const char* cmd);
 
 static int bool_like(const opt_t* o) {
     return o->kind == K_FLAG || streq(o->rule, "bool") || streq(o->rule, "choice:true,false") || streq(o->rule, "choice:false,true");
@@ -696,7 +699,7 @@ static char* describe_rule(const char* r) {
         {"hostname", "hostname"}, {"url", "URL"}, {"port", "port: 1-65535"}, {"email", "email address"}, {"uuid", "UUID"},
         {"bool", "true/false, yes/no, 1/0, on/off"}, {"date:YYYY-MM-DD", "date: YYYY-MM-DD"},
         {"file:exists", "existing file"}, {"file:readable", "readable file"}, {"file:writable", "writable file"},
-        {"dir:exists", "existing directory"}, {"dir:writable", "writable directory"},
+        {"file:executable", "executable"}, {"dir:exists", "existing directory"}, {"dir:writable", "writable directory"},
     };
     for (size_t i = 0; i < sizeof fixed / sizeof *fixed; i++) if (streq(r, fixed[i][0])) return xstrdup(fixed[i][1]);
     const char* noun = starts(r, "int:") ? "integer" : starts(r, "float:") ? "number" : starts(r, "string:") ? "text" : NULL;
@@ -816,6 +819,9 @@ static char* validate(const char* v, const char* rule, const char* name, const c
                     err = fmt("%s directory is not writable: %s", name, dir);
                 free(dir);
             }
+        } else if (streq(rule, "file:executable")) {
+            /* A bare name on PATH, or a path to an executable regular file. */
+            if (!command_available(v)) err = fmt("%s is not an executable: %s", name, v);
         } else if (streq(rule, "dir:exists")) {
             if (!exists || !S_ISDIR(st.st_mode)) err = fmt("%s directory does not exist: %s", name, v);
         } else if (streq(rule, "dir:writable")) {
@@ -870,6 +876,12 @@ static char* resolve_path(const char* value, const char* base, const svec* dirs)
         }
     }
     return from_base;
+}
+
+/* A path value resolved (spec section 6), except a bare program name, which stays as given. */
+static char* resolve_value(const char* rule, const char* value, const char* base, const svec* dirs) {
+    if (streq(rule, "file:executable") && is_bare_program(value)) return xstrdup(value);
+    return resolve_path(value, base, dirs);
 }
 
 static int command_available(const char* cmd) {
@@ -1135,12 +1147,12 @@ static int resolve_values(clyops_t* cli) {
         const char* base = streq(o->src, "cli") ? cli->cwd : streq(o->src, "config") ? o->cfg_dir : cli->root_abs;
         if (o->kind == K_ARRAY) {
             for (size_t k = 0; k < o->list.len; k++) {
-                char* r = resolve_path(o->list.v[k], base, &o->search);
+                char* r = resolve_value(o->rule, o->list.v[k], base, &o->search);
                 free(o->list.v[k]);
                 o->list.v[k] = r;
             }
         } else {
-            char* r = resolve_path(o->raw, base, &o->search);
+            char* r = resolve_value(o->rule, o->raw, base, &o->search);
             free(o->raw);
             o->raw = r;
         }
@@ -1150,12 +1162,12 @@ static int resolve_values(clyops_t* cli) {
         if (!is_path_rule(a->rule)) continue;
         if (a->variadic) {
             for (size_t k = 0; k < a->list.len; k++) {
-                char* r = resolve_path(a->list.v[k], cli->cwd, NULL);
+                char* r = resolve_value(a->rule, a->list.v[k], cli->cwd, NULL);
                 free(a->list.v[k]);
                 a->list.v[k] = r;
             }
         } else {
-            char* r = resolve_path(a->raw, cli->cwd, NULL);
+            char* r = resolve_value(a->rule, a->raw, cli->cwd, NULL);
             free(a->raw);
             a->raw = r;
         }
@@ -1936,7 +1948,7 @@ static void completion_kind(sbuf* b, const char* rule, const svec* dirs) {
     const char* kind = "default";
     sbuf values = {0};
     if (streq(rule, "path") || starts(rule, "file:") || starts(rule, "dir:")) {
-        kind = starts(rule, "dir:") ? "dir" : "file";
+        kind = starts(rule, "dir:") ? "dir" : streq(rule, "file:executable") ? "command" : "file";
         for (size_t i = 0; dirs && i < dirs->len; i++) {
             if (i) sb_putc(&values, ':');
             sb_put(&values, dirs->v[i]);
