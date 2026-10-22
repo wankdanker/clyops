@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Cli } from 'clyops';
-import { buildDoc, defaultDate, document, firstSentence, leaves, markdownText, troff } from '../dist/index.js';
+import { buildDoc, defaultDate, document, firstSentence, leaves, markdownText, pageName, pages, troff } from '../dist/index.js';
 
 const cli = fileURLToPath(new URL('../dist/cli.js', import.meta.url));
 const repo = fileURLToPath(new URL('../../..', import.meta.url));
@@ -31,7 +31,7 @@ test('documents itself: its own schema on stdin gives its man page', () => {
   assert.match(page.stdout, /\\fB\\-f, \\-\\-format=<value>\\fR/);
   if (hasGroff) assert.equal(groffWarnings(page.stdout), '');
   const parsed = JSON.parse(schema.stdout);
-  assert.deepEqual(parsed.effects, ['read-only']);
+  assert.deepEqual(parsed.effects, ['idempotent', 'destructive'], 'it can write files, with --out-dir and --execute');
   assert.equal(parsed.stdin.contentType, 'application/json');
 });
 
@@ -130,3 +130,69 @@ test('the NAME line, and the header date', () => {
   assert.match(defaultDate({}), /^\d{4}-\d{2}-\d{2}$/);
   assert.match(document(tasks, 'man', { section: '8', date: '2026-10-21' }), /^\.TH "TASKS" "8" /m);
 });
+
+test('split: a page per command, git-style, each with what it inherits and SEE ALSO', () => {
+  assert.equal(pageName('tasks', ['db', 'migrate']), 'tasks-db-migrate');
+  assert.equal(pageName('mytool media'), 'mytool-media');
+  const man = pages(tasks, 'man', { date: '2026-10-21' });
+  assert.deepEqual(man.map((p) => p.file), ['tasks.1', 'tasks-db-migrate.1', 'tasks-db-status.1', 'tasks-send.1']);
+  const [top, migrate] = man.map((p) => p.content);
+  assert.match(top, /^\.TH "TASKS" "1"/m);
+  assert.match(top, /^\\fBtasks db migrate\\fR\nApply migrations\. See tasks\\-db\\-migrate\(1\)\.$/m);
+  assert.match(top, /^\.SH "OPTIONS"\n\.PP\nAccepted by every command\.\n\.TP\n\\fB\\-v, \\-\\-verbose\\fR$/m);
+  assert.match(top, /^\.BR "tasks\\-db\\-migrate" "\(1\),"\n\.BR "tasks\\-db\\-status" "\(1\),"\n\.BR "tasks\\-send" "\(1\)"$/m);
+  assert.doesNotMatch(top, /DB_URL/, 'the top page lists only the program\'s own variables');
+  assert.match(migrate, /^\.TH "TASKS\\-DB\\-MIGRATE" "1"/m);
+  assert.match(migrate, /^\.SH "NAME"\ntasks\\-db\\-migrate \\- Apply migrations$/m);
+  assert.match(migrate, /^tasks db migrate \[<target>\] \[OPTIONS\]$/m);
+  assert.match(migrate, /\\fB\\-v, \\-\\-verbose\\fR/, 'inherited options are on the command\'s page');
+  assert.match(migrate, /Effects: destructive/);
+  assert.match(migrate, /^\.SH "SEE ALSO"\n\.PP\n\.BR "tasks" "\(1\)"$/m);
+  if (hasGroff) for (const p of man) assert.equal(groffWarnings(p.content), '', p.file);
+
+  const md = pages(tasks, 'markdown', { date: '2026-10-21', section: '8' });
+  assert.deepEqual(md.map((p) => p.file), ['tasks.md', 'tasks-db-migrate.md', 'tasks-db-status.md', 'tasks-send.md']);
+  assert.match(md[0].content, /\[tasks-db-migrate\(8\)\]\(tasks-db-migrate\.md\)/);
+  assert.match(pages(tasks, 'html')[1].content, /<a href="tasks\.html"><code>tasks<\/code>\(1\)<\/a>/);
+  assert.deepEqual(pages(demo, 'man').map((p) => p.file), ['demo.1'], 'a program without commands is one page');
+  assert.deepEqual(pages(tasks, 'man', { name: 'ops tasks' }).map((p) => p.file).slice(0, 2), ['ops-tasks.1', 'ops-tasks-db-migrate.1']);
+});
+
+test('--out-dir: lists the files, writes them with --execute, and leaves unchanged ones alone', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'clyops-doc-'));
+  try {
+    const out = join(dir, 'man1');
+    const input = JSON.stringify(tasks);
+    const preview = run(['--split', '--out-dir', out, '--date', '2026-10-21'], input);
+    assert.equal(preview.status, 0, preview.stderr);
+    assert.equal(preview.stdout, ['tasks.1', 'tasks-db-migrate.1', 'tasks-db-status.1', 'tasks-send.1'].map((f) => join(out, f) + '\n').join(''));
+    assert.match(preview.stderr, /Would write 4 page\(s\) in .*; add --execute to write them\./);
+    assert.equal(existsSync(out), false, 'nothing is written without --execute');
+
+    const wrote = run(['--split', '--out-dir', out, '--execute', '--date', '2026-10-21'], input);
+    assert.equal(wrote.status, 0, wrote.stderr);
+    assert.deepEqual(readdirSync(out).sort(), ['tasks-db-migrate.1', 'tasks-db-status.1', 'tasks-send.1', 'tasks.1']);
+    assert.equal(readFileSync(join(out, 'tasks-send.1'), 'utf8'), pages(tasks, 'man', { date: '2026-10-21' })[3].content);
+
+    const mtime = statSync(join(out, 'tasks.1')).mtimeMs;
+    writeFileSync(join(out, 'tasks-send.1'), 'old\n');
+    const again = run(['--split', '--out-dir', out, '-x', '--date', '2026-10-21'], input);
+    assert.match(again.stderr, /Wrote 4 page\(s\), replacing 1, 3 already up to date in /);
+    assert.equal(statSync(join(out, 'tasks.1')).mtimeMs, mtime, 'an unchanged page is not rewritten');
+    assert.notEqual(readFileSync(join(out, 'tasks-send.1'), 'utf8'), 'old\n');
+
+    const single = run(['--out-dir', dir, '-x', '--format', 'markdown'], JSON.stringify(demo));
+    assert.equal(single.status, 0, single.stderr);
+    assert.equal(single.stdout, join(dir, 'demo.md') + '\n');
+    assert.match(readFileSync(join(dir, 'demo.md'), 'utf8'), /^# `demo`/);
+
+    for (const args of [['--split'], ['--execute']]) {
+      const bad = run(args, input);
+      assert.equal(bad.status, 1);
+      assert.match(bad.stderr, new RegExp(`--${args[0].slice(2)} requires --out-dir`));
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+

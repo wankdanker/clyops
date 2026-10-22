@@ -11,6 +11,11 @@ section here.
   `null`. `clyops-schema` types it as `SchemaConfig`.
 - clyops-doc writes a FILES section for a program with a config file: the option and
   variable naming it, its default, the line format and prefixes, and an example line.
+- clyops-doc `--out-dir DIR` writes page files instead of printing one, listing them unless
+  `--execute` is given and leaving unchanged files alone; `--split` writes a page per command,
+  git-style (`mytool.1` lists them, `mytool-db-migrate.1` documents one, with SEE ALSO between
+  them), also as `pages()` in the library. clyops-doc now declares the `idempotent` and
+  `destructive` effects instead of `read-only`, since it can write files.
 
 ## [0.6.0] - 2026-10-21
 
