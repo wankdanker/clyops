@@ -1324,6 +1324,15 @@ public class Cli {
             optList.add(m);
         }
         out.put("options", optList);
+        if (parent == null) {
+            Map<String, Object> config = null;
+            if (!configOption.isEmpty()) {
+                config = new LinkedHashMap<>();
+                config.put("option", configOption);
+                config.put("prefixes", new ArrayList<>(configPrefixes));
+            }
+            out.put("config", config);
+        }
         List<Object> cmdList = new ArrayList<>();
         for (Command c : commands) {
             Map<String, Object> m = new LinkedHashMap<>();

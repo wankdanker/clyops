@@ -76,10 +76,10 @@ test('commands: one subsection per runnable command, with what it inherits', () 
   if (hasGroff) assert.equal(groffWarnings(man), '');
 });
 
-test('a program: arguments, options, streams, notes, environment, exit status and examples', () => {
+test('a program: arguments, options, streams, notes, environment, files, exit status and examples', () => {
   const doc = buildDoc(demo, { date: '2026-10-21' });
   assert.deepEqual(doc.sections.map((s) => s.title),
-    ['NAME', 'SYNOPSIS', 'DESCRIPTION', 'ARGUMENTS', 'OPTIONS', 'STREAMS', 'NOTES', 'ENVIRONMENT', 'EXIT STATUS', 'EXAMPLES']);
+    ['NAME', 'SYNOPSIS', 'DESCRIPTION', 'ARGUMENTS', 'OPTIONS', 'STREAMS', 'NOTES', 'ENVIRONMENT', 'FILES', 'EXIT STATUS', 'EXAMPLES']);
   const md = document(demo, 'markdown', { date: '2026-10-21' });
   assert.match(md, /- `-k, --key=<value>`: API key \(required; secret: prefer the environment; environment: KEY\)/);
   assert.match(md, /- `<rest\.\.\.>`: Extra items \(any number\)/);
@@ -87,6 +87,23 @@ test('a program: arguments, options, streams, notes, environment, exit status an
   assert.match(md, /Needs sh on PATH: POSIX shell \(install dash\)\./);
   assert.match(md, /## EXAMPLES\n\n```\nExamples:\n  demo in\.txt slow a b --tag x --tag y/);
   assert.doesNotMatch(md, /`HELP`/, 'the built-in --help has no environment variable worth listing');
+});
+
+test('files: the declared config file, and none without one', () => {
+  const md = document(demo, 'markdown', { date: '2026-10-21' });
+  assert.match(md, /## FILES\n\nThe config file is the one named by --config or CONFIG, resolved against the current directory\./);
+  assert.match(md, /one key=value per line, on lines starting with demo: or shared:\./);
+  assert.match(md, /```\ndemo:color=auto\n```/);
+  assert.match(md, /command line takes precedence over the config file/);
+  const plain = document(tasks, 'markdown', { date: '2026-10-21' });
+  assert.doesNotMatch(plain, /## FILES|config file/);
+  const older = document({ ...demo, config: undefined }, 'markdown', { date: '2026-10-21' });
+  assert.doesNotMatch(older, /## FILES/, 'a schema from before 0.7 has no config field');
+  const every = buildDoc({ ...demo, config: { option: 'config', prefixes: [] } }, { date: '2026-10-21' });
+  const files = every.sections.find((s) => s.title === 'FILES');
+  assert.match(files.blocks[1].text, /^It sets options with one key=value per line\. /);
+  assert.equal(files.blocks[2].text, 'color=auto');
+  if (hasGroff) assert.equal(groffWarnings(document(demo, 'man', { date: '2026-10-21' })), '');
 });
 
 test('escaping: troff, Markdown and HTML render text as itself', () => {

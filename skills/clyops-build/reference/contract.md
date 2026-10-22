@@ -166,7 +166,8 @@ bare relative names.
 ## Schema (`--help-json-schema`, §8)
 
 Top level: `clyops` (1), `script`, `description`, `epilog`, `arguments[]`,
-`options[]`, `requiredCommands[]`, `effects[]`, `constraints[]`, `stdin`,
+`options[]`, `config` (`option`, `prefixes[]`, or `null`; the program's only),
+`requiredCommands[]`, `effects[]`, `constraints[]`, `stdin`,
 `stdout`, `roles[]` (`name`, `direction`, `description`, `contentType`,
 `schema`), `commands[]`. Each option has `name`, `shortName`, `variableName`,
 `description`, `default`, `group`, `type` (`boolean|integer|number|choice|path|string`),

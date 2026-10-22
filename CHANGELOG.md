@@ -5,6 +5,13 @@ section here.
 
 ## [Unreleased]
 
+- `--help-json-schema` reports the config file declaration as a top-level `config`
+  (`{"option": "config", "prefixes": ["demo:"]}`, or `null` when there is none), in all
+  nine languages. Commands don't have it; output from older versions without it means
+  `null`. `clyops-schema` types it as `SchemaConfig`.
+- clyops-doc writes a FILES section for a program with a config file: the option and
+  variable naming it, its default, the line format and prefixes, and an example line.
+
 ## [0.6.0] - 2026-10-21
 
 ### Job progress from stderr
