@@ -5,6 +5,13 @@ section here.
 
 ## [Unreleased]
 
+- A validation rule, `file:executable`, for an option or argument that names a program to run, in
+  all nine languages (spec section 5): a bare name must be found on `PATH` and stays as given
+  (`ffmpeg`), and a value with a `/` must be an executable regular file, resolved like other
+  paths. On Windows a regular file that exists counts, and bare names are also tried with
+  `PATHEXT`. Help says `accepts: executable`, the schema has `"type": "path"`, and shells complete
+  command names for it (completion kind `command`). `secret:file:executable` works too.
+
 ## [0.7.0] - 2026-10-22
 
 ### Config files in the schema

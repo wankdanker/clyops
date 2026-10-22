@@ -63,9 +63,15 @@ field types in TypeScript, Python or Ruby.
 
 Rules include `int`, `float`, `bool`, `port`, `ip`, `hostname`, `url`, `email`,
 `uuid`, `date:YYYY-MM-DD`, `path`, `file:exists`, `file:readable`, `file:writable`,
-`dir:exists` and `dir:writable`. Parameterized rules include `int:1-10`,
+`file:executable`, `dir:exists` and `dir:writable`. Parameterized rules include `int:1-10`,
 `float:0-1`, `string:1-100`, `choice:red,green,blue` and `regex:PATTERN`.
 See [spec section 5](../spec/SPEC.md#5-validation-rules) for ranges and exact behavior.
+
+Use `file:executable` for an option that names a program to run (`--ffmpeg`): a bare
+name must be on `PATH` and stays as given, and anything with a `/` must be an executable
+file. It also tells servers that run tools for remote callers not to take that option
+from them ([spec section 13](../spec/SPEC.md#13-json-input-toargv)), and shells complete
+command names for it.
 
 Standalone `validate` helpers return a typed value or the native validation
 error/result. Unknown registration rules and duplicate names are programming
