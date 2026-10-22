@@ -26,6 +26,9 @@ __export(index_exports, {
   auditLog: () => auditLog,
   checkWithin: () => checkWithin,
   classify: () => classify,
+  closedInputs: () => closedInputs,
+  closedKeys: () => closedKeys,
+  closedRequirement: () => closedRequirement,
   commandName: () => commandName,
   commands: () => commands,
   declaredRoles: () => declaredRoles,
@@ -38,6 +41,7 @@ __export(index_exports, {
   isTextType: () => isTextType,
   loadSchema: () => loadSchema,
   loadTools: () => loadTools,
+  publicSchema: () => publicSchema,
   readSettings: () => readSettings,
   redactArgv: () => redactArgv,
   run: () => run,
@@ -414,6 +418,9 @@ var InputError = class extends Error {
 function isPathValued(validation, type) {
   return type === "path" || validation === "path" || validation.startsWith("file:") || validation.startsWith("dir:");
 }
+function isBareProgram(validation, value) {
+  return validation === "file:executable" && value !== "" && !value.includes("/") && !(process.platform === "win32" && value.includes("\\"));
+}
 var TRUE = /^(true|1|yes|on)$/i;
 var FALSE = /^(false|0|no|off)$/i;
 function toArgv(schema, input, opts = {}) {
@@ -428,9 +435,10 @@ function toArgv(schema, input, opts = {}) {
     }
     return void 0;
   };
-  const text = (value, pathValued, name = "") => {
+  const text = (value, pathValued, name = "", validation = "") => {
     let s = typeof value === "object" ? JSON.stringify(value) : String(value);
     if (opts.render) s = opts.render(s);
+    if (isBareProgram(validation, s)) return s;
     if (pathValued && opts.base && !["", "-", "disabled", "false"].includes(s) && !(0, import_node_path2.isAbsolute)(s) && !/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) {
       s = (0, import_node_path2.resolve)(opts.base, s);
     }
@@ -457,11 +465,11 @@ function toArgv(schema, input, opts = {}) {
       continue;
     }
     if (opts.secretEnv && option.secret && !option.isArray) {
-      out.env[option.variableName] = text(found.value, isPathValued(option.validation, option.type), `--${option.name}`);
+      out.env[option.variableName] = text(found.value, isPathValued(option.validation, option.type), `--${option.name}`, option.validation);
       continue;
     }
     for (const item of Array.isArray(found.value) ? found.value : [found.value]) {
-      out.argv.push(`--${option.name}`, text(item, isPathValued(option.validation, option.type), `--${option.name}`));
+      out.argv.push(`--${option.name}`, text(item, isPathValued(option.validation, option.type), `--${option.name}`, option.validation));
     }
   }
   const explicit = Array.isArray(opts.positionals) ? opts.positionals : void 0;
@@ -472,6 +480,11 @@ function toArgv(schema, input, opts = {}) {
     let skipped = [];
     for (const argument of schema.arguments) {
       const found = pick(argument);
+      if (found && opts.controlled?.includes(argument.name)) {
+        out.controlled.push(found.key);
+        skipped.push(argument);
+        continue;
+      }
       if (!found || found.value === null || found.value === void 0) {
         skipped.push(argument);
         continue;
@@ -482,7 +495,7 @@ function toArgv(schema, input, opts = {}) {
       }
       skipped = [];
       const values = Array.isArray(found.value) ? found.value : [found.value];
-      positionals.push(...values.map((v) => text(v, isPathValued(argument.validation), argument.name)));
+      positionals.push(...values.map((v) => text(v, isPathValued(argument.validation), argument.name, argument.validation)));
     }
   }
   if (positionals.some((p) => p.startsWith("-"))) out.argv.push("--", ...positionals);
@@ -749,6 +762,27 @@ function shellQuote(args) {
 
 // packages/tools/src/tools.ts
 var import_node_fs4 = require("node:fs");
+function closedInputs(schema, policy) {
+  const closed = (validation, type) => validation === "file:executable" ? !policy.allowExecutables : isPathValued(validation, type) && !policy.confined;
+  return [
+    ...schema.options.filter((o) => o.name !== "help" && closed(o.validation, o.type)).map((o) => o.name),
+    ...schema.arguments.filter((a) => closed(a.validation)).map((a) => a.name)
+  ];
+}
+function publicSchema(schema, closed) {
+  if (!closed.length) return schema;
+  return {
+    ...schema,
+    options: schema.options.filter((o) => !closed.includes(o.name)),
+    arguments: schema.arguments.filter((a) => !closed.includes(a.name))
+  };
+}
+function closedKeys(schema, closed, input) {
+  return [...schema.options, ...schema.arguments].filter((item) => closed.includes(item.name)).flatMap((item) => inputKeys(item).filter((key) => Object.prototype.hasOwnProperty.call(input, key) && input[key] !== null && input[key] !== void 0));
+}
+function closedRequirement(schema, closed) {
+  return schema.arguments.find((a) => a.required && closed.includes(a.name))?.name;
+}
 function globRegex(pattern) {
   const source = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*\*|\*|\?/g, (m) => m === "**" ? ".*" : m === "*" ? "[^/]*" : "[^/]");
   return new RegExp(`^${source}$`);
@@ -843,7 +877,14 @@ async function watchTools(root, opts = {}) {
   };
 }
 function startTool(tool, input, opts = {}) {
-  const { argv, env } = toArgv(tool.schema, input, { within: opts.within, cwd: opts.cwd, secretEnv: opts.secretsInEnv !== false, positionals: opts.positionalsOrder });
+  const { argv, env, controlled } = toArgv(tool.schema, input, {
+    within: opts.within,
+    cwd: opts.cwd,
+    secretEnv: opts.secretsInEnv !== false,
+    positionals: opts.positionalsOrder,
+    controlled: opts.closed
+  });
+  if (controlled.length) throw new InputError(`${controlled.join(", ")}: set by the server, not by callers`);
   const full = [...tool.subcommand ?? [], ...argv];
   const roles = opts.roles && declaredRoles(tool, opts.roles);
   const started = start(tool.file, full, { ...opts, roles, env: Object.keys(env).length ? { ...opts.env ?? process.env, ...env } : opts.env });
@@ -886,6 +927,9 @@ function auditLog(target) {
   auditLog,
   checkWithin,
   classify,
+  closedInputs,
+  closedKeys,
+  closedRequirement,
   commandName,
   commands,
   declaredRoles,
@@ -898,6 +942,7 @@ function auditLog(target) {
   isTextType,
   loadSchema,
   loadTools,
+  publicSchema,
   readSettings,
   redactArgv,
   run,

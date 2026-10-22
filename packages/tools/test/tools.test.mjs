@@ -4,7 +4,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { allowed, checkWithin, classify, commands, discover, expandCommands, inputKeys, loadSchema, loadTools, redactArgv, run, runTool, start, startTool, tail, toArgv, toJsonSchema, watchTools } from '../dist/index.js';
+import { allowed, checkWithin, classify, closedInputs, closedKeys, closedRequirement, commands, publicSchema, discover, expandCommands, inputKeys, loadSchema, loadTools, redactArgv, run, runTool, start, startTool, tail, toArgv, toJsonSchema, watchTools } from '../dist/index.js';
 
 const repo = fileURLToPath(new URL('../../..', import.meta.url));
 const golden = JSON.parse(readFileSync(join(repo, 'spec/conformance/golden/schema.json'), 'utf8'));
@@ -477,4 +477,32 @@ test('roles: expandCommands gives a command its own and its ancestors\' roles', 
   const roles = (words) => tools.find((t) => t.subcommand.join(' ') === words).schema.roles.map((r) => r.name);
   assert.deepEqual(roles('db migrate'), ['progress', 'plan']);
   assert.deepEqual(roles('db status'), ['progress']);
+});
+
+test('closed inputs: the policy, the public schema, and toArgv refusing them', () => {
+  const schema = {
+    clyops: 1, script: 't', description: '', epilog: '', requiredCommands: [],
+    arguments: [{ name: 'src', description: '', required: false, isVariadic: false, default: '', validation: 'file:readable' }],
+    options: [
+      { name: 'exec', shortName: '', variableName: 'EXEC', description: '', default: '', group: '', type: 'path', isFlag: false, isArray: false, required: false, validation: 'file:executable', choices: [], secret: false },
+      { name: 'out', shortName: '', variableName: 'OUT', description: '', default: '', group: '', type: 'path', isFlag: false, isArray: false, required: false, validation: 'dir:writable', choices: [], secret: false },
+      { name: 'name', shortName: '', variableName: 'NAME', description: '', default: '', group: '', type: 'string', isFlag: false, isArray: false, required: false, validation: '', choices: [], secret: false },
+    ],
+  };
+  assert.deepEqual(closedInputs(schema, { confined: false }), ['exec', 'out', 'src']);
+  assert.deepEqual(closedInputs(schema, { confined: true }), ['exec']);
+  assert.deepEqual(closedInputs(schema, { confined: true, allowExecutables: true }), []);
+  const closed = closedInputs(schema, { confined: false });
+  const pub = publicSchema(schema, closed);
+  assert.deepEqual([pub.options.map((o) => o.name), pub.arguments.length], [['name'], 0]);
+  assert.equal(closedRequirement(schema, closed), undefined, 'src is optional');
+  assert.equal(closedRequirement({ ...schema, arguments: [{ ...schema.arguments[0], required: true }] }, closed), 'src');
+  assert.deepEqual(closedKeys(schema, closed, { exec: 'sh', name: 'n', src: null }), ['exec']);
+
+  const argv = toArgv(schema, { exec: 'sh', src: 'a.txt', name: 'n' }, { controlled: closed });
+  assert.deepEqual([argv.argv, argv.controlled.sort()], [['--name', 'n'], ['exec', 'src']]);
+  // A bare program name is neither resolved against the base nor confined.
+  const open = toArgv(schema, { exec: 'ffmpeg' }, { base: '/work', within: ['/work'] });
+  assert.deepEqual(open.argv, ['--exec', 'ffmpeg']);
+  assert.throws(() => toArgv(schema, { exec: '/usr/bin/x' }, { base: '/work', within: ['/work'] }), /outside the allowed directories/);
 });

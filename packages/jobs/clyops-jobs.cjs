@@ -230,6 +230,9 @@ var InputError = class extends Error {
 function isPathValued(validation, type) {
   return type === "path" || validation === "path" || validation.startsWith("file:") || validation.startsWith("dir:");
 }
+function isBareProgram(validation, value) {
+  return validation === "file:executable" && value !== "" && !value.includes("/") && !(process.platform === "win32" && value.includes("\\"));
+}
 var TRUE = /^(true|1|yes|on)$/i;
 var FALSE = /^(false|0|no|off)$/i;
 function toArgv(schema, input, opts = {}) {
@@ -244,9 +247,10 @@ function toArgv(schema, input, opts = {}) {
     }
     return void 0;
   };
-  const text = (value, pathValued, name = "") => {
+  const text = (value, pathValued, name = "", validation = "") => {
     let s = typeof value === "object" ? JSON.stringify(value) : String(value);
     if (opts.render) s = opts.render(s);
+    if (isBareProgram(validation, s)) return s;
     if (pathValued && opts.base && !["", "-", "disabled", "false"].includes(s) && !(0, import_node_path2.isAbsolute)(s) && !/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) {
       s = (0, import_node_path2.resolve)(opts.base, s);
     }
@@ -273,11 +277,11 @@ function toArgv(schema, input, opts = {}) {
       continue;
     }
     if (opts.secretEnv && option.secret && !option.isArray) {
-      out.env[option.variableName] = text(found.value, isPathValued(option.validation, option.type), `--${option.name}`);
+      out.env[option.variableName] = text(found.value, isPathValued(option.validation, option.type), `--${option.name}`, option.validation);
       continue;
     }
     for (const item of Array.isArray(found.value) ? found.value : [found.value]) {
-      out.argv.push(`--${option.name}`, text(item, isPathValued(option.validation, option.type), `--${option.name}`));
+      out.argv.push(`--${option.name}`, text(item, isPathValued(option.validation, option.type), `--${option.name}`, option.validation));
     }
   }
   const explicit = Array.isArray(opts.positionals) ? opts.positionals : void 0;
@@ -288,6 +292,11 @@ function toArgv(schema, input, opts = {}) {
     let skipped = [];
     for (const argument of schema.arguments) {
       const found = pick(argument);
+      if (found && opts.controlled?.includes(argument.name)) {
+        out.controlled.push(found.key);
+        skipped.push(argument);
+        continue;
+      }
       if (!found || found.value === null || found.value === void 0) {
         skipped.push(argument);
         continue;
@@ -298,7 +307,7 @@ function toArgv(schema, input, opts = {}) {
       }
       skipped = [];
       const values = Array.isArray(found.value) ? found.value : [found.value];
-      positionals.push(...values.map((v) => text(v, isPathValued(argument.validation), argument.name)));
+      positionals.push(...values.map((v) => text(v, isPathValued(argument.validation), argument.name, argument.validation)));
     }
   }
   if (positionals.some((p) => p.startsWith("-"))) out.argv.push("--", ...positionals);
