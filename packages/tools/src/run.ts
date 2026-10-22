@@ -19,10 +19,15 @@ export interface RunOptions {
   cwd?: string;
   /** Environment supplied to the process or read for option defaults. */
   env?: NodeJS.ProcessEnv;
-  /** Kill the tool and its process tree after this long; 0 or unset waits forever. */
+  /** Stop the tool and its process tree after this long (like `signal`, and `timedOut` is set); 0 or unset waits forever. */
   timeoutMs?: number;
-  /** Abort the process tree (SIGTERM, then SIGKILL after a short grace period). */
+  /** Abort the process tree (SIGTERM, then SIGKILL after `killGraceMs`). */
   signal?: AbortSignal;
+  /**
+   * How long a stopped tool (abort or timeout) has after SIGTERM to clean up and exit before its
+   * process tree gets SIGKILL. Default 200.
+   */
+  killGraceMs?: number;
   /** Called for each decoded stdout chunk. */
   onStdout?: (chunk: string) => void;
   /** Called for each decoded stderr chunk. */
@@ -79,7 +84,7 @@ export interface Started {
   result: Promise<RunResult>;
 }
 
-const ABORT_GRACE_MS = 200;
+const KILL_GRACE_MS = 200;
 const STOP_WAIT_MS = 1000;
 
 /** Terminate only the group we created, or the Windows child process tree. */
@@ -124,6 +129,7 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
     windowsHide: true,
   });
   const limit = opts.maxOutput || Infinity;
+  const killGraceMs = Math.max(0, opts.killGraceMs ?? KILL_GRACE_MS);
   let truncated = false;
   const collect = (stream: Readable, onChunk?: (chunk: string) => void) => {
     const chunks: Buffer[] = [];
@@ -233,11 +239,13 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
       clearTimeout(timer);
       treeStopped = terminateTree(child, signal);
       closeInput();
+      const grace = signal === 'SIGTERM' ? killGraceMs : 0;
       if (signal === 'SIGTERM') {
-        escalation = setTimeout(() => { treeStopped = terminateTree(child, 'SIGKILL'); }, ABORT_GRACE_MS);
+        escalation = setTimeout(() => { treeStopped = terminateTree(child, 'SIGKILL'); }, grace);
       }
       // Inherited pipes must never make cancellation wait indefinitely, even
-      // if a descendant has deliberately left our process group.
+      // if a descendant has deliberately left our process group. The tool
+      // keeps its whole grace period before this.
       deadline = setTimeout(() => {
         treeStopped = terminateTree(child, 'SIGKILL');
         for (const stream of [childOut, childErr, ...roleOut.map((r) => r.stream)]) {
@@ -250,7 +258,7 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
           }
         }
         void finish(child.exitCode, child.signalCode);
-      }, STOP_WAIT_MS);
+      }, grace + STOP_WAIT_MS);
     };
     const abort = () => stop('SIGTERM');
     const inputError = (err: Error) => {
@@ -265,7 +273,7 @@ export function start(file: string, argv: string[], opts: RunOptions = {}): Star
     child.once('exit', () => { exited = true; closeInput(); });
     child.once('close', (exitCode, signal) => { void finish(exitCode, signal); });
     timer = opts.timeoutMs
-      ? setTimeout(() => { timedOut = true; stop('SIGKILL'); }, opts.timeoutMs)
+      ? setTimeout(() => { timedOut = true; stop('SIGTERM'); }, opts.timeoutMs)
       : undefined;
     opts.signal?.addEventListener('abort', abort, { once: true });
     if (opts.stdin !== undefined && child.stdin) {

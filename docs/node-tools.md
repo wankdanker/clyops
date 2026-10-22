@@ -45,7 +45,8 @@ child and readable stdout. `stdin` accepts text, Buffer or Readable.
 `stdout: 'buffer'` captures binary data; `'stream'` exposes it for consumption.
 Use `timeoutMs`, `signal` and `maxOutput` to bound execution. Await the result
 promise, consume streamed stdout, and handle rejected promises. Timeout/abort
-terminates the process tree and cleans up streams.
+sends the process tree SIGTERM, then SIGKILL after `killGraceMs` (default 200),
+and cleans up streams.
 
 `roles` wires up a tool's [roles](guide.md#roles-on-file-descriptors) for one run:
 each named role gets the next descriptor from 3, the tool is told in `CLYOPS_FDS`,

@@ -345,7 +345,7 @@ var import_node_child_process2 = require("node:child_process");
 var import_node_stream = require("node:stream");
 var import_node_string_decoder = require("node:string_decoder");
 var ROLE_NAME = /^[A-Za-z][A-Za-z0-9_.-]*$/;
-var ABORT_GRACE_MS = 200;
+var KILL_GRACE_MS = 200;
 var STOP_WAIT_MS = 1e3;
 function terminateTree(child, signal) {
   const pid = child.pid;
@@ -381,6 +381,7 @@ function start(file, argv, opts = {}) {
     windowsHide: true
   });
   const limit = opts.maxOutput || Infinity;
+  const killGraceMs = Math.max(0, opts.killGraceMs ?? KILL_GRACE_MS);
   let truncated = false;
   const collect = (stream, onChunk) => {
     const chunks = [];
@@ -489,10 +490,11 @@ function start(file, argv, opts = {}) {
       clearTimeout(timer);
       treeStopped = terminateTree(child, signal);
       closeInput();
+      const grace = signal === "SIGTERM" ? killGraceMs : 0;
       if (signal === "SIGTERM") {
         escalation = setTimeout(() => {
           treeStopped = terminateTree(child, "SIGKILL");
-        }, ABORT_GRACE_MS);
+        }, grace);
       }
       deadline = setTimeout(() => {
         treeStopped = terminateTree(child, "SIGKILL");
@@ -504,7 +506,7 @@ function start(file, argv, opts = {}) {
           }
         }
         void finish(child.exitCode, child.signalCode);
-      }, STOP_WAIT_MS);
+      }, grace + STOP_WAIT_MS);
     };
     const abort = () => stop("SIGTERM");
     const inputError = (err) => {
@@ -525,7 +527,7 @@ function start(file, argv, opts = {}) {
     });
     timer = opts.timeoutMs ? setTimeout(() => {
       timedOut = true;
-      stop("SIGKILL");
+      stop("SIGTERM");
     }, opts.timeoutMs) : void 0;
     opts.signal?.addEventListener("abort", abort, { once: true });
     if (opts.stdin !== void 0 && child.stdin) {
@@ -646,6 +648,7 @@ async function runScriptFunction(fn, opts) {
     cwd: opts.cwd,
     env: opts.env,
     timeoutMs: opts.timeoutMs,
+    killGraceMs: opts.killGraceMs,
     signal: opts.signal,
     onStderr: opts.onStderr,
     stdin: stdinPath ? (0, import_node_fs4.createReadStream)(stdinPath) : void 0,

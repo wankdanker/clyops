@@ -5,6 +5,13 @@ section here.
 
 ## [Unreleased]
 
+- clyops-tools: `killGraceMs` sets how long a stopped run (abort or timeout) has after
+  SIGTERM before its process tree gets SIGKILL (default 200 ms, as before), and a timeout
+  now sends SIGTERM first instead of going straight to SIGKILL (`timedOut` is still set,
+  and a timed-out tool that exits on SIGTERM reports `signal: 'SIGTERM'`), so tools such
+  as ffmpeg wrappers can clean up partial files. clyops-jobs: `runScriptFunction` passes
+  `killGraceMs` on.
+
 ## [0.6.0] - 2026-10-21
 
 ### Job progress from stderr

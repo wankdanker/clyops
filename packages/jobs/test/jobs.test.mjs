@@ -242,3 +242,20 @@ test('roles: progress updates the record without history entries', async () => {
   assert.deepEqual(job.record.progress, { pct: 75 });
   assert.deepEqual(seen, [['pending', null], ['processing', null], ['processing', 25], ['processing', 75], ['done', 75]]);
 });
+
+test('runScriptFunction passes killGraceMs on: a timed-out tool gets time to clean up', { skip: process.platform === 'win32', timeout: 5000 }, async () => {
+  const root = workspace();
+  const marker = join(root, 'marker');
+  const script = join(root, 'scripts/slow.sh');
+  writeFileSync(script, `#!/bin/bash
+if [ "$1" = --help-json-schema ]; then echo '{"clyops":1,"description":"","arguments":[],"options":[]}'; exit 0; fi
+trap 'sleep 0.5; echo cleaned > ${marker}; exit 0' TERM
+while :; do sleep 0.05; done
+`);
+  chmodSync(script, 0o755);
+  const fn = resolveFunctionConfig(root, { functions: { slow: { script: 'scripts/slow.sh' } } }, 'slow');
+  const result = await runScriptFunction(fn, { configRoot: root, env, cwd: root, timeoutMs: 300, killGraceMs: 2000 });
+  assert.equal(result.timedOut, true);
+  assert.equal(result.exitCode, 0);
+  assert.equal(readFileSync(marker, 'utf8'), 'cleaned\n');
+});
