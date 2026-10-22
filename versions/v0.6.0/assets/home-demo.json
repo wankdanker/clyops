@@ -1,0 +1,208 @@
+{
+  "variants": [
+    {
+      "id": "python",
+      "name": "Python",
+      "file": "plan.py",
+      "install": "python -m pip install clyops",
+      "source": "#!/usr/bin/env python3\nimport json\n\nfrom clyops import Cli\n\ncli = Cli(name=\"plan\")\ncli.set_description(\"Build a deployment plan. Change nothing.\")\ncli.opt(\"SERVICE\", \"service\", \"s\", \"api\", \"Service\", rule=\"choice:api,worker\")\ncli.opt(\"ENV\", \"env\", \"e\", \"staging\", \"Environment\", rule=\"choice:staging,production\")\ncli.opt(\"REPLICAS\", \"replicas\", \"r\", \"2\", \"Replica count\", rule=\"int:1-10\")\ncli.set_effects(\"read-only\")\ncli.set_stdout(\"Deployment plan\", \"application/json\")\nargs = cli.run()\nprint(json.dumps({\"service\": args.SERVICE, \"env\": args.ENV, \"replicas\": args.REPLICAS}))",
+      "frames": [
+        {
+          "title": "Write the tool",
+          "caption": "Register options, validation and effects beside your code.",
+          "command": "$EDITOR scripts/plan.py",
+          "text": "#!/usr/bin/env python3\nimport json\n\nfrom clyops import Cli\n\ncli = Cli(name=\"plan\")\ncli.set_description(\"Build a deployment plan. Change nothing.\")\ncli.opt(\"SERVICE\", \"service\", \"s\", \"api\", \"Service\", rule=\"choice:api,worker\")\ncli.opt(\"ENV\", \"env\", \"e\", \"staging\", \"Environment\", rule=\"choice:staging,production\")\ncli.opt(\"REPLICAS\", \"replicas\", \"r\", \"2\", \"Replica count\", rule=\"int:1-10\")\ncli.set_effects(\"read-only\")\ncli.set_stdout(\"Deployment plan\", \"application/json\")\nargs = cli.run()\nprint(json.dumps({\"service\": args.SERVICE, \"env\": args.ENV, \"replicas\": args.REPLICAS}))",
+          "kind": "source"
+        },
+        {
+          "title": "Run it in your terminal",
+          "caption": "Help text comes from those same registrations.",
+          "command": "python scripts/plan.py --help",
+          "text": "Usage: plan [OPTIONS]\n\nBuild a deployment plan. Change nothing.\n\nOutput: Deployment plan (application/json)\n\nOptions:\n  -s, --service=<value>         Service (default: api, accepts: choices: api, worker)\n  -e, --env=<value>             Environment (default: staging, accepts: choices: staging,\n                                production)\n  -r, --replicas=<value>        Replica count (default: 2, accepts: integer: 1-10)\n\nGlobal:\n  -h, --help                    Show this help message and exit",
+          "kind": "help"
+        },
+        {
+          "title": "Validate before execution",
+          "caption": "Accepted inputs produce a plan. Out-of-range values fail validation.",
+          "command": "python scripts/plan.py --service api --env staging --replicas 2",
+          "text": "{\n  \"service\": \"api\",\n  \"env\": \"staging\",\n  \"replicas\": 2\n}\n\n$ python scripts/plan.py --replicas 99\n2026-10-22 02:09:49 [error] --replicas must be <= 10, got 99\n[exit 1]",
+          "kind": "run"
+        },
+        {
+          "title": "Expose the contract",
+          "caption": "Types, limits, effects and I/O become machine-readable.",
+          "command": "python scripts/plan.py --help-json-schema",
+          "text": "{\n  \"script\": \"plan\",\n  \"effects\": [\n    \"read-only\"\n  ],\n  \"stdout\": {\n    \"description\": \"Deployment plan\",\n    \"contentType\": \"application/json\"\n  },\n  \"options\": [\n    {\n      \"name\": \"service\",\n      \"type\": \"choice\",\n      \"validation\": \"choice:api,worker\"\n    },\n    {\n      \"name\": \"env\",\n      \"type\": \"choice\",\n      \"validation\": \"choice:staging,production\"\n    },\n    {\n      \"name\": \"replicas\",\n      \"type\": \"integer\",\n      \"validation\": \"int:1-10\"\n    }\n  ]\n}",
+          "kind": "schema"
+        },
+        {
+          "title": "Hand it to an agent",
+          "caption": "MCP exposes the tool and validates its inputs before execution.",
+          "command": "claude mcp add --transport stdio ops -- pnpm exec clyops-mcp --root ./scripts --read-only\n$ claude",
+          "text": "> Plan two api replicas in staging.\n\n+ ops / plan\n| {\"service\":\"api\",\"env\":\"staging\",\"replicas\":2}\n|\n{\n  \"service\": \"api\",\n  \"env\": \"staging\",\n  \"replicas\": 2\n}\n\nPlan ready. No infrastructure changed.",
+          "kind": "agent"
+        },
+        {
+          "title": "Give it an HTTP endpoint",
+          "caption": "The API publishes OpenAPI and runs the same tool with JSON input.",
+          "command": "pnpm exec clyops-api --root ./scripts --read-only\n$ curl localhost:8080/tools/plan \\\n  -H 'content-type: application/json' \\\n  -d '{\"service\":\"api\",\"env\":\"staging\",\"replicas\":2}'",
+          "text": "{\n  \"ok\": true,\n  \"exitCode\": 0,\n  \"json\": {\n    \"service\": \"api\",\n    \"env\": \"staging\",\n    \"replicas\": 2\n  }\n}",
+          "kind": "http"
+        }
+      ]
+    },
+    {
+      "id": "bash",
+      "name": "Bash",
+      "file": "plan.sh",
+      "install": "curl -fsSL https://raw.githubusercontent.com/wankdanker/clyops/main/packages/bash/clyops.sh -o clyops.sh",
+      "source": "#!/usr/bin/env bash\nsource \"${CLYOPS_LIBRARY:-./clyops.sh}\"\n\nclyops_name plan\nclyops_description \"Build a deployment plan. Change nothing.\"\nclyops_opt SERVICE service s api \"Service\" Options choice:api,worker\nclyops_opt ENV env e staging \"Environment\" Options choice:staging,production\nclyops_opt REPLICAS replicas r 2 \"Replica count\" Options int:1-10\nclyops_effects read-only\nclyops_stdout \"Deployment plan\" application/json\nclyops_run \"$@\"\nprintf '{\"service\":\"%s\",\"env\":\"%s\",\"replicas\":%s}\\n' \"$SERVICE\" \"$ENV\" \"$REPLICAS\"",
+      "frames": [
+        {
+          "title": "Write the tool",
+          "caption": "Register options, validation and effects beside your code.",
+          "command": "$EDITOR scripts/plan.sh",
+          "text": "#!/usr/bin/env bash\nsource \"${CLYOPS_LIBRARY:-./clyops.sh}\"\n\nclyops_name plan\nclyops_description \"Build a deployment plan. Change nothing.\"\nclyops_opt SERVICE service s api \"Service\" Options choice:api,worker\nclyops_opt ENV env e staging \"Environment\" Options choice:staging,production\nclyops_opt REPLICAS replicas r 2 \"Replica count\" Options int:1-10\nclyops_effects read-only\nclyops_stdout \"Deployment plan\" application/json\nclyops_run \"$@\"\nprintf '{\"service\":\"%s\",\"env\":\"%s\",\"replicas\":%s}\\n' \"$SERVICE\" \"$ENV\" \"$REPLICAS\"",
+          "kind": "source"
+        },
+        {
+          "title": "Run it in your terminal",
+          "caption": "Help text comes from those same registrations.",
+          "command": "bash scripts/plan.sh --help",
+          "text": "Usage: plan [OPTIONS]\n\nBuild a deployment plan. Change nothing.\n\nOutput: Deployment plan (application/json)\n\nOptions:\n  -s, --service=<value>         Service (default: api, accepts: choices: api, worker)\n  -e, --env=<value>             Environment (default: staging, accepts: choices: staging,\n                                production)\n  -r, --replicas=<value>        Replica count (default: 2, accepts: integer: 1-10)\n\nGlobal:\n  -h, --help                    Show this help message and exit",
+          "kind": "help"
+        },
+        {
+          "title": "Validate before execution",
+          "caption": "Accepted inputs produce a plan. Out-of-range values fail validation.",
+          "command": "bash scripts/plan.sh --service api --env staging --replicas 2",
+          "text": "{\n  \"service\": \"api\",\n  \"env\": \"staging\",\n  \"replicas\": 2\n}\n\n$ bash scripts/plan.sh --replicas 99\n2026-10-22 02:09:49 [error] --replicas must be <= 10, got 99\n[exit 1]",
+          "kind": "run"
+        },
+        {
+          "title": "Expose the contract",
+          "caption": "Types, limits, effects and I/O become machine-readable.",
+          "command": "bash scripts/plan.sh --help-json-schema",
+          "text": "{\n  \"script\": \"plan\",\n  \"effects\": [\n    \"read-only\"\n  ],\n  \"stdout\": {\n    \"description\": \"Deployment plan\",\n    \"contentType\": \"application/json\"\n  },\n  \"options\": [\n    {\n      \"name\": \"service\",\n      \"type\": \"choice\",\n      \"validation\": \"choice:api,worker\"\n    },\n    {\n      \"name\": \"env\",\n      \"type\": \"choice\",\n      \"validation\": \"choice:staging,production\"\n    },\n    {\n      \"name\": \"replicas\",\n      \"type\": \"integer\",\n      \"validation\": \"int:1-10\"\n    }\n  ]\n}",
+          "kind": "schema"
+        },
+        {
+          "title": "Hand it to an agent",
+          "caption": "MCP exposes the tool and validates its inputs before execution.",
+          "command": "claude mcp add --transport stdio ops -- pnpm exec clyops-mcp --root ./scripts --read-only\n$ claude",
+          "text": "> Plan two api replicas in staging.\n\n+ ops / plan\n| {\"service\":\"api\",\"env\":\"staging\",\"replicas\":2}\n|\n{\n  \"service\": \"api\",\n  \"env\": \"staging\",\n  \"replicas\": 2\n}\n\nPlan ready. No infrastructure changed.",
+          "kind": "agent"
+        },
+        {
+          "title": "Give it an HTTP endpoint",
+          "caption": "The API publishes OpenAPI and runs the same tool with JSON input.",
+          "command": "pnpm exec clyops-api --root ./scripts --read-only\n$ curl localhost:8080/tools/plan \\\n  -H 'content-type: application/json' \\\n  -d '{\"service\":\"api\",\"env\":\"staging\",\"replicas\":2}'",
+          "text": "{\n  \"ok\": true,\n  \"exitCode\": 0,\n  \"json\": {\n    \"service\": \"api\",\n    \"env\": \"staging\",\n    \"replicas\": 2\n  }\n}",
+          "kind": "http"
+        }
+      ]
+    },
+    {
+      "id": "typescript",
+      "name": "TypeScript",
+      "file": "plan.ts",
+      "install": "pnpm add clyops clyops-api clyops-mcp\npnpm add -D tsx",
+      "source": "#!/usr/bin/env -S pnpm exec tsx\nimport { Cli } from 'clyops';\n\nconst cli = new Cli({ name: 'plan' });\ncli.setDescription('Build a deployment plan. Change nothing.');\ncli.opt('SERVICE', 'service', 's', 'api', 'Service', 'Options', 'choice:api,worker');\ncli.opt('ENV', 'env', 'e', 'staging', 'Environment', 'Options', 'choice:staging,production');\ncli.opt('REPLICAS', 'replicas', 'r', '2', 'Replica count', 'Options', 'int:1-10');\ncli.setEffects('read-only');\ncli.setStdout('Deployment plan', 'application/json');\nconst args = cli.run();\nconsole.log(JSON.stringify({ service: args.SERVICE, env: args.ENV, replicas: args.REPLICAS }));",
+      "frames": [
+        {
+          "title": "Write the tool",
+          "caption": "Register options, validation and effects beside your code.",
+          "command": "$EDITOR scripts/plan.ts",
+          "text": "#!/usr/bin/env -S pnpm exec tsx\nimport { Cli } from 'clyops';\n\nconst cli = new Cli({ name: 'plan' });\ncli.setDescription('Build a deployment plan. Change nothing.');\ncli.opt('SERVICE', 'service', 's', 'api', 'Service', 'Options', 'choice:api,worker');\ncli.opt('ENV', 'env', 'e', 'staging', 'Environment', 'Options', 'choice:staging,production');\ncli.opt('REPLICAS', 'replicas', 'r', '2', 'Replica count', 'Options', 'int:1-10');\ncli.setEffects('read-only');\ncli.setStdout('Deployment plan', 'application/json');\nconst args = cli.run();\nconsole.log(JSON.stringify({ service: args.SERVICE, env: args.ENV, replicas: args.REPLICAS }));",
+          "kind": "source"
+        },
+        {
+          "title": "Run it in your terminal",
+          "caption": "Help text comes from those same registrations.",
+          "command": "pnpm exec tsx scripts/plan.ts --help",
+          "text": "Usage: plan [OPTIONS]\n\nBuild a deployment plan. Change nothing.\n\nOutput: Deployment plan (application/json)\n\nOptions:\n  -s, --service=<value>         Service (default: api, accepts: choices: api, worker)\n  -e, --env=<value>             Environment (default: staging, accepts: choices: staging,\n                                production)\n  -r, --replicas=<value>        Replica count (default: 2, accepts: integer: 1-10)\n\nGlobal:\n  -h, --help                    Show this help message and exit",
+          "kind": "help"
+        },
+        {
+          "title": "Validate before execution",
+          "caption": "Accepted inputs produce a plan. Out-of-range values fail validation.",
+          "command": "pnpm exec tsx scripts/plan.ts --service api --env staging --replicas 2",
+          "text": "{\n  \"service\": \"api\",\n  \"env\": \"staging\",\n  \"replicas\": 2\n}\n\n$ pnpm exec tsx scripts/plan.ts --replicas 99\n2026-10-22 02:09:49 [error] --replicas must be <= 10, got 99\n[exit 1]",
+          "kind": "run"
+        },
+        {
+          "title": "Expose the contract",
+          "caption": "Types, limits, effects and I/O become machine-readable.",
+          "command": "pnpm exec tsx scripts/plan.ts --help-json-schema",
+          "text": "{\n  \"script\": \"plan\",\n  \"effects\": [\n    \"read-only\"\n  ],\n  \"stdout\": {\n    \"description\": \"Deployment plan\",\n    \"contentType\": \"application/json\"\n  },\n  \"options\": [\n    {\n      \"name\": \"service\",\n      \"type\": \"choice\",\n      \"validation\": \"choice:api,worker\"\n    },\n    {\n      \"name\": \"env\",\n      \"type\": \"choice\",\n      \"validation\": \"choice:staging,production\"\n    },\n    {\n      \"name\": \"replicas\",\n      \"type\": \"integer\",\n      \"validation\": \"int:1-10\"\n    }\n  ]\n}",
+          "kind": "schema"
+        },
+        {
+          "title": "Hand it to an agent",
+          "caption": "MCP exposes the tool and validates its inputs before execution.",
+          "command": "claude mcp add --transport stdio ops -- pnpm exec clyops-mcp --root ./scripts --read-only\n$ claude",
+          "text": "> Plan two api replicas in staging.\n\n+ ops / plan\n| {\"service\":\"api\",\"env\":\"staging\",\"replicas\":2}\n|\n{\n  \"service\": \"api\",\n  \"env\": \"staging\",\n  \"replicas\": 2\n}\n\nPlan ready. No infrastructure changed.",
+          "kind": "agent"
+        },
+        {
+          "title": "Give it an HTTP endpoint",
+          "caption": "The API publishes OpenAPI and runs the same tool with JSON input.",
+          "command": "pnpm exec clyops-api --root ./scripts --read-only\n$ curl localhost:8080/tools/plan \\\n  -H 'content-type: application/json' \\\n  -d '{\"service\":\"api\",\"env\":\"staging\",\"replicas\":2}'",
+          "text": "{\n  \"ok\": true,\n  \"exitCode\": 0,\n  \"json\": {\n    \"service\": \"api\",\n    \"env\": \"staging\",\n    \"replicas\": 2\n  }\n}",
+          "kind": "http"
+        }
+      ]
+    },
+    {
+      "id": "rust",
+      "name": "Rust",
+      "file": "plan.rs",
+      "install": "cargo add clyops",
+      "source": "use clyops::Cli;\n\nfn main() {\n    let mut cli = Cli::new();\n    cli.name(\"plan\");\n    cli.description(\"Build a deployment plan. Change nothing.\");\n    cli.opt(\"SERVICE\", \"service\", \"s\", \"api\", \"Service\").rule(\"choice:api,worker\");\n    cli.opt(\"ENV\", \"env\", \"e\", \"staging\", \"Environment\").rule(\"choice:staging,production\");\n    cli.opt(\"REPLICAS\", \"replicas\", \"r\", \"2\", \"Replica count\").rule(\"int:1-10\");\n    cli.effects(&[\"read-only\"]);\n    cli.stdout(\"Deployment plan\", \"application/json\");\n    let args = cli.run();\n    println!(\"{{\\\"service\\\":\\\"{}\\\",\\\"env\\\":\\\"{}\\\",\\\"replicas\\\":{}}}\",\n        args.str(\"SERVICE\"), args.str(\"ENV\"), args.int(\"REPLICAS\"));\n}",
+      "frames": [
+        {
+          "title": "Write the tool",
+          "caption": "Register options, validation and effects beside your code.",
+          "command": "$EDITOR src/main.rs",
+          "text": "use clyops::Cli;\n\nfn main() {\n    let mut cli = Cli::new();\n    cli.name(\"plan\");\n    cli.description(\"Build a deployment plan. Change nothing.\");\n    cli.opt(\"SERVICE\", \"service\", \"s\", \"api\", \"Service\").rule(\"choice:api,worker\");\n    cli.opt(\"ENV\", \"env\", \"e\", \"staging\", \"Environment\").rule(\"choice:staging,production\");\n    cli.opt(\"REPLICAS\", \"replicas\", \"r\", \"2\", \"Replica count\").rule(\"int:1-10\");\n    cli.effects(&[\"read-only\"]);\n    cli.stdout(\"Deployment plan\", \"application/json\");\n    let args = cli.run();\n    println!(\"{{\\\"service\\\":\\\"{}\\\",\\\"env\\\":\\\"{}\\\",\\\"replicas\\\":{}}}\",\n        args.str(\"SERVICE\"), args.str(\"ENV\"), args.int(\"REPLICAS\"));\n}",
+          "kind": "source"
+        },
+        {
+          "title": "Run it in your terminal",
+          "caption": "Help text comes from those same registrations.",
+          "command": "./scripts/plan --help",
+          "text": "Usage: plan [OPTIONS]\n\nBuild a deployment plan. Change nothing.\n\nOutput: Deployment plan (application/json)\n\nOptions:\n  -s, --service=<value>         Service (default: api, accepts: choices: api, worker)\n  -e, --env=<value>             Environment (default: staging, accepts: choices: staging,\n                                production)\n  -r, --replicas=<value>        Replica count (default: 2, accepts: integer: 1-10)\n\nGlobal:\n  -h, --help                    Show this help message and exit",
+          "kind": "help"
+        },
+        {
+          "title": "Validate before execution",
+          "caption": "Accepted inputs produce a plan. Out-of-range values fail validation.",
+          "command": "./scripts/plan --service api --env staging --replicas 2",
+          "text": "{\n  \"service\": \"api\",\n  \"env\": \"staging\",\n  \"replicas\": 2\n}\n\n$ ./scripts/plan --replicas 99\n2026-10-22 02:09:49 [error] --replicas must be <= 10, got 99\n[exit 1]",
+          "kind": "run"
+        },
+        {
+          "title": "Expose the contract",
+          "caption": "Types, limits, effects and I/O become machine-readable.",
+          "command": "./scripts/plan --help-json-schema",
+          "text": "{\n  \"script\": \"plan\",\n  \"effects\": [\n    \"read-only\"\n  ],\n  \"stdout\": {\n    \"description\": \"Deployment plan\",\n    \"contentType\": \"application/json\"\n  },\n  \"options\": [\n    {\n      \"name\": \"service\",\n      \"type\": \"choice\",\n      \"validation\": \"choice:api,worker\"\n    },\n    {\n      \"name\": \"env\",\n      \"type\": \"choice\",\n      \"validation\": \"choice:staging,production\"\n    },\n    {\n      \"name\": \"replicas\",\n      \"type\": \"integer\",\n      \"validation\": \"int:1-10\"\n    }\n  ]\n}",
+          "kind": "schema"
+        },
+        {
+          "title": "Hand it to an agent",
+          "caption": "MCP exposes the tool and validates its inputs before execution.",
+          "command": "claude mcp add --transport stdio ops -- pnpm exec clyops-mcp --root ./scripts --read-only\n$ claude",
+          "text": "> Plan two api replicas in staging.\n\n+ ops / plan\n| {\"service\":\"api\",\"env\":\"staging\",\"replicas\":2}\n|\n{\n  \"service\": \"api\",\n  \"env\": \"staging\",\n  \"replicas\": 2\n}\n\nPlan ready. No infrastructure changed.",
+          "kind": "agent"
+        },
+        {
+          "title": "Give it an HTTP endpoint",
+          "caption": "The API publishes OpenAPI and runs the same tool with JSON input.",
+          "command": "pnpm exec clyops-api --root ./scripts --read-only\n$ curl localhost:8080/tools/plan \\\n  -H 'content-type: application/json' \\\n  -d '{\"service\":\"api\",\"env\":\"staging\",\"replicas\":2}'",
+          "text": "{\n  \"ok\": true,\n  \"exitCode\": 0,\n  \"json\": {\n    \"service\": \"api\",\n    \"env\": \"staging\",\n    \"replicas\": 2\n  }\n}",
+          "kind": "http"
+        }
+      ]
+    }
+  ]
+}
