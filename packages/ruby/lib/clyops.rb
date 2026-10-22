@@ -83,7 +83,7 @@ module Clyops
     "hostname" => "hostname", "url" => "URL", "port" => "port: 1-65535", "email" => "email address", "uuid" => "UUID",
     "bool" => "true/false, yes/no, 1/0, on/off", "date:YYYY-MM-DD" => "date: YYYY-MM-DD",
     "file:exists" => "existing file", "file:readable" => "readable file", "file:writable" => "writable file",
-    "dir:exists" => "existing directory", "dir:writable" => "writable directory"
+    "file:executable" => "executable", "dir:exists" => "existing directory", "dir:writable" => "writable directory"
   }.freeze
   # @private
   EFFECTS = %w[read-only idempotent destructive network].freeze
@@ -248,12 +248,43 @@ module Clyops
         dir = File.dirname(value)
         fail_with.("directory is not writable: #{dir}") unless File.directory?(dir) && File.writable?(dir)
       end
+    when "file:executable"
+      fail_with.("is not an executable: #{value}") unless executable?(value)
     when "dir:exists"
       fail_with.("directory does not exist: #{value}") unless File.directory?(value)
     when "dir:writable"
       fail_with.("directory does not exist or is not writable: #{value}") unless File.directory?(value) && File.writable?(value)
     end
     value
+  end
+
+  # Whether a `file:executable` value names a program on PATH rather than a
+  # path (spec section 5).
+  # @param value [String] The value.
+  # @return [Boolean] true for a bare name.
+  def bare_program?(value)
+    !value.empty? && !value.include?("/") && !(File::ALT_SEPARATOR && value.include?(File::ALT_SEPARATOR))
+  end
+
+  # Whether `value` is a program: a bare name found on PATH, or a path to an
+  # executable regular file (spec section 5).
+  # @param value [String] The value.
+  # @param env [Hash] The environment holding PATH (and PATHEXT on Windows).
+  # @return [Boolean] true when it can be run.
+  def executable?(value, env = ENV)
+    return executable_file?(value) unless bare_program?(value)
+
+    exts = File::ALT_SEPARATOR ? [""] + env.fetch("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";").reject(&:empty?) : [""]
+    env.fetch("PATH", "").split(File::PATH_SEPARATOR).reject(&:empty?).any? do |dir|
+      exts.any? { |ext| executable_file?(File.join(dir, value + ext)) }
+    end
+  end
+
+  # A regular file the user may run; Windows has no execute bit, so one that exists.
+  # @param path [String] The path.
+  # @return [Boolean] true when it is one.
+  def executable_file?(path)
+    File.file?(path) && (!File::ALT_SEPARATOR.nil? || File.executable?(path))
   end
 
   # Join and normalize like Python's os.path.normpath(os.path.join(...)): an
@@ -323,6 +354,7 @@ module Clyops
   # @param search_dirs [Array<String>] The search dirs value.
   # @return [Array<String>] the documented result.
   def completion_kind(rule, search_dirs)
+    return ["command", search_dirs.join(":")] if rule == "file:executable"
     return ["file", search_dirs.join(":")] if rule == "path" || rule.start_with?("file:")
     return ["dir", search_dirs.join(":")] if rule.start_with?("dir:")
     return ["choice", rule[7..]] if rule.start_with?("choice:")
@@ -1340,13 +1372,16 @@ module Clyops
                else @root
                end
         value = @raw[opt.long]
-        @raw[opt.long] = value.is_a?(Array) ? value.map { |v| Clyops.resolve_path(v, base, opt.search_dirs) } : Clyops.resolve_path(value, base, opt.search_dirs)
+        # A bare program name stays as given (spec section 6).
+        one = ->(v) { opt.rule == "file:executable" && Clyops.bare_program?(v) ? v : Clyops.resolve_path(v, base, opt.search_dirs) }
+        @raw[opt.long] = value.is_a?(Array) ? value.map(&one) : one.(value)
       end
       args.each do |arg|
         next unless Clyops.path_rule?(arg.rule)
 
         value = @arg_raw[arg.name]
-        @arg_raw[arg.name] = value.is_a?(Array) ? value.map { |v| Clyops.resolve_path(v, @cwd) } : Clyops.resolve_path(value, @cwd)
+        one = ->(v) { arg.rule == "file:executable" && Clyops.bare_program?(v) ? v : Clyops.resolve_path(v, @cwd) }
+        @arg_raw[arg.name] = value.is_a?(Array) ? value.map(&one) : one.(value)
       end
 
       convert = ->(v, rule, name) { !v.empty? && !rule.empty? ? Clyops.validate(v, rule, name) : v }

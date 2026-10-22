@@ -37,6 +37,14 @@ order. `secretEnv` passes scalar secrets in the environment; `within` restricts
 path input. `toJsonSchema` describes accepted input; `redactArgv` masks secrets
 in displayed commands. See [spec section 13](../spec/SPEC.md#13-json-input-toargv).
 
+A server taking input over a network decides which inputs callers may set
+(spec section 13): `closedInputs(schema, { confined, allowExecutables })` names
+the closed ones (`file:executable` unless allowed, and path inputs unless
+confined), `publicSchema(schema, closed)` is the schema callers should see,
+`closedKeys` finds input that sets one, and `closedRequirement` names a required
+argument that is closed, so the tool can't be served. Pass `closed` to
+`runTool`/`startTool` and input setting one is an `InputError`.
+
 ## Streams, cancellation and errors
 
 `run(file, argv, options)` resolves a `RunResult`; nonzero exit codes are outcomes,

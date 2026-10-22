@@ -15,6 +15,13 @@ function __clyops___CLYOPS_FUNC___value --argument-names kind values cur
                     end
                 end
             end
+        case command
+            # A program on PATH, or a path once the word has a slash.
+            if string match -q -- '*/*' $cur
+                __fish_complete_path $cur
+            else
+                complete -C -- $cur
+            end
         case dir
             __fish_complete_directories $cur
         case host

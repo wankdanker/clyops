@@ -17,7 +17,7 @@ export type Source = 'cli' | 'config' | 'env' | 'default' | 'unset';
  */
 export type Validation =
   | '' | 'int' | 'float' | 'string' | 'path' | 'ip' | 'hostname' | 'url' | 'port' | 'email' | 'uuid' | 'bool'
-  | 'date:YYYY-MM-DD' | 'file:exists' | 'file:readable' | 'file:writable' | 'dir:exists' | 'dir:writable'
+  | 'date:YYYY-MM-DD' | 'file:exists' | 'file:readable' | 'file:writable' | 'file:executable' | 'dir:exists' | 'dir:writable'
   | `int:${string}` | `float:${string}` | `string:${string}` | `choice:${string}` | `regex:${string}`
   | 'secret' | `secret:${string}`;
 
@@ -170,7 +170,7 @@ function boolWord(value: string): boolean | undefined {
 
 const FIXED_RULES = new Set([
   'int', 'float', 'string', 'path', 'ip', 'hostname', 'url', 'port', 'email', 'uuid', 'bool',
-  'date:YYYY-MM-DD', 'file:exists', 'file:readable', 'file:writable', 'dir:exists', 'dir:writable',
+  'date:YYYY-MM-DD', 'file:exists', 'file:readable', 'file:writable', 'file:executable', 'dir:exists', 'dir:writable',
 ]);
 
 function isKnownRule(rule: string): boolean {
@@ -204,7 +204,7 @@ export function describeRule(rule: string): string {
     url: 'URL', port: 'port: 1-65535', email: 'email address', uuid: 'UUID',
     bool: 'true/false, yes/no, 1/0, on/off', 'date:YYYY-MM-DD': 'date: YYYY-MM-DD',
     'file:exists': 'existing file', 'file:readable': 'readable file', 'file:writable': 'writable file',
-    'dir:exists': 'existing directory', 'dir:writable': 'writable directory',
+    'file:executable': 'executable', 'dir:exists': 'existing directory', 'dir:writable': 'writable directory',
   };
   if (rule in fixed) return fixed[rule];
   for (const [prefix, noun, suffix] of [['int:', 'integer', ''], ['float:', 'number', ''], ['string:', 'text', ' chars']]) {
@@ -228,6 +228,27 @@ function statKind(p: string): 'file' | 'dir' | 'other' | undefined {
     const st = fs.statSync(p);
     return st.isFile() ? 'file' : st.isDirectory() ? 'dir' : 'other';
   } catch { return undefined; }
+}
+
+/** A `file:executable` value that names a program on PATH rather than a path (spec section 5). */
+export function isBareProgram(value: string): boolean {
+  return value !== '' && !value.includes('/') && !(process.platform === 'win32' && value.includes('\\'));
+}
+
+// An executable regular file: one the user may run, or on Windows one that exists.
+function isExecutableFile(p: string): boolean {
+  return statKind(p) === 'file' && (process.platform === 'win32' || isWritable(p, fs.constants.X_OK));
+}
+
+/** Whether `value` is a program: a bare name found on PATH, or a path to an executable regular file. */
+export function isExecutable(value: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  if (!isBareProgram(value)) return isExecutableFile(value);
+  const exts = process.platform === 'win32' ? ['', ...(env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean)] : [''];
+  for (const dir of (env.PATH ?? '').split(path.delimiter)) {
+    if (!dir) continue;
+    for (const ext of exts) if (isExecutableFile(path.join(dir, value + ext))) return true;
+  }
+  return false;
 }
 
 /**
@@ -327,6 +348,9 @@ export function validate(value: string, rule: string, name: string): Scalar {
         if (statKind(dir) !== 'dir' || !isWritable(dir)) fail(`directory is not writable: ${dir}`);
       }
       return value;
+    case 'file:executable':
+      if (!isExecutable(value)) fail(`is not an executable: ${value}`);
+      return value;
     case 'dir:exists':
       if (statKind(value) !== 'dir') fail(`directory does not exist: ${value}`);
       return value;
@@ -381,6 +405,7 @@ function isCommandAvailable(cmd: string, env: Record<string, string | undefined>
 }
 
 function completionKind(rule: string, searchDirs: string[]): [string, string] {
+  if (rule === 'file:executable') return ['command', searchDirs.join(':')];
   if (rule === 'path' || rule.startsWith('file:')) return ['file', searchDirs.join(':')];
   if (rule.startsWith('dir:')) return ['dir', searchDirs.join(':')];
   if (rule.startsWith('choice:')) return ['choice', rule.slice(7)];
@@ -967,12 +992,14 @@ export class Cli {
       const base = src === 'cli' ? this.cwd
         : src === 'config' ? (this.configValues.get(opt.long) as { dir: string }).dir : this.root;
       const v = this.raw.get(opt.long) as string | string[];
-      this.raw.set(opt.long, Array.isArray(v) ? v.map((x) => resolvePath(x, base, opt.searchDirs)) : resolvePath(v, base, opt.searchDirs));
+      const one = (x: string) => (opt.validation === 'file:executable' && isBareProgram(x) ? x : resolvePath(x, base, opt.searchDirs));
+      this.raw.set(opt.long, Array.isArray(v) ? v.map(one) : one(v));
     }
     for (const arg of args) {
       if (!isPathRule(arg.validation)) continue;
       const v = this.argRaw.get(arg.name) as string | string[];
-      this.argRaw.set(arg.name, Array.isArray(v) ? v.map((x) => resolvePath(x, this.cwd)) : resolvePath(v, this.cwd));
+      const one = (x: string) => (arg.validation === 'file:executable' && isBareProgram(x) ? x : resolvePath(x, this.cwd));
+      this.argRaw.set(arg.name, Array.isArray(v) ? v.map(one) : one(v));
     }
 
     // Validation and conversion.

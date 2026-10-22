@@ -43,6 +43,7 @@ cli.opt('SIZE',     'size',     '',  'optional',  'Size code',             'Vali
 cli.opt('DATA_DIR', 'data-dir', 'd', 'optional',  'Data directory',        'Files',      'dir:exists');
 cli.opt('SRC',      'src',      '',  'optional',  'Source file',           'Files',      'file:exists');
 cli.opt('DEST',     'dest',     '',  'optional',  'Destination file',      'Files',      'file:writable');
+cli.opt('EXEC',     'exec',     '',  'optional',  'Program to run',        'Files',      'file:executable');
 cli.optArray('INCLUDE', 'include', 'I',           'Include directory',     'Files',      'path');
 
 cli.setConfig('config', 'demo:,shared:');
@@ -55,6 +56,6 @@ cli.emit('meta', cli.fdOpen('extra') !== null ? '{"extra":true}' : '{"extra":fal
 cli.emit('progress', '{"pct":100}');
 
 const longs = ['config', 'verbose', 'quiet', 'color', 'out', 'notes', 'count', 'ratio', 'enabled', 'tag', 'no-cache', 'key',
-  'host', 'port', 'endpoint', 'addr', 'id', 'email', 'date', 'code', 'level', 'size', 'data-dir', 'src', 'dest', 'include', 'help'];
+  'host', 'port', 'endpoint', 'addr', 'id', 'email', 'date', 'code', 'level', 'size', 'data-dir', 'src', 'dest', 'exec', 'include', 'help'];
 const sources = Object.fromEntries(longs.map((l) => [l, cli.source(l)] as const));
 process.stdout.write(JSON.stringify({ values: JSON.parse(cli.valuesJson()), sources }, null, 2) + '\n');

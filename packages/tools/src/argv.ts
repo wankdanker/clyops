@@ -16,7 +16,7 @@ export type Input = Record<string, unknown>;
 export interface ArgvOptions {
   /** Directory that relative path values resolve against (default: leave them to the tool). */
   base?: string;
-  /** Option names the caller sets itself; input keys for them are reported in `controlled`. */
+  /** Option and argument names the caller sets itself; input keys for them are reported in `controlled`. */
   controlled?: string[];
   /** Applied to every string value before it is used (templating). */
   render?: (value: string) => string;
@@ -47,7 +47,7 @@ export interface Argv {
   env: Record<string, string>;
   /** Input keys that matched no option or argument. */
   unknown: string[];
-  /** Input keys for options named in `controlled`, not passed on. */
+  /** Input keys for options and arguments named in `controlled`, not passed on. */
   controlled: string[];
 }
 
@@ -57,6 +57,11 @@ import { inputKeys, isBareFlag } from 'clyops-schema';
 /** Whether a schema type or validation rule denotes a filesystem path. */
 export function isPathValued(validation: string, type?: string): boolean {
   return type === 'path' || validation === 'path' || validation.startsWith('file:') || validation.startsWith('dir:');
+}
+
+// A file:executable value naming a program on PATH (spec section 5): not a path to resolve or confine.
+function isBareProgram(validation: string, value: string): boolean {
+  return validation === 'file:executable' && value !== '' && !value.includes('/') && !(process.platform === 'win32' && value.includes('\\'));
 }
 
 const TRUE = /^(true|1|yes|on)$/i;
@@ -80,9 +85,10 @@ export function toArgv(schema: Schema, input: Input, opts: ArgvOptions = {}): Ar
     return undefined;
   };
 
-  const text = (value: unknown, pathValued: boolean, name = ''): string => {
+  const text = (value: unknown, pathValued: boolean, name = '', validation = ''): string => {
     let s = typeof value === 'object' ? JSON.stringify(value) : String(value);
     if (opts.render) s = opts.render(s);
+    if (isBareProgram(validation, s)) return s;
     // Empty, '-' (stdin), absolute paths and URLs are left alone, as are the
     // 'disabled' and 'false' sentinels some tools use to turn a path off.
     if (pathValued && opts.base && !['', '-', 'disabled', 'false'].includes(s) && !isAbsolute(s) && !/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) {
@@ -112,11 +118,11 @@ export function toArgv(schema: Schema, input: Input, opts: ArgvOptions = {}): Ar
       continue;
     }
     if (opts.secretEnv && option.secret && !option.isArray) {
-      out.env[option.variableName] = text(found.value, isPathValued(option.validation, option.type), `--${option.name}`);
+      out.env[option.variableName] = text(found.value, isPathValued(option.validation, option.type), `--${option.name}`, option.validation);
       continue;
     }
     for (const item of Array.isArray(found.value) ? found.value : [found.value]) {
-      out.argv.push(`--${option.name}`, text(item, isPathValued(option.validation, option.type), `--${option.name}`));
+      out.argv.push(`--${option.name}`, text(item, isPathValued(option.validation, option.type), `--${option.name}`, option.validation));
     }
   }
 
@@ -130,6 +136,11 @@ export function toArgv(schema: Schema, input: Input, opts: ArgvOptions = {}): Ar
     let skipped: SchemaArgument[] = [];
     for (const argument of schema.arguments) {
       const found = pick(argument);
+      if (found && opts.controlled?.includes(argument.name)) {
+        out.controlled.push(found.key);
+        skipped.push(argument);
+        continue;
+      }
       if (!found || found.value === null || found.value === undefined) {
         skipped.push(argument);
         continue;
@@ -140,7 +151,7 @@ export function toArgv(schema: Schema, input: Input, opts: ArgvOptions = {}): Ar
       }
       skipped = [];
       const values = Array.isArray(found.value) ? found.value : [found.value];
-      positionals.push(...values.map((v) => text(v, isPathValued(argument.validation), argument.name)));
+      positionals.push(...values.map((v) => text(v, isPathValued(argument.validation), argument.name, argument.validation)));
     }
   }
   if (positionals.some((p) => p.startsWith('-'))) out.argv.push('--', ...positionals);

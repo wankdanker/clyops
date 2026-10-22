@@ -95,6 +95,14 @@ _clyops_value___CLYOPS_FUNC__() {
                     [[ -d "$dir" ]] && COMPREPLY+=($(cd "$dir" && compgen $flag -- "$cur"))
                 done
             fi ;;
+        command)
+            # A program on PATH, or a path once the word has a slash.
+            if [[ "$cur" == */* ]]; then
+                compopt -o filenames 2>/dev/null
+                COMPREPLY=($(compgen -f -- "$cur"))
+            else
+                COMPREPLY=($(compgen -c -- "$cur"))
+            fi ;;
         host) COMPREPLY=($(compgen -A hostname -- "$cur")) ;;
         none) COMPREPLY=() ;;
         *) compopt -o default 2>/dev/null; COMPREPLY=() ;;

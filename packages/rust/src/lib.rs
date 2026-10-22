@@ -359,6 +359,7 @@ const FIXED_RULES: &[&str] = &[
     "file:exists",
     "file:readable",
     "file:writable",
+    "file:executable",
     "dir:exists",
     "dir:writable",
 ];
@@ -400,6 +401,7 @@ pub fn describe_rule(rule: &str) -> String {
         "file:exists" => "existing file",
         "file:readable" => "readable file",
         "file:writable" => "writable file",
+        "file:executable" => "executable",
         "dir:exists" => "existing directory",
         "dir:writable" => "writable directory",
         _ => "",
@@ -450,6 +452,43 @@ fn access(path: &str, mode: i32) -> bool {
 
 const R_OK: i32 = 4;
 const W_OK: i32 = 2;
+const X_OK: i32 = 1;
+
+/// Whether a `file:executable` value names a program on PATH rather than a path (spec section 5).
+pub fn is_bare_program(value: &str) -> bool {
+    !(value.is_empty() || value.contains('/') || (cfg!(windows) && value.contains('\\')))
+}
+
+/// Whether `value` is a program: a bare name found on PATH, or a path to an executable regular file
+/// (spec section 5).
+pub fn is_executable(value: &str) -> bool {
+    if !is_bare_program(value) {
+        return is_executable_file(Path::new(value));
+    }
+    let mut exts = vec![String::new()];
+    if cfg!(windows) {
+        let pathext = std::env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into());
+        exts.extend(pathext.split(';').filter(|e| !e.is_empty()).map(String::from));
+    }
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    std::env::split_paths(&path)
+        .filter(|dir| !dir.as_os_str().is_empty())
+        .any(|dir| exts.iter().any(|ext| is_executable_file(&dir.join(format!("{value}{ext}")))))
+}
+
+// A regular file the user may run; without access(2) (Windows), one that exists.
+fn is_executable_file(path: &Path) -> bool {
+    path.is_file() && path.to_str().is_some_and(|p| access(p, X_OK))
+}
+
+// A path value resolved (spec section 6), except a bare program name, which stays as given.
+fn resolve_value(rule: &str, value: &str, base: &str, search_dirs: &[String]) -> String {
+    if rule == "file:executable" && is_bare_program(value) {
+        value.to_string()
+    } else {
+        resolve_path(value, base, search_dirs)
+    }
+}
 
 /// Validate `value` against `rule` and convert it to its typed form.
 /// The error is the spec's error text.
@@ -564,6 +603,7 @@ pub fn validate(value: &str, rule: &str, name: &str) -> Result<Value, String> {
                 }
             }
         }
+        "file:executable" if !is_executable(value) => return fail(format!("is not an executable: {value}")),
         "dir:exists" if !p.is_dir() => return fail(format!("directory does not exist: {value}")),
         "dir:writable" if !p.is_dir() || !access(value, W_OK) => {
             return fail(format!("directory does not exist or is not writable: {value}"))
@@ -658,7 +698,9 @@ fn command_available(cmd: &str, path_var: &str) -> bool {
 }
 
 fn completion_kind(rule: &str, dirs: &[String]) -> (&'static str, String) {
-    if rule == "path" || rule.starts_with("file:") {
+    if rule == "file:executable" {
+        ("command", dirs.join(":"))
+    } else if rule == "path" || rule.starts_with("file:") {
         ("file", dirs.join(":"))
     } else if rule.starts_with("dir:") {
         ("dir", dirs.join(":"))
@@ -1578,8 +1620,8 @@ impl Cli {
                 _ => self.root.clone(),
             };
             match raw {
-                Raw::One(v) => *v = resolve_path(v, &base, &opt.search_dirs),
-                Raw::Many(l) => l.iter_mut().for_each(|v| *v = resolve_path(v, &base, &opt.search_dirs)),
+                Raw::One(v) => *v = resolve_value(&opt.rule, v, &base, &opt.search_dirs),
+                Raw::Many(l) => l.iter_mut().for_each(|v| *v = resolve_value(&opt.rule, v, &base, &opt.search_dirs)),
             }
         }
         for arg in &args {
@@ -1587,8 +1629,8 @@ impl Cli {
                 continue;
             }
             match self.arg_raw.get_mut(&arg.name) {
-                Some(Raw::One(v)) => *v = resolve_path(v, &self.cwd, &[]),
-                Some(Raw::Many(l)) => l.iter_mut().for_each(|v| *v = resolve_path(v, &self.cwd, &[])),
+                Some(Raw::One(v)) => *v = resolve_value(&arg.rule, v, &self.cwd, &[]),
+                Some(Raw::Many(l)) => l.iter_mut().for_each(|v| *v = resolve_value(&arg.rule, v, &self.cwd, &[])),
                 None => {}
             }
         }

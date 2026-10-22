@@ -56,6 +56,7 @@ public class Cli {
         Map.entry("uuid", "UUID"), Map.entry("bool", "true/false, yes/no, 1/0, on/off"),
         Map.entry("date:YYYY-MM-DD", "date: YYYY-MM-DD"), Map.entry("file:exists", "existing file"),
         Map.entry("file:readable", "readable file"), Map.entry("file:writable", "writable file"),
+        Map.entry("file:executable", "executable"),
         Map.entry("dir:exists", "existing directory"), Map.entry("dir:writable", "writable directory"));
 
     private static final Pattern INT_RULE = Pattern.compile("int:(\\d+-\\d*|-\\d+)");
@@ -223,6 +224,9 @@ public class Cli {
                     if (!Files.isDirectory(Paths.get(dir)) || !Files.isWritable(Paths.get(dir))) throw fail(name, "directory is not writable: " + dir);
                 }
             }
+            case "file:executable" -> {
+                if (!isExecutable(value, System.getenv())) throw fail(name, "is not an executable: " + value);
+            }
             case "dir:exists" -> {
                 if (!Files.isDirectory(Paths.get(value))) throw fail(name, "directory does not exist: " + value);
             }
@@ -296,7 +300,46 @@ public class Cli {
         return out;
     }
 
+    private static final boolean WINDOWS = File.separatorChar == '\\';
+
+    /**
+     * Whether a {@code file:executable} value names a program on PATH rather than a path (spec section 5).
+     *
+     * @param value the value
+     * @return true for a bare name
+     */
+    public static boolean isBareProgram(String value) {
+        return !value.isEmpty() && !value.contains("/") && !(WINDOWS && value.contains("\\"));
+    }
+
+    /**
+     * Whether {@code value} is a program: a bare name found on PATH, or a path to an executable
+     * regular file (spec section 5).
+     *
+     * @param value the value
+     * @param env the environment holding PATH (and PATHEXT on Windows)
+     * @return true when it can be run
+     */
+    public static boolean isExecutable(String value, Map<String, String> env) {
+        if (!isBareProgram(value)) return isExecutableFile(Paths.get(value));
+        List<String> exts = new ArrayList<>(List.of(""));
+        if (WINDOWS) {
+            for (String ext : env.getOrDefault("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";")) if (!ext.isEmpty()) exts.add(ext);
+        }
+        for (String dir : env.getOrDefault("PATH", "").split(Pattern.quote(File.pathSeparator))) {
+            if (dir.isEmpty()) continue;
+            for (String ext : exts) if (isExecutableFile(Paths.get(dir, value + ext))) return true;
+        }
+        return false;
+    }
+
+    // A regular file the user may run; Windows has no execute bit, so one that exists.
+    private static boolean isExecutableFile(Path p) {
+        return Files.isRegularFile(p) && (WINDOWS || Files.isExecutable(p));
+    }
+
     private static String[] completionKind(String rule, List<String> searchDirs) {
+        if (rule.equals("file:executable")) return new String[] {"command", String.join(":", searchDirs)};
         if (rule.equals("path") || rule.startsWith("file:")) return new String[] {"file", String.join(":", searchDirs)};
         if (rule.startsWith("dir:")) return new String[] {"dir", String.join(":", searchDirs)};
         if (rule.startsWith("choice:")) return new String[] {"choice", rule.substring(7)};
@@ -1043,10 +1086,14 @@ public class Cli {
             if (!isPathRule(opt.rule) || !raw.containsKey(opt.lng) || opt.lng.equals(configOption)) continue;
             String source = sources.get(opt.lng);
             String base = source.equals("cli") ? cwd : source.equals("config") ? config.get(opt.lng).dir() : root;
-            raw.get(opt.lng).replaceAll(v -> resolvePath(v, base, opt.searchDirs));
+            // A bare program name stays as given (spec section 6).
+            boolean program = opt.rule.equals("file:executable");
+            raw.get(opt.lng).replaceAll(v -> program && isBareProgram(v) ? v : resolvePath(v, base, opt.searchDirs));
         }
         for (Argument arg : args) {
-            if (isPathRule(arg.rule())) argRaw.get(arg.name()).replaceAll(v -> resolvePath(v, cwd, List.of()));
+            if (!isPathRule(arg.rule())) continue;
+            boolean program = arg.rule().equals("file:executable");
+            argRaw.get(arg.name()).replaceAll(v -> program && isBareProgram(v) ? v : resolvePath(v, cwd, List.of()));
         }
 
         for (Option opt : options) {

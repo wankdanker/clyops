@@ -138,7 +138,7 @@ successfully listening.
 ```
 clyops-api --root DIR [--name NAME] [--cwd DIR] [--timeout SECONDS] [--concurrency N]
            [--host 127.0.0.1] [--port 8080] [--api-key KEY] [--keys FILE] [--no-mcp] [--no-watch] [--no-ui]
-           [--allow GLOB]... [--deny GLOB]... [--read-only] [--paths-within DIR]...
+           [--allow GLOB]... [--deny GLOB]... [--read-only] [--paths-within DIR]... [--allow-executable-inputs]
            [--max-body BYTES] [--max-output BYTES] [--audit FILE]
 ```
 
@@ -165,8 +165,19 @@ Serve only what callers should be able to run:
   are any, and no `--deny` pattern; `allow:` and `deny:` lines in the root `.clyops` file apply as
   well. `--read-only` serves only tools declaring the `read-only` effect. Hot reload applies the
   same rules to new tools.
-- **Paths.** `--paths-within DIR` (repeatable): path inputs (`path`, `file:*`, `dir:*`) must
-  resolve inside one of these directories, symlinks followed, or the request is a `400`.
+- **Inputs the server sets.** A caller never chooses which program runs: options and arguments
+  validated by `file:executable` aren't in the OpenAPI document, the MCP tool list or the web
+  runner, and a request that sets one is a `400` (`exec: set by the server, not by callers`).
+  The tool gets them from its environment, config file or default. `--allow-executable-inputs`
+  opens them, for a server whose callers you trust to run anything.
+- **Paths.** Path inputs (`path`, `file:*`, `dir:*`) must resolve inside one of the
+  `--paths-within DIR` directories (repeatable), symlinks followed, or the request is a `400`.
+  Without the option they are confined to `--cwd`, unless that is `/`: then callers can't set
+  path inputs at all, and the server warns at startup. A file uploaded as a multipart part is
+  always accepted, since the server chooses its path.
+- **Tools that need a closed input.** A tool whose required argument is closed (a
+  `file:executable` argument, or a path argument with paths closed) isn't served; the server
+  says so when it starts.
 - **Limits.** `--timeout`, `--concurrency`, `--max-body` (JSON, multipart and spooled bodies;
   default 10 MiB) and `--max-output` (stdout and stderr kept per run; default 16 MiB).
 - **Secrets.** Options a tool marks secret are passed to it in its environment rather than on

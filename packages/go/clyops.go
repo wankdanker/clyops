@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -81,7 +82,7 @@ var fixedRules = map[string]string{
 	"hostname": "hostname", "url": "URL", "port": "port: 1-65535", "email": "email address", "uuid": "UUID",
 	"bool": "true/false, yes/no, 1/0, on/off", "date:YYYY-MM-DD": "date: YYYY-MM-DD",
 	"file:exists": "existing file", "file:readable": "readable file", "file:writable": "writable file",
-	"dir:exists": "existing directory", "dir:writable": "writable directory",
+	"file:executable": "executable", "dir:exists": "existing directory", "dir:writable": "writable directory",
 }
 
 var (
@@ -304,6 +305,10 @@ func Validate(value, rule, name string) (any, error) {
 		} else if dir := filepath.Dir(value); !isDir(dir) || !accessible(dir, 2) {
 			return fail("directory is not writable: %s", dir)
 		}
+	case rule == "file:executable":
+		if !IsExecutable(value) {
+			return fail("is not an executable: %s", value)
+		}
 	case rule == "dir:exists":
 		if !isDir(value) {
 			return fail("directory does not exist: %s", value)
@@ -314,6 +319,49 @@ func Validate(value, rule, name string) (any, error) {
 		}
 	}
 	return value, nil
+}
+
+// IsBareProgram reports whether a file:executable value names a program on
+// PATH rather than a path (spec section 5).
+func IsBareProgram(value string) bool {
+	return value != "" && !strings.Contains(value, "/") && !(runtime.GOOS == "windows" && strings.Contains(value, `\`))
+}
+
+// IsExecutable reports whether value is a program: a bare name found on PATH,
+// or a path to an executable regular file (spec section 5).
+func IsExecutable(value string) bool {
+	if !IsBareProgram(value) {
+		return isExecutableFile(value)
+	}
+	exts := []string{""}
+	if runtime.GOOS == "windows" {
+		pathext := os.Getenv("PATHEXT")
+		if pathext == "" {
+			pathext = ".COM;.EXE;.BAT;.CMD"
+		}
+		for _, ext := range strings.Split(pathext, ";") {
+			if ext != "" {
+				exts = append(exts, ext)
+			}
+		}
+	}
+	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
+		if dir == "" {
+			continue
+		}
+		for _, ext := range exts {
+			if isExecutableFile(filepath.Join(dir, value+ext)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// A regular file the user may run; without access(2) (Windows), one that exists.
+func isExecutableFile(path string) bool {
+	st, err := os.Stat(path)
+	return err == nil && st.Mode().IsRegular() && accessible(path, 1)
 }
 
 func isDir(path string) bool {
@@ -374,6 +422,8 @@ func WrapText(text string, width int) []string {
 
 func completionKind(rule string, searchDirs []string) (kind, values string) {
 	switch {
+	case rule == "file:executable":
+		return "command", strings.Join(searchDirs, ":")
 	case rule == "path" || strings.HasPrefix(rule, "file:"):
 		return "file", strings.Join(searchDirs, ":")
 	case strings.HasPrefix(rule, "dir:"):
@@ -1348,13 +1398,18 @@ func (c *Cli) resolve() {
 			base = c.config[opt.long].dir
 		}
 		for i, v := range values {
-			values[i] = ResolvePath(v, base, opt.searchDirs)
+			// A bare program name stays as given (spec section 6).
+			if opt.rule != "file:executable" || !IsBareProgram(v) {
+				values[i] = ResolvePath(v, base, opt.searchDirs)
+			}
 		}
 	}
 	for _, arg := range args {
 		if isPathRule(arg.rule) {
 			for i, v := range c.argRaw[arg.name] {
-				c.argRaw[arg.name][i] = ResolvePath(v, c.Cwd, nil)
+				if arg.rule != "file:executable" || !IsBareProgram(v) {
+					c.argRaw[arg.name][i] = ResolvePath(v, c.Cwd, nil)
+				}
 			}
 		}
 	}

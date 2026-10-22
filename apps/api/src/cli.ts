@@ -25,7 +25,8 @@ cli.opt('CLYOPS_API_KEYS',         'keys',        'K', 'optional',  'JSON file o
 cli.optArray('CLYOPS_API_ALLOW',        'allow',        'a',              'Serve only tools matching this glob over their words (media/*, media/**)', 'Security');
 cli.optArray('CLYOPS_API_DENY',         'deny',         'D',              'Leave out tools matching this glob', 'Security');
 cli.opt('CLYOPS_API_READ_ONLY',         'read-only',    '',  'flag',      'Serve only tools that declare the read-only effect', 'Security');
-cli.optArray('CLYOPS_API_PATHS_WITHIN', 'paths-within', '',               'Path inputs must resolve inside this directory', 'Security', 'dir:exists');
+cli.optArray('CLYOPS_API_PATHS_WITHIN', 'paths-within', '',               'Path inputs must resolve inside this directory (default: the working directory, unless it is /)', 'Security', 'dir:exists');
+cli.opt('CLYOPS_API_ALLOW_EXECUTABLE_INPUTS', 'allow-executable-inputs', '', 'flag', 'Let callers set file:executable inputs, choosing what runs on this host', 'Security');
 cli.opt('CLYOPS_API_MAX_BODY',          'max-body',     '',  '10485760',  'Largest request body in bytes: JSON, multipart or spooled for an async job', 'Security', 'int:1-');
 cli.opt('CLYOPS_API_MAX_OUTPUT',        'max-output',   '',  '16777216',  'Keep at most this many bytes of a tool\'s stdout and stderr (0: all)', 'Security', 'int:0-');
 cli.opt('CLYOPS_API_AUDIT',             'audit',        '',  'optional',  'Append a JSON line per run to this file (-: stderr)', 'Security', 'path');
@@ -53,6 +54,7 @@ const { app, current, close } = await createApi({
   keys,
   filter: { allow: args.CLYOPS_API_ALLOW as string[], deny: args.CLYOPS_API_DENY as string[], readOnly: args.CLYOPS_API_READ_ONLY as boolean },
   within: within.length ? within : undefined,
+  allowExecutableInputs: args.CLYOPS_API_ALLOW_EXECUTABLE_INPUTS as boolean,
   maxBody: args.CLYOPS_API_MAX_BODY as number,
   maxOutput: args.CLYOPS_API_MAX_OUTPUT as number,
   audit: args.CLYOPS_API_AUDIT ? auditLog(args.CLYOPS_API_AUDIT as string) : undefined,

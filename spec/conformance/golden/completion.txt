@@ -28,6 +28,7 @@ opt	--size	-	value	none	-	Size code
 opt	--data-dir	-d	value	dir	-	Data directory
 opt	--src	-	value	file	-	Source file
 opt	--dest	-	value	file	-	Destination file
+opt	--exec	-	value	command	-	Program to run
 opt	--include	-I	value	file	-	Include directory
 opt	--help	-h	flag	none	-	Show this help message and exit
 opt	--no-help	-	flag	none	-	Show this help message and exit

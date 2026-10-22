@@ -1,7 +1,8 @@
 // An HTTP API over a directory of clyops tools: one POST endpoint per tool,
 // validated and documented from its --help-json-schema.
 import {
-  allowed, InputError, isTextType, loadTools, runTool, startTool, tail, toJsonSchema, watchTools,
+  allowed, closedInputs, closedKeys, closedRequirement, InputError, inputKeys, isTextType, loadTools, publicSchema, runTool, startTool, tail,
+  toJsonSchema, watchTools, type InputPolicy,
   type AuditEntry, type Command, type Group, type RunResult, type Tool, type ToolFilter, type ToolResult, type ToolRunOptions,
 } from 'clyops-tools';
 import { JobQueue, parseRoleJson, type JobRecord } from 'clyops-jobs';
@@ -11,7 +12,7 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import { EventEmitter } from 'node:events';
 import { createReadStream, createWriteStream, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { basename, join, parse, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Readable, Transform } from 'node:stream';
 import { finished, pipeline } from 'node:stream/promises';
@@ -44,8 +45,15 @@ export interface ApiOptions {
   keys?: Record<string, ApiKey>;
   /** Which tools to serve at all (with the root's `allow`/`deny` settings). */
   filter?: ToolFilter;
-  /** Path-valued inputs must resolve inside these directories. */
+  /**
+   * Path-valued inputs must resolve inside these directories (default: the working directory, unless
+   * it is the filesystem root; then callers can't set path inputs at all).
+   */
   within?: string[];
+  /** Let callers set `file:executable` inputs, choosing what runs on the host (default: no; spec section 13). */
+  allowExecutableInputs?: boolean;
+  /** Which inputs callers may set (default: from `within` and `allowExecutableInputs`). */
+  inputs?: InputPolicy;
   /** Kill a tool after this long (0: never). */
   timeoutMs?: number;
   /** Largest request body accepted: JSON, multipart, or spooled for an async job (default 10 MiB). */
@@ -201,10 +209,11 @@ function limited(limit: number): Transform {
  * saved and its path given as that input (repeated for array inputs). Files
  * go to `dir`; at most `limit` bytes in all.
  */
-function readMultipart(req: Request, tool: Tool, dir: string, limit: number): Promise<{ input: Record<string, unknown>; stdin?: string }> {
+function readMultipart(req: Request, tool: Tool, dir: string, limit: number): Promise<{ input: Record<string, unknown>; stdin?: string; uploaded: string[] }> {
   const schema = toJsonSchema(tool.schema) as { properties: Record<string, { type?: string }> };
   return new Promise((resolve, reject) => {
     const input: Record<string, unknown> = {};
+    const uploaded: string[] = [];
     let stdin: string | undefined;
     let size = 0;
     let n = 0;
@@ -244,11 +253,12 @@ function readMultipart(req: Request, tool: Tool, dir: string, limit: number): Pr
       if (name === 'stdin') stdin = file;
       else if (schema.properties[name]?.type === 'array') input[name] = [...((input[name] as string[]) ?? []), file];
       else input[name] = file;
+      if (name !== 'stdin') uploaded.push(name);
       stream.on('data', (chunk: Buffer) => void count(chunk.length));
       save(stream, file);
     });
     bb.on('error', (err) => fail(err as Error));
-    bb.on('close', () => Promise.all(writes).then(() => resolve({ input, stdin }), reject));
+    bb.on('close', () => Promise.all(writes).then(() => resolve({ input, stdin, uploaded }), reject));
     req.pipe(bb);
   });
 }
@@ -259,6 +269,14 @@ function readMultipart(req: Request, tool: Tool, dir: string, limit: number): Pr
  * are fixed when the app is built.
  */
 export async function createApi(opts: ApiOptions) {
+  // Callers never choose what runs, and path inputs stay inside the working directory by default
+  // (spec section 13). Confining them to the filesystem root would confine nothing.
+  const cwd = resolve(opts.cwd ?? process.cwd());
+  const within = opts.within ?? (cwd === parse(cwd).root ? undefined : [cwd]);
+  if (!within && !opts.inputs) {
+    process.emitWarning(`callers can't set path inputs: the working directory is ${cwd}; give --paths-within to let them name files`);
+  }
+  opts = { ...opts, within, inputs: opts.inputs ?? { confined: Boolean(within?.length), allowExecutables: opts.allowExecutableInputs } };
   const maxBody = opts.maxBody ?? 10 << 20;
   // A job's files (spooled stdin, uploads, binary stdout) live until it is dropped.
   const jobDirs = new Map<string, string>();
@@ -274,7 +292,13 @@ export async function createApi(opts: ApiOptions) {
     },
   });
   const onError = (cmd: Command | null, err: Error) => process.emitWarning(cmd ? `skipping ${cmd.words.join(' ')}: ${err.message}` : err.message);
-  const withPaths = (tools: Tool[]): ApiTool[] => tools.map((t) => ({ ...t, path: `/tools/${t.words.join('/')}` }));
+  const withPaths = (tools: Tool[]): ApiTool[] => tools
+    .filter((t) => {
+      const arg = closedRequirement(t.schema, closedOf(opts, t));
+      if (arg) process.emitWarning(`not serving ${t.words.join(' ')}: its required argument ${arg} is closed to callers (spec section 13)`);
+      return !arg;
+    })
+    .map((t) => ({ ...t, path: `/tools/${t.words.join('/')}` }));
 
   // Everything documented in OpenAPI lives on a router rebuilt for each set of tools.
   let api: ReturnType<typeof buildRoutes>;
@@ -306,13 +330,17 @@ export async function createApi(opts: ApiOptions) {
     });
   }
   app.get('/openapi.json', (_req: Request, res: Response) => {
-    res.json(documentStreams(api.registry.generateOpenAPIDocument(opts.apiKey || keys.length ? { security: [{ apiKey: [] }] } : {}), api.tools));
+    res.json(documentStreams(opts, api.registry.generateOpenAPIDocument(opts.apiKey || keys.length ? { security: [{ apiKey: [] }] } : {}), api.tools));
   });
   // A key only sees and runs the tools it may.
   app.use((req: Request, res: Response, next: NextFunction) => {
     const caller = res.locals.caller as Caller | undefined;
     const tool = api.tools.find((t) => t.path === req.path);
     if (tool && caller?.filter && !allowed(tool, caller.filter)) return void res.status(403).json({ error: `this key may not run ${tool.words.join(' ')}` });
+    // Say why a closed input is refused, before the schema calls it unknown.
+    const set = tool && req.method === 'POST' && req.is('application/json') && req.body && typeof req.body === 'object'
+      ? closedKeys(tool.schema, closedOf(opts, tool), req.body as Record<string, unknown>) : [];
+    if (set.length) return void res.status(400).json({ error: `${set.join(', ')}: set by the server, not by callers` });
     next();
   });
   // A non-JSON body is the tool's stdin (the arguments come from the query
@@ -335,6 +363,7 @@ export async function createApi(opts: ApiOptions) {
         cwd: opts.cwd,
         timeoutMs: opts.timeoutMs, positionalsOrder: opts.positionalsOrder,
         within: opts.within,
+        inputs: opts.inputs,
         maxOutput: opts.maxOutput,
         audit: opts.audit && ((entry) => opts.audit?.({ ...entry, key: caller?.name })),
       };
@@ -358,20 +387,26 @@ type Ctx = { queue: JobQueue<ApiResult>; jobDirs: Map<string, string>; maxBody: 
 
 /** A POST with a non-JSON body: validate the query (or the args part), then run with the body as stdin. */
 async function runBody(opts: ApiOptions, ctx: Ctx, tool: ApiTool, req: Request, res: Response): Promise<void> {
-  const inputSchema = toJsonSchema(tool.schema);
   const dir = mkdtempSync(join(tmpdir(), 'clyops-api-'));
   let keep = false;
   try {
     let input: Record<string, unknown>;
     let stdin: string | Readable | undefined;
+    let uploaded: string[] = [];
     if (req.is('multipart/form-data')) {
       const parts = await readMultipart(req, tool, dir, ctx.maxBody);
       input = parts.input;
       stdin = parts.stdin;
+      uploaded = parts.uploaded;
     } else {
-      input = queryInput(req.query, inputSchema as never);
+      input = queryInput(req.query, toJsonSchema(publicSchema(tool.schema, closedOf(opts, tool))) as never);
       stdin = req;
     }
+    // An uploaded file's path is the server's choice, so its input is open for this request.
+    const closed = closedOf(opts, tool).filter((name) => !uploadedFor(tool, name, uploaded));
+    const set = closedKeys(tool.schema, closed, input);
+    if (set.length) return void res.status(400).json({ error: `${set.join(', ')}: set by the server, not by callers` });
+    const inputSchema = toJsonSchema(publicSchema(tool.schema, closed));
     const checked = toZod(inputSchema).safeParse(input);
     if (!checked.success) return void res.status(400).json({ error: 'Validation failed', issues: checked.error.issues });
     if (req.query.async === 'true' && stdin === req) {
@@ -380,7 +415,7 @@ async function runBody(opts: ApiOptions, ctx: Ctx, tool: ApiTool, req: Request, 
       await pipeline(req, limited(ctx.maxBody), createWriteStream(stdin));
     }
     keep = req.query.async === 'true';
-    await respond(opts, ctx, tool, input, req, res, stdin, keep ? dir : undefined);
+    await respond(opts, ctx, tool, input, req, res, stdin, keep ? dir : undefined, { closed, uploads: uploaded.length ? dir : undefined });
   } finally {
     if (!keep) rmSync(dir, { recursive: true, force: true });
   }
@@ -430,9 +465,14 @@ function stderrStage(stage: (stage: string) => void): { onStderr: (chunk: string
  * the tool starts) or a stream. A job owns `dir` and removes it when dropped.
  */
 async function respond(opts: ApiOptions, ctx: Ctx, tool: ApiTool, input: Record<string, unknown>, req: Request, res: Response,
-  stdin?: string | Readable, dir?: string): Promise<void> {
+  stdin?: string | Readable, dir?: string, request: { closed?: string[]; uploads?: string } = {}): Promise<void> {
   const caller = res.locals.caller as Caller | undefined;
-  const base: ToolRunOptions = { cwd: opts.cwd, timeoutMs: opts.timeoutMs, positionalsOrder: opts.positionalsOrder, within: opts.within, maxOutput: opts.maxOutput };
+  // Uploaded files live in the request's own directory, which is allowed for it.
+  const within = opts.within && request.uploads ? [...opts.within, request.uploads] : opts.within;
+  const base: ToolRunOptions = {
+    cwd: opts.cwd, timeoutMs: opts.timeoutMs, positionalsOrder: opts.positionalsOrder, within, maxOutput: opts.maxOutput,
+    closed: request.closed ?? closedOf(opts, tool),
+  };
   const open = () => (typeof stdin === 'string' ? createReadStream(stdin) : stdin);
   const audit = (result: RunResult) => opts.audit?.({
     key: caller?.name, tool: tool.words.join(' '), command: result.command, exitCode: result.exitCode, signal: result.signal,
@@ -526,7 +566,7 @@ async function respond(opts: ApiOptions, ctx: Ctx, tool: ApiTool, input: Record<
  * request bodies (a tool's stdin, multipart), the query parameters they take,
  * declared binary stdout and the tools' effects.
  */
-function documentStreams(doc: { paths?: Record<string, Record<string, Record<string, unknown>>> }, tools: ApiTool[]) {
+function documentStreams(opts: ApiOptions, doc: { paths?: Record<string, Record<string, Record<string, unknown>>> }, tools: ApiTool[]) {
   const binary = { type: 'string', format: 'binary' };
   for (const tool of tools) {
     const op = doc.paths?.[tool.path]?.post as {
@@ -545,7 +585,7 @@ function documentStreams(doc: { paths?: Record<string, Record<string, Record<str
         additionalProperties: { ...binary, description: 'A file for the path input of the same name' },
       },
     };
-    const properties = (toJsonSchema(tool.schema).properties ?? {}) as Record<string, Record<string, unknown>>;
+    const properties = (toJsonSchema(publicSchema(tool.schema, closedOf(opts, tool))).properties ?? {}) as Record<string, Record<string, unknown>>;
     op.parameters = [
       ...(op.parameters ?? []),
       ...Object.entries(properties).map(([name, schema]) => ({
@@ -593,7 +633,9 @@ function buildRoutes(opts: ApiOptions, ctx: Ctx, tree: Group, tools: ApiTool[]) 
   );
 
   for (const tool of tools) {
-    const inputSchema = toJsonSchema(tool.schema);
+    // Callers see the tool without the inputs closed to them (spec section 13).
+    const schema = publicSchema(tool.schema, closedOf(opts, tool));
+    const inputSchema = toJsonSchema(schema);
     const tag = tool.words.length > 1 ? tool.words.slice(0, -1).join(' ') : 'tools';
     router.get(
       {
@@ -603,7 +645,7 @@ function buildRoutes(opts: ApiOptions, ctx: Ctx, tree: Group, tools: ApiTool[]) 
         responses: { 200: json(z.object({ schema: z.unknown(), input: z.unknown() }), 'The tool\'s clyops schema and the JSON Schema of its input') },
       },
       (_req: Request, res: Response) => {
-        res.json({ schema: tool.schema, input: inputSchema });
+        res.json({ schema, input: inputSchema });
       },
     );
     router.post(
@@ -727,4 +769,15 @@ export function errorHandler(err: Error & { /** Lifecycle state or HTTP input-er
   }
   if (res.headersSent) return void res.end();
   res.status(status).json({ error: err.message, ...(issues !== undefined ? { issues } : {}) });
+}
+
+// The inputs of `tool` callers may not set under the server's policy.
+function closedOf(opts: ApiOptions, tool: Tool): string[] {
+  return opts.inputs ? closedInputs(tool.schema, opts.inputs) : [];
+}
+
+// Whether input `name` of `tool` was given as an uploaded file (by any of its input keys).
+function uploadedFor(tool: Tool, name: string, uploaded: string[]): boolean {
+  const item = [...tool.schema.options, ...tool.schema.arguments].find((i) => i.name === name);
+  return Boolean(item && inputKeys(item).some((key) => uploaded.includes(key)));
 }

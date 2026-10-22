@@ -1695,6 +1695,239 @@
     }
   },
   {
+    "name": "executable: a bare name on PATH stays as given",
+    "args": [
+      "in.txt",
+      "--exec",
+      "demo-tool"
+    ],
+    "files": {
+      "bin/demo-tool": "#!/bin/sh\nexit 0\n"
+    },
+    "modes": {
+      "bin/demo-tool": "755"
+    },
+    "env": {
+      "PATH": "{tmp}/bin:{path}"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "EXEC": "demo-tool"
+      }
+    }
+  },
+  {
+    "name": "executable: a bare name not on PATH",
+    "args": [
+      "in.txt",
+      "--exec",
+      "clyops-no-such-program"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--exec is not an executable: clyops-no-such-program"
+      ]
+    }
+  },
+  {
+    "name": "executable: a bare name on PATH that is not executable",
+    "args": [
+      "in.txt",
+      "--exec",
+      "demo-tool"
+    ],
+    "files": {
+      "bin/demo-tool": "#!/bin/sh\nexit 0\n"
+    },
+    "modes": {
+      "bin/demo-tool": "644"
+    },
+    "env": {
+      "PATH": "{tmp}/bin:{path}"
+    },
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--exec is not an executable: demo-tool"
+      ]
+    }
+  },
+  {
+    "name": "executable: an absolute path to an executable file",
+    "args": [
+      "in.txt",
+      "--exec",
+      "{tmp}/bin/demo-tool"
+    ],
+    "files": {
+      "bin/demo-tool": "#!/bin/sh\nexit 0\n"
+    },
+    "modes": {
+      "bin/demo-tool": "755"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "EXEC": "{tmp}/bin/demo-tool"
+      }
+    }
+  },
+  {
+    "name": "executable: an absolute path to a file that is not executable",
+    "args": [
+      "in.txt",
+      "--exec",
+      "{tmp}/notes.txt"
+    ],
+    "files": {
+      "notes.txt": "x"
+    },
+    "modes": {
+      "notes.txt": "644"
+    },
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--exec is not an executable: {tmp}/notes.txt"
+      ]
+    }
+  },
+  {
+    "name": "executable: a directory is not one",
+    "args": [
+      "in.txt",
+      "--exec",
+      "{tmp}/bin"
+    ],
+    "dirs": [
+      "bin"
+    ],
+    "modes": {
+      "bin": "755"
+    },
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--exec is not an executable: {tmp}/bin"
+      ]
+    }
+  },
+  {
+    "name": "executable: a relative path resolves against the cwd, not PATH",
+    "args": [
+      "in.txt",
+      "--exec",
+      "./bin/demo-tool"
+    ],
+    "files": {
+      "bin/demo-tool": "#!/bin/sh\nexit 0\n"
+    },
+    "modes": {
+      "bin/demo-tool": "755"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "EXEC": "{tmp}/bin/demo-tool"
+      }
+    }
+  },
+  {
+    "name": "executable: a relative path with a slash in the cwd",
+    "args": [
+      "in.txt",
+      "--exec",
+      "bin/demo-tool"
+    ],
+    "cwd": "sub",
+    "dirs": [
+      "sub"
+    ],
+    "files": {
+      "sub/bin/demo-tool": "#!/bin/sh\nexit 0\n"
+    },
+    "modes": {
+      "sub/bin/demo-tool": "755"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "EXEC": "{tmp}/sub/bin/demo-tool"
+      }
+    }
+  },
+  {
+    "name": "executable: a file in the cwd is not found by its bare name",
+    "args": [
+      "in.txt",
+      "--exec",
+      "demo-tool"
+    ],
+    "files": {
+      "demo-tool": "#!/bin/sh\nexit 0\n"
+    },
+    "modes": {
+      "demo-tool": "755"
+    },
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--exec is not an executable: demo-tool"
+      ]
+    }
+  },
+  {
+    "name": "executable: from the config file, a path resolves against the file",
+    "args": [
+      "in.txt",
+      "-c",
+      "conf/demo.conf"
+    ],
+    "files": {
+      "conf/demo.conf": "demo:exec=tools/run\n",
+      "conf/tools/run": "#!/bin/sh\nexit 0\n"
+    },
+    "modes": {
+      "conf/tools/run": "755"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "EXEC": "{tmp}/conf/tools/run"
+      },
+      "sources": {
+        "exec": "config"
+      }
+    }
+  },
+  {
+    "name": "executable: from the environment, a bare name stays as given",
+    "args": [
+      "in.txt"
+    ],
+    "files": {
+      "bin/demo-tool": "#!/bin/sh\nexit 0\n"
+    },
+    "modes": {
+      "bin/demo-tool": "755"
+    },
+    "env": {
+      "PATH": "{tmp}/bin:{path}",
+      "EXEC": "demo-tool"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "EXEC": "demo-tool"
+      },
+      "sources": {
+        "exec": "env"
+      }
+    }
+  },
+  {
     "name": "secret value is masked in values json",
     "args": [
       "in.txt",

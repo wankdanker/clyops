@@ -43,6 +43,7 @@ clyops_opt       SIZE     size     "" optional "Size code"             Validatio
 clyops_opt       DATA_DIR data-dir d optional  "Data directory"        Files      "dir:exists"
 clyops_opt       SRC      src      "" optional "Source file"           Files      "file:exists"
 clyops_opt       DEST     dest     "" optional "Destination file"      Files      "file:writable"
+clyops_opt       EXEC     exec     "" optional "Program to run"        Files      "file:executable"
 clyops_opt_array INCLUDE  include  I           "Include directory"     Files      path
 
 clyops_config      config "demo:,shared:"
@@ -55,7 +56,7 @@ if clyops_fd_open extra >/dev/null; then clyops_emit meta '{"extra":true}'; else
 clyops_emit progress '{"pct":100}'
 
 sources=""
-for long in config verbose quiet color out notes count ratio enabled tag no-cache key host port endpoint addr id email date code level size data-dir src dest include help; do
+for long in config verbose quiet color out notes count ratio enabled tag no-cache key host port endpoint addr id email date code level size data-dir src dest exec include help; do
     sources+="${sources:+, }\"$long\": \"$(clyops_source "$long")\""
 done
 printf '{"values": %s, "sources": {%s}}\n' "$(clyops_values_json)" "$sources"

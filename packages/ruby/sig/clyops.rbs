@@ -22,6 +22,9 @@ module Clyops
   def self.describe_rule: (String rule) -> String
   def self.validate: (String value, String rule, String name) -> scalar
   def self.normpath: (String base, String value) -> String
+  def self.bare_program?: (String value) -> bool
+  def self.executable?: (String value, ?Hash[String, String] env) -> bool
+  def self.executable_file?: (String path) -> bool
   def self.resolve_path: (String value, String base, ?Array[String] search_dirs) -> String
   def self.wrap_text: (String text, Integer width) -> Array[String]
   def self.pretty_json: (untyped value) -> String

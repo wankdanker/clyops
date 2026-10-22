@@ -144,6 +144,7 @@ error.
 | `port` | 1–65535 | integer |
 | `path` | anything; marks a path (resolved to absolute) | string |
 | `file:exists`, `file:readable`, `file:writable` | file checks (writable allows a missing file in a writable dir) | string |
+| `file:executable` | a program: a bare name on `PATH` (kept as given), or a path to an executable file. Use it for any option naming a program to run; servers won't take it from remote callers | string |
 | `dir:exists`, `dir:writable` | directory checks | string |
 | `ip`, `hostname`, `url` (`http`/`https` only), `email`, `uuid` | format | string |
 | `date:YYYY-MM-DD` | that format | string |

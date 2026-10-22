@@ -1,7 +1,7 @@
 // A directory of tools, loaded with their schemas, and running one with JSON input.
 import { watch } from 'node:fs';
 import { commands, discover, type Command, type Group } from './discover.js';
-import { redactArgv, toArgv, type Input } from './argv.js';
+import { InputError, inputKeys, isPathValued, redactArgv, toArgv, type Input } from './argv.js';
 import { start, type RoleOption, type RunOptions, type RunResult, type Started } from './run.js';
 import { loadSchema, type Schema, type SchemaBody } from './schema.js';
 
@@ -35,6 +35,49 @@ export interface ToolFilter {
   deny?: string[];
   /** Serve only tools declaring the `read-only` effect. */
   readOnly?: boolean;
+}
+
+/**
+ * Which inputs a server takes from its callers (spec section 13, server-set inputs). A network
+ * server applies one; a local one may.
+ */
+export interface InputPolicy {
+  /** Path inputs are confined to directories (`within`): they are then open, and confined; else closed. */
+  confined: boolean;
+  /** Callers may set `file:executable` inputs, choosing what runs (default: no). */
+  allowExecutables?: boolean;
+}
+
+/** The options and arguments of `schema` a caller may not set under `policy`: their names. */
+export function closedInputs(schema: SchemaBody, policy: InputPolicy): string[] {
+  const closed = (validation: string, type?: string) =>
+    validation === 'file:executable' ? !policy.allowExecutables : isPathValued(validation, type) && !policy.confined;
+  return [
+    ...schema.options.filter((o) => o.name !== 'help' && closed(o.validation, o.type)).map((o) => o.name),
+    ...schema.arguments.filter((a) => closed(a.validation)).map((a) => a.name),
+  ];
+}
+
+/** `schema` as callers see it: without the `closed` options and arguments. */
+export function publicSchema<S extends SchemaBody>(schema: S, closed: string[]): S {
+  if (!closed.length) return schema;
+  return {
+    ...schema,
+    options: schema.options.filter((o) => !closed.includes(o.name)),
+    arguments: schema.arguments.filter((a) => !closed.includes(a.name)),
+  };
+}
+
+/** The keys of `input` that set one of the `closed` options or arguments. */
+export function closedKeys(schema: SchemaBody, closed: string[], input: Record<string, unknown>): string[] {
+  return [...schema.options, ...schema.arguments]
+    .filter((item) => closed.includes(item.name))
+    .flatMap((item) => inputKeys(item).filter((key) => Object.prototype.hasOwnProperty.call(input, key) && input[key] !== null && input[key] !== undefined));
+}
+
+/** The required argument a caller would have to give but may not, so the tool can't be served; or none. */
+export function closedRequirement(schema: SchemaBody, closed: string[]): string | undefined {
+  return schema.arguments.find((a) => a.required && closed.includes(a.name))?.name;
 }
 
 function globRegex(pattern: string): RegExp {
@@ -190,15 +233,20 @@ export interface ToolRunOptions extends RunOptions {
   within?: string[];
   /** Pass secret inputs in the environment instead of on the command line (default: true). */
   secretsInEnv?: boolean;
+  /** Options and arguments the caller may not set (see `closedInputs`); input setting one is an InputError. */
+  closed?: string[];
 }
 
 /**
  * Start a tool with JSON input (spec section 13). `command` is the command
  * line with secrets shown as `***`. Throws an InputError for input `within`
- * rejects, and for an argument given without an earlier one.
+ * rejects, for a `closed` input, and for an argument given without an earlier one.
  */
 export function startTool(tool: Tool, input: Input, opts: ToolRunOptions = {}): Started & { /** Executed command words, including executable and arguments. */ command: string[] } {
-  const { argv, env } = toArgv(tool.schema, input, { within: opts.within, cwd: opts.cwd, secretEnv: opts.secretsInEnv !== false, positionals: opts.positionalsOrder });
+  const { argv, env, controlled } = toArgv(tool.schema, input, {
+    within: opts.within, cwd: opts.cwd, secretEnv: opts.secretsInEnv !== false, positionals: opts.positionalsOrder, controlled: opts.closed,
+  });
+  if (controlled.length) throw new InputError(`${controlled.join(', ')}: set by the server, not by callers`);
   const full = [...(tool.subcommand ?? []), ...argv];
   const roles = opts.roles && declaredRoles(tool, opts.roles);
   const started = start(tool.file, full, { ...opts, roles, env: Object.keys(env).length ? { ...(opts.env ?? process.env), ...env } : opts.env });

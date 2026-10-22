@@ -52,6 +52,7 @@ func main() {
 	cli.Opt("DATA_DIR", "data-dir", "d", "optional", "Data directory", "Files", "dir:exists")
 	cli.Opt("SRC", "src", "", "optional", "Source file", "Files", "file:exists")
 	cli.Opt("DEST", "dest", "", "optional", "Destination file", "Files", "file:writable")
+	cli.Opt("EXEC", "exec", "", "optional", "Program to run", "Files", "file:executable")
 	cli.OptArray("INCLUDE", "include", "I", "Include directory", "Files", "path")
 
 	cli.SetConfig("config", "demo:,shared:")
@@ -69,7 +70,7 @@ func main() {
 
 	longs := []string{"config", "verbose", "quiet", "color", "out", "notes", "count", "ratio", "enabled", "tag", "no-cache", "key",
 		"host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "data-dir", "src", "dest",
-		"include", "help"}
+		"exec", "include", "help"}
 	sources := map[string]string{}
 	for _, l := range longs {
 		sources[l] = cli.Source(l)

@@ -48,6 +48,7 @@ cli.opt("SIZE",     "size",     "",  "optional",  "Size code",             "Vali
 cli.opt("DATA_DIR", "data-dir", "d", "optional",  "Data directory",        "Files",      "dir:exists")
 cli.opt("SRC",      "src",      "",  "optional",  "Source file",           "Files",      "file:exists")
 cli.opt("DEST",     "dest",     "",  "optional",  "Destination file",      "Files",      "file:writable")
+cli.opt("EXEC",     "exec",     "",  "optional",  "Program to run",        "Files",      "file:executable")
 cli.opt_array("INCLUDE", "include", "I",          "Include directory",     "Files",      "path")
 
 cli.set_config("config", "demo:,shared:")
@@ -61,5 +62,5 @@ cli.emit("progress", '{"pct":100}')
 
 longs = ["config", "verbose", "quiet", "color", "out", "notes", "count", "ratio", "enabled", "tag", "no-cache", "key",
          "host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "data-dir", "src", "dest",
-         "include", "help"]
+         "exec", "include", "help"]
 print(json.dumps({"values": json.loads(cli.values_json()), "sources": {k: cli.source(k) for k in longs}}, indent=2))

@@ -219,3 +219,23 @@ test('mcpProgress maps progress updates onto MCP notifications', () => {
   assert.equal(mcpProgress({ pct: 40 }, 40), undefined, 'progress must increase');
   assert.equal(mcpProgress({ stage: 'warming up' }, -Infinity), undefined, 'no number');
 });
+
+test('stdio: inputs are open by default; --close-inputs closes them as the API does', { timeout: 60_000 }, async () => {
+  const root = tree();
+  const listed = async (...args) => {
+    const client = new Client({ name: 'test', version: '1' });
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [cli, '--root', root, '--no-watch', ...args], env, stderr: 'pipe' }));
+    try {
+      return Object.fromEntries((await client.listTools()).tools.map((t) => [t.name, Object.keys(t.inputSchema.properties)]));
+    } finally {
+      await client.close();
+    }
+  };
+  const open = await listed();
+  assert.ok(open.media_demo.includes('exec') && open.media_demo.includes('input'), 'a local agent may set them');
+  // Without --paths-within, the demo's required path argument is closed, so it isn't served.
+  assert.equal((await listed('--close-inputs')).media_demo, undefined);
+  const confined = (await listed('--close-inputs', '--paths-within', root)).media_demo;
+  assert.ok(confined.includes('input') && !confined.includes('exec'), confined.join(' '));
+  assert.ok((await listed('--close-inputs', '--paths-within', root, '--allow-executable-inputs')).media_demo.includes('exec'));
+});

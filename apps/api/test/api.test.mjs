@@ -598,3 +598,99 @@ setTimeout(() => {}, 1200);
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// Server-set inputs (spec section 13): what a caller may not choose.
+function inputsTree() {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'clyops-api-inputs-')));
+  jsTool(root, 'runner', `const cli = new Cli({ name: 'runner' });
+cli.setEffects('read-only');
+cli.opt('EXEC', 'exec', '', 'optional', 'Program to run', 'Options', 'file:executable');
+cli.opt('IN', 'in', '', 'optional', 'Input file', 'Options', 'file:readable');
+cli.opt('NAME', 'name', '', 'optional', 'A name');
+const v = cli.run();
+console.log(JSON.stringify({ exec: v.EXEC, in: v.IN, name: v.NAME }));
+`);
+  jsTool(root, 'needs', `const cli = new Cli({ name: 'needs' });
+cli.arg('program', 'Program to run', '', 'file:executable');
+cli.run();
+`);
+  writeFileSync(join(root, 'inside.txt'), 'x');
+  return root;
+}
+
+test('inputs: file:executable and unconfined paths are set by the server, not callers', async () => {
+  const root = inputsTree();
+  const warnings = [];
+  const onWarning = (w) => warnings.push(w.message);
+  process.on('warning', onWarning);
+  const s = await serve({ root, cwd: root });
+  try {
+    // A tool whose required argument is closed isn't served at all.
+    assert.deepEqual((await (await fetch(`${s.at}/tools`)).json()).map((t) => t.name), ['runner']);
+    await new Promise((r) => setImmediate(r));
+    assert.ok(warnings.some((m) => /not serving needs: its required argument program is closed/.test(m)), warnings.join('\n'));
+    // Callers don't see the closed option; paths are confined to the working directory, so open.
+    const described = await (await fetch(`${s.at}/tools/runner`)).json();
+    assert.deepEqual(described.schema.options.map((o) => o.name).sort(), ['help', 'in', 'name']);
+    assert.deepEqual(Object.keys(described.input.properties).sort(), ['in', 'name']);
+    const doc = await (await fetch(`${s.at}/openapi.json`)).json();
+    assert.equal(JSON.stringify(doc).includes('"exec"'), false);
+
+    const set = await fetch(`${s.at}/tools/runner`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ exec: 'sh' }) });
+    assert.equal(set.status, 400);
+    assert.deepEqual(await set.json(), { error: 'exec: set by the server, not by callers' });
+    const ok = await (await fetch(`${s.at}/tools/runner`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ in: 'inside.txt', name: 'n' }) })).json();
+    assert.equal(ok.ok, true, ok.stderr);
+    assert.deepEqual(ok.json, { exec: null, in: join(root, 'inside.txt'), name: 'n' });
+    const outside = await fetch(`${s.at}/tools/runner`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ in: '/etc/hostname' }) });
+    assert.equal(outside.status, 400);
+    assert.match((await outside.json()).error, /outside the allowed directories/);
+
+    // The same over MCP.
+    const client = new Client({ name: 'test', version: '1' });
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${s.at}/mcp`)));
+    const [listed] = (await client.listTools()).tools;
+    assert.deepEqual([listed.name, Object.keys(listed.inputSchema.properties).sort()], ['runner', ['in', 'name']]);
+    const call = await client.callTool({ name: 'runner', arguments: { exec: 'sh' } });
+    assert.equal(call.isError, true);
+    await client.close();
+  } finally {
+    process.off('warning', onWarning);
+    s.close();
+  }
+
+  // The operator may open executables; a bare name stays as given.
+  const open = await serve({ root, cwd: root, allowExecutableInputs: true });
+  try {
+    const res = await (await fetch(`${open.at}/tools/runner`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ exec: 'sh' }) })).json();
+    assert.equal(res.ok, true, res.stderr);
+    assert.equal(res.json.exec, 'sh');
+    assert.deepEqual((await (await fetch(`${open.at}/tools`)).json()).map((t) => t.name).sort(), ['needs', 'runner']);
+  } finally {
+    open.close();
+  }
+
+  // Run from /, path inputs are closed unless --paths-within confines them; an upload is still fine.
+  const fromRoot = await serve({ root, cwd: '/' });
+  try {
+    const props = Object.keys((await (await fetch(`${fromRoot.at}/tools/runner`)).json()).input.properties);
+    assert.deepEqual(props, ['name']);
+    const set = await fetch(`${fromRoot.at}/tools/runner`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ in: join(root, 'inside.txt') }) });
+    assert.deepEqual([set.status, (await set.json()).error], [400, 'in: set by the server, not by callers']);
+    const form = new FormData();
+    form.set('args', JSON.stringify({ name: 'up' }));
+    form.set('in', new Blob(['uploaded']), 'up.txt');
+    const up = await (await fetch(`${fromRoot.at}/tools/runner`, { method: 'POST', body: form })).json();
+    assert.equal(up.ok, true, up.stderr);
+    assert.match(up.json.in, /up\.txt$/);
+  } finally {
+    fromRoot.close();
+  }
+  const confined = await serve({ root, cwd: '/', within: [root] });
+  try {
+    assert.deepEqual(Object.keys((await (await fetch(`${confined.at}/tools/runner`)).json()).input.properties).sort(), ['in', 'name']);
+  } finally {
+    confined.close();
+  }
+  rmSync(root, { recursive: true, force: true });
+});

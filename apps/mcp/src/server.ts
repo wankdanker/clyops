@@ -5,7 +5,10 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
 import type { JsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/types.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { InputError, isTextType, runTool, tail, toJsonSchema, type AuditEntry, type JsonSchema, type Tool, type ToolResult } from 'clyops-tools';
+import {
+  closedInputs, closedRequirement, InputError, isTextType, publicSchema, runTool, tail, toJsonSchema,
+  type AuditEntry, type InputPolicy, type JsonSchema, type Tool, type ToolResult,
+} from 'clyops-tools';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 /** Server identity, discovered tools, authorization boundaries, and execution limits for MCP. */
@@ -26,6 +29,11 @@ export interface McpOptions {
   timeoutMs?: number;
   /** Path-valued arguments must resolve inside these directories. */
   within?: string[];
+  /**
+   * Which inputs callers may set (spec section 13): without it, all. Over HTTP, give one; a tool
+   * whose required argument it closes isn't served.
+   */
+  inputs?: InputPolicy;
   /** Keep at most this many bytes of a tool's stdout and stderr (0: all). */
   maxOutput?: number;
   /** Called after every run, for an audit log. */
@@ -103,11 +111,14 @@ export function mcpProgress(update: Record<string, unknown>, last: number): { pr
 // Each tool's input schema and compiled validator, built once per tool object.
 // A tool that declares stdin takes it as one more argument, `stdin`.
 const validator = new AjvJsonSchemaValidator();
-const prepared = new WeakMap<Tool, { inputSchema: JsonSchema; validate: JsonSchemaValidator<Record<string, unknown>> }>();
-function prepare(tool: Tool) {
-  let entry = prepared.get(tool);
+// Keyed by the closed inputs too, since servers with different policies can share tools.
+const prepared = new WeakMap<Tool, Map<string, { inputSchema: JsonSchema; validate: JsonSchemaValidator<Record<string, unknown>> }>>();
+function prepare(tool: Tool, closed: string[] = []) {
+  let byClosed = prepared.get(tool);
+  if (!byClosed) prepared.set(tool, (byClosed = new Map()));
+  let entry = byClosed.get(closed.join('\n'));
   if (!entry) {
-    const inputSchema = toJsonSchema(tool.schema);
+    const inputSchema = toJsonSchema(publicSchema(tool.schema, closed));
     const stdin = tool.schema.stdin;
     const properties = inputSchema.properties as Record<string, JsonSchema>;
     if (stdin && !('stdin' in properties)) {
@@ -116,9 +127,16 @@ function prepare(tool: Tool) {
       properties.stdin = { type: 'string', description: `Standard input${what ? `: ${what}` : ''}${text ? '' : ', base64-encoded'}`, ...(text ? {} : { contentEncoding: 'base64' }) };
     }
     entry = { inputSchema, validate: validator.getValidator<Record<string, unknown>>(inputSchema as never) };
-    prepared.set(tool, entry);
+    byClosed.set(closed.join('\n'), entry);
   }
   return entry;
+}
+
+/** The tools `opts` serves, with the inputs its policy closes: not those whose required argument is closed. */
+export function servedTools(opts: Pick<McpOptions, 'tools' | 'inputs'>): { tool: Tool; closed: string[] }[] {
+  return opts.tools
+    .map((tool) => ({ tool, closed: opts.inputs ? closedInputs(tool.schema, opts.inputs) : [] }))
+    .filter(({ tool, closed }) => !closedRequirement(tool.schema, closed));
 }
 
 /** MCP tool annotations from the tool's declared effects (spec section 1.3). */
@@ -141,19 +159,20 @@ export function createMcpServer(opts: McpOptions): Server {
   const server = new Server({ name: opts.name, version: opts.version ?? '0.0.0' }, { capabilities: { tools: { listChanged: true } }, instructions: opts.instructions });
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: opts.tools.map((tool) => ({
+    tools: servedTools(opts).map(({ tool, closed }) => ({
       name: toolName(tool),
       title: tool.words.join(' '),
       description: [tool.schema.description, tool.schema.epilog].filter(Boolean).join('\n\n'),
-      inputSchema: prepare(tool).inputSchema as { type: 'object'; [key: string]: unknown },
+      inputSchema: prepare(tool, closed).inputSchema as { type: 'object'; [key: string]: unknown },
       ...annotations(tool),
     })),
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-    const tool = opts.tools.find((t) => toolName(t) === request.params.name);
-    if (!tool) return { content: [{ type: 'text', text: `Unknown tool: ${request.params.name}` }], isError: true };
-    const checked = prepare(tool).validate(request.params.arguments ?? {});
+    const served = servedTools(opts).find(({ tool }) => toolName(tool) === request.params.name);
+    if (!served) return { content: [{ type: 'text', text: `Unknown tool: ${request.params.name}` }], isError: true };
+    const { tool, closed } = served;
+    const checked = prepare(tool, closed).validate(request.params.arguments ?? {});
     if (!checked.valid) return { content: [{ type: 'text', text: `Invalid arguments: ${checked.errorMessage}` }], isError: true };
     const { stdin, ...input } = checked.data;
     const declared = tool.schema.stdin;
@@ -172,7 +191,7 @@ export function createMcpServer(opts: McpOptions): Server {
     let result: ToolResult;
     try {
       result = await runTool(tool, declared ? input : checked.data, {
-        cwd: opts.cwd, timeoutMs: opts.timeoutMs, positionalsOrder: opts.positionalsOrder, signal: extra.signal, within: opts.within, maxOutput: opts.maxOutput,
+        cwd: opts.cwd, timeoutMs: opts.timeoutMs, positionalsOrder: opts.positionalsOrder, signal: extra.signal, within: opts.within, maxOutput: opts.maxOutput, closed,
         stdin: stdinData, stdout: binaryStdout(tool) ? 'buffer' : 'text',
         roles: { meta: {}, ...(onLine ? { progress: { onLine } } : {}) },
       });

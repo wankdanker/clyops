@@ -57,6 +57,7 @@ _clyops_action___CLYOPS_FUNC__() {
         choice) print -r -- "(${values//,/ })" ;;
         file) if [[ -n "$values" ]]; then print -r -- "{_files; _files -W \"(${values//:/ })\"}"; else print -r -- _files; fi ;;
         dir) if [[ -n "$values" ]]; then print -r -- "{_files -/; _files -/ -W \"(${values//:/ })\"}"; else print -r -- "_files -/"; fi ;;
+        command) print -r -- '{if [[ $PREFIX == */* ]]; then _files; else _command_names -e; fi}' ;;
         host) print -r -- _hosts ;;
         none) print -r -- " " ;;
         *) print -r -- _files ;;

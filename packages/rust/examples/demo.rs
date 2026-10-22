@@ -45,6 +45,7 @@ fn main() {
     cli.opt("DATA_DIR", "data-dir", "d", "optional",  "Data directory").group("Files").rule("dir:exists");
     cli.opt("SRC",      "src",      "",  "optional",  "Source file").group("Files").rule("file:exists");
     cli.opt("DEST",     "dest",     "",  "optional",  "Destination file").group("Files").rule("file:writable");
+    cli.opt("EXEC",     "exec",     "",  "optional",  "Program to run").group("Files").rule("file:executable");
     cli.opt_array("INCLUDE", "include", "I",          "Include directory").group("Files").rule("path");
 
     cli.config("config", "demo:,shared:");
@@ -57,7 +58,7 @@ fn main() {
     cli.emit("progress", r#"{"pct":100}"#);
 
     let longs = ["config", "verbose", "quiet", "color", "out", "notes", "count", "ratio", "enabled", "tag", "no-cache", "key",
-        "host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "data-dir", "src", "dest", "include", "help"];
+        "host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "data-dir", "src", "dest", "exec", "include", "help"];
     let sources: Vec<String> = longs.iter().map(|l| format!("\"{l}\": \"{}\"", cli.source(l))).collect();
     println!("{{\"values\": {}, \"sources\": {{{}}}}}", cli.values_json(), sources.join(", "));
 }

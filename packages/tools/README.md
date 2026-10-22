@@ -37,6 +37,7 @@ const result = await run('./scripts/media/to-pcm.sh', argv, { timeoutMs: 60_000 
 | `startTool(tool, input, runOptions?)` | The same, started: `{child, stdout, result, command}`, to stream stdout. |
 | `expandCommands(cmd, schema)` | A program's commands ([spec §1.7](https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md#17-commands)) as tools: words, `subcommand`, and the command's schema with the options it inherits. |
 | `allowed(tool, {allow?, deny?, readOnly?})` | Whether a filter lets a tool through: globs over its words joined by `/` (`*` within a word, `**` across). |
+| `closedInputs(schema, {confined, allowExecutables?})`, `publicSchema(schema, closed)`, `closedKeys(schema, closed, input)`, `closedRequirement(schema, closed)` | Which inputs a server sets itself rather than its callers ([spec §13](https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md#13-json-input-toargv)): `file:executable` unless allowed, path inputs unless confined. `runTool`/`startTool` take them as `closed`. |
 | `commands(group)` | Every command in a tree. |
 | `classify(file)` | `tool`, `dispatcher` or `other`. Only `tool`s should be run for their schema. |
 | `loadSchema(file, {cwd?, timeoutMs?})` | The tool's `--help-json-schema` output, cached by file modification time and size. |
