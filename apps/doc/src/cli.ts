@@ -16,7 +16,8 @@ cli.setEpilog('Examples:\n  mytool --help-json-schema | clyops-doc > mytool.1\n 
 // It writes files only with --out-dir or --prefix and --execute, and then only its own pages.
 cli.setEffects('idempotent', 'destructive');
 cli.setStdin('The tool\'s --help-json-schema output (unless --schema or --root is given)', 'application/json');
-cli.setStdout('The documentation, in the format --format names; with --out-dir or --prefix, the files written (or, without --execute, that would be), one per line', 'text/plain');
+// One declared type per program: what it writes is text/troff, text/markdown or text/html by --format.
+cli.setStdout('The documentation as --format says: text/troff, text/markdown or text/html; with --out-dir or --prefix, the files written (or, without --execute, that would be), one per line', 'text/plain');
 cli.opt('CLYOPS_DOC_FORMAT',  'format',  'f', 'man',      'Output format',                                                  'Output', 'choice:man,markdown,html');
 cli.opt('CLYOPS_DOC_NAME',    'name',    'n', 'optional', 'How the tool is run (default: the schema\'s name), e.g. "mytool media to-pcm"; with --root, the dispatcher\'s name (default: the directory\'s)', 'Output');
 cli.opt('CLYOPS_DOC_SECTION', 'section', 's', '1',        'Manual section for the man page header',                         'Output', 'regex:^[1-9][a-z]*$');

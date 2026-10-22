@@ -26,6 +26,9 @@ section here.
 - The clyops-skillify skill generates its reference pages with clyops-doc
   (`npx clyops-doc --format markdown`, or `--root` for a whole tree) instead of its own
   Python renderer, `scripts/schema-to-reference.py`, which is removed.
+- Spec section 15 documents clyops-doc's contract: input, options, sections, inheritance, page
+  names and formats. Its stdout stays `text/plain` (one type per program) and its description
+  names `text/troff`, `text/markdown` and `text/html`.
 
 ## [0.6.0] - 2026-10-21
 
