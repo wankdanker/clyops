@@ -53,7 +53,7 @@ callers decide whether those are errors. Positionals come first by default;
 dash-prefixed values follow options and <code>--</code>. <code>positionals: 'last'</code> changes their
 order. <code>secretEnv</code> passes scalar secrets in the environment; <code>within</code> restricts
 path input. <code>toJsonSchema</code> describes accepted input; <code>redactArgv</code> masks secrets
-in displayed commands. See <a href="https://github.com/wankdanker/clyops/blob/a9ebf9ad3806b42a36d0b090a3e1618dc129fec3/spec/SPEC.md#13-json-input-toargv">spec section 13</a>.</p>
+in displayed commands. See <a href="https://github.com/wankdanker/clyops/blob/a7bae46e1146f9d768fb4a945d7c284d9eef7d01/spec/SPEC.md#13-json-input-toargv">spec section 13</a>.</p>
 <h2 id="streams-cancellation-and-errors">Streams, cancellation and errors</h2>
 <p><code>run(file, argv, options)</code> resolves a <code>RunResult</code>; nonzero exit codes are outcomes,
 while spawn/input/output stream errors reject. <code>start</code> additionally returns the
@@ -73,7 +73,7 @@ result.roles?.meta; // the tool's meta document, as text
 <p><code>runTool</code> adds schema mapping, secret handling and <code>ok</code>. Filters (<code>allow</code>, <code>deny</code>,
 <code>readOnly</code>) and path boundaries should match the application's intended access.
 <code>auditLog</code> provides an append-only JSONL audit writer. See the
-<a href="https://github.com/wankdanker/clyops/blob/a9ebf9ad3806b42a36d0b090a3e1618dc129fec3/packages/tools/README.md">tools package guide</a>.</p>
+<a href="https://github.com/wankdanker/clyops/blob/a7bae46e1146f9d768fb4a945d7c284d9eef7d01/packages/tools/README.md">tools package guide</a>.</p>
 <h2 id="jobs-and-templates">Jobs and templates</h2>
 <pre><code class="language-sh">pnpm add clyops-jobs
 </code></pre>
@@ -98,7 +98,7 @@ and transition serializable job states. <code>JobQueue.add</code> returns a canc
 method and a <code>done</code> promise; <code>get</code> and <code>list</code> expose retained work. Cancellation
 is recorded as an error with <code>cancelled</code>; <code>onDrop</code> lets the host clean retained
 files. The queue is in memory, so durable storage is the host's responsibility.
-See <a href="https://github.com/wankdanker/clyops/blob/a9ebf9ad3806b42a36d0b090a3e1618dc129fec3/packages/jobs/README.md">job configuration and artifacts</a>.</p>
+See <a href="https://github.com/wankdanker/clyops/blob/a7bae46e1146f9d768fb4a945d7c284d9eef7d01/packages/jobs/README.md">job configuration and artifacts</a>.</p>
 <h2 id="http-api">HTTP API</h2>
 <pre><code class="language-sh">pnpm add clyops-api
 pnpm exec clyops-api --root ./tools --port 8080 --read-only
@@ -114,7 +114,7 @@ MCP transport. Options include named scoped keys, filters, path boundaries,
 body/output limits, concurrency, audit and hot reload. Binary output and streamed
 stdin have transport-specific conventions. A tool's <code>meta</code> and <code>progress</code> roles show
 up in the JSON envelope, on job records, as <code>GET /jobs/&lt;id&gt;/events</code> server-sent
-events and as an <code>X-Clyops-Meta</code> header on streamed output; see the <a href="https://github.com/wankdanker/clyops/blob/a9ebf9ad3806b42a36d0b090a3e1618dc129fec3/apps/api/README.md">HTTP guide</a>
+events and as an <code>X-Clyops-Meta</code> header on streamed output; see the <a href="https://github.com/wankdanker/clyops/blob/a7bae46e1146f9d768fb4a945d7c284d9eef7d01/apps/api/README.md">HTTP guide</a>
 for routes and examples. <code>toZod</code> is the exported input-validator adapter.</p>
 <h2 id="mcp">MCP</h2>
 <pre><code class="language-sh">pnpm add clyops-mcp
@@ -125,7 +125,7 @@ streamable HTTP transport in an HTTP host; <code>toolName</code> derives exposed
 Effects become annotations. The server exposes declared stdin and represents
 binary output as image/audio/blob results. A tool's <code>progress</code> role becomes MCP
 progress notifications when the request has a progress token, and its <code>meta</code> comes
-back in the result's <code>_meta</code>. See the <a href="https://github.com/wankdanker/clyops/blob/a9ebf9ad3806b42a36d0b090a3e1618dc129fec3/apps/mcp/README.md">MCP guide</a>
+back in the result's <code>_meta</code>. See the <a href="https://github.com/wankdanker/clyops/blob/a7bae46e1146f9d768fb4a945d7c284d9eef7d01/apps/mcp/README.md">MCP guide</a>
 for transport setup and lifecycle responsibilities.</p>
 </main>
   </div>
