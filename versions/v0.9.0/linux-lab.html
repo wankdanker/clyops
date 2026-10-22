@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Linux lab · clyops</title>
+  <meta name="description" content="Run real Bash, Python, FFmpeg and curl examples in a Linux virtual machine inside your browser.">
+  <link rel="stylesheet" href="/versions/v0.9.0/assets/home.css">
+  <link rel="stylesheet" href="/versions/v0.9.0/assets/linux-lab/lab.css">
+  <link rel="stylesheet" href="/versions/v0.9.0/assets/linux-lab.css">
+  <script type="module" src="/versions/v0.9.0/assets/linux-lab/lab.js"></script>
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <header class="site-header wrap"><a class="brand" href="/versions/v0.9.0/">[c] clyops</a><nav aria-label="Main navigation"><a href="/versions/v0.9.0/examples.html">Examples</a><a href="/versions/v0.9.0/completion.html">Completion</a><a href="https://github.com/wankdanker/clyops">GitHub ↗︎</a></nav></header>
+  <main class="wrap lab-page" id="content">
+    <div class="section-heading"><p class="eyebrow">LINUX / IN YOUR BROWSER</p><h1>Real shell.<br><span>Real tools.</span></h1><p class="lab-lead">Bash, Python, FFmpeg and curl. The same scripts you can run from a cloned checkout, executing in a Linux guest inside this tab.</p></div>
+    <section id="linux-lab" class="playground-card" data-assets="/versions/v0.9.0/assets/linux-lab/" data-runtime="/linux-runtime/" aria-label="Linux terminal">
+      <div class="playground-toolbar"><span>ALPINE LINUX / v86</span><div><button type="button" id="lab-start">Start Linux</button><button type="button" id="lab-reset" disabled>Stop &amp; reset</button></div></div>
+      <div id="lab-terminal" aria-label="Interactive Linux terminal"><p class="lab-placeholder">Press Start to boot Linux. Then type commands, use Tab completion, or try the examples below.</p></div>
+      <p id="lab-status" role="status">Linux loads only when you start. The filesystem downloads on demand.</p>
+    </section>
+    <div class="lab-actions" aria-label="Example commands">
+      <button type="button" data-lab-command="plan.py --help" disabled>Python help</button>
+      <button type="button" data-lab-command="media-info.sh examples/data/tone.wav" disabled>Inspect media</button>
+      <button type="button" data-lab-command="transcode.sh examples/data/tone.wav /tmp/tone.m4a --execute" disabled>Transcode audio</button>
+      <button type="button" data-lab-command="upload.sh /tmp/tone.m4a --url http://127.0.0.1:9000/upload --execute" disabled>Upload inside Linux</button>
+      <button type="button" data-lab-command="plan.py --env production --replicas 3 | json-format.py --sort" disabled>Pipe two tools</button>
+    </div>
+    <section class="lab-files" aria-label="Guest files"><div><label for="lab-upload">Add a file to the guest · up to 8 MiB</label><input id="lab-upload" type="file" disabled></div><button type="button" id="lab-download" disabled>Download /tmp/tone.m4a ↓</button><p id="lab-transfer-status" role="status">Files and commands stay in the guest workspace. Reset discards its changes.</p></section>
+    <div class="lab-guide"><h2 id="try-the-whole-workflow">Try the whole workflow</h2>
+<p>The guest starts in <code>/workspace</code>, with the example scripts on PATH and Bash
+completion already enabled. This is an ordinary Linux shell: pipes, redirection,
+history, environment variables, <code>cat</code>, <code>ls</code> and the programs' real help work here.</p>
+<pre><code class="language-bash">ls examples/scripts
+media-info.sh examples/data/tone.wav
+transcode.sh examples/data/tone.wav /tmp/tone.m4a --execute
+upload.sh /tmp/tone.m4a --url http://127.0.0.1:9000/upload --execute
+plan.py --env production --replicas 3 | json-format.py --sort
+</code></pre>
+<p>Transcode produces an actual AAC audio file with FFmpeg. The upload sends a real
+HTTP PUT through curl to a Python server inside this Linux guest. Its response
+contains the received byte count, SHA-256 and saved path. Use the download button
+to save the audio output to your computer. Scripts, validation and completion
+come directly from this checkout's Bash/Python library and examples.</p>
+<p>Files you add appear under <code>/workspace/inbox/</code>. For example, inspect one with
+<code>media-info.sh '/workspace/inbox/your file.wav'</code>. You can freely edit the guest's
+files and scripts; everything lives in memory for this session. Stop &amp; reset
+unloads the emulator, and Start restores a fresh guest.</p>
+<h2 id="what-runs-where">What runs where</h2>
+<p><a href="https://github.com/copy/v86">v86</a> emulates a 32-bit PC and executes Alpine Linux
+and normal Linux binaries in a Web Worker. The website serves static assets;
+it does not execute your commands on a server. No network relay is configured,
+so the guest's upload server is reachable inside the guest and public internet
+destinations are unavailable. The lab needs a connection to load its static
+filesystem assets. Large files and long encodes are better run locally.</p>
+<p>For a smaller download, the <a href="/versions/v0.9.0/#playground">Python playground</a> runs three of the
+same examples directly in Pyodide. For your real filesystem and network,
+<a href="/versions/v0.9.0/examples.html">clone and run the scripts</a> or use the <a href="/versions/v0.9.0/web-runner.html">web runner</a>.</p>
+<h2 id="guest-software-and-sources">Guest software and sources</h2>
+<p>The lab uses Alpine Linux packages with their individual upstream licenses.
+<a href="/versions/v0.9.0/assets/linux-lab/packages.json">Package versions and licenses</a> and the
+<a href="/versions/v0.9.0/assets/linux-lab/v86-LICENSE.txt">v86 license</a> ship with the assets.
+The <a href="https://github.com/wankdanker/clyops/tree/622ea9d60a30d293d97a72f85815158b2f87bd78/tools/linux-lab">guest build recipe</a> and <a href="https://github.com/wankdanker/clyops/blob/622ea9d60a30d293d97a72f85815158b2f87bd78/tools/build-linux-lab.py">asset builder</a>
+describe the image. The package index records each origin's Alpine source commit
+and upstream project; corresponding Alpine build recipes and source patches are
+in <a href="https://gitlab.alpinelinux.org/alpine/aports">Alpine aports</a>.</p>
+</div>
+    <noscript><p>Enable JavaScript for the Linux lab, or <a href="/versions/v0.9.0/examples.html">run the examples locally</a>.</p></noscript>
+  </main>
+  <footer class="site-footer wrap"><span>clyops · MIT</span><a href="/versions/v0.9.0/examples.html">Clone-and-run examples</a><a href="/versions/v0.9.0/">Project homepage</a></footer>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bash API · clyops</title>
+  <link rel="stylesheet" href="/versions/v0.9.0/assets/docs.css">
+  <script defer src="/versions/v0.9.0/assets/search.js"></script>
+</head>
+<body data-search-index="/versions/v0.9.0/search-index.json">
+  <a class="skip" href="#content">Skip to content</a>
+  <header><a href="/versions/v0.9.0/"><strong>clyops</strong></a><span>Documentation · 0.9.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <div class="shell">
+    <nav aria-label="Documentation">
+      <a href="/versions/v0.9.0/guide.html">Concepts and behavior</a>
+      <a href="/versions/v0.9.0/reference.html">API references</a>
+      <a href="/versions/v0.9.0/examples.html">Clone-and-run examples</a>
+      <a href="/versions/v0.9.0/linux-lab.html">Linux lab in your browser</a>
+      <a href="/versions/v0.9.0/completion.html">Bash, Zsh and Fish completion</a>
+      <h2>Languages</h2>
+      <a href="/versions/v0.9.0/languages/javascript.html">JavaScript / TypeScript</a><a href="/versions/v0.9.0/languages/python.html">Python</a><a href="/versions/v0.9.0/languages/rust.html">Rust</a><a href="/versions/v0.9.0/languages/go.html">Go</a><a href="/versions/v0.9.0/languages/java.html">Java</a><a href="/versions/v0.9.0/languages/ruby.html">Ruby</a><a href="/versions/v0.9.0/languages/c.html">C</a><a href="/versions/v0.9.0/languages/bash.html">Bash</a>
+      <h2>Tools and servers</h2>
+      <a href="/versions/v0.9.0/node-tools.html">Node tools, jobs, API and MCP</a>
+      <a href="/versions/v0.9.0/web-runner.html">Web runner and shared schema</a>
+      <a href="/versions/v0.9.0/applications.html">Dispatcher and desktop runner</a>
+      <a href="/versions/v0.9.0/maintaining.html">Maintaining the docs</a>
+      <a href="/versions/v0.9.0/versions.html">Release documentation</a>
+      <form action="/versions/v0.9.0/search.html" role="search"><label for="search">Search guides</label><input id="search" name="q" type="search"><button>Search</button></form>
+    </nav>
+    <main id="content"><h1 id="bash-api">Bash API</h1>
+<p>Generated from public function usage comments in <code>clyops.sh</code>.</p>
+<h2 id="info"><code>info</code></h2>
+<p>Usage: info &lt;message...&gt;. Log an informational message to stderr.</p>
+<h2 id="warn"><code>warn</code></h2>
+<p>Usage: warn &lt;message...&gt;. Log a warning to stderr.</p>
+<h2 id="error"><code>error</code></h2>
+<p>Usage: error &lt;message...&gt;. Log an error to stderr.</p>
+<h2 id="success"><code>success</code></h2>
+<p>Usage: success &lt;message...&gt;. Log a success message to stderr.</p>
+<h2 id="die"><code>die</code></h2>
+<p>Usage: die &lt;exit_code&gt; <message></p>
+<h2 id="clyops_name"><code>clyops_name</code></h2>
+<p>Usage: clyops_name <name>. Set the program name for help and completion.</p>
+<h2 id="clyops_root"><code>clyops_root</code></h2>
+<p>Usage: clyops_root <directory>. Set the base for default and environment paths.</p>
+<h2 id="clyops_description"><code>clyops_description</code></h2>
+<p>Usage: clyops_description <text>. Set the description below the usage line.</p>
+<h2 id="clyops_epilog"><code>clyops_epilog</code></h2>
+<p>Usage: clyops_epilog <text>. Set the final help text.</p>
+<h2 id="clyops_command"><code>clyops_command</code></h2>
+<p>Usage: clyops_command &quot;<word> [<word>...]&quot; <description>
+Registers a command (spec section 1.7); later registrations belong to it.
+&quot;db migrate&quot; is the migrate command of db, which must be registered first.</p>
+<h2 id="clyops_effects"><code>clyops_effects</code></h2>
+<p>Usage: clyops_effects <effect>...   (read-only, idempotent, destructive, network)</p>
+<h2 id="clyops_stdin"><code>clyops_stdin</code></h2>
+<p>Usage: clyops_stdin <description> [content-type]   /   clyops_stdout <description> [content-type]</p>
+<h2 id="clyops_stdout"><code>clyops_stdout</code></h2>
+<p>Usage: clyops_stdout <description> [content-type]. Declare output metadata.</p>
+<h2 id="clyops_role"><code>clyops_role</code></h2>
+<p>Usage: clyops_role <name> &lt;in|out&gt; <description> [content-type] [schema-json]
+Declare a role (spec section 1.3): a stream on a descriptor the runner chooses. name: meta,
+progress, log, result or another agreed name; schema-json: a JSON Schema each document or line matches.</p>
+<h2 id="clyops_fd_open"><code>clyops_fd_open</code></h2>
+<p>Usage: clyops_fd_open <role>
+Prints the descriptor for a declared role and succeeds when CLYOPS_FDS maps it and it is open
+(spec section 14); fails silently otherwise.</p>
+<h2 id="clyops_emit"><code>clyops_emit</code></h2>
+<p>Usage: clyops_emit <role> <text>
+Write text and a newline (unless it ends with one) to a declared &quot;out&quot; role (spec section 14).
+Does nothing when the runner didn't map it; write errors are ignored.</p>
+<h2 id="clyops_forward_fds"><code>clyops_forward_fds</code></h2>
+<p>Usage: clyops_forward_fds <role>...
+Prints the CLYOPS_FDS value passing these roles on to a program this one starts (spec section 14).</p>
+<h2 id="clyops_exclusive"><code>clyops_exclusive</code></h2>
+<p>Usage: clyops_exclusive <long>...  /  clyops_requires <long> <long>...  /  clyops_one_of <long>...</p>
+<h2 id="clyops_requires"><code>clyops_requires</code></h2>
+<p>Usage: clyops_requires <long> &lt;long...&gt;. The first option requires the others.</p>
+<h2 id="clyops_one_of"><code>clyops_one_of</code></h2>
+<p>Usage: clyops_one_of &lt;long...&gt;. Require at least one listed option.</p>
+<h2 id="clyops_config"><code>clyops_config</code></h2>
+<p>Usage: clyops_config <option-long-name> &lt;prefix[,prefix...]&gt;</p>
+<h2 id="clyops_require_command"><code>clyops_require_command</code></h2>
+<p>Usage: clyops_require_command <command> <description> [install-hint]</p>
+<h2 id="clyops_path_search"><code>clyops_path_search</code></h2>
+<p>Usage: clyops_path_search <long> &lt;dir[:dir...]&gt;   (dirs relative to the root)</p>
+<h2 id="clyops_opt"><code>clyops_opt</code></h2>
+<p>Usage: clyops_opt <VAR> <long> <short> &lt;default|flag|optional|&quot;&quot;&gt; <description> [group] [rule]</p>
+<h2 id="clyops_opt_array"><code>clyops_opt_array</code></h2>
+<p>Usage: clyops_opt_array <VAR> <long> <short> <description> [group] [rule]</p>
+<h2 id="clyops_arg"><code>clyops_arg</code></h2>
+<p>Usage: clyops_arg <NAME> <description> [default] [rule]</p>
+<h2 id="clyops_arg_variadic"><code>clyops_arg_variadic</code></h2>
+<p>Usage: clyops_arg_variadic <NAME> <description> [rule]</p>
+<h2 id="clyops_parse"><code>clyops_parse</code></h2>
+<p>Parse without exiting. Returns 0 when values were assigned; otherwise
+_CLYOPS_HELP is set (help requested) or _CLYOPS_ERROR holds the message.</p>
+<h2 id="clyops_run"><code>clyops_run</code></h2>
+<p>Parse like a CLI: handles --help, --help-json-schema and --bash-completion,
+prints errors and exits on failure, otherwise assigns the variables.</p>
+<h2 id="clyops_source"><code>clyops_source</code></h2>
+<p>Print where an option's value came from: cli, config, env, default or unset.</p>
+<h2 id="clyops_is_set"><code>clyops_is_set</code></h2>
+<p>Usage: clyops_is_set <long>. Return zero if the option came from CLI, else one.</p>
+<h2 id="clyops_is_explicitly_set"><code>clyops_is_explicitly_set</code></h2>
+<p>Usage: clyops_is_explicitly_set <long>. Return zero for CLI/config/env, else one.</p>
+<h2 id="clyops_values_json"><code>clyops_values_json</code></h2>
+<p>Resolved values as JSON (spec section 10).</p>
+<h2 id="clyops_usage"><code>clyops_usage</code></h2>
+<p>Help text (spec section 7), for the selected command.</p>
+<h2 id="clyops_json_schema"><code>clyops_json_schema</code></h2>
+<p>JSON description of the CLI (spec section 8).</p>
+<h2 id="clyops_completion_data"><code>clyops_completion_data</code></h2>
+<p>Tab-separated completion records (spec section 9). The arguments are the
+words typed after the program name; a program with commands follows them.</p>
+<h2 id="clyops_completion_script"><code>clyops_completion_script</code></h2>
+<p>Print a script that enables completion for this program in bash, zsh or fish
+(spec section 9): eval &quot;$(prog --completion bash)&quot;. Returns 1 for an unknown shell.</p>
+</main>
+  </div>
+  <footer>Guides are Markdown. API references come from the published source interfaces.</footer>
+</body>
+</html>

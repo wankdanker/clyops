@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>
+  File: README
+  
+    &mdash; Documentation by YARD 0.9.38
+  
+</title>
+
+  <link rel="stylesheet" href="css/style.css" type="text/css" />
+
+  <link rel="stylesheet" href="css/common.css" type="text/css" />
+
+<script type="text/javascript">
+  pathId = "README";
+  relpath = '';
+</script>
+
+
+  <script type="text/javascript" charset="utf-8" src="js/jquery.js"></script>
+
+  <script type="text/javascript" charset="utf-8" src="js/app.js"></script>
+
+
+  </head>
+  <body>
+    <div class="nav_wrap">
+      <iframe id="nav" src="file_list.html?1"></iframe>
+      <div id="resizer"></div>
+    </div>
+
+    <div id="main" tabindex="-1">
+      <div id="header">
+        <div id="menu">
+  
+    <a href="_index.html">Index</a> &raquo; 
+    <span class="title">File: README</span>
+  
+</div>
+
+        <div id="search">
+  
+    <a class="full_list_link" id="class_list_link"
+        href="class_list.html">
+
+        <svg width="24" height="24">
+          <rect x="0" y="4" width="24" height="4" rx="1" ry="1"></rect>
+          <rect x="0" y="12" width="24" height="4" rx="1" ry="1"></rect>
+          <rect x="0" y="20" width="24" height="4" rx="1" ry="1"></rect>
+        </svg>
+    </a>
+  
+</div>
+        <div class="clear"></div>
+      </div>
+
+      <div id="content"><div id='filecontents'>
+<h1 id="label-clyops+-28Ruby-29">clyops (Ruby)</h1>
+
+<p>One-line-per-option CLI parsing with validation, help text, config files, JSON schema, logging and shell completion. Standard library only, Ruby 3.1+. See the <a href="https://github.com/wankdanker/clyops">main README</a>.</p>
+
+<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_gem'>gem</span> <span class='id identifier rubyid_install'>install</span> <span class='id identifier rubyid_clyops'>clyops</span>
+</code></pre>
+
+<pre class="code ruby"><code class="ruby"><span class='comment'>#!/usr/bin/env ruby
+</span><span class='id identifier rubyid_require'>require</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>clyops</span><span class='tstring_end'>&quot;</span></span>
+
+<span class='id identifier rubyid_cli'>cli</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Clyops.html" title="Clyops (module)">Clyops</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Clyops/Cli.html" title="Clyops::Cli (class)">Cli</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Clyops/Cli.html#initialize-instance_method" title="Clyops::Cli#initialize (method)">new</a></span></span>
+<span class='id identifier rubyid_cli'>cli</span><span class='period'>.</span><span class='id identifier rubyid_set_description'>set_description</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Copy files to a server.</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
+<span class='id identifier rubyid_cli'>cli</span><span class='period'>.</span><span class='id identifier rubyid_arg'>arg</span>          <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>SRC</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>   <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>File to send</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>file:exists</span><span class='tstring_end'>&quot;</span></span>
+<span class='id identifier rubyid_cli'>cli</span><span class='period'>.</span><span class='id identifier rubyid_arg_variadic'>arg_variadic</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>EXTRA</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>More files</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>file:exists</span><span class='tstring_end'>&quot;</span></span>
+<span class='id identifier rubyid_cli'>cli</span><span class='period'>.</span><span class='id identifier rubyid_opt'>opt</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>HOST</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>    <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>host</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>    <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>H</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>localhost</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Server</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>      <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Network</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>hostname</span><span class='tstring_end'>&quot;</span></span>
+<span class='id identifier rubyid_cli'>cli</span><span class='period'>.</span><span class='id identifier rubyid_opt'>opt</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>PORT</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>    <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>port</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>    <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>p</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>22</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>        <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Port</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>        <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Network</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>port</span><span class='tstring_end'>&quot;</span></span>
+<span class='id identifier rubyid_cli'>cli</span><span class='period'>.</span><span class='id identifier rubyid_opt'>opt</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>VERBOSE</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>verbose</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>v</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>flag</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>      <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Chatty</span><span class='tstring_end'>&quot;</span></span>
+<span class='id identifier rubyid_cli'>cli</span><span class='period'>.</span><span class='id identifier rubyid_opt'>opt</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>CONFIG</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>  <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>config</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>  <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>c</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>optional</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>  <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Config file</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Config</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>  <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>path</span><span class='tstring_end'>&quot;</span></span>
+<span class='id identifier rubyid_cli'>cli</span><span class='period'>.</span><span class='id identifier rubyid_set_config'>set_config</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>config</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>send:</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
+<span class='id identifier rubyid_args'>args</span> <span class='op'>=</span> <span class='id identifier rubyid_cli'>cli</span><span class='period'>.</span><span class='id identifier rubyid_run'>run</span>
+
+<span class='const'><span class='object_link'><a href="Clyops.html" title="Clyops (module)">Clyops</a></span></span><span class='period'>.</span><span class='id identifier rubyid_info'><span class='object_link'><a href="Clyops.html#info-class_method" title="Clyops.info (method)">info</a></span></span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>sending </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_args'>args</span><span class='period'>.</span><span class='const'>SRC</span><span class='embexpr_end'>}</span><span class='tstring_content'> to </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_args'>args</span><span class='period'>.</span><span class='const'>HOST</span><span class='embexpr_end'>}</span><span class='tstring_content'>:</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_args'>args</span><span class='period'>.</span><span class='const'>PORT</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
+</code></pre>
+
+<p><code>opt(var, long, short, default, description, group, rule)</code>: <code>default</code> is a value, <code>&quot;flag&quot;</code>, <code>&quot;optional&quot;</code>, or <code>&quot;&quot;</code> for a required option; <code>opt_array</code> registers a repeatable one. <code>run</code> handles <code>--help</code>, <code>--help-json-schema</code> and <code>--completion</code>, prints errors and exits, and returns a Hash of typed values (Integer, Float, true/false, String, Array) that also reads as methods (<code>args.PORT</code>). <code>parse(argv)</code> is the non-exiting variant and returns a <code>ParseResult</code>.</p>
+
+<p>Also: <code>source</code>, <code>set?</code>, <code>explicitly_set?</code>, <code>usage</code>, <code>json_schema</code>, <code>completion_script</code>, <code>values_json</code>, <code>set_path_search</code>, <code>require_command</code>, <code>Clyops.validate</code>, <code>Clyops.resolve_path</code>, <code>Clyops.describe_rule</code>, <code>Clyops.wrap_text</code>, and the logging helpers <code>Clyops.info</code>, <code>warn</code>, <code>error</code>, <code>success</code>, <code>die</code> and <code>silent=</code>. Registration mistakes (an unknown rule, a duplicate option) raise <code>Clyops::DefinitionError</code>.</p>
+
+<p>Shell completion: <code>eval &quot;$(mytool --completion bash)&quot;</code> (or <code>zsh</code>, <code>fish</code>).</p>
+
+<h2 id="label-Commands-2C+relationships-2C+secrets-2C+effects+and+I-2FO">Commands, relationships, secrets, effects and I/O</h2>
+
+<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_db'>db</span> <span class='op'>=</span> <span class='id identifier rubyid_cli'>cli</span><span class='period'>.</span><span class='id identifier rubyid_command'>command</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>db</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Database tasks</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>                <span class='comment'># a command: mytool db ...
+</span><span class='id identifier rubyid_migrate'>migrate</span> <span class='op'>=</span> <span class='id identifier rubyid_db'>db</span><span class='period'>.</span><span class='id identifier rubyid_command'>command</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>migrate</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Apply migrations</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>     <span class='comment'># mytool db migrate
+</span><span class='id identifier rubyid_migrate'>migrate</span><span class='period'>.</span><span class='id identifier rubyid_opt'>opt</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>TO</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>to</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>optional</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Target version</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Options</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>int</span><span class='tstring_end'>&quot;</span></span>
+<span class='id identifier rubyid_migrate'>migrate</span><span class='period'>.</span><span class='id identifier rubyid_set_effects'>set_effects</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>destructive</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>                      <span class='comment'># read-only, idempotent, destructive, network
+</span><span class='id identifier rubyid_cli'>cli</span><span class='period'>.</span><span class='id identifier rubyid_opt'>opt</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>TOKEN</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>token</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>t</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>API token</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Auth</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>secret</span><span class='tstring_end'>&quot;</span></span>  <span class='comment'># masked in help and values_json
+</span><span class='id identifier rubyid_cli'>cli</span><span class='period'>.</span><span class='id identifier rubyid_exclusive'>exclusive</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>json</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>quiet</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>                          <span class='comment'># also requires(a, b...) and one_of(a, b...)
+</span><span class='id identifier rubyid_cli'>cli</span><span class='period'>.</span><span class='id identifier rubyid_set_stdin'>set_stdin</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Audio to transcribe</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>audio/wav</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>       <span class='comment'># and set_stdout(description, content_type)
+</span><span class='id identifier rubyid_cli'>cli</span><span class='period'>.</span><span class='id identifier rubyid_role'>role</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>progress</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>out</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Progress</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>application/x-ndjson</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>  <span class='comment'># then cli.emit(&quot;progress&quot;, { pct: 50 })
+</span><span class='id identifier rubyid_args'>args</span> <span class='op'>=</span> <span class='id identifier rubyid_cli'>cli</span><span class='period'>.</span><span class='id identifier rubyid_run'>run</span>                                          <span class='comment'># args.command == [&quot;db&quot;, &quot;migrate&quot;]
+</span></code></pre>
+
+<p><code>cli.command_path</code> is the selected command words. Commands share the program’s options (accepted before or after the command words) and config file; each has its own help (<code>mytool db migrate --help</code>), schema and completion. See the <a href="https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md">spec</a> sections 1.3 to 1.7.</p>
+
+<h2 id="label-Documentation">Documentation</h2>
+
+<p>Read the <a href="https://clyops.io/languages/ruby.html">language guide</a> for installation, examples and editor setup, and the <a href="https://clyops.io/reference.html">complete API reference</a> for public signatures, return values and errors. The <a href="https://github.com/wankdanker/clyops/tree/main/docs/languages">Markdown sources</a> are also readable on GitHub.</p>
+
+<p>The gem includes RBS type signatures in <code>sig/clyops.rbs</code>.</p>
+</div></div>
+
+      <div id="footer">
+  Generated on Thu Oct 22 21:47:15 2026 by
+  <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
+  0.9.38 (ruby-3.3.12).
+</div>
+
+    </div>
+  </body>
+</html>
