@@ -22,6 +22,8 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var index_exports = {};
 __export(index_exports, {
   InputError: () => InputError,
+  PROBE_CONCURRENCY: () => PROBE_CONCURRENCY,
+  PROBE_TIMEOUT_MS: () => PROBE_TIMEOUT_MS,
   allowed: () => allowed,
   auditLog: () => auditLog,
   checkWithin: () => checkWithin,
@@ -183,12 +185,13 @@ function stamp(file) {
   return `${s.mtimeMs}:${s.size}`;
 }
 var cache = /* @__PURE__ */ new Map();
+var PROBE_TIMEOUT_MS = 3e4;
 function loadSchema(file, opts = {}) {
   const key = stamp(file);
   const hit = cache.get(file);
   if (hit && hit.stamp === key) return hit.schema;
   const schema = new Promise((resolve3, reject) => {
-    (0, import_node_child_process.execFile)(file, ["--help-json-schema"], { cwd: opts.cwd, timeout: opts.timeoutMs ?? 5e3, maxBuffer: 16 << 20 }, (err, stdout) => {
+    (0, import_node_child_process.execFile)(file, ["--help-json-schema"], { cwd: opts.cwd, timeout: opts.timeoutMs ?? PROBE_TIMEOUT_MS, maxBuffer: 16 << 20 }, (err, stdout) => {
       if (err) return reject(new Error(`${file} does not provide --help-json-schema: ${err.message}`));
       const start2 = stdout.indexOf("{");
       const end = stdout.lastIndexOf("}");
@@ -204,7 +207,9 @@ function loadSchema(file, opts = {}) {
       }
     });
   });
-  schema.catch(() => cache.delete(file));
+  schema.catch(() => {
+    if (cache.get(file)?.schema === schema) cache.delete(file);
+  });
   cache.set(file, { stamp: key, schema });
   return schema;
 }
@@ -783,6 +788,20 @@ function closedKeys(schema, closed, input) {
 function closedRequirement(schema, closed) {
   return schema.arguments.find((a) => a.required && closed.includes(a.name))?.name;
 }
+var PROBE_CONCURRENCY = 8;
+async function mapLimit(items, limit, fn) {
+  const n = limit === Infinity ? items.length : Number.isFinite(limit) && limit >= 1 ? Math.floor(limit) : PROBE_CONCURRENCY;
+  const out = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker));
+  return out;
+}
 function globRegex(pattern) {
   const source = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*\*|\*|\?/g, (m) => m === "**" ? ".*" : m === "*" ? "[^/]*" : "[^/]");
   return new RegExp(`^${source}$`);
@@ -833,22 +852,20 @@ function expandCommands(cmd, schema) {
 }
 async function loadTools(root, opts = {}) {
   const tree = discover(root, { name: opts.name });
-  const loaded = await Promise.all(
-    commands(tree).filter((cmd) => cmd.kind === "tool").map(async (cmd) => {
-      try {
-        return expandCommands(cmd, await loadSchema(cmd.file));
-      } catch (err) {
-        opts.onError?.(cmd, err);
-        return [];
-      }
-    })
-  );
+  const loaded = await mapLimit(commands(tree).filter((cmd) => cmd.kind === "tool"), opts.concurrency ?? PROBE_CONCURRENCY, async (cmd) => {
+    try {
+      return expandCommands(cmd, await loadSchema(cmd.file, { timeoutMs: opts.timeoutMs ?? PROBE_TIMEOUT_MS }));
+    } catch (err) {
+      opts.onError?.(cmd, err);
+      return [];
+    }
+  });
   const settings = { allow: tree.allow, deny: tree.deny };
   const tools = loaded.flat().filter((t) => allowed(t, settings) && allowed(t, opts.filter ?? {}));
   return { tree, tools };
 }
 async function watchTools(root, opts = {}) {
-  const load = () => loadTools(root, { name: opts.name, filter: opts.filter, onError: opts.onError });
+  const load = () => loadTools(root, { name: opts.name, filter: opts.filter, onError: opts.onError, concurrency: opts.concurrency, timeoutMs: opts.timeoutMs });
   let loaded = await load();
   let timer;
   let running = Promise.resolve();
@@ -923,6 +940,8 @@ function auditLog(target) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   InputError,
+  PROBE_CONCURRENCY,
+  PROBE_TIMEOUT_MS,
   allowed,
   auditLog,
   checkWithin,

@@ -18,6 +18,8 @@ cli.opt('CLYOPS_API_CONCURRENCY',  'concurrency', 'j', 'optional',  'Async jobs 
 cli.opt('CLYOPS_API_MCP',          'mcp',         '',  'true',      'Also serve the tools over MCP (streamable HTTP) at /mcp', 'Server', 'bool');
 cli.opt('CLYOPS_API_UI',           'ui',          '',  'true',      'Serve the static web runner at /ui/', 'Server', 'bool');
 cli.opt('CLYOPS_API_WATCH',        'watch',       'w', 'true',      'Pick up added, changed and removed tools without a restart', 'Tools', 'bool');
+cli.opt('CLYOPS_API_PROBE_CONCURRENCY', 'probe-concurrency', '', '8', 'Tools asked for --help-json-schema at the same time when loading', 'Tools', 'int:1-');
+cli.opt('CLYOPS_API_PROBE_TIMEOUT', 'probe-timeout', '', '30',       'Seconds each tool has to answer --help-json-schema', 'Tools', 'int:1-');
 cli.opt('CLYOPS_API_HOST',         'host',        'H', '127.0.0.1', 'Address to listen on', 'Server');
 cli.opt('CLYOPS_API_PORT',         'port',        'p', '8080',      'Port to listen on',                             'Server', 'port');
 cli.opt('CLYOPS_API_API_KEY',      'api-key',     'k', 'optional',  'Require this key (Authorization: Bearer KEY or X-API-Key); it may run every tool', 'Server', 'secret');
@@ -61,6 +63,8 @@ const { app, current, close } = await createApi({
   mcp: args.CLYOPS_API_MCP as boolean,
   ui: args.CLYOPS_API_UI as boolean,
   watch: args.CLYOPS_API_WATCH as boolean,
+  probeConcurrency: args.CLYOPS_API_PROBE_CONCURRENCY as number,
+  probeTimeoutMs: (args.CLYOPS_API_PROBE_TIMEOUT as number) * 1000,
   onReload: ({ tools }) => info('reloaded: %d tool(s)', tools.length),
   version,
 });

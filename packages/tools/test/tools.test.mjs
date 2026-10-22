@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -505,4 +505,63 @@ test('closed inputs: the policy, the public schema, and toArgv refusing them', (
   const open = toArgv(schema, { exec: 'ffmpeg' }, { base: '/work', within: ['/work'] });
   assert.deepEqual(open.argv, ['--exec', 'ffmpeg']);
   assert.throws(() => toArgv(schema, { exec: '/usr/bin/x' }, { base: '/work', within: ['/work'] }), /outside the allowed directories/);
+});
+
+test('loadTools probes a few tools at a time, each with its own timeout', { skip: process.platform === 'win32', timeout: 30_000 }, async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'clyops-probe-')));
+  try {
+    const log = join(root, '.log');
+    // Each probe notes when it starts and ends, and takes a moment.
+    const schema = JSON.stringify({ clyops: 1, script: 't', description: '', epilog: '', arguments: [], options: [], requiredCommands: [] });
+    for (let i = 0; i < 6; i++) {
+      writeFileSync(join(root, `t${i}`), `#!/bin/sh\n# clyops-tool\necho start >> '${log}'\nsleep 0.3\necho end >> '${log}'\ncat <<'EOF'\n${schema}\nEOF\n`);
+      chmodSync(join(root, `t${i}`), 0o755);
+    }
+    const { tools } = await loadTools(root, { concurrency: 2 });
+    assert.equal(tools.length, 6);
+    let running = 0;
+    let most = 0;
+    for (const line of readFileSync(log, 'utf8').trim().split('\n')) {
+      running += line === 'start' ? 1 : -1;
+      most = Math.max(most, running);
+    }
+    assert.ok(most >= 1 && most <= 2, `never more probes than the limit (saw ${most})`);
+
+    // A probe slower than its timeout is left out and reported; the default leaves room.
+    writeFileSync(join(root, 't0'), `#!/bin/sh\n# clyops-tool\nsleep 1\ncat <<'EOF'\n${schema}\nEOF\n`);
+    const errors = [];
+    const short = await loadTools(root, { timeoutMs: 300, onError: (cmd, err) => errors.push([cmd.name, err.message]) });
+    assert.deepEqual([short.tools.length, errors.map(([name]) => name)], [5, ['t0']]);
+    assert.equal((await loadTools(root)).tools.length, 6, 'a failed probe is not cached');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('loadSchema: an old failed probe leaves the newer one for a changed file cached', { skip: process.platform === 'win32' }, async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'clyops-probe-')));
+  try {
+    const file = join(root, 'tool');
+    // It says when it is running, so the shell has the file open before it is replaced: the
+    // kernel only names the script to sh, which opens it a moment later.
+    const running = join(root, '.running');
+    writeFileSync(file, `#!/bin/sh\n# clyops-tool\ntouch '${running}'\nsleep 0.3\nexit 1\n`);
+    chmodSync(file, 0o755);
+    const failing = loadSchema(file);
+    for (let i = 0; i < 500 && !existsSync(running); i++) await new Promise((r) => setTimeout(r, 10));
+    assert.ok(existsSync(running), 'the first probe started');
+    // The file is replaced (a new file, as an editor or install does) while the first probe runs.
+    const next = join(root, 'tool.new');
+    writeFileSync(next, `#!/bin/sh\n# clyops-tool\necho '${JSON.stringify({ clyops: 1, script: 't', description: '', epilog: '', arguments: [], options: [], requiredCommands: [] })}'\n`);
+    chmodSync(next, 0o755);
+    const { renameSync, utimesSync } = await import('node:fs');
+    utimesSync(next, new Date(), new Date(Date.now() + 5000));
+    renameSync(next, file);
+    const fixed = loadSchema(file);
+    await assert.rejects(failing);
+    assert.equal(loadSchema(file), fixed, 'the newer probe is still cached');
+    assert.equal((await fixed).script, 't');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

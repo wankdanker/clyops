@@ -136,7 +136,7 @@ successfully listening.
 ## Options
 
 ```
-clyops-api --root DIR [--name NAME] [--cwd DIR] [--timeout SECONDS] [--concurrency N]
+clyops-api --root DIR [--name NAME] [--cwd DIR] [--timeout SECONDS] [--concurrency N] [--probe-concurrency N] [--probe-timeout SECONDS]
            [--host 127.0.0.1] [--port 8080] [--api-key KEY] [--keys FILE] [--no-mcp] [--no-watch] [--no-ui]
            [--allow GLOB]... [--deny GLOB]... [--read-only] [--paths-within DIR]... [--allow-executable-inputs]
            [--max-body BYTES] [--max-output BYTES] [--audit FILE]

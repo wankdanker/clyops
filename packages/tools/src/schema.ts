@@ -31,6 +31,9 @@ export function stamp(file: string): string {
 
 const cache = new Map<string, { stamp: string; schema: Promise<Schema> }>();
 
+/** How long a schema probe may take by default, in milliseconds. */
+export const PROBE_TIMEOUT_MS = 30_000;
+
 /**
  * Run `file --help-json-schema` and parse its output, cached until the file
  * changes. Text around the JSON object (a stray log line) is ignored.
@@ -40,7 +43,7 @@ export function loadSchema(file: string, opts: { /** Working directory used to r
   const hit = cache.get(file);
   if (hit && hit.stamp === key) return hit.schema;
   const schema = new Promise<Schema>((resolve, reject) => {
-    execFile(file, ['--help-json-schema'], { cwd: opts.cwd, timeout: opts.timeoutMs ?? 5000, maxBuffer: 16 << 20 }, (err, stdout) => {
+    execFile(file, ['--help-json-schema'], { cwd: opts.cwd, timeout: opts.timeoutMs ?? PROBE_TIMEOUT_MS, maxBuffer: 16 << 20 }, (err, stdout) => {
       if (err) return reject(new Error(`${file} does not provide --help-json-schema: ${err.message}`));
       const start = stdout.indexOf('{');
       const end = stdout.lastIndexOf('}');
@@ -56,8 +59,11 @@ export function loadSchema(file: string, opts: { /** Working directory used to r
       }
     });
   });
-  // A failed load is not cached, so a fixed tool is picked up without a restart.
-  schema.catch(() => cache.delete(file));
+  // A failed load is not cached, so a fixed tool is picked up without a restart. A newer probe of
+  // a changed file may have replaced it meanwhile; that one stays.
+  schema.catch(() => {
+    if (cache.get(file)?.schema === schema) cache.delete(file);
+  });
   cache.set(file, { stamp: key, schema });
   return schema;
 }

@@ -54,7 +54,7 @@ message and correct itself.
   message. A tool's `meta` document comes back in the result's `_meta` as `clyops.io/meta`.
 
 ```
-clyops-mcp --root DIR [--name NAME] [--cwd DIR] [--timeout SECONDS] [--no-watch]
+clyops-mcp --root DIR [--name NAME] [--cwd DIR] [--timeout SECONDS] [--no-watch] [--probe-concurrency N] [--probe-timeout SECONDS]
            [--allow GLOB]... [--deny GLOB]... [--read-only] [--paths-within DIR]...
            [--close-inputs [--allow-executable-inputs]] [--max-output BYTES] [--audit FILE]
 ```
