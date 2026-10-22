@@ -1778,18 +1778,25 @@ type schemaCommand struct {
 	InstallHint string `json:"installHint"`
 }
 
+type schemaConfig struct {
+	Option   string   `json:"option"`
+	Prefixes []string `json:"prefixes"`
+}
+
 type schemaBody struct {
-	Description      string           `json:"description"`
-	Epilog           string           `json:"epilog"`
-	Arguments        []schemaArgument `json:"arguments"`
-	Options          []schemaOption   `json:"options"`
-	RequiredCommands []schemaCommand  `json:"requiredCommands"`
-	Effects          []string         `json:"effects"`
-	Constraints      []constraint     `json:"constraints"`
-	Stdin            *stream          `json:"stdin"`
-	Stdout           *stream          `json:"stdout"`
-	Roles            []roleDecl       `json:"roles"`
-	Commands         []schemaNode     `json:"commands"`
+	Description string           `json:"description"`
+	Epilog      string           `json:"epilog"`
+	Arguments   []schemaArgument `json:"arguments"`
+	Options     []schemaOption   `json:"options"`
+	// The program's only: nil (left out) for a command, else a pointer to nil (null) or the declaration.
+	Config           **schemaConfig  `json:"config,omitempty"`
+	RequiredCommands []schemaCommand `json:"requiredCommands"`
+	Effects          []string        `json:"effects"`
+	Constraints      []constraint    `json:"constraints"`
+	Stdin            *stream         `json:"stdin"`
+	Stdout           *stream         `json:"stdout"`
+	Roles            []roleDecl      `json:"roles"`
+	Commands         []schemaNode    `json:"commands"`
 }
 
 type schemaNode struct {
@@ -1806,7 +1813,13 @@ type schema struct {
 // JSONSchema is the JSON description of the CLI (spec section 8).
 func (c *Cli) JSONSchema() string {
 	c.ensureHelp()
-	return jsonIndent(schema{1, c.Name, c.schemaBody()})
+	body := c.schemaBody()
+	var config *schemaConfig
+	if c.configOption != "" {
+		config = &schemaConfig{c.configOption, append([]string{}, c.configPrefixes...)}
+	}
+	body.Config = &config
+	return jsonIndent(schema{1, c.Name, body})
 }
 
 func (c *Cli) schemaBody() schemaBody {

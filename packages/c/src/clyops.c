@@ -1852,7 +1852,20 @@ static void schema_node(sbuf* b, const clyops_t* cli) {
         }
         sb_printf(b, "],\n      \"secret\": %s\n    }", o->secret ? "true" : "false");
     }
-    sb_put(b, "\n  ],\n  \"requiredCommands\": [");
+    sb_put(b, "\n  ],");
+    if (!cli->parent) {
+        sb_put(b, "\n  \"config\": ");
+        if (empty(cli->config_option)) sb_put(b, "null");
+        else {
+            sb_put(b, "{\"option\": ");
+            json_str(b, cli->config_option);
+            sb_put(b, ", \"prefixes\": ");
+            json_list(b, (const char* const*)cli->prefixes.v, cli->prefixes.len);
+            sb_putc(b, '}');
+        }
+        sb_putc(b, ',');
+    }
+    sb_put(b, "\n  \"requiredCommands\": [");
     for (size_t i = 0; i < cli->cmds.len; i++) {
         sb_put(b, i ? ",\n    {\n      \"command\": " : "\n    {\n      \"command\": ");
         json_str(b, cli->cmds.v[i]);

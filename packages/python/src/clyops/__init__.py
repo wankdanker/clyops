@@ -1177,6 +1177,8 @@ class Cli:
                 "validation": o.rule, "choices": o.rule[7:].split(",") if o.rule.startswith("choice:") else [],
                 "secret": o.secret,
             } for o in self._options],
+            **({} if self._parent else {"config": {"option": self._config_option, "prefixes": list(self._config_prefixes)}
+                                        if self._config_option else None}),
             "requiredCommands": [{"command": c, "description": d, "installHint": h} for c, d, h in self._commands],
             "effects": self._effects,
             "constraints": self._constraints,
