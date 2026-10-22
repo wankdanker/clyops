@@ -330,7 +330,8 @@ tool.
 [apps/doc](apps/doc) turns any tool's `--help-json-schema` into documentation:
 `mytool --help-json-schema | clyops-doc > mytool.1` writes a man page, and `--format markdown` or
 `--format html` writes those instead. A program with commands gets a section per command with the
-options it inherits.
+options it inherits, or a page per command with `--split`; `--root DIR` documents a whole directory of
+tools, and `--prefix ~/.local --execute` installs the man pages where `man` finds them.
 
 ## Web runner
 
