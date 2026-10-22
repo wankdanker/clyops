@@ -16,6 +16,8 @@ cli.opt('CLYOPS_MCP_NAME',    'name',    'n', 'optional', 'Server name (default:
 cli.opt('CLYOPS_MCP_CWD',     'cwd',     '',  'optional', 'Working directory for the tools (default: the current one)', 'Tools', 'dir:exists');
 cli.opt('CLYOPS_MCP_TIMEOUT', 'timeout', 't', '0',        'Kill a tool after this many seconds (0: never)', 'Tools', 'int:0-');
 cli.opt('CLYOPS_MCP_WATCH',   'watch',   'w', 'true',     'Pick up added, changed and removed tools without a restart', 'Tools', 'bool');
+cli.opt('CLYOPS_MCP_PROBE_CONCURRENCY', 'probe-concurrency', '', '8', 'Tools asked for --help-json-schema at the same time when loading', 'Tools', 'int:1-');
+cli.opt('CLYOPS_MCP_PROBE_TIMEOUT', 'probe-timeout', '', '30', 'Seconds each tool has to answer --help-json-schema', 'Tools', 'int:1-');
 cli.optArray('CLYOPS_MCP_ALLOW',        'allow',        'a',              'Serve only tools matching this glob over their words (media/*, media/**)', 'Security');
 cli.optArray('CLYOPS_MCP_DENY',         'deny',         'D',              'Leave out tools matching this glob', 'Security');
 cli.opt('CLYOPS_MCP_READ_ONLY',         'read-only',    '',  'flag',      'Serve only tools that declare the read-only effect', 'Security');
@@ -30,7 +32,10 @@ const args = cli.run();
 // stdout is the MCP channel; clyops logs to stderr.
 const onError = (cmd: { words: string[] } | null, err: Error) => warn('%s%s', cmd ? `skipping ${cmd.words.join(' ')}: ` : '', err.message);
 const filter = { allow: args.CLYOPS_MCP_ALLOW as string[], deny: args.CLYOPS_MCP_DENY as string[], readOnly: args.CLYOPS_MCP_READ_ONLY as boolean };
-const opts = { name: (args.CLYOPS_MCP_NAME as string | null) ?? undefined, filter, onError };
+const opts = {
+  name: (args.CLYOPS_MCP_NAME as string | null) ?? undefined, filter, onError,
+  concurrency: args.CLYOPS_MCP_PROBE_CONCURRENCY as number, timeoutMs: (args.CLYOPS_MCP_PROBE_TIMEOUT as number) * 1000,
+};
 const within = args.CLYOPS_MCP_PATHS_WITHIN as string[];
 // Local over stdio, inputs are open unless asked otherwise (spec section 13).
 const inputs: InputPolicy | undefined = args.CLYOPS_MCP_CLOSE_INPUTS

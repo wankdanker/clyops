@@ -5,6 +5,14 @@ section here.
 
 ## [Unreleased]
 
+- clyops-tools: `loadTools` and `watchTools` probe tools' `--help-json-schema` 8 at a time
+  instead of all at once, and give each probe 30 s instead of 5 s (`loadSchema` too), so a busy
+  host no longer leaves healthy tools out; `concurrency` and `timeoutMs` change them
+  (`PROBE_CONCURRENCY`, `PROBE_TIMEOUT_MS`). clyops-api and clyops-mcp have `--probe-concurrency`
+  and `--probe-timeout`. A large toolset may take longer to load.
+- clyops-tools: when a file changed while its schema probe ran and that probe then failed, the
+  failure dropped the newer probe from the cache; it no longer does.
+
 ## [0.8.0] - 2026-10-22
 
 ### Breaking changes

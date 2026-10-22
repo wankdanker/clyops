@@ -27,7 +27,8 @@ if (!result.ok) console.error(result.stderr);
 
 Run this inside an async function in CommonJS, or use ESM imports and top-level
 await. `discover` builds the tree without execution; `loadSchema` probes recognized
-tools; `loadTools` loads schemas and expands leaf commands. `watchTools` reloads
+tools; `loadTools` loads schemas (8 probes at a time, 30 s each, set with
+`concurrency` and `timeoutMs`) and expands leaf commands. `watchTools` reloads
 changed tools and has `current()` and `close()`; close it during shutdown.
 
 `toArgv` maps input using the tool schema. It reports unknown/controlled keys;

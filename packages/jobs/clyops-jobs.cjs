@@ -179,12 +179,13 @@ function stamp(file) {
   return `${s.mtimeMs}:${s.size}`;
 }
 var cache = /* @__PURE__ */ new Map();
+var PROBE_TIMEOUT_MS = 3e4;
 function loadSchema(file, opts = {}) {
   const key = stamp(file);
   const hit = cache.get(file);
   if (hit && hit.stamp === key) return hit.schema;
   const schema = new Promise((resolve5, reject) => {
-    (0, import_node_child_process.execFile)(file, ["--help-json-schema"], { cwd: opts.cwd, timeout: opts.timeoutMs ?? 5e3, maxBuffer: 16 << 20 }, (err, stdout) => {
+    (0, import_node_child_process.execFile)(file, ["--help-json-schema"], { cwd: opts.cwd, timeout: opts.timeoutMs ?? PROBE_TIMEOUT_MS, maxBuffer: 16 << 20 }, (err, stdout) => {
       if (err) return reject(new Error(`${file} does not provide --help-json-schema: ${err.message}`));
       const start2 = stdout.indexOf("{");
       const end = stdout.lastIndexOf("}");
@@ -200,7 +201,9 @@ function loadSchema(file, opts = {}) {
       }
     });
   });
-  schema.catch(() => cache.delete(file));
+  schema.catch(() => {
+    if (cache.get(file)?.schema === schema) cache.delete(file);
+  });
   cache.set(file, { stamp: key, schema });
   return schema;
 }

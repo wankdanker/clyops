@@ -70,6 +70,10 @@ export interface ApiOptions {
   ui?: boolean;
   /** Pick up added, changed and removed tools without a restart (default: false; call close() to stop). */
   watch?: boolean;
+  /** Schema probes run at the same time when loading tools (default: clyops-tools' `PROBE_CONCURRENCY`). */
+  probeConcurrency?: number;
+  /** How long each schema probe may take, in milliseconds (default: clyops-tools' `PROBE_TIMEOUT_MS`). */
+  probeTimeoutMs?: number;
   /** Called after each reload when watching. */
   onReload?: (loaded: { /** Discovered directory tree. */ tree: Group; /** Discovered, schema-loaded tools offered by the server. */ tools: ApiTool[] }) => void;
   /** Server version advertised to clients. */
@@ -304,10 +308,11 @@ export async function createApi(opts: ApiOptions) {
   let api: ReturnType<typeof buildRoutes>;
   const swap = (loaded: { tree: Group; tools: Tool[] }) => (api = buildRoutes(opts, ctx, loaded.tree, withPaths(loaded.tools)));
   const ctx = { queue, jobDirs, maxBody, events };
+  const loading = { name: opts.name, filter: opts.filter, onError, concurrency: opts.probeConcurrency, timeoutMs: opts.probeTimeoutMs };
   const watcher = opts.watch
-    ? await watchTools(opts.root, { name: opts.name, filter: opts.filter, onError, onChange: (loaded) => opts.onReload?.(swap(loaded)) })
+    ? await watchTools(opts.root, { ...loading, onChange: (loaded) => opts.onReload?.(swap(loaded)) })
     : undefined;
-  swap(watcher ? watcher.current() : await loadTools(opts.root, { name: opts.name, filter: opts.filter, onError }));
+  swap(watcher ? watcher.current() : await loadTools(opts.root, loading));
 
   const app: Express = express();
   if (opts.ui !== false) {

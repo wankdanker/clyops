@@ -3,7 +3,7 @@ import { watch } from 'node:fs';
 import { commands, discover, type Command, type Group } from './discover.js';
 import { InputError, inputKeys, isPathValued, redactArgv, toArgv, type Input } from './argv.js';
 import { start, type RoleOption, type RunOptions, type RunResult, type Started } from './run.js';
-import { loadSchema, type Schema, type SchemaBody } from './schema.js';
+import { loadSchema, PROBE_TIMEOUT_MS, type Schema, type SchemaBody } from './schema.js';
 
 /** A probed executable or leaf command, with its effective inherited schema. */
 export interface Tool extends Command {
@@ -80,6 +80,25 @@ export function closedRequirement(schema: SchemaBody, closed: string[]): string 
   return schema.arguments.find((a) => a.required && closed.includes(a.name))?.name;
 }
 
+/** Schema probes `loadTools` runs at the same time by default. */
+export const PROBE_CONCURRENCY = 8;
+
+// `fn` over `items`, at most `limit` at a time, results in order. A limit that isn't a positive
+// number means the default; Infinity means all at once.
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const n = limit === Infinity ? items.length : Number.isFinite(limit) && limit >= 1 ? Math.floor(limit) : PROBE_CONCURRENCY;
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker));
+  return out;
+}
+
 function globRegex(pattern: string): RegExp {
   const source = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*|\*|\?/g, (m) => (m === '**' ? '.*' : m === '*' ? '[^/]*' : '[^/]'));
   return new RegExp(`^${source}$`);
@@ -147,21 +166,28 @@ export function expandCommands(cmd: Command, schema: Schema): Tool[] {
  */
 export async function loadTools(
   root: string,
-  opts: { /** Program, command, option, or argument name as declared in its containing type. */ name?: string; filter?: ToolFilter; onError?: (cmd: Command, err: Error) => void } = {},
+  opts: {
+    /** Program, command, option, or argument name as declared in its containing type. */
+    name?: string;
+    filter?: ToolFilter;
+    onError?: (cmd: Command, err: Error) => void;
+    /** Schema probes run at the same time (default `PROBE_CONCURRENCY`). */
+    concurrency?: number;
+    /** How long each probe may take, in milliseconds (default `PROBE_TIMEOUT_MS`). */
+    timeoutMs?: number;
+  } = {},
 ): Promise<{ /** Discovered directory tree. */ tree: Group; /** Discovered, schema-loaded tools offered by the server. */ tools: Tool[] }> {
   const tree = discover(root, { name: opts.name });
-  const loaded = await Promise.all(
-    commands(tree)
-      .filter((cmd) => cmd.kind === 'tool')
-      .map(async (cmd) => {
-        try {
-          return expandCommands(cmd, await loadSchema(cmd.file));
-        } catch (err) {
-          opts.onError?.(cmd, err as Error);
-          return [];
-        }
-      }),
-  );
+  // A few probes at a time, each with room to start: on a busy host, probing a hundred tools at
+  // once times healthy ones out.
+  const loaded = await mapLimit(commands(tree).filter((cmd) => cmd.kind === 'tool'), opts.concurrency ?? PROBE_CONCURRENCY, async (cmd) => {
+    try {
+      return expandCommands(cmd, await loadSchema(cmd.file, { timeoutMs: opts.timeoutMs ?? PROBE_TIMEOUT_MS }));
+    } catch (err) {
+      opts.onError?.(cmd, err as Error);
+      return [];
+    }
+  });
   const settings: ToolFilter = { allow: tree.allow, deny: tree.deny };
   const tools = loaded.flat().filter((t) => allowed(t, settings) && allowed(t, opts.filter ?? {}));
   return { tree, tools };
@@ -189,11 +215,15 @@ export async function watchTools(
     name?: string;
     filter?: ToolFilter;
     debounceMs?: number;
+    /** Schema probes run at the same time (see `loadTools`). */
+    concurrency?: number;
+    /** How long each probe may take, in milliseconds (see `loadTools`). */
+    timeoutMs?: number;
     onChange?: (loaded: { /** Discovered directory tree. */ tree: Group; /** Discovered, schema-loaded tools offered by the server. */ tools: Tool[] }) => void;
     onError?: (cmd: Command | null, err: Error) => void;
   } = {},
 ): Promise<ToolsWatcher> {
-  const load = () => loadTools(root, { name: opts.name, filter: opts.filter, onError: opts.onError });
+  const load = () => loadTools(root, { name: opts.name, filter: opts.filter, onError: opts.onError, concurrency: opts.concurrency, timeoutMs: opts.timeoutMs });
   let loaded = await load();
   let timer: NodeJS.Timeout | undefined;
   // Reloads run one at a time; a change during one schedules another.
