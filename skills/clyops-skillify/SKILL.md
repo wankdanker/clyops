@@ -119,7 +119,7 @@ it, or `npm install -g clyops-doc`). `--name` is how the tool is run, and
 
 ```sh
 TOOL --help-json-schema \
-  | SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) npx -y clyops-doc@^0.7.0 \
+  | SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) npx -y clyops-doc@^0.8.0 \
       --format markdown --name "mytool media to-pcm" \
   > <suite>/reference/to-pcm.md
 ```
@@ -128,7 +128,7 @@ For a dispatcher's whole tree at once, `--root` writes a page per tool
 (`mytool-media-to-pcm.md`) and an index:
 
 ```sh
-SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) npx -y clyops-doc@^0.7.0 --format markdown \
+SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) npx -y clyops-doc@^0.8.0 --format markdown \
   --root scripts --name mytool --out-dir <suite>/reference --execute
 ```
 

@@ -8,7 +8,7 @@ Requires **Go 1.21+**. [Complete API reference](/reference/go/index.html) · [Sh
 ## Install and run
 
 ```sh
-go get github.com/wankdanker/clyops/packages/go@v0.7.0
+go get github.com/wankdanker/clyops/packages/go@v0.8.0
 ```
 
 Save the following as `quickstart.go`:
