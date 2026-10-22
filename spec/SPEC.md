@@ -419,6 +419,7 @@ line of its own).
       "group": "", "type": "string", "isFlag": false, "isArray": false, "required": false,
       "validation": "", "choices": [] }
   ],
+  "config": { "option": "config", "prefixes": ["demo:", "shared:"] },
   "requiredCommands": [
     { "command": "", "description": "", "installHint": "" }
   ],
@@ -443,6 +444,11 @@ line of its own).
 `boolean` (flags and `bool`), `integer` (`int*`, `port`), `number` (`float*`),
 `choice` (`choice:*`), `path` (`path`, `file:*`, `dir:*`) or `string`.
 `choices` lists the `choice:` values. Options also have `"secret"` (1.5).
+`config` is the declared config file (1.3, section 4): `option` the long name
+of the option holding its path and `prefixes` the line prefixes in the order
+given (empty when every line is read), or `null` when the program declares
+none. It is the program's alone, so commands don't have it; a consumer reading
+the output of an older version without `config` treats it as `null`.
 `effects` lists the declared effects (1.3) in the order given; `constraints`
 the relationships (1.6) in registration order, `type` being `exclusive`,
 `requires` or `oneOf` and `options` the long names; `stdin` and `stdout` are

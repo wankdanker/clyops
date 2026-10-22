@@ -1185,6 +1185,7 @@ export class Cli {
         isFlag: o.kind === 'flag', isArray: o.kind === 'array', required: o.required, validation: o.validation,
         choices: o.validation.startsWith('choice:') ? o.validation.slice(7).split(',') : [], secret: o.secret,
       })),
+      ...(this.parent ? {} : { config: this.configOption ? { option: this.configOption, prefixes: this.configPrefixes } : null }),
       requiredCommands: this.commands.map((c) => ({ command: c.command, description: c.description, installHint: c.installHint })),
       effects: this.effects,
       constraints: this.constraints,

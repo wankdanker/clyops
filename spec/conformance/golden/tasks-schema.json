@@ -36,6 +36,7 @@
       "secret": false
     }
   ],
+  "config": null,
   "requiredCommands": [],
   "effects": [],
   "constraints": [],
