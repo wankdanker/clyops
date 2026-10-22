@@ -1,7 +1,7 @@
 // A clyops schema (spec section 8) as a small document: sections of paragraphs, definition lists
 // and preformatted text, which each output format renders.
 import { describeRule } from 'clyops';
-import type { Schema, SchemaArgument, SchemaBody, SchemaOption, SchemaRole, SchemaStream } from 'clyops-schema';
+import type { Schema, SchemaArgument, SchemaBody, SchemaConfig, SchemaOption, SchemaRole, SchemaStream } from 'clyops-schema';
 
 /** One piece of a section. Terms are option names, commands and the like: code in every format. */
 export type Block =
@@ -237,7 +237,9 @@ export function buildDoc(schema: Schema, opts: DocOptions = {}): Doc {
   sections.push({
     title: 'ENVIRONMENT',
     blocks: [
-      { kind: 'p', text: 'An option given on the command line takes precedence over the config file, which takes precedence over the environment, which takes precedence over the default.' },
+      { kind: 'p', text: schema.config
+        ? 'An option given on the command line takes precedence over the config file, which takes precedence over the environment, which takes precedence over the default.'
+        : 'An option given on the command line takes precedence over the environment, which takes precedence over the default.' },
       {
         kind: 'dl',
         items: [
@@ -250,6 +252,7 @@ export function buildDoc(schema: Schema, opts: DocOptions = {}): Doc {
       },
     ],
   });
+  if (schema.config) sections.push({ title: 'FILES', blocks: files(schema.config, schema.options) });
   sections.push({
     title: 'EXIT STATUS',
     blocks: [{
@@ -263,4 +266,18 @@ export function buildDoc(schema: Schema, opts: DocOptions = {}): Doc {
   });
   if (schema.epilog) sections.push({ title: 'EXAMPLES', blocks: [{ kind: 'pre', text: schema.epilog.replace(/\n+$/, '') }] });
   return { name, section: opts.section || '1', version: opts.version || '', date: opts.date || defaultDate(), summary, sections };
+}
+
+// The config file (spec section 4): where it comes from and what a line looks like.
+function files(config: SchemaConfig, options: SchemaOption[]): Block[] {
+  const opt = options.find((o) => o.name === config.option);
+  const from = [`--${config.option}`, ...(opt?.variableName ? [opt.variableName] : [])].join(' or ');
+  const where = opt?.default ? `, ${opt.default} by default` : '';
+  const prefixes = config.prefixes.length ? `, on lines starting with ${config.prefixes.join(' or ')}` : '';
+  const example = options.find((o) => o.name !== config.option && o.name !== 'help' && !o.isFlag) ?? options.find((o) => o.name !== config.option && o.name !== 'help');
+  return [
+    { kind: 'p', text: `The config file is the one named by ${from}${where}, resolved against the current directory. An empty value or disabled skips it; a file that doesn't exist is an error.` },
+    { kind: 'p', text: `It sets options with one key=value per line${prefixes}. The key is an option's long name, with or without the leading --. Blank lines and lines starting with # are ignored, and @include PATH reads another file in place, relative to the one including it. Later lines override earlier ones, and an option given on the command line wins over the file.` },
+    ...(example ? [{ kind: 'pre' as const, text: `${config.prefixes[0] ?? ''}${example.name}=${example.isFlag ? 'true' : example.default || 'VALUE'}` }] : []),
+  ];
 }
