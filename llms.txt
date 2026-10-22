@@ -38,7 +38,6 @@ Key facts for agents:
 - [Dispatcher](https://raw.githubusercontent.com/wankdanker/clyops/main/apps/dispatch/README.md): a directory of tools as one command with subcommands, and which programs it will probe
 - [MCP server](https://raw.githubusercontent.com/wankdanker/clyops/main/apps/mcp/README.md): a directory of tools as MCP tools, with allow/deny, read-only mode and path confinement
 - [HTTP API](https://raw.githubusercontent.com/wankdanker/clyops/main/apps/api/README.md): a directory of tools as REST endpoints with OpenAPI, jobs and MCP over HTTP
-- [Documentation](https://raw.githubusercontent.com/wankdanker/clyops/main/apps/doc/README.md): `clyops-doc`, man pages, Markdown or HTML from any tool's `--help-json-schema`, a page per command with `--split`, or a whole tools directory with `--root`
 - [Node tools, jobs, API and MCP](https://raw.githubusercontent.com/wankdanker/clyops/main/docs/node-tools.md): the Node packages behind them
 
 ## Optional

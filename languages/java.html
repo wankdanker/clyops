@@ -82,7 +82,7 @@ a program that starts others removes it from <code>ProcessBuilder.environment()<
 sets it to <code>forwardFds(...)</code>.</p>
 <p>Commands share the program's options (accepted before or after the command words) and config file;
 each has its own help (<code>mytool db migrate --help</code>), schema and completion. See the
-<a href="https://github.com/wankdanker/clyops/blob/8beabe0cef9f2297f9b8475951489dabe3c5d0b2/spec/SPEC.md">spec</a> sections 1.3 to 1.7.</p>
+<a href="https://github.com/wankdanker/clyops/blob/ad291e74c899f43cbaf7283754dbf3516bcaaf8b/spec/SPEC.md">spec</a> sections 1.3 to 1.7.</p>
 <h2 id="parsing-and-errors">Parsing and errors</h2>
 <p>Use <code>run</code> for a standalone program: it displays help/schema/completion and exits for those requests, or exits with status 1 on invalid input. Use the non-exiting <code>parse</code> variant in libraries and tests; check its outcome before reading resolved values. Registration errors (duplicate names, unknown rules, or commands mixed with positionals) are programming errors, distinct from invalid user input. See the native reference for the language's result and error types.</p>
 <h2 id="more-recipes">More recipes</h2>
