@@ -419,6 +419,7 @@ line of its own).
       "group": "", "type": "string", "isFlag": false, "isArray": false, "required": false,
       "validation": "", "choices": [] }
   ],
+  "config": { "option": "config", "prefixes": ["demo:", "shared:"] },
   "requiredCommands": [
     { "command": "", "description": "", "installHint": "" }
   ],
@@ -443,6 +444,11 @@ line of its own).
 `boolean` (flags and `bool`), `integer` (`int*`, `port`), `number` (`float*`),
 `choice` (`choice:*`), `path` (`path`, `file:*`, `dir:*`) or `string`.
 `choices` lists the `choice:` values. Options also have `"secret"` (1.5).
+`config` is the declared config file (1.3, section 4): `option` the long name
+of the option holding its path and `prefixes` the line prefixes in the order
+given (empty when every line is read), or `null` when the program declares
+none. It is the program's alone, so commands don't have it; a consumer reading
+the output of an older version without `config` treats it as `null`.
 `effects` lists the declared effects (1.3) in the order given; `constraints`
 the relationships (1.6) in registration order, `type` being `exclusive`,
 `requires` or `oneOf` and `options` the long names; `stdin` and `stdout` are
@@ -807,3 +813,75 @@ its ancestors are searched, nearest first.
 
 Descriptors are a POSIX notion: where there are none (Windows), `fdOpen`
 returns none, `emit` does nothing and `forwardFds` is empty.
+
+## 15. Documentation (`clyops-doc`)
+
+`clyops-doc` writes documentation from a program's `--help-json-schema`
+(section 8) alone, so every language and compiled tools get the same pages
+without the program running anything else. It is itself a clyops program, so
+`clyops-doc --help-json-schema | clyops-doc` is its own man page.
+
+**Input.** The schema on stdin, or from `--schema FILE`. Input that isn't a
+schema (`"clyops": 1` with `options` and `arguments`) is an error, exit 1. With
+`--root DIR` it reads no schema: it finds tools under `DIR` (a directory or a
+dispatcher definition) by the dispatcher's rules (section 12) and asks each for
+`--help-json-schema`; an executable that isn't detected as a clyops tool, or
+whose probe fails, is skipped with a warning, and none at all is an error.
+
+**Options.** Each can also be set as `CLYOPS_DOC_<OPTION>`.
+
+| Option | Meaning |
+| --- | --- |
+| `--format` | `man` (default), `markdown` or `html` |
+| `--name` | How the program is run (default: `script`), e.g. `mytool media to-pcm`; with `--root`, the dispatcher's name (default: the directory's) |
+| `--section` | Manual section, default `1` |
+| `--version`, `--date` | Header fields; the date defaults to today, or to `SOURCE_DATE_EPOCH`'s |
+| `--out-dir DIR` | Write page files into `DIR` instead of one page to stdout |
+| `--prefix PREFIX` | Like `--out-dir PREFIX/share/man/man<section>`, man pages only; warns when `manpath` (or `MANPATH`) doesn't include `PREFIX/share/man` |
+| `--split` | A page per runnable command |
+| `--execute` | Write the files; without it, only list them |
+
+`--schema` and `--root` are exclusive, as are `--out-dir` and `--prefix`.
+`--root`, `--split` and `--execute` need `--out-dir` or `--prefix`. Writing
+prints each file's path on stdout, whether or not it was written, and leaves a
+file that already has the page's content untouched. Because it can write files,
+`clyops-doc` declares `idempotent` and `destructive`.
+
+**Sections**, in this order, each only when it has content:
+
+| Section | From the schema |
+| --- | --- |
+| NAME | the page name and the first sentence of `description` |
+| SYNOPSIS | a usage line per runnable command, as help writes it (section 7) |
+| DESCRIPTION | `description`, a paragraph per blank-line-separated block |
+| ARGUMENTS, OPTIONS, STREAMS, NOTES | for a program without commands: its arguments, its options except `help` (each with required, repeatable, secret, default, accepted values and variable), `stdin`, `stdout` and roles, then effects, relationships and required commands |
+| COMMANDS | for a program with commands: each runnable command with the same parts |
+| ENVIRONMENT | the precedence rule, each option's variable once, `CLYOPS_FDS` when there are roles, `CLYOPS_SILENT`, `CLYOPS_MAX_WIDTH`, `NO_COLOR` |
+| FILES | when `config` is set: the option and variable naming the file, its default, the line format and prefixes (section 4) |
+| EXIT STATUS | 0, 1, and the program's own |
+| EXAMPLES | `epilog`, as is |
+| SEE ALSO | with `--split` or `--root`, the other pages |
+
+A runnable command has its own options and then its ancestors', nearest first;
+the nearest non-empty `effects`, `stdin` and `stdout`; each role name's nearest
+declaration; and every relationship and required command from the program
+down (as section 13 expands commands). A level that declares no effects is
+documented as "not declared, so treat it as possibly destructive".
+
+**Pages.** A page's name is its invocation with spaces turned into hyphens
+(`mytool media to-pcm` is `mytool-media-to-pcm`), used in the man header, the
+NAME line and the file name: `NAME.SECTION` for man, `NAME.md`, `NAME.html`.
+With `--split`, the program's page has its own options and a list of the
+commands, and each runnable command gets a page as if it were a program. With
+`--root`, each tool gets a page (or, with `--split`, its pages) and the
+dispatcher's name gets an index page. Two pages with one name are an error.
+
+**Formats.** Man pages use only `man(7)` macros (`.TH .SH .SS .PP .TP .nf .fi
+.RS .RE .BR`), so groff and mandoc both render them. Text has `\` written as
+`\e` and `-` as `\-`, and a line starting with `.` or `'` gets `\&` in front.
+Markdown is CommonMark whose first line is the comment `<!-- Generated by
+clyops-doc from --help-json-schema. Do not edit; regenerate instead. -->`, with
+markup characters escaped. HTML is one standalone page with every value
+escaped. A program declares one `stdout` type, so `clyops-doc`'s is
+`text/plain`; what it writes is `text/troff`, `text/markdown` or `text/html`
+by `--format`.

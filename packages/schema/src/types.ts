@@ -69,6 +69,14 @@ export interface SchemaRole {
   schema: unknown;
 }
 
+/** The declared config file (spec sections 1.3 and 4). */
+export interface SchemaConfig {
+  /** Long name of the option that holds the config file path. */
+  option: string;
+  /** Line prefixes in declaration order; empty when every line is read. */
+  prefixes: string[];
+}
+
 /** An option relationship (spec section 1.6). */
 export interface SchemaConstraint {
   /** Declared value type or relationship kind, according to the containing interface. */
@@ -122,4 +130,6 @@ export interface Schema extends SchemaBody {
   clyops: number;
   /** Program name declared by the tool, which may differ from its executable path. */
   script: string;
+  /** The declared config file, or null; absent before 0.7. Only the program has it. */
+  config?: SchemaConfig | null;
 }

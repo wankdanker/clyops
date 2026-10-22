@@ -980,6 +980,7 @@ module Clyops
             "validation" => o.rule, "choices" => o.rule.start_with?("choice:") ? o.rule[7..].split(",", -1) : [],
             "secret" => o.secret }
         end,
+        **(@parent ? {} : { "config" => @config_option.empty? ? nil : { "option" => @config_option, "prefixes" => @config_prefixes.dup } }),
         "requiredCommands" => @commands.map { |c, d, h| { "command" => c, "description" => d, "installHint" => h } },
         "effects" => @effects,
         "constraints" => @constraints,

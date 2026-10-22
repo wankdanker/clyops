@@ -440,6 +440,13 @@
       "secret": false
     }
   ],
+  "config": {
+    "option": "config",
+    "prefixes": [
+      "demo:",
+      "shared:"
+    ]
+  },
   "requiredCommands": [
     {
       "command": "sh",

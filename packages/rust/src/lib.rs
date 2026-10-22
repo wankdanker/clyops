@@ -2016,6 +2016,18 @@ impl Cli {
             ),
             ("commands", Json::Arr(self.children.iter().map(|c| Json::Obj(c.schema_node())).collect())),
         ]);
+        if self.word.is_empty() {
+            let config = if self.config_option.is_empty() {
+                Json::Null
+            } else {
+                Json::Obj(vec![
+                    ("option", s(&self.config_option)),
+                    ("prefixes", Json::Arr(self.config_prefixes.iter().map(|p| s(p)).collect())),
+                ])
+            };
+            let at = fields.iter().position(|(k, _)| *k == "options").map_or(fields.len(), |i| i + 1);
+            fields.insert(at, ("config", config));
+        }
         fields
     }
 

@@ -18,6 +18,7 @@ contract the libraries emit (`--help-json-schema`):
 | `packages/schema`, `packages/tools`, `packages/jobs` | Node: shared schema conversion, tool discovery and running, job queue |
 | `apps/dispatch` | `clyops-dispatch` (Rust) |
 | `apps/api`, `apps/mcp`, `apps/web`, `apps/runner` | HTTP API, MCP server, web runner, desktop runner |
+| `apps/doc` | `clyops-doc`: man pages, Markdown and HTML from `--help-json-schema` (spec section 15) |
 | `examples/scripts` | Clone-and-run example tools |
 | `docs/` | Guides for the clyops.io site (Eleventy), plus `docs/llms.txt` |
 | `skills/` | Agent skills for building, using and skillifying clyops tools |

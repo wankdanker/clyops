@@ -154,6 +154,37 @@
         }
       }
     },
+    "config": {
+      "description": "The declared config file (spec sections 1.3 and 4), or null; absent in output from versions before it existed. Only the program has it, not commands.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "option",
+            "prefixes"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "option": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Long name of the option that holds the config file path."
+            },
+            "prefixes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "Line prefixes in declaration order; empty means every line."
+            }
+          }
+        }
+      ]
+    },
     "requiredCommands": {
       "type": "array",
       "items": {

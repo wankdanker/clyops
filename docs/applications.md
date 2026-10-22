@@ -45,8 +45,19 @@ mytool --help-json-schema | clyops-doc > mytool.1
 mytool --help-json-schema | clyops-doc --format markdown --name "mytool media to-pcm" > to-pcm.md
 ```
 
-A program with commands gets a section per command with the options it inherits. See the
-[clyops-doc guide](../apps/doc/README.md) for the options and what goes in each section.
+A program with commands gets a section per command with the options it inherits. To write files
+instead, give `--out-dir` (or `--prefix` to install man pages where `man` looks), and `--execute`
+to actually write them; without it, clyops-doc only lists the files:
+
+```sh
+mytool --help-json-schema | clyops-doc --split --out-dir man1 --execute    # mytool.1, mytool-db-migrate.1, ...
+clyops-doc --root ./tools --name mytools --prefix ~/.local --execute       # every tool, and an index page
+```
+
+`--split` gives each command a page of its own, git-style, and `--root` documents a whole directory
+of tools the way the dispatcher finds them. The [clyops-doc guide](../apps/doc/README.md) covers
+the options and what goes in each section; [spec section 15](../spec/SPEC.md#15-documentation-clyops-doc)
+is the contract.
 
 ## Web runner
 

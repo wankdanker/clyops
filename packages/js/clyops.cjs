@@ -1281,6 +1281,7 @@ var Cli = class _Cli {
         choices: o.validation.startsWith("choice:") ? o.validation.slice(7).split(",") : [],
         secret: o.secret
       })),
+      ...this.parent ? {} : { config: this.configOption ? { option: this.configOption, prefixes: this.configPrefixes } : null },
       requiredCommands: this.commands.map((c) => ({ command: c.command, description: c.description, installHint: c.installHint })),
       effects: this.effects,
       constraints: this.constraints,

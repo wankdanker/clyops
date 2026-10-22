@@ -1339,7 +1339,17 @@ _clyops_schema_node() {
         printf '      "secret": %s\n    }' "$([[ -n "${_CLYOPS_SECRET[$long]:-}" ]] && echo true || echo false)"
         sep=","
     done
-    printf '\n  ],\n  "requiredCommands": ['
+    printf '\n  ],'
+    if [[ -z "$path" ]]; then
+        if [[ -n "$_CLYOPS_CONFIG_OPT" ]]; then
+            _clyops_json_list "${_CLYOPS_CONFIG_PREFIXES[@]}"; local prefixes="$_r"
+            _clyops_json_str "$_CLYOPS_CONFIG_OPT"
+            printf '\n  "config": {"option": %s, "prefixes": %s},' "$_r" "$prefixes"
+        else
+            printf '\n  "config": null,'
+        fi
+    fi
+    printf '\n  "requiredCommands": ['
     sep=""
     for (( i = 0; i < ${#_CLYOPS_CMDS[@]}; i++ )); do
         [[ "${_CLYOPS_CMD_OWNER[i]}" == "$path" ]] || continue

@@ -46,6 +46,7 @@ This prints JSON with `"clyops": 1`. What to read:
 | `options[]` | `name` (`--name`), `shortName`, `type`, `choices`, `validation` (e.g. `int:1-10`), `isFlag`, `isArray` (repeat the option), `required`, `default`, `secret`, `variableName` |
 | `effects` | What running it does (see step 3) |
 | `constraints` | `exclusive` (at most one), `requires` (first needs the rest), `oneOf` (at least one) |
+| `config` | The config file option and its line prefixes, or `null` (top level only) |
 | `requiredCommands` | External programs it needs on `PATH` |
 | `stdin` / `stdout` | What it reads and writes, with MIME types; `null` = no stdin / plain text out |
 | `commands[]` | Subcommands. A tool with commands runs as `TOOL CMD… ARGS`; each nested command has its own options |
