@@ -43,7 +43,7 @@ import java.util.regex.PatternSyntaxException;
  */
 public class Cli {
     /** The clyops version this library implements. */
-    public static final String VERSION = "0.7.0";
+    public static final String VERSION = "0.8.0";
 
     // -----------------------------------------------------------------------
     // Rules

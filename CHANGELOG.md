@@ -5,12 +5,10 @@ section here.
 
 ## [Unreleased]
 
-- A validation rule, `file:executable`, for an option or argument that names a program to run, in
-  all nine languages (spec section 5): a bare name must be found on `PATH` and stays as given
-  (`ffmpeg`), and a value with a `/` must be an executable regular file, resolved like other
-  paths. On Windows a regular file that exists counts, and bare names are also tried with
-  `PATHEXT`. Help says `accepts: executable`, the schema has `"type": "path"`, and shells complete
-  command names for it (completion kind `command`). `secret:file:executable` works too.
+## [0.8.0] - 2026-10-22
+
+### Breaking changes
+
 - **Breaking: clyops-api (REST and `/mcp`) sets some inputs itself instead of taking them from
   callers** (spec section 13). `file:executable` inputs are closed unless
   `--allow-executable-inputs` is given. Path inputs are confined to `--cwd` when there is no
@@ -18,11 +16,25 @@ section here.
   out of the OpenAPI document, the MCP tool list and the web runner, setting one is a `400`, and a
   tool whose required argument is closed isn't served. Uploaded files are still accepted. A
   server that already uses `--paths-within` only sees the `file:executable` change.
+
+### Programs to run: `file:executable`
+
+- A validation rule, `file:executable`, for an option or argument that names a program to run, in
+  all nine languages (spec section 5): a bare name must be found on `PATH` and stays as given
+  (`ffmpeg`), and a value with a `/` must be an executable regular file, resolved like other
+  paths. On Windows a regular file that exists counts, and bare names are also tried with
+  `PATHEXT`. Help says `accepts: executable`, the schema has `"type": "path"`, and shells complete
+  command names for it (completion kind `command`). `secret:file:executable` works too.
+
+### Inputs servers set themselves
+
 - clyops-mcp over stdio keeps inputs open; `--close-inputs` (with `--allow-executable-inputs`)
   closes them as clyops-api does.
 - clyops-tools: `closedInputs`, `publicSchema`, `closedKeys` and `closedRequirement`, and a
   `closed` run option; `toArgv`'s `controlled` covers arguments too, and a bare `file:executable`
   value is neither resolved against `base` nor confined by `within`.
+- clyops-api: a multipart upload works with `--paths-within`: each request's upload directory
+  is allowed for that request (uploads were refused when it was outside the allowed directories).
 
 ## [0.7.0] - 2026-10-22
 

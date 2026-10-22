@@ -47,6 +47,8 @@ FILES = [
     ("skills/clyops-build/reference/languages/java.md", r'clyops-(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)\.jar'),
     ("skills/clyops-build/reference/languages/go.md", r'packages/go@v([0-9A-Za-z.-]+)'),
     ("skills/clyops-build/reference/languages/bash.md", r'/clyops/v([0-9A-Za-z.-]+)/'),
+    # npx pins the minor version (^0.x.y stays below 0.(x+1)), so it moves with each release.
+    ("skills/clyops-skillify/SKILL.md", r'clyops-doc@\^(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)'),
 ]
 
 
