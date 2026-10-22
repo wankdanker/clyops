@@ -22,8 +22,9 @@ cp -r skills/clyops-build ~/.claude/skills/        # for you, in every project
 cp -r skills/clyops-build .claude/skills/          # for everyone working in one project
 ```
 
-`clyops-skillify`'s renderer (`scripts/schema-to-reference.py`) is itself a
-clyops tool and needs the Python package: `pip install clyops`.
+`clyops-skillify` generates its reference pages with
+[`clyops-doc`](https://www.npmjs.com/package/clyops-doc), which needs Node 20+
+(`npx -y clyops-doc` or `npm install -g clyops-doc`).
 
 ## Package one for a marketplace
 

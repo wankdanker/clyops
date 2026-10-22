@@ -112,20 +112,33 @@ should go:
     └── <tool>.md         # generated from the schema; never edited by hand
 ```
 
-**`reference/<tool>.md`**: generate each one with the renderer bundled in
-**this skill's** `scripts/` folder (it needs the `clyops` Python package:
-`pip install clyops`):
+**`reference/<tool>.md`**: generate each one with
+[`clyops-doc`](https://www.npmjs.com/package/clyops-doc) (Node 20+; `npx` fetches
+it, or `npm install -g clyops-doc`). `--name` is how the tool is run, and
+`SOURCE_DATE_EPOCH` keeps the date in the header from changing on every run:
 
 ```sh
 TOOL --help-json-schema \
-  | python3 <this-skill-dir>/scripts/schema-to-reference.py --invocation "mytool media to-pcm" \
+  | SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) npx -y clyops-doc@^0.7.0 \
+      --format markdown --name "mytool media to-pcm" \
   > <suite>/reference/to-pcm.md
 ```
 
-It renders usage, effects, stdin/stdout, constraints, required commands, the
-argument and option tables (with each option's environment variable and secret
-handling), and one section per leaf command with inherited options. It marks
-the file as generated.
+For a dispatcher's whole tree at once, `--root` writes a page per tool
+(`mytool-media-to-pcm.md`) and an index:
+
+```sh
+SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) npx -y clyops-doc@^0.7.0 --format markdown \
+  --root scripts --name mytool --out-dir <suite>/reference --execute
+```
+
+Each page has the usage, effects (or a warning that they're undeclared),
+stdin, stdout and roles, constraints, required commands, every argument and
+option with its rule, default, environment variable and secret handling, and,
+for a program with commands, a section per command with the options it
+inherits. Its first line marks it as generated. If clyops-doc or Node isn't
+available, say so and point the user at `npm install -g clyops-doc` rather than
+writing references by hand.
 
 **`SKILL.md`**, from `reference/suite-skill-template.md`:
 

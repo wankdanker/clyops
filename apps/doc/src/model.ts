@@ -133,7 +133,7 @@ export function optionText(o: SchemaOption): string {
   const notes: string[] = [];
   if (o.required) notes.push('required');
   if (o.isArray) notes.push('repeatable');
-  if (o.secret) notes.push('secret: prefer the environment');
+  if (o.secret) notes.push('secret: set it in the environment, never on the command line');
   if (o.default && !o.isFlag) notes.push(`default: ${o.default}`);
   if (o.validation) notes.push(`accepts: ${describeRule(o.validation)}`);
   notes.push(`environment: ${o.variableName}`);
@@ -174,7 +174,9 @@ function leafParts(leaf: Leaf): { args?: Block; options?: Block; streams?: Block
     ...leaf.roles.map((r) => ({ term: `${r.direction === 'in' ? 'input' : 'output'} role ${r.name}`, text: stream(r) })),
   ];
   const notes = [
-    ...(leaf.effects.length ? [`Effects: ${leaf.effects.map((e) => `${e} (${EFFECTS[e] ?? e})`).join(', ')}.`] : []),
+    leaf.effects.length
+      ? `Effects: ${leaf.effects.map((e) => `${e} (${EFFECTS[e] ?? e})`).join(', ')}.`
+      : 'Effects: not declared, so treat it as possibly destructive.',
     ...leaf.constraints.map((c) => CONSTRAINT[c.type]?.(c.options) ?? ''),
     ...leaf.requiredCommands.map((r) => `Needs ${r.command} on PATH: ${r.description}${r.installHint ? ` (${r.installHint})` : ''}.`),
   ].filter(Boolean);
