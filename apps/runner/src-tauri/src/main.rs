@@ -930,7 +930,7 @@ mod tests {
         let schema = get_script_schema(demo.path.clone()).expect("demo answers --help-json-schema");
         assert_eq!(schema.script, "demo");
         assert_eq!(schema.path, demo.path);
-        assert_eq!(schema.options.len(), 27);
+        assert_eq!(schema.options.len(), 28);
     }
 
     #[test]
