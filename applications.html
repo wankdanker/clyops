@@ -39,7 +39,7 @@ or denied tools. Source detection requires a supported import/source statement
 or an explicit <code># clyops-tool</code> / <code>// clyops-tool</code> header marker for wrappers.
 Binary completion markers and nested dispatcher shebangs are also supported.
 Schemas are cached by file stamp; probes have a timeout.</p>
-<p>The <a href="https://github.com/wankdanker/clyops/blob/1260102fd688aa6d4b50cf65d80a9a41ccdcde85/apps/dispatch/README.md">dispatcher guide</a> covers definition files,
+<p>The <a href="https://github.com/wankdanker/clyops/blob/3f3184a88ae26e633252a25cf2533d915023f255/apps/dispatch/README.md">dispatcher guide</a> covers definition files,
 aliases, completion, caching and filesystem behavior. This application exposes
 a command-line interface, rather than an installed library API.</p>
 <h2 id="desktop-runner">Desktop runner</h2>
@@ -49,7 +49,7 @@ explicitly override enabled config/environment values. Templates preserve false
 and zero values and omit secrets. Destructive tools require confirmation. A tool's
 <code>progress</code> role shows as a progress bar, its <code>meta</code> beside the output, and <code>log</code>
 and <code>result</code> lines in it.</p>
-<p>See the <a href="https://github.com/wankdanker/clyops/blob/1260102fd688aa6d4b50cf65d80a9a41ccdcde85/apps/runner/README.md">runner guide</a> for installation, usage, templates
+<p>See the <a href="https://github.com/wankdanker/clyops/blob/3f3184a88ae26e633252a25cf2533d915023f255/apps/runner/README.md">runner guide</a> for installation, usage, templates
 and frontend/native development. Its internal UI helpers are not a public package API.</p>
 <h2 id="documentation-clyops-doc">Documentation (clyops-doc)</h2>
 <p><code>clyops-doc</code> reads a tool's <code>--help-json-schema</code> and writes a man page, Markdown or HTML, so any
@@ -58,7 +58,7 @@ clyops tool gets documentation without writing it twice:</p>
 mytool --help-json-schema | clyops-doc --format markdown --name &quot;mytool media to-pcm&quot; &gt; to-pcm.md
 </code></pre>
 <p>A program with commands gets a section per command with the options it inherits. See the
-<a href="https://github.com/wankdanker/clyops/blob/1260102fd688aa6d4b50cf65d80a9a41ccdcde85/apps/doc/README.md">clyops-doc guide</a> for the options and what goes in each section.</p>
+<a href="https://github.com/wankdanker/clyops/blob/3f3184a88ae26e633252a25cf2533d915023f255/apps/doc/README.md">clyops-doc guide</a> for the options and what goes in each section.</p>
 <h2 id="web-runner">Web runner</h2>
 <p>The static SvelteKit web runner is served by <code>clyops-api</code> at <code>/ui/</code>. It discovers
 tools through REST and uses the shared schema package for typed fields, ranges,
