@@ -1,0 +1,104 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>clyops Go API</title><link rel="stylesheet" href="../../assets/docs.css"><main><a href="../../languages/go.html">Go guide</a><h1>Go API</h1><p>Package clyops is declarative, one-line-per-option CLI parsing for Go:
+validation, help text, a JSON schema of the interface, config files,
+environment variables, logging and shell completion. Behavior follows
+spec/SPEC.md in <a href="https://github.com/wankdanker/clyops">https://github.com/wankdanker/clyops</a>.
+<pre>cli := clyops.New()
+cli.Arg(&quot;input&quot;, &quot;Input file&quot;, &quot;&quot;, &quot;path&quot;)
+cli.Opt(&quot;PORT&quot;, &quot;port&quot;, &quot;p&quot;, &quot;8080&quot;, &quot;Server port&quot;, &quot;Network&quot;, &quot;port&quot;)
+cli.Opt(&quot;VERBOSE&quot;, &quot;verbose&quot;, &quot;v&quot;, &quot;flag&quot;, &quot;Verbose output&quot;)
+v := cli.Run()
+fmt.Println(v.String(&quot;input&quot;), v.Int(&quot;PORT&quot;), v.Bool(&quot;VERBOSE&quot;))
+</pre>
+<section id="Version"><h2>Version</h2><pre><code>const Version = &#34;0.8.0&#34;</code></pre><p>Version is the clyops version this package implements.
+</section><section id="DescribeRule"><h2>DescribeRule</h2><pre><code>func DescribeRule(rule string) string</code></pre><p>DescribeRule is the help text for a validation rule (spec section 5).
+</section><section id="Die"><h2>Die</h2><pre><code>func Die(code int, format string, args ...any)</code></pre><p>Die logs an error (never suppressed) and exits with code.
+</section><section id="Error"><h2>Error</h2><pre><code>func Error(format string, args ...any)</code></pre><p>Error logs an error to stderr.
+</section><section id="Info"><h2>Info</h2><pre><code>func Info(format string, args ...any)</code></pre><p>Info logs an informational message to stderr.
+</section><section id="IsBareProgram"><h2>IsBareProgram</h2><pre><code>func IsBareProgram(value string) bool</code></pre><p>IsBareProgram reports whether a file:executable value names a program on
+PATH rather than a path (spec section 5).
+</section><section id="IsExecutable"><h2>IsExecutable</h2><pre><code>func IsExecutable(value string) bool</code></pre><p>IsExecutable reports whether value is a program: a bare name found on PATH,
+or a path to an executable regular file (spec section 5).
+</section><section id="ResolvePath"><h2>ResolvePath</h2><pre><code>func ResolvePath(value, base string, searchDirs []string) string</code></pre><p>ResolvePath resolves a path value against base (spec section 6), trying
+searchDirs for bare names that don&apos;t exist under base.
+</section><section id="SetSilent"><h2>SetSilent</h2><pre><code>func SetSilent(value bool)</code></pre><p>SetSilent suppresses Info/Warn/Error/Success output (Die and parse errors still print).
+</section><section id="Success"><h2>Success</h2><pre><code>func Success(format string, args ...any)</code></pre><p>Success logs a success message to stderr.
+</section><section id="Validate"><h2>Validate</h2><pre><code>func Validate(value, rule, name string) (any, error)</code></pre><p>Validate checks value against rule and returns its typed form: int for
+int* and port, float64 for float*, bool for bool, string otherwise.
+</section><section id="Warn"><h2>Warn</h2><pre><code>func Warn(format string, args ...any)</code></pre><p>Warn logs a warning to stderr.
+</section><section id="WrapText"><h2>WrapText</h2><pre><code>func WrapText(text string, width int) []string</code></pre><p>WrapText is a greedy word wrap that keeps existing line breaks (spec section 7).
+</section><section id="Cli"><h2>Cli</h2><pre><code>type Cli struct {
+	Name   string            // program name (default: the executable&#39;s base name)
+	Root   string            // base for default path values (default: Cwd)
+	Cwd    string            // base for command-line path values (default: the working directory)
+	Env    map[string]string // environment (default: the process environment)
+	Values Values
+	// contains filtered or unexported fields
+}</code></pre><p>Cli is a program&apos;s command-line interface. Register options and arguments,
+then call Run (or Parse).
+</section><section id="New"><h2>New</h2><pre><code>func New() *Cli</code></pre><p>New returns an empty Cli for the running program.
+</section><section id="Cli.Arg"><h2>Cli.Arg</h2><pre><code>func (c *Cli) Arg(name, description, def string, rule ...string) *Cli</code></pre><p>Arg registers a positional argument. An empty def makes it required.
+</section><section id="Cli.ArgVariadic"><h2>Cli.ArgVariadic</h2><pre><code>func (c *Cli) ArgVariadic(name, description string, rule ...string) *Cli</code></pre><p>ArgVariadic registers a final positional argument that collects the remaining tokens.
+</section><section id="Cli.Command"><h2>Cli.Command</h2><pre><code>func (c *Cli) Command(name, description string) *Cli</code></pre><p>Command registers a command (spec section 1.7) and returns it, to register
+its options and arguments on.
+</section><section id="Cli.CommandPath"><h2>Cli.CommandPath</h2><pre><code>func (c *Cli) CommandPath() []string</code></pre><p>CommandPath is the command words selected by the last parse, e.g. [&quot;db&quot;, &quot;migrate&quot;].
+</section><section id="Cli.CompletionData"><h2>Cli.CompletionData</h2><pre><code>func (c *Cli) CompletionData(words ...string) string</code></pre><p>CompletionData is the tab-separated completion records (spec section 9).
+words are the words typed after the program name; a program with commands
+follows them.
+</section><section id="Cli.CompletionScript"><h2>Cli.CompletionScript</h2><pre><code>func (c *Cli) CompletionScript(shell string) (script string, ok bool)</code></pre><p>CompletionScript is the shell script that enables completion for this
+program (spec section 9): eval &quot;$(prog --completion bash)&quot;. ok is false for
+an unknown shell.
+</section><section id="Cli.Emit"><h2>Cli.Emit</h2><pre><code>func (c *Cli) Emit(name string, value any)</code></pre><p>Emit writes value and a newline (unless it ends with one) to a declared &quot;out&quot; role (spec section
+14): a string as is, anything else as compact JSON. It does nothing when the runner didn&apos;t map the
+role and ignores write errors. It panics when name isn&apos;t declared or is an input.
+</section><section id="Cli.Exclusive"><h2>Cli.Exclusive</h2><pre><code>func (c *Cli) Exclusive(longs ...string) *Cli</code></pre><p>Exclusive says at most one of these options may be given.
+</section><section id="Cli.FdOpen"><h2>Cli.FdOpen</h2><pre><code>func (c *Cli) FdOpen(name string) int</code></pre><p>FdOpen is the descriptor for a declared role when CLYOPS_FDS maps it and it is open, else -1
+(spec section 14).
+</section><section id="Cli.ForwardFds"><h2>Cli.ForwardFds</h2><pre><code>func (c *Cli) ForwardFds(names ...string) string</code></pre><p>ForwardFds is the CLYOPS_FDS value passing these roles on to a program this one starts (spec
+section 14). Set it in the child&apos;s environment and pass the descriptors in ExtraFiles.
+</section><section id="Cli.Get"><h2>Cli.Get</h2><pre><code>func (c *Cli) Get(name string) any</code></pre><p>Get is a resolved value by option variable or argument name.
+</section><section id="Cli.IsExplicitlySet"><h2>Cli.IsExplicitlySet</h2><pre><code>func (c *Cli) IsExplicitlySet(long string) bool</code></pre><p>IsExplicitlySet reports whether the option came from the command line, a config file or the environment.
+</section><section id="Cli.IsSet"><h2>Cli.IsSet</h2><pre><code>func (c *Cli) IsSet(long string) bool</code></pre><p>IsSet reports whether the option was given on the command line.
+</section><section id="Cli.JSONSchema"><h2>Cli.JSONSchema</h2><pre><code>func (c *Cli) JSONSchema() string</code></pre><p>JSONSchema is the JSON description of the CLI (spec section 8).
+</section><section id="Cli.OneOf"><h2>Cli.OneOf</h2><pre><code>func (c *Cli) OneOf(longs ...string) *Cli</code></pre><p>OneOf says at least one of these options must be given.
+</section><section id="Cli.Opt"><h2>Cli.Opt</h2><pre><code>func (c *Cli) Opt(variable, long, short, def, description string, groupAndRule ...string) *Cli</code></pre><p>Opt registers an option. def is a value, &quot;flag&quot;, &quot;optional&quot;, or &quot;&quot; (required).
+groupAndRule is an optional group (default &quot;Options&quot;) and validation rule.
+</section><section id="Cli.OptArray"><h2>Cli.OptArray</h2><pre><code>func (c *Cli) OptArray(variable, long, short, description string, groupAndRule ...string) *Cli</code></pre><p>OptArray registers a repeatable option whose values accumulate into a list.
+</section><section id="Cli.Parse"><h2>Cli.Parse</h2><pre><code>func (c *Cli) Parse(argv []string) ParseResult</code></pre><p>Parse parses argv without exiting. Values are in c.Values when Status is &quot;ok&quot;.
+</section><section id="Cli.RequireCommand"><h2>Cli.RequireCommand</h2><pre><code>func (c *Cli) RequireCommand(name, description, installHint string) *Cli</code></pre><p>RequireCommand declares an external command the program needs.
+</section><section id="Cli.Requires"><h2>Cli.Requires</h2><pre><code>func (c *Cli) Requires(long string, longs ...string) *Cli</code></pre><p>Requires says that when long is given, the others must be too.
+</section><section id="Cli.Role"><h2>Cli.Role</h2><pre><code>func (c *Cli) Role(name, direction, description, contentType string, schema any) *Cli</code></pre><p>Role declares a role (spec section 1.3): a stream the program writes (&quot;out&quot;) or reads (&quot;in&quot;) on a
+descriptor its runner chooses. name is meta, progress, log, result or another agreed name; schema is
+a JSON Schema for each document or line: JSON text as a string, any other value marshalled, or nil.
+</section><section id="Cli.Run"><h2>Cli.Run</h2><pre><code>func (c *Cli) Run() Values</code></pre><p>Run parses os.Args like a CLI: it handles --help, --help-json-schema,
+--completion and --bash-completion, prints errors and exits on failure,
+and returns the values.
+</section><section id="Cli.RunArgs"><h2>Cli.RunArgs</h2><pre><code>func (c *Cli) RunArgs(argv []string) Values</code></pre><p>RunArgs is Run with an explicit argv (without the program name).
+</section><section id="Cli.SetConfig"><h2>Cli.SetConfig</h2><pre><code>func (c *Cli) SetConfig(option, prefixes string) *Cli</code></pre><p>SetConfig names the option holding a config file path; prefixes is comma-separated.
+</section><section id="Cli.SetDescription"><h2>Cli.SetDescription</h2><pre><code>func (c *Cli) SetDescription(text string) *Cli</code></pre><p>SetDescription sets the text shown under the usage line.
+</section><section id="Cli.SetEffects"><h2>Cli.SetEffects</h2><pre><code>func (c *Cli) SetEffects(effects ...string) *Cli</code></pre><p>SetEffects declares what running the program does: read-only, idempotent, destructive, network.
+</section><section id="Cli.SetEpilog"><h2>Cli.SetEpilog</h2><pre><code>func (c *Cli) SetEpilog(text string) *Cli</code></pre><p>SetEpilog sets the text shown at the end of the help.
+</section><section id="Cli.SetPathSearch"><h2>Cli.SetPathSearch</h2><pre><code>func (c *Cli) SetPathSearch(long, dirs string) *Cli</code></pre><p>SetPathSearch gives fallback directories (colon-separated, relative to Root)
+for bare relative values of a path option.
+</section><section id="Cli.SetStdin"><h2>Cli.SetStdin</h2><pre><code>func (c *Cli) SetStdin(description, contentType string) *Cli</code></pre><p>SetStdin declares what the program reads on stdin; contentType is a MIME type or a comma-separated list.
+</section><section id="Cli.SetStdout"><h2>Cli.SetStdout</h2><pre><code>func (c *Cli) SetStdout(description, contentType string) *Cli</code></pre><p>SetStdout declares what the program writes on stdout; undeclared means text.
+</section><section id="Cli.Source"><h2>Cli.Source</h2><pre><code>func (c *Cli) Source(long string) string</code></pre><p>Source is where an option&apos;s value came from: cli, config, env, default or unset.
+</section><section id="Cli.Usage"><h2>Cli.Usage</h2><pre><code>func (c *Cli) Usage() string</code></pre><p>Usage is the help text (spec section 7), for the selected command.
+</section><section id="Cli.ValuesJSON"><h2>Cli.ValuesJSON</h2><pre><code>func (c *Cli) ValuesJSON() string</code></pre><p>ValuesJSON is the resolved values as JSON (spec section 10), in registration order.
+</section><section id="ParseResult"><h2>ParseResult</h2><pre><code>type ParseResult struct {
+	Status    string
+	Error     string
+	ShowUsage bool
+	Detail    []string
+}</code></pre><p>ParseResult is the outcome of Parse: Status is &quot;ok&quot;, &quot;help&quot; or &quot;error&quot;.
+</section><section id="ValidationError"><h2>ValidationError</h2><pre><code>type ValidationError struct{ Message string }</code></pre><p>ValidationError carries the spec&apos;s error text for a value that fails its rule.
+</section><section id="ValidationError.Error"><h2>ValidationError.Error</h2><pre><code>func (e *ValidationError) Error() string</code></pre><p>Error returns the validation failure message, implementing error.
+</section><section id="Values"><h2>Values</h2><pre><code>type Values map[string]any</code></pre><p>Values holds resolved values, keyed by option variable and argument name.
+Types follow spec section 10: bool for flags, int, float64, string, a
+[]any for arrays and variadics, nil when unset.
+</section><section id="Values.Bool"><h2>Values.Bool</h2><pre><code>func (v Values) Bool(name string) bool</code></pre><p>Bool is the value as a bool (false when unset).
+</section><section id="Values.Float"><h2>Values.Float</h2><pre><code>func (v Values) Float(name string) float64</code></pre><p>Float is the value as a float64 (0 when unset).
+</section><section id="Values.Int"><h2>Values.Int</h2><pre><code>func (v Values) Int(name string) int</code></pre><p>Int is the value as an int (0 when unset or not an integer).
+</section><section id="Values.List"><h2>Values.List</h2><pre><code>func (v Values) List(name string) []any</code></pre><p>List is an array option&apos;s or variadic argument&apos;s values.
+</section><section id="Values.String"><h2>Values.String</h2><pre><code>func (v Values) String(name string) string</code></pre><p>String is the value as a string (&quot;&quot; when unset).
+</section><section id="Values.Strings"><h2>Values.Strings</h2><pre><code>func (v Values) Strings(name string) []string</code></pre><p>Strings is an array option&apos;s or variadic argument&apos;s values as strings.
+</section></main></html>
