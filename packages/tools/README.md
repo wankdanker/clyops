@@ -60,10 +60,11 @@ tool is stopped and reaped. Execution closes and unpipes supplied streams on
 completion or failure; a tool that exits before consuming all input still
 succeeds, including when its stdin pipe closes early.
 
-Timeouts and stdin failures kill the launched process tree; abort requests
-start with SIGTERM and escalate to SIGKILL after 200 ms. Unix tools have their
-own process group; Windows uses `taskkill /T /F`. Cancellation waits at most
-one second for inherited output pipes (plus Windows termination overhead).
+Stdin failures kill the launched process tree; timeouts and abort requests
+start with SIGTERM and escalate to SIGKILL after `killGraceMs` (default 200 ms),
+so a tool can clean up partial output. Unix tools have their own process group;
+Windows uses `taskkill /T /F`, at once, so there is no grace period there. Cancellation waits at most one second past the
+grace period for inherited output pipes (plus Windows termination overhead).
 A program deliberately creating a new Unix session leaves that group; its
 pipes still cannot delay settlement indefinitely.
 

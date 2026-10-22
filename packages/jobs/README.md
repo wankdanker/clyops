@@ -63,7 +63,7 @@ record = transitionJobRecord(record, { status: 'done', completedAt: timestampIso
 `runScriptFunction` options: `configRoot` (relative path options resolve against it),
 `context`, `controlled` (options the trigger sets itself, default `['help']`), `defaultPositional`
 (a template for the first argument when the config gives none, e.g. `'${media.path}'`),
-`timeoutMs`, `env`, `cwd`, `signal`, `onStderr`, `onProgress`, `onLog`. Its `command` shows secret options as `***`.
+`timeoutMs`, `killGraceMs`, `env`, `cwd`, `signal`, `onStderr`, `onProgress`, `onLog`. Its `command` shows secret options as `***`.
 
 When the tool declares the well-known [roles](https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md#14-roles-on-file-descriptors),
 the run wires them up: each `progress` object goes to `onProgress` (and the last one is the run's

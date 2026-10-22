@@ -148,7 +148,7 @@ test('run reports failures, timeouts and aborts', async () => {
   file(join(root, 'slow'), '#!/bin/sh\nsleep 5\n');
   const slow = await run(join(root, 'slow'), [], { timeoutMs: 100 });
   assert.equal(slow.timedOut, true);
-  assert.equal(slow.signal, 'SIGKILL');
+  assert.equal(slow.signal, 'SIGTERM');
   const ac = new AbortController();
   setTimeout(() => ac.abort(), 100);
   const aborted = await run(join(root, 'slow'), [], { signal: ac.signal });

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { getEventListeners, once } from 'node:events';
-import { createWriteStream, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
@@ -74,7 +74,7 @@ for (const module of ['../dist/index.js', '../clyops-tools.cjs']) {
   test(`${module}: shell timeout settles promptly`, { skip: process.platform === 'win32', timeout: 5000 }, async () => {
     const result = await run('/bin/sh', ['-c', 'sleep 3; echo late'], { timeoutMs: 100 });
     assert.equal(result.timedOut, true);
-    assert.equal(result.signal, 'SIGKILL');
+    assert.equal(result.signal, 'SIGTERM');
     assert.equal(result.stdout, '');
     assert.ok(result.durationMs < 1500, `timeout took ${result.durationMs}ms`);
   });
@@ -142,6 +142,74 @@ for (const module of ['../dist/index.js', '../clyops-tools.cjs']) {
       } finally { await f.cleanup(); }
     });
   }
+  // A tool that cleans up on SIGTERM for 500 ms: longer than the default 200 ms grace.
+  const cleanupTool = (root) => {
+    const marker = join(root, 'marker');
+    const script = join(root, 'tool.sh');
+    writeFileSync(script, `trap 'sleep 0.5; echo cleaned > ${marker}; echo cleaned; exit 0' TERM\necho ready\nwhile :; do sleep 0.05; done\n`);
+    return { marker, script };
+  };
+  test(`${module}: a timeout sends SIGTERM and honours killGraceMs`, { skip: process.platform === 'win32', timeout: 5000 }, async () => {
+    const root = mkdtempSync(join(tmpdir(), 'clyops-grace-'));
+    try {
+      const { marker, script } = cleanupTool(root);
+      const result = await run('/bin/bash', [script], { timeoutMs: 300, killGraceMs: 2000 });
+      assert.equal(result.timedOut, true);
+      assert.equal(result.exitCode, 0);
+      assert.equal(result.stdout, 'ready\ncleaned\n');
+      assert.equal(readFileSync(marker, 'utf8'), 'cleaned\n');
+      assert.ok(result.durationMs >= 700 && result.durationMs < 2300, `took ${result.durationMs}ms`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+  test(`${module}: a timeout SIGKILLs a tool ignoring SIGTERM after the default grace`, { skip: process.platform === 'win32', timeout: 5000 }, async () => {
+    const result = await run('/bin/bash', ['-c', "trap '' TERM; echo ready; while :; do sleep 0.05; done"], { timeoutMs: 200 });
+    assert.equal(result.timedOut, true);
+    assert.equal(result.exitCode, null);
+    assert.equal(result.signal, 'SIGKILL');
+    assert.equal(result.stdout, 'ready\n');
+    assert.ok(result.durationMs >= 350 && result.durationMs < 1500, `took ${result.durationMs}ms`);
+  });
+  test(`${module}: the default grace cuts a slow cleanup short`, { skip: process.platform === 'win32', timeout: 5000 }, async () => {
+    const root = mkdtempSync(join(tmpdir(), 'clyops-grace-'));
+    try {
+      const { marker, script } = cleanupTool(root);
+      const result = await run('/bin/bash', [script], { timeoutMs: 300 });
+      assert.equal(result.timedOut, true);
+      assert.equal(result.signal, 'SIGKILL');
+      assert.equal(existsSync(marker), false);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+  test(`${module}: killGraceMs Infinity waits for the cleanup instead of overflowing the timer`, { skip: process.platform === 'win32', timeout: 5000 }, async () => {
+    const root = mkdtempSync(join(tmpdir(), 'clyops-grace-'));
+    try {
+      const { marker, script } = cleanupTool(root);
+      for (const killGraceMs of [Infinity, 2 ** 40]) {
+        rmSync(marker, { force: true });
+        const result = await run('/bin/bash', [script], { timeoutMs: 300, killGraceMs });
+        assert.equal(result.exitCode, 0, `killGraceMs ${killGraceMs}`);
+        assert.equal(result.stdout, 'ready\ncleaned\n');
+        assert.equal(readFileSync(marker, 'utf8'), 'cleaned\n');
+      }
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+  test(`${module}: abort honours killGraceMs`, { skip: process.platform === 'win32', timeout: 5000 }, async () => {
+    const root = mkdtempSync(join(tmpdir(), 'clyops-grace-'));
+    const controller = new AbortController();
+    try {
+      const { marker, script } = cleanupTool(root);
+      let aborted = 0;
+      const result = await run('/bin/bash', [script], {
+        signal: controller.signal, killGraceMs: 2000,
+        onStdout: (chunk) => { if (chunk.includes('ready') && !aborted) { aborted = Date.now(); controller.abort(); } },
+      });
+      assert.equal(result.timedOut, false);
+      assert.equal(result.exitCode, 0);
+      assert.equal(readFileSync(marker, 'utf8'), 'cleaned\n');
+      const elapsed = Date.now() - aborted;
+      assert.ok(elapsed >= 400 && elapsed < 2000, `took ${elapsed}ms`);
+      assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
   test(`${module}: pre-aborted signals settle without a timeout`, { timeout: 5000 }, async () => {
     const controller = new AbortController(); controller.abort();
     const result = await run(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { signal: controller.signal });

@@ -162,6 +162,7 @@ export async function runScriptFunction(
   fn: ResolvedFunction,
   opts: CommandOptions & {
     timeoutMs?: number;
+    /** How long a stopped tool (abort or timeout) has after SIGTERM before SIGKILL; default 200. */ killGraceMs?: number;
     /** Environment supplied to the process or read for option defaults. */ env?: NodeJS.ProcessEnv;
     /** Working directory used to resolve command-line paths and execute tools. */ cwd?: string;
     /** AbortSignal used to cancel execution and terminate the tool process tree. */ signal?: AbortSignal;
@@ -193,7 +194,7 @@ export async function runScriptFunction(
     log: { onLine: opts.onLog },
   };
   const started = start(file, argv, {
-    cwd: opts.cwd, env: opts.env, timeoutMs: opts.timeoutMs, signal: opts.signal, onStderr: opts.onStderr,
+    cwd: opts.cwd, env: opts.env, timeoutMs: opts.timeoutMs, killGraceMs: opts.killGraceMs, signal: opts.signal, onStderr: opts.onStderr,
     stdin: stdinPath ? createReadStream(stdinPath) : undefined,
     stdout: stdoutPath ? 'stream' : 'text',
     roles: declaredRoles({ schema }, roles),
