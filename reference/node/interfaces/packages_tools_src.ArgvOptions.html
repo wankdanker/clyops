@@ -16,7 +16,7 @@
 </div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">ArgvOptions</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#base">base</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#controlled">controlled</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#cwd">cwd</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#positionals">positionals</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;first&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;last&quot;</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#positionalsorder">positionalsOrder</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">&quot;first&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;last&quot;</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#render">render</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">value</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#secretenv">secretEnv</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#within">within</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/3f3184a88ae26e633252a25cf2533d915023f255/packages/tools/src/argv.ts#L16">packages/tools/src/argv.ts:16</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/8beabe0cef9f2297f9b8475951489dabe3c5d0b2/packages/tools/src/argv.ts#L16">packages/tools/src/argv.ts:16</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -42,42 +42,42 @@
 <div class="tsd-comment tsd-typography"><p>Directory that relative path values resolve against (default: leave them to the tool).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/3f3184a88ae26e633252a25cf2533d915023f255/packages/tools/src/argv.ts#L18">packages/tools/src/argv.ts:18</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/8beabe0cef9f2297f9b8475951489dabe3c5d0b2/packages/tools/src/argv.ts#L18">packages/tools/src/argv.ts:18</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="controlled"><code class="tsd-tag">Optional</code><span>controlled</span><a href="#controlled" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">controlled</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span></div>
 <div class="tsd-comment tsd-typography"><p>Option names the caller sets itself; input keys for them are reported in <code>controlled</code>.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/3f3184a88ae26e633252a25cf2533d915023f255/packages/tools/src/argv.ts#L20">packages/tools/src/argv.ts:20</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/8beabe0cef9f2297f9b8475951489dabe3c5d0b2/packages/tools/src/argv.ts#L20">packages/tools/src/argv.ts:20</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="cwd"><code class="tsd-tag">Optional</code><span>cwd</span><a href="#cwd" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">cwd</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>The tool's working directory, for <code>within</code> (default: this process's).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/3f3184a88ae26e633252a25cf2533d915023f255/packages/tools/src/argv.ts#L39">packages/tools/src/argv.ts:39</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/8beabe0cef9f2297f9b8475951489dabe3c5d0b2/packages/tools/src/argv.ts#L39">packages/tools/src/argv.ts:39</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="positionals"><code class="tsd-tag">Optional</code><span>positionals</span><a href="#positionals" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">positionals</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;first&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;last&quot;</span></div>
 <div class="tsd-comment tsd-typography"><p>Explicit positional values, or their order (default: 'first').</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/3f3184a88ae26e633252a25cf2533d915023f255/packages/tools/src/argv.ts#L24">packages/tools/src/argv.ts:24</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/8beabe0cef9f2297f9b8475951489dabe3c5d0b2/packages/tools/src/argv.ts#L24">packages/tools/src/argv.ts:24</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="positionalsorder"><code class="tsd-tag">Optional</code><span>positionals<wbr/>Order</span><a href="#positionalsorder" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">positionalsOrder</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">&quot;first&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;last&quot;</span></div>
 <div class="tsd-comment tsd-typography"><p>Order when also supplying explicit positional values.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/3f3184a88ae26e633252a25cf2533d915023f255/packages/tools/src/argv.ts#L26">packages/tools/src/argv.ts:26</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/8beabe0cef9f2297f9b8475951489dabe3c5d0b2/packages/tools/src/argv.ts#L26">packages/tools/src/argv.ts:26</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="render"><code class="tsd-tag">Optional</code><span>render</span><a href="#render" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">render</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">value</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>Applied to every string value before it is used (templating).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/3f3184a88ae26e633252a25cf2533d915023f255/packages/tools/src/argv.ts#L22">packages/tools/src/argv.ts:22</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/8beabe0cef9f2297f9b8475951489dabe3c5d0b2/packages/tools/src/argv.ts#L22">packages/tools/src/argv.ts:22</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="secretenv"><code class="tsd-tag">Optional</code><span>secret<wbr/>Env</span><a href="#secretenv" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">secretEnv</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div>
@@ -86,7 +86,7 @@ variable names, instead of on the command line where <code>ps</code> shows them.
 Array options stay on the command line.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/3f3184a88ae26e633252a25cf2533d915023f255/packages/tools/src/argv.ts#L32">packages/tools/src/argv.ts:32</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/8beabe0cef9f2297f9b8475951489dabe3c5d0b2/packages/tools/src/argv.ts#L32">packages/tools/src/argv.ts:32</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="within"><code class="tsd-tag">Optional</code><span>within</span><a href="#within" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">within</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span></div>
@@ -94,7 +94,7 @@ Array options stay on the command line.</p>
 ones against <code>base</code>, else <code>cwd</code>); anything else is an InputError.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/3f3184a88ae26e633252a25cf2533d915023f255/packages/tools/src/argv.ts#L37">packages/tools/src/argv.ts:37</a></li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/8beabe0cef9f2297f9b8475951489dabe3c5d0b2/packages/tools/src/argv.ts#L37">packages/tools/src/argv.ts:37</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
