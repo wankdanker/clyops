@@ -25,7 +25,7 @@
           "title": "Validate before execution",
           "caption": "Accepted inputs produce a plan. Out-of-range values fail validation.",
           "command": "python scripts/plan.py --service api --env staging --replicas 2",
-          "text": "{\n  \"service\": \"api\",\n  \"env\": \"staging\",\n  \"replicas\": 2\n}\n\n$ python scripts/plan.py --replicas 99\n2026-10-22 19:50:22 [error] --replicas must be <= 10, got 99\n[exit 1]",
+          "text": "{\n  \"service\": \"api\",\n  \"env\": \"staging\",\n  \"replicas\": 2\n}\n\n$ python scripts/plan.py --replicas 99\n2026-10-22 21:16:42 [error] --replicas must be <= 10, got 99\n[exit 1]",
           "kind": "run"
         },
         {
@@ -76,7 +76,7 @@
           "title": "Validate before execution",
           "caption": "Accepted inputs produce a plan. Out-of-range values fail validation.",
           "command": "bash scripts/plan.sh --service api --env staging --replicas 2",
-          "text": "{\n  \"service\": \"api\",\n  \"env\": \"staging\",\n  \"replicas\": 2\n}\n\n$ bash scripts/plan.sh --replicas 99\n2026-10-22 19:50:22 [error] --replicas must be <= 10, got 99\n[exit 1]",
+          "text": "{\n  \"service\": \"api\",\n  \"env\": \"staging\",\n  \"replicas\": 2\n}\n\n$ bash scripts/plan.sh --replicas 99\n2026-10-22 21:16:42 [error] --replicas must be <= 10, got 99\n[exit 1]",
           "kind": "run"
         },
         {
@@ -127,7 +127,7 @@
           "title": "Validate before execution",
           "caption": "Accepted inputs produce a plan. Out-of-range values fail validation.",
           "command": "pnpm exec tsx scripts/plan.ts --service api --env staging --replicas 2",
-          "text": "{\n  \"service\": \"api\",\n  \"env\": \"staging\",\n  \"replicas\": 2\n}\n\n$ pnpm exec tsx scripts/plan.ts --replicas 99\n2026-10-22 19:50:22 [error] --replicas must be <= 10, got 99\n[exit 1]",
+          "text": "{\n  \"service\": \"api\",\n  \"env\": \"staging\",\n  \"replicas\": 2\n}\n\n$ pnpm exec tsx scripts/plan.ts --replicas 99\n2026-10-22 21:16:43 [error] --replicas must be <= 10, got 99\n[exit 1]",
           "kind": "run"
         },
         {
@@ -178,7 +178,7 @@
           "title": "Validate before execution",
           "caption": "Accepted inputs produce a plan. Out-of-range values fail validation.",
           "command": "./scripts/plan --service api --env staging --replicas 2",
-          "text": "{\n  \"service\": \"api\",\n  \"env\": \"staging\",\n  \"replicas\": 2\n}\n\n$ ./scripts/plan --replicas 99\n2026-10-22 19:50:22 [error] --replicas must be <= 10, got 99\n[exit 1]",
+          "text": "{\n  \"service\": \"api\",\n  \"env\": \"staging\",\n  \"replicas\": 2\n}\n\n$ ./scripts/plan --replicas 99\n2026-10-22 21:16:43 [error] --replicas must be <= 10, got 99\n[exit 1]",
           "kind": "run"
         },
         {
