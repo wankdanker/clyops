@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web runner and shared schema · clyops</title>
+  <link rel="stylesheet" href="/versions/v0.7.0/assets/docs.css">
+  <script defer src="/versions/v0.7.0/assets/search.js"></script>
+</head>
+<body data-search-index="/versions/v0.7.0/search-index.json">
+  <a class="skip" href="#content">Skip to content</a>
+  <header><a href="/versions/v0.7.0/"><strong>clyops</strong></a><span>Documentation · 0.7.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <div class="shell">
+    <nav aria-label="Documentation">
+      <a href="/versions/v0.7.0/guide.html">Concepts and behavior</a>
+      <a href="/versions/v0.7.0/reference.html">API references</a>
+      <a href="/versions/v0.7.0/examples.html">Clone-and-run examples</a>
+      <a href="/versions/v0.7.0/linux-lab.html">Linux lab in your browser</a>
+      <a href="/versions/v0.7.0/completion.html">Bash, Zsh and Fish completion</a>
+      <h2>Languages</h2>
+      <a href="/versions/v0.7.0/languages/javascript.html">JavaScript / TypeScript</a><a href="/versions/v0.7.0/languages/python.html">Python</a><a href="/versions/v0.7.0/languages/rust.html">Rust</a><a href="/versions/v0.7.0/languages/go.html">Go</a><a href="/versions/v0.7.0/languages/java.html">Java</a><a href="/versions/v0.7.0/languages/ruby.html">Ruby</a><a href="/versions/v0.7.0/languages/c.html">C</a><a href="/versions/v0.7.0/languages/bash.html">Bash</a>
+      <h2>Tools and servers</h2>
+      <a href="/versions/v0.7.0/node-tools.html">Node tools, jobs, API and MCP</a>
+      <a href="/versions/v0.7.0/web-runner.html">Web runner and shared schema</a>
+      <a href="/versions/v0.7.0/applications.html">Dispatcher and desktop runner</a>
+      <a href="/versions/v0.7.0/maintaining.html">Maintaining the docs</a>
+      <a href="/versions/v0.7.0/versions.html">Release documentation</a>
+      <form action="/versions/v0.7.0/search.html" role="search"><label for="search">Search guides</label><input id="search" name="q" type="search"><button>Search</button></form>
+    </nav>
+    <main id="content"><h1 id="web-runner-and-shared-schema">Web runner and shared schema</h1>
+<p>The SvelteKit web runner turns the REST API's tool descriptions into forms and
+execution results. Its built HTML/CSS/JavaScript are static, packaged with the API,
+and served at <code>/ui/</code>. It does not need a SvelteKit server at runtime.</p>
+<h2 id="start-and-connect">Start and connect</h2>
+<p>Install <code>clyops-api</code> and start it with your executable scripts directory:</p>
+<pre><code class="language-sh">pnpm add clyops-api
+pnpm exec clyops-api --root ./scripts --api-key YOUR_KEY
+</code></pre>
+<p>Open <code>http://localhost:8080/ui/</code>, enter the key, and connect. The UI shell is public
+so it can present the login controls; every API tool/job request still requires
+the configured key. <code>--no-ui</code> disables the bundled frontend independently.
+From this repository, <code>pnpm build</code> builds the shared package, SPA and API in order;
+<code>node apps/api/dist/cli.js --root ./scripts</code> starts the built server.</p>
+<p>The connection URL is the API root, not its <code>/ui/</code> path. Keys stay in memory and
+are cleared from the password input after connecting. Disconnect clears the client.
+API key scopes continue to determine which tools and jobs are visible.</p>
+<p>The default same-origin deployment needs no CORS setup. A frontend served from
+another origin requires explicit CORS support in the API's reverse proxy, including
+Authorization/Content-Type headers, OPTIONS and GET/POST/DELETE. Use an HTTPS API
+when the frontend is HTTPS. The documentation site remains a separate static site;
+it does not run the tools or host a REST backend.</p>
+<h2 id="forms-and-inheritance">Forms and inheritance</h2>
+<p>Select a tool from its directory group. Commands appear as separate leaf tools,
+with inherited registrations already expanded by the API.</p>
+<table>
+<thead>
+<tr>
+<th>Declaration</th>
+<th>Form control</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>choice:a,b</code></td>
+<td>Enum dropdown</td>
+</tr>
+<tr>
+<td>Integer range</td>
+<td>Number input with min/max and step 1</td>
+</tr>
+<tr>
+<td>Float range</td>
+<td>Number input with min/max and arbitrary fractional step</td>
+</tr>
+<tr>
+<td>String length</td>
+<td>Length-aware text input</td>
+</tr>
+<tr>
+<td>Repeatable option or variadic argument</td>
+<td>Repeatable, typed item controls</td>
+</tr>
+<tr>
+<td>Boolean</td>
+<td>Inherit/on/off</td>
+</tr>
+<tr>
+<td>Secret</td>
+<td>Password control, excluded from previews and templates</td>
+</tr>
+<tr>
+<td>Path</td>
+<td>Server path input with optional file upload</td>
+</tr>
+<tr>
+<td>Declared stdin</td>
+<td>Text or file input</td>
+</tr>
+<tr>
+<td>Declared binary stdout</td>
+<td>Authenticated download</td>
+</tr>
+</tbody>
+</table>
+<p>Only enabled overrides are submitted. Declared defaults are hints; they are not
+automatically sent. Explicit zero and false are preserved. Untouched values are
+resolved by the tool from config, environment and defaults using the usual
+<a href="/versions/v0.7.0/guide.html">precedence rules</a>.</p>
+<p>Relationship summaries explain <code>exclusive</code>, <code>requires</code> and <code>oneOf</code>. clyops
+<code>oneOf</code> means at least one; combine it with <code>exclusive</code> for exactly one. Explicit
+exclusive conflicts block submission. Requirements that may be satisfied by
+config/environment are advisory, and the tool validates effective values.
+Destructive tools require confirmation before execution.</p>
+<p>The JSON editor applies the same input schema as the API. It omits secrets;
+password values remain in their dedicated controls. Templates save only known,
+non-secret overrides in this browser, scoped by API and tool. Files and stdin are
+not saved, and restoring a template clears secret fields.</p>
+<h2 id="execution-and-jobs">Execution and jobs</h2>
+<p>Run synchronously for a result, or submit a background job and follow its status.
+The runner polls the existing job endpoints and supports cancellation. A job whose
+tool declares a <code>progress</code> role shows a progress bar while it runs; output is shown
+when the job finishes, with the tool's <code>meta</code> beside it. This interface does not
+promise live log streaming.
+stdout and stderr render ANSI colors (basic, 256-color and truecolor) and styles
+by default. Uncheck <strong>ANSI colors</strong> for plain text without escape sequences.
+Output remains escaped text; terminal hyperlinks and cursor instructions are
+ignored. This is a captured log view rather than an interactive terminal.
+Tools must emit ANSI codes; tools that disable color when piped need their own
+color option enabled. Downloads preserve original output bytes. Parsed JSON is
+displayed as text. Binary envelopes and job
+output are downloaded with the API client's bearer key, without putting the key
+into a download URL. See <a href="/versions/v0.7.0/node-tools.html#http-api">REST endpoints</a>.</p>
+<h2 id="shared-library">Shared library</h2>
+<p><code>clyops-schema</code> is a dependency-free, browser-compatible package with types,
+<code>toJsonSchema</code>, <code>valueSchema</code>, name mapping, <code>formFields</code>, <code>formSchema</code>,
+<code>constraintIssues</code>, <code>withoutSecrets</code> and <code>isTextType</code>. The
+<a href="/versions/v0.7.0/reference/node/index.html">complete Node API reference</a> documents its exports.</p>
+<pre><code class="language-ts">import { toJsonSchema, formFields, constraintIssues } from 'clyops-schema';
+const inputSchema = toJsonSchema(toolSchema);
+const controls = formFields(toolSchema);
+const relationships = constraintIssues(toolSchema, overrides);
+</code></pre>
+<p><code>toJsonSchema(schema, 'declared')</code> keeps the original keys for desktop templates;
+the default uses the API/MCP input keys. <code>formSchema</code> adds clyops metadata without
+changing request validation. The API and MCP retain their existing clyops-tools
+imports, which re-export the shared converter for compatibility. The desktop
+editor now uses it too, and numeric fields share the range conversion.</p>
+<p>Build/type/test commands and browser checks are in the <a href="https://github.com/wankdanker/clyops/blob/ecf8ca033c9c60115dd5b0ebf34220f696551af4/apps/web/README.md">app README</a>.</p>
+</main>
+  </div>
+  <footer>Guides are Markdown. API references come from the published source interfaces.</footer>
+</body>
+</html>

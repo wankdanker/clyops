@@ -1,0 +1,1234 @@
+[
+  {
+    "name": "alpine-baselayout",
+    "version": "3.6.8-r0",
+    "license": "GPL-2.0-only",
+    "origin": "alpine-baselayout",
+    "source_commit": "82d6c06a6d6e8de20a4db05994da6046f0623af3",
+    "upstream": "https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout"
+  },
+  {
+    "name": "alpine-baselayout-data",
+    "version": "3.6.8-r0",
+    "license": "GPL-2.0-only",
+    "origin": "alpine-baselayout",
+    "source_commit": "82d6c06a6d6e8de20a4db05994da6046f0623af3",
+    "upstream": "https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout"
+  },
+  {
+    "name": "alpine-keys",
+    "version": "2.5-r0",
+    "license": "MIT",
+    "origin": "alpine-keys",
+    "source_commit": "6d473fb38effb2389f567b29fb7eb27039b3a279",
+    "upstream": "https://alpinelinux.org"
+  },
+  {
+    "name": "alpine-release",
+    "version": "3.21.0-r0",
+    "license": "MIT",
+    "origin": "alpine-base",
+    "source_commit": "59962f87e4603deb5bb4d237927fd7eb84c7c9c9",
+    "upstream": "https://alpinelinux.org"
+  },
+  {
+    "name": "alsa-lib",
+    "version": "1.2.12-r0",
+    "license": "LGPL-2.1-or-later",
+    "origin": "alsa-lib",
+    "source_commit": "09eeac3d97742a5f78ed6911d81014571977e47e",
+    "upstream": "https://alsa-project.org/"
+  },
+  {
+    "name": "aom-libs",
+    "version": "3.11.0-r0",
+    "license": "BSD-2-Clause AND custom",
+    "origin": "aom",
+    "source_commit": "566a03ffbe0922833d0cc76ee4f93a44df5dfb93",
+    "upstream": "https://aomedia.org/"
+  },
+  {
+    "name": "apk-tools",
+    "version": "2.14.6-r2",
+    "license": "GPL-2.0-only",
+    "origin": "apk-tools",
+    "source_commit": "85fce5ac38cd9990b8910637d750591e3ef55a6c",
+    "upstream": "https://gitlab.alpinelinux.org/alpine/apk-tools"
+  },
+  {
+    "name": "bash",
+    "version": "5.2.37-r0",
+    "license": "GPL-3.0-or-later",
+    "origin": "bash",
+    "source_commit": "dfdce3cefb431614e410ac9bc3665d33ea45020c",
+    "upstream": "https://www.gnu.org/software/bash/bash.html"
+  },
+  {
+    "name": "brotli-libs",
+    "version": "1.1.0-r2",
+    "license": "MIT",
+    "origin": "brotli",
+    "source_commit": "bdeb5ac39445d803f7d97bb9b3cf9171d9a35f52",
+    "upstream": "https://github.com/google/brotli"
+  },
+  {
+    "name": "busybox",
+    "version": "1.37.0-r8",
+    "license": "GPL-2.0-only",
+    "origin": "busybox",
+    "source_commit": "79fddc2aa9c64c47fb3da6edeae9570b4e9caa7e",
+    "upstream": "https://busybox.net/"
+  },
+  {
+    "name": "busybox-binsh",
+    "version": "1.37.0-r8",
+    "license": "GPL-2.0-only",
+    "origin": "busybox",
+    "source_commit": "79fddc2aa9c64c47fb3da6edeae9570b4e9caa7e",
+    "upstream": "https://busybox.net/"
+  },
+  {
+    "name": "c-ares",
+    "version": "1.34.8-r0",
+    "license": "MIT",
+    "origin": "c-ares",
+    "source_commit": "40d4af1c03fd0a11bcd6dd687181b78c5cf6c4c9",
+    "upstream": "https://c-ares.org/"
+  },
+  {
+    "name": "ca-certificates-bundle",
+    "version": "20241010-r0",
+    "license": "MPL-2.0 AND MIT",
+    "origin": "ca-certificates",
+    "source_commit": "537f890454d2213fd05cde5e458dfa9c8ef1977f",
+    "upstream": "https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/"
+  },
+  {
+    "name": "cjson",
+    "version": "1.7.19-r0",
+    "license": "MIT",
+    "origin": "cjson",
+    "source_commit": "a9e252500f8b142a8e6ef49038804f8286fd5fe2",
+    "upstream": "https://github.com/DaveGamble/cJSON"
+  },
+  {
+    "name": "cryptsetup-libs",
+    "version": "2.7.5-r1",
+    "license": "GPL-2.0-or-later WITH cryptsetup-OpenSSL-exception",
+    "origin": "cryptsetup",
+    "source_commit": "d63289c555dc047e5c39fcff691770ce9743b464",
+    "upstream": "https://gitlab.com/cryptsetup/cryptsetup"
+  },
+  {
+    "name": "curl",
+    "version": "8.14.1-r2",
+    "license": "curl",
+    "origin": "curl",
+    "source_commit": "2c79595339118c69c0809dbff53ad71c90beba48",
+    "upstream": "https://curl.se/"
+  },
+  {
+    "name": "dbus-libs",
+    "version": "1.14.10-r4",
+    "license": "AFL-2.1 OR GPL-2.0-or-later",
+    "origin": "dbus",
+    "source_commit": "1d13eb33acf55225b9e428ad1129f65a8fd978b3",
+    "upstream": "https://www.freedesktop.org/Software/dbus"
+  },
+  {
+    "name": "device-mapper-libs",
+    "version": "2.03.29-r1",
+    "license": "GPL-2.0-or-later AND LGPL-2.1-or-later AND BSD-2-Clause",
+    "origin": "lvm2",
+    "source_commit": "c555cc256cd8f742491d4733687b50cebd1dd1d8",
+    "upstream": "https://sourceware.org/lvm2/"
+  },
+  {
+    "name": "ffmpeg",
+    "version": "6.1.2-r1",
+    "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+    "origin": "ffmpeg",
+    "source_commit": "96d03ae8ccd0a75e113ddde5626781a11772a127",
+    "upstream": "https://ffmpeg.org/"
+  },
+  {
+    "name": "ffmpeg-libavcodec",
+    "version": "6.1.2-r1",
+    "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+    "origin": "ffmpeg",
+    "source_commit": "96d03ae8ccd0a75e113ddde5626781a11772a127",
+    "upstream": "https://ffmpeg.org/"
+  },
+  {
+    "name": "ffmpeg-libavdevice",
+    "version": "6.1.2-r1",
+    "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+    "origin": "ffmpeg",
+    "source_commit": "96d03ae8ccd0a75e113ddde5626781a11772a127",
+    "upstream": "https://ffmpeg.org/"
+  },
+  {
+    "name": "ffmpeg-libavfilter",
+    "version": "6.1.2-r1",
+    "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+    "origin": "ffmpeg",
+    "source_commit": "96d03ae8ccd0a75e113ddde5626781a11772a127",
+    "upstream": "https://ffmpeg.org/"
+  },
+  {
+    "name": "ffmpeg-libavformat",
+    "version": "6.1.2-r1",
+    "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+    "origin": "ffmpeg",
+    "source_commit": "96d03ae8ccd0a75e113ddde5626781a11772a127",
+    "upstream": "https://ffmpeg.org/"
+  },
+  {
+    "name": "ffmpeg-libavutil",
+    "version": "6.1.2-r1",
+    "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+    "origin": "ffmpeg",
+    "source_commit": "96d03ae8ccd0a75e113ddde5626781a11772a127",
+    "upstream": "https://ffmpeg.org/"
+  },
+  {
+    "name": "ffmpeg-libpostproc",
+    "version": "6.1.2-r1",
+    "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+    "origin": "ffmpeg",
+    "source_commit": "96d03ae8ccd0a75e113ddde5626781a11772a127",
+    "upstream": "https://ffmpeg.org/"
+  },
+  {
+    "name": "ffmpeg-libswresample",
+    "version": "6.1.2-r1",
+    "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+    "origin": "ffmpeg",
+    "source_commit": "96d03ae8ccd0a75e113ddde5626781a11772a127",
+    "upstream": "https://ffmpeg.org/"
+  },
+  {
+    "name": "ffmpeg-libswscale",
+    "version": "6.1.2-r1",
+    "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+    "origin": "ffmpeg",
+    "source_commit": "96d03ae8ccd0a75e113ddde5626781a11772a127",
+    "upstream": "https://ffmpeg.org/"
+  },
+  {
+    "name": "fontconfig",
+    "version": "2.15.0-r1",
+    "license": "MIT",
+    "origin": "fontconfig",
+    "source_commit": "bdeb5ac39445d803f7d97bb9b3cf9171d9a35f52",
+    "upstream": "https://www.freedesktop.org/wiki/Software/fontconfig"
+  },
+  {
+    "name": "freetype",
+    "version": "2.13.3-r0",
+    "license": "FTL OR GPL-2.0-or-later",
+    "origin": "freetype",
+    "source_commit": "9404f86086f8e5c970b156336e71c56828a1e587",
+    "upstream": "https://www.freetype.org/"
+  },
+  {
+    "name": "fribidi",
+    "version": "1.0.16-r0",
+    "license": "LGPL-2.1-or-later",
+    "origin": "fribidi",
+    "source_commit": "cc5de81d984f8ce3d5b45680a3996742333a5a64",
+    "upstream": "https://github.com/fribidi/fribidi"
+  },
+  {
+    "name": "gdbm",
+    "version": "1.24-r0",
+    "license": "GPL-3.0-or-later",
+    "origin": "gdbm",
+    "source_commit": "cf76e1b436494c60e0c188400007dbf78bbff5f0",
+    "upstream": "https://www.gnu.org/software/gdbm/"
+  },
+  {
+    "name": "giflib",
+    "version": "5.2.2-r2",
+    "license": "MIT",
+    "origin": "giflib",
+    "source_commit": "774a03e258c265375b0f8bd537d317fd9d2eb33c",
+    "upstream": "https://sourceforge.net/projects/giflib/"
+  },
+  {
+    "name": "glib",
+    "version": "2.82.5-r0",
+    "license": "LGPL-2.1-or-later",
+    "origin": "glib",
+    "source_commit": "28bee7ac73548857499358beb6685e2d4a934eb3",
+    "upstream": "https://developer.gnome.org/glib/"
+  },
+  {
+    "name": "glslang-libs",
+    "version": "1.3.296.0-r0",
+    "license": "BSD-3-Clause AND BSD-2-Clause AND MIT AND Apache-2.0 AND GPL-3.0-or-later",
+    "origin": "glslang",
+    "source_commit": "3b3fbaf29768a77b2d94940cbd046733e88b3c86",
+    "upstream": "https://github.com/KhronosGroup/glslang"
+  },
+  {
+    "name": "graphite2",
+    "version": "1.3.14-r6",
+    "license": "LGPL-2.1-or-later OR MPL-1.1",
+    "origin": "graphite2",
+    "source_commit": "33283848034c9885d984c8e8697c645c57324938",
+    "upstream": "https://graphite.sil.org/"
+  },
+  {
+    "name": "harfbuzz",
+    "version": "9.0.0-r1",
+    "license": "MIT",
+    "origin": "harfbuzz",
+    "source_commit": "398a5aee3025ec8a4d0d761e448dc86ac777fa09",
+    "upstream": "https://harfbuzz.github.io/"
+  },
+  {
+    "name": "hwdata-pci",
+    "version": "0.393-r0",
+    "license": "GPL-2.0-or-later OR XFree86-1.1",
+    "origin": "hwdata",
+    "source_commit": "e38f063e57e03b526909d542cb84a0e536ec3e8a",
+    "upstream": "https://github.com/vcrhonek/hwdata"
+  },
+  {
+    "name": "imath",
+    "version": "3.1.12-r0",
+    "license": "BSD-3-Clause",
+    "origin": "imath",
+    "source_commit": "6fdc538f8685b5aca7756d8dfaec92df10dce6a4",
+    "upstream": "https://github.com/AcademySoftwareFoundation/Imath"
+  },
+  {
+    "name": "json-c",
+    "version": "0.18-r0",
+    "license": "MIT",
+    "origin": "json-c",
+    "source_commit": "4f233162b1e4baa074341b27b66ba2a492628499",
+    "upstream": "https://github.com/json-c/json-c/wiki"
+  },
+  {
+    "name": "kmod",
+    "version": "33-r2",
+    "license": "GPL-2.0-or-later",
+    "origin": "kmod",
+    "source_commit": "d6a1fd6e13210167b3f0b6c49788ecaca992f571",
+    "upstream": "http://git.kernel.org/?p=utils/kernel/kmod/kmod.git;a=summary"
+  },
+  {
+    "name": "kmod-libs",
+    "version": "33-r2",
+    "license": "LGPL-2.1-or-later",
+    "origin": "kmod",
+    "source_commit": "d6a1fd6e13210167b3f0b6c49788ecaca992f571",
+    "upstream": "http://git.kernel.org/?p=utils/kernel/kmod/kmod.git;a=summary"
+  },
+  {
+    "name": "lame-libs",
+    "version": "3.100-r5",
+    "license": "LGPL-2.0-or-later",
+    "origin": "lame",
+    "source_commit": "ffd76e0bae9921b604c4d3fab6e236e6c7b4039a",
+    "upstream": "https://lame.sourceforge.net/"
+  },
+  {
+    "name": "lcms2",
+    "version": "2.19-r0",
+    "license": "MIT",
+    "origin": "lcms2",
+    "source_commit": "21342ffd81c977f7b6f21ee192b144634f4dfb6d",
+    "upstream": "https://www.littlecms.com"
+  },
+  {
+    "name": "lddtree",
+    "version": "1.27-r0",
+    "license": "GPL-2.0-only",
+    "origin": "lddtree",
+    "source_commit": "007305e7880a70d5c804019aa3da115da732776b",
+    "upstream": "https://github.com/ncopa/lddtree"
+  },
+  {
+    "name": "libass",
+    "version": "0.17.3-r0",
+    "license": "ISC",
+    "origin": "libass",
+    "source_commit": "39a002bf1e3328110cc0aa9f3044a917d43a7671",
+    "upstream": "https://github.com/libass/libass"
+  },
+  {
+    "name": "libasyncns",
+    "version": "0.8-r4",
+    "license": "LGPL-2.0-or-later",
+    "origin": "libasyncns",
+    "source_commit": "40ea6c48d709733051b824abfc3d0ed2309ae339",
+    "upstream": "https://0pointer.de/lennart/projects/libasyncns/"
+  },
+  {
+    "name": "libblkid",
+    "version": "2.40.4-r1",
+    "license": "LGPL-2.1-or-later",
+    "origin": "util-linux",
+    "source_commit": "67123673d9594a0de26838c585ce77ac2e75e7de",
+    "upstream": "https://git.kernel.org/cgit/utils/util-linux/util-linux.git"
+  },
+  {
+    "name": "libbluray",
+    "version": "1.3.4-r1",
+    "license": "LGPL-2.1-or-later",
+    "origin": "libbluray",
+    "source_commit": "33283848034c9885d984c8e8697c645c57324938",
+    "upstream": "https://www.videolan.org/developers/libbluray.html"
+  },
+  {
+    "name": "libbsd",
+    "version": "0.12.2-r0",
+    "license": "BSD-3-Clause",
+    "origin": "libbsd",
+    "source_commit": "02365e78d654a7beb23fd35d7d69f4a649009ede",
+    "upstream": "https://libbsd.freedesktop.org/"
+  },
+  {
+    "name": "libbz2",
+    "version": "1.0.8-r6",
+    "license": "bzip2-1.0.6",
+    "origin": "bzip2",
+    "source_commit": "33283848034c9885d984c8e8697c645c57324938",
+    "upstream": "https://sourceware.org/bzip2/"
+  },
+  {
+    "name": "libcrypto3",
+    "version": "3.3.2-r4",
+    "license": "Apache-2.0",
+    "origin": "openssl",
+    "source_commit": "e18f4d0c2080542ef5c4fd329a5be584064658aa",
+    "upstream": "https://www.openssl.org/"
+  },
+  {
+    "name": "libcurl",
+    "version": "8.14.1-r2",
+    "license": "curl",
+    "origin": "curl",
+    "source_commit": "2c79595339118c69c0809dbff53ad71c90beba48",
+    "upstream": "https://curl.se/"
+  },
+  {
+    "name": "libdav1d",
+    "version": "1.5.0-r0",
+    "license": "BSD-2-Clause",
+    "origin": "dav1d",
+    "source_commit": "209790842fd2d60db34aed86d7e5f8b035f89b0e",
+    "upstream": "https://code.videolan.org/videolan/dav1d"
+  },
+  {
+    "name": "libdeflate",
+    "version": "1.22-r0",
+    "license": "MIT",
+    "origin": "libdeflate",
+    "source_commit": "8055136bd5b80853fb293af7c15f32f9ea983364",
+    "upstream": "https://github.com/ebiggers/libdeflate"
+  },
+  {
+    "name": "libdovi",
+    "version": "3.3.1-r0",
+    "license": "MIT",
+    "origin": "libdovi",
+    "source_commit": "33de35e2d8bffde7ed48eb9ae3a9aacce5e2deb3",
+    "upstream": "https://github.com/quietvoid/dovi_tool"
+  },
+  {
+    "name": "libdrm",
+    "version": "2.4.123-r1",
+    "license": "MIT",
+    "origin": "libdrm",
+    "source_commit": "398a5aee3025ec8a4d0d761e448dc86ac777fa09",
+    "upstream": "https://gitlab.freedesktop.org/mesa/drm"
+  },
+  {
+    "name": "libeconf",
+    "version": "0.6.3-r0",
+    "license": "MIT",
+    "origin": "libeconf",
+    "source_commit": "1e0aa723fba50417893fe5f6cf72f76d044b8192",
+    "upstream": "https://github.com/openSUSE/libeconf"
+  },
+  {
+    "name": "libexpat",
+    "version": "2.8.4-r0",
+    "license": "MIT",
+    "origin": "expat",
+    "source_commit": "d46a3884017c3c180ea5fa36585135b4da608fcb",
+    "upstream": "https://libexpat.github.io/"
+  },
+  {
+    "name": "libffi",
+    "version": "3.4.7-r0",
+    "license": "MIT",
+    "origin": "libffi",
+    "source_commit": "22c7b41f717ec56d69c0cc0a183703326fa47414",
+    "upstream": "https://sourceware.org/libffi/"
+  },
+  {
+    "name": "libflac",
+    "version": "1.4.3-r1",
+    "license": "BSD-3-Clause AND GPL-2.0-or-later",
+    "origin": "flac",
+    "source_commit": "ca5c575ac798af1b323e54aa63a8a42b4b68a43d",
+    "upstream": "https://xiph.org/flac/"
+  },
+  {
+    "name": "libgcc",
+    "version": "14.2.0-r4",
+    "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+    "origin": "gcc",
+    "source_commit": "1a03a2a9c9e77f1a07d48b6f6805e72c8c63c03f",
+    "upstream": "https://gcc.gnu.org"
+  },
+  {
+    "name": "libgomp",
+    "version": "14.2.0-r4",
+    "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+    "origin": "gcc",
+    "source_commit": "1a03a2a9c9e77f1a07d48b6f6805e72c8c63c03f",
+    "upstream": "https://gcc.gnu.org"
+  },
+  {
+    "name": "libhwy",
+    "version": "1.0.7-r0",
+    "license": "Apache-2.0",
+    "origin": "highway",
+    "source_commit": "d3468d77ab14b37cb291f15f03d61efc926cee17",
+    "upstream": "https://github.com/google/highway"
+  },
+  {
+    "name": "libidn2",
+    "version": "2.3.7-r0",
+    "license": "GPL-2.0-or-later OR LGPL-3.0-or-later",
+    "origin": "libidn2",
+    "source_commit": "1cdcdd0eccbee1f60078417a7aaf83f92f6e6754",
+    "upstream": "https://www.gnu.org/software/libidn#libidn2"
+  },
+  {
+    "name": "libintl",
+    "version": "0.22.5-r0",
+    "license": "LGPL-2.1-or-later",
+    "origin": "gettext",
+    "source_commit": "c49ded5d54b708768165f7a99589464cd5c5eeee",
+    "upstream": "https://www.gnu.org/software/gettext/gettext.html"
+  },
+  {
+    "name": "libjpeg-turbo",
+    "version": "3.0.4-r0",
+    "license": "BSD-3-Clause AND IJG AND Zlib",
+    "origin": "libjpeg-turbo",
+    "source_commit": "30b4b4d47dba66db916d78a58ea7a4639447a04f",
+    "upstream": "https://libjpeg-turbo.org/"
+  },
+  {
+    "name": "libjxl",
+    "version": "0.10.4-r0",
+    "license": "Apache-2.0",
+    "origin": "libjxl",
+    "source_commit": "a187b8178873fe30a6128749fcc946b8232a8606",
+    "upstream": "https://jpeg.org/jpegxl/"
+  },
+  {
+    "name": "libltdl",
+    "version": "2.4.7-r3",
+    "license": "LGPL-2.0-or-later AND GPL-2.0-or-later",
+    "origin": "libtool",
+    "source_commit": "33283848034c9885d984c8e8697c645c57324938",
+    "upstream": "https://www.gnu.org/software/libtool"
+  },
+  {
+    "name": "libmd",
+    "version": "1.1.0-r0",
+    "license": "BSD-3-Clause AND BSD-2-Clause AND ISC AND Beerware AND Public Domain",
+    "origin": "libmd",
+    "source_commit": "73e716067b9edc32c4cc7818cb7d206e57fdde15",
+    "upstream": "https://www.hadrons.org/software/libmd/"
+  },
+  {
+    "name": "libmount",
+    "version": "2.40.4-r1",
+    "license": "LGPL-2.1-or-later",
+    "origin": "util-linux",
+    "source_commit": "67123673d9594a0de26838c585ce77ac2e75e7de",
+    "upstream": "https://git.kernel.org/cgit/utils/util-linux/util-linux.git"
+  },
+  {
+    "name": "libncursesw",
+    "version": "6.5_p20241006-r3",
+    "license": "X11",
+    "origin": "ncurses",
+    "source_commit": "2cf24c798675a7f7deb2603c350d4adc7b59c8bb",
+    "upstream": "https://invisible-island.net/ncurses/"
+  },
+  {
+    "name": "libogg",
+    "version": "1.3.5-r5",
+    "license": "BSD-3-Clause",
+    "origin": "libogg",
+    "source_commit": "33283848034c9885d984c8e8697c645c57324938",
+    "upstream": "https://xiph.org/ogg/"
+  },
+  {
+    "name": "libopenmpt",
+    "version": "0.7.12-r0",
+    "license": "BSD-3-Clause",
+    "origin": "libopenmpt",
+    "source_commit": "21e53e7e65b625ca598e63cdb83d17ded9b63825",
+    "upstream": "https://lib.openmpt.org/libopenmpt/"
+  },
+  {
+    "name": "libpanelw",
+    "version": "6.5_p20241006-r3",
+    "license": "X11",
+    "origin": "ncurses",
+    "source_commit": "2cf24c798675a7f7deb2603c350d4adc7b59c8bb",
+    "upstream": "https://invisible-island.net/ncurses/"
+  },
+  {
+    "name": "libpciaccess",
+    "version": "0.18.1-r0",
+    "license": "X11",
+    "origin": "libpciaccess",
+    "source_commit": "9bda3b34ae265f5b18e3e0de94261e63dbe8d586",
+    "upstream": "https://xorg.freedesktop.org/"
+  },
+  {
+    "name": "libplacebo",
+    "version": "6.338.2-r3",
+    "license": "LGPL-2.1-or-later",
+    "origin": "libplacebo",
+    "source_commit": "483f618fd3e0e18a393cccce8d72cc82cc420630",
+    "upstream": "https://code.videolan.org/videolan/libplacebo"
+  },
+  {
+    "name": "libpng",
+    "version": "1.6.59-r0",
+    "license": "Libpng",
+    "origin": "libpng",
+    "source_commit": "8f4a3b0c259019308adff958bdd97ed114397b18",
+    "upstream": "http://www.libpng.org"
+  },
+  {
+    "name": "libpsl",
+    "version": "0.21.5-r3",
+    "license": "MIT",
+    "origin": "libpsl",
+    "source_commit": "398a5aee3025ec8a4d0d761e448dc86ac777fa09",
+    "upstream": "https://rockdaboot.github.io/libpsl"
+  },
+  {
+    "name": "libpulse",
+    "version": "17.0-r4",
+    "license": "LGPL-2.1-or-later",
+    "origin": "pulseaudio",
+    "source_commit": "b86a9d3007211ec15c0959fe42065110d1004386",
+    "upstream": "https://www.freedesktop.org/wiki/Software/PulseAudio/"
+  },
+  {
+    "name": "librist",
+    "version": "0.2.10-r1",
+    "license": "BSD-2-Clause",
+    "origin": "librist",
+    "source_commit": "7fae7a223bdcca4f6796176c4db09417927060a5",
+    "upstream": "https://www.rist.tv/"
+  },
+  {
+    "name": "libsharpyuv",
+    "version": "1.4.0-r0",
+    "license": "BSD-3-Clause",
+    "origin": "libwebp",
+    "source_commit": "9e9632efda29b66bba6f82b0010a94660831760e",
+    "upstream": "https://developers.google.com/speed/webp"
+  },
+  {
+    "name": "libsndfile",
+    "version": "1.2.2-r2",
+    "license": "LGPL-2.1-or-later",
+    "origin": "libsndfile",
+    "source_commit": "8b4181c2fe9388718a54e1149afdf0834a777012",
+    "upstream": "https://libsndfile.github.io/libsndfile/"
+  },
+  {
+    "name": "libsodium",
+    "version": "1.0.20-r1",
+    "license": "ISC",
+    "origin": "libsodium",
+    "source_commit": "42b40f9425c9a0cc672f0fc7ddfc5c9ebed639c6",
+    "upstream": "https://github.com/jedisct1/libsodium"
+  },
+  {
+    "name": "libsrt",
+    "version": "1.5.3-r0",
+    "license": "MPL-2.0",
+    "origin": "libsrt",
+    "source_commit": "f1b5c266a074cf49a036e6df60c666aa7beb02f4",
+    "upstream": "https://www.srtalliance.org/"
+  },
+  {
+    "name": "libssh",
+    "version": "0.11.1-r0",
+    "license": "LGPL-2.1-or-later BSD-2-Clause",
+    "origin": "libssh",
+    "source_commit": "d67a1842319057a9b070747f15e6e4a3299fed95",
+    "upstream": "https://www.libssh.org/"
+  },
+  {
+    "name": "libssl3",
+    "version": "3.3.2-r4",
+    "license": "Apache-2.0",
+    "origin": "openssl",
+    "source_commit": "e18f4d0c2080542ef5c4fd329a5be584064658aa",
+    "upstream": "https://www.openssl.org/"
+  },
+  {
+    "name": "libstdc++",
+    "version": "14.2.0-r4",
+    "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+    "origin": "gcc",
+    "source_commit": "1a03a2a9c9e77f1a07d48b6f6805e72c8c63c03f",
+    "upstream": "https://gcc.gnu.org"
+  },
+  {
+    "name": "libtheora",
+    "version": "1.1.1-r18",
+    "license": "BSD-3-Clause",
+    "origin": "libtheora",
+    "source_commit": "33283848034c9885d984c8e8697c645c57324938",
+    "upstream": "https://www.xiph.org"
+  },
+  {
+    "name": "libunibreak",
+    "version": "6.1-r0",
+    "license": "Zlib",
+    "origin": "libunibreak",
+    "source_commit": "3add37f3a9a86b35717f2cf7187158d28b328c2b",
+    "upstream": "https://github.com/adah1972/libunibreak"
+  },
+  {
+    "name": "libunistring",
+    "version": "1.2-r0",
+    "license": "GPL-2.0-or-later OR LGPL-3.0-or-later",
+    "origin": "libunistring",
+    "source_commit": "c4c67852adc5bc15e278054876bc3c70c321948e",
+    "upstream": "https://www.gnu.org/software/libunistring/"
+  },
+  {
+    "name": "libuuid",
+    "version": "2.40.4-r1",
+    "license": "BSD-3-Clause",
+    "origin": "util-linux",
+    "source_commit": "67123673d9594a0de26838c585ce77ac2e75e7de",
+    "upstream": "https://git.kernel.org/cgit/utils/util-linux/util-linux.git"
+  },
+  {
+    "name": "libva",
+    "version": "2.22.0-r1",
+    "license": "MIT",
+    "origin": "libva",
+    "source_commit": "398a5aee3025ec8a4d0d761e448dc86ac777fa09",
+    "upstream": "https://01.org/linuxmedia"
+  },
+  {
+    "name": "libvdpau",
+    "version": "1.5-r4",
+    "license": "MIT",
+    "origin": "libvdpau",
+    "source_commit": "398a5aee3025ec8a4d0d761e448dc86ac777fa09",
+    "upstream": "https://gitlab.freedesktop.org/vdpau/libvdpau"
+  },
+  {
+    "name": "libvorbis",
+    "version": "1.3.7-r2",
+    "license": "BSD-3-Clause",
+    "origin": "libvorbis",
+    "source_commit": "fc95c59998285564fbcb0bfb2443898c62e10171",
+    "upstream": "https://xiph.org/vorbis"
+  },
+  {
+    "name": "libvpx",
+    "version": "1.15.0-r0",
+    "license": "BSD-3-Clause",
+    "origin": "libvpx",
+    "source_commit": "572ebfeb56786d1d701690efe8a0cd8411962d16",
+    "upstream": "https://www.webmproject.org/"
+  },
+  {
+    "name": "libwebp",
+    "version": "1.4.0-r0",
+    "license": "BSD-3-Clause",
+    "origin": "libwebp",
+    "source_commit": "9e9632efda29b66bba6f82b0010a94660831760e",
+    "upstream": "https://developers.google.com/speed/webp"
+  },
+  {
+    "name": "libwebpmux",
+    "version": "1.4.0-r0",
+    "license": "BSD-3-Clause",
+    "origin": "libwebp",
+    "source_commit": "9e9632efda29b66bba6f82b0010a94660831760e",
+    "upstream": "https://developers.google.com/speed/webp"
+  },
+  {
+    "name": "libx11",
+    "version": "1.8.10-r0",
+    "license": "X11",
+    "origin": "libx11",
+    "source_commit": "35f49f7d1dd8609d25302034acf39e5a0fd68391",
+    "upstream": "https://xorg.freedesktop.org/"
+  },
+  {
+    "name": "libxau",
+    "version": "1.0.11-r4",
+    "license": "MIT",
+    "origin": "libxau",
+    "source_commit": "614e9166706cec427fc3d907b8d981390a42e088",
+    "upstream": "https://xorg.freedesktop.org/"
+  },
+  {
+    "name": "libxcb",
+    "version": "1.16.1-r0",
+    "license": "MIT",
+    "origin": "libxcb",
+    "source_commit": "96c0dfa57f3437a68b4df24fdbbdcf49f1698248",
+    "upstream": "https://xcb.freedesktop.org/"
+  },
+  {
+    "name": "libxdmcp",
+    "version": "1.1.5-r1",
+    "license": "MIT",
+    "origin": "libxdmcp",
+    "source_commit": "614e9166706cec427fc3d907b8d981390a42e088",
+    "upstream": "https://xorg.freedesktop.org/"
+  },
+  {
+    "name": "libxext",
+    "version": "1.3.6-r2",
+    "license": "MIT",
+    "origin": "libxext",
+    "source_commit": "614e9166706cec427fc3d907b8d981390a42e088",
+    "upstream": "https://xorg.freedesktop.org/"
+  },
+  {
+    "name": "libxfixes",
+    "version": "6.0.1-r4",
+    "license": "MIT",
+    "origin": "libxfixes",
+    "source_commit": "614e9166706cec427fc3d907b8d981390a42e088",
+    "upstream": "https://xorg.freedesktop.org/"
+  },
+  {
+    "name": "libxml2",
+    "version": "2.13.9-r1",
+    "license": "MIT",
+    "origin": "libxml2",
+    "source_commit": "f77d9e58e5dcbf8b6cc3090c8198d09614581c9b",
+    "upstream": "https://gitlab.gnome.org/GNOME/libxml2"
+  },
+  {
+    "name": "libzmq",
+    "version": "4.3.5-r2",
+    "license": "MPL-2.0",
+    "origin": "zeromq",
+    "source_commit": "f87ef4d699c4aab6b2d2b8b67d86e6006a18be07",
+    "upstream": "https://zeromq.org/"
+  },
+  {
+    "name": "lilv-libs",
+    "version": "0.24.24-r1",
+    "license": "ISC",
+    "origin": "lilv",
+    "source_commit": "acebff9d2d1f83431a556f4a0a5bd2b70bb05d2b",
+    "upstream": "https://drobilla.net/software/lilv"
+  },
+  {
+    "name": "linux-virt",
+    "version": "6.12.112-r0",
+    "license": "GPL-2.0-only",
+    "origin": "linux-lts",
+    "source_commit": "62d50affefb6f5aa5a810f573855b767a0a07486",
+    "upstream": "https://www.kernel.org"
+  },
+  {
+    "name": "mbedtls",
+    "version": "3.6.7-r0",
+    "license": "Apache-2.0 OR GPL-2.0-or-later",
+    "origin": "mbedtls",
+    "source_commit": "e6ed8726ca3424f24e46762f0bb403baf7603467",
+    "upstream": "https://www.trustedfirmware.org/projects/mbed-tls/"
+  },
+  {
+    "name": "mdev-conf",
+    "version": "4.7-r0",
+    "license": "MIT",
+    "origin": "mdev-conf",
+    "source_commit": "1b1f5714e8b6d651767db8151dad65bdb271cd64",
+    "upstream": "https://gitlab.alpinelinux.org/alpine/mdev-conf"
+  },
+  {
+    "name": "mkinitfs",
+    "version": "3.11.1-r0",
+    "license": "GPL-2.0-only",
+    "origin": "mkinitfs",
+    "source_commit": "985cd121903f44ee0b360450999d5979eb1b5ec8",
+    "upstream": "https://gitlab.alpinelinux.org/alpine/mkinitfs"
+  },
+  {
+    "name": "mpdecimal",
+    "version": "4.0.0-r0",
+    "license": "BSD-2-Clause",
+    "origin": "mpdecimal",
+    "source_commit": "2eb73f6cb661fb3582606482331ad083155f18e8",
+    "upstream": "https://www.bytereef.org/mpdecimal/index.html"
+  },
+  {
+    "name": "mpg123-libs",
+    "version": "1.32.9-r0",
+    "license": "LGPL-2.1-only",
+    "origin": "mpg123",
+    "source_commit": "4bdd1b69c7fc06acbc0f138c9d2f66ec1f4d5e30",
+    "upstream": "https://www.mpg123.org/"
+  },
+  {
+    "name": "musl",
+    "version": "1.2.5-r8",
+    "license": "MIT",
+    "origin": "musl",
+    "source_commit": "c1ab9dfcb36751c3e9097f0f67e01ad12b2e1f5f",
+    "upstream": "https://musl.libc.org/"
+  },
+  {
+    "name": "musl-utils",
+    "version": "1.2.5-r8",
+    "license": "MIT AND BSD-2-Clause AND GPL-2.0-or-later",
+    "origin": "musl",
+    "source_commit": "c1ab9dfcb36751c3e9097f0f67e01ad12b2e1f5f",
+    "upstream": "https://musl.libc.org/"
+  },
+  {
+    "name": "ncurses-terminfo-base",
+    "version": "6.5_p20241006-r3",
+    "license": "X11",
+    "origin": "ncurses",
+    "source_commit": "2cf24c798675a7f7deb2603c350d4adc7b59c8bb",
+    "upstream": "https://invisible-island.net/ncurses/"
+  },
+  {
+    "name": "nghttp2-libs",
+    "version": "1.69.0-r0",
+    "license": "MIT",
+    "origin": "nghttp2",
+    "source_commit": "f5865f848b702c52c657060adbe80706265984ec",
+    "upstream": "https://nghttp2.org"
+  },
+  {
+    "name": "numactl",
+    "version": "2.0.18-r0",
+    "license": "LGPL-2.1-only",
+    "origin": "numactl",
+    "source_commit": "1800f4f0060aa17fbe10686a0a66161b216c5bf9",
+    "upstream": "https://github.com/numactl/numactl"
+  },
+  {
+    "name": "openexr-libiex",
+    "version": "3.3.2-r0",
+    "license": "BSD-3-Clause",
+    "origin": "openexr",
+    "source_commit": "152208c87b37a706da31b08747b3f49a0c1216dd",
+    "upstream": "https://www.openexr.com/"
+  },
+  {
+    "name": "openexr-libilmthread",
+    "version": "3.3.2-r0",
+    "license": "BSD-3-Clause",
+    "origin": "openexr",
+    "source_commit": "152208c87b37a706da31b08747b3f49a0c1216dd",
+    "upstream": "https://www.openexr.com/"
+  },
+  {
+    "name": "openexr-libopenexr",
+    "version": "3.3.2-r0",
+    "license": "BSD-3-Clause",
+    "origin": "openexr",
+    "source_commit": "152208c87b37a706da31b08747b3f49a0c1216dd",
+    "upstream": "https://www.openexr.com/"
+  },
+  {
+    "name": "openexr-libopenexrcore",
+    "version": "3.3.2-r0",
+    "license": "BSD-3-Clause",
+    "origin": "openexr",
+    "source_commit": "152208c87b37a706da31b08747b3f49a0c1216dd",
+    "upstream": "https://www.openexr.com/"
+  },
+  {
+    "name": "opus",
+    "version": "1.5.2-r1",
+    "license": "BSD-3-Clause",
+    "origin": "opus",
+    "source_commit": "398a5aee3025ec8a4d0d761e448dc86ac777fa09",
+    "upstream": "https://www.opus-codec.org/"
+  },
+  {
+    "name": "orc",
+    "version": "0.4.40-r1",
+    "license": "BSD-2-Clause",
+    "origin": "orc",
+    "source_commit": "398a5aee3025ec8a4d0d761e448dc86ac777fa09",
+    "upstream": "https://gstreamer.freedesktop.org/modules/orc.html"
+  },
+  {
+    "name": "pcre2",
+    "version": "10.43-r0",
+    "license": "BSD-3-Clause",
+    "origin": "pcre2",
+    "source_commit": "0826e91f0c743946bdc6ffa51fe90479bf4a83da",
+    "upstream": "https://pcre.org/"
+  },
+  {
+    "name": "pyc",
+    "version": "3.12.15-r0",
+    "license": "PSF-2.0",
+    "origin": "python3",
+    "source_commit": "73cda94eb86770bcf80392a179d7543ba805b0e8",
+    "upstream": "https://www.python.org/"
+  },
+  {
+    "name": "python3",
+    "version": "3.12.15-r0",
+    "license": "PSF-2.0",
+    "origin": "python3",
+    "source_commit": "73cda94eb86770bcf80392a179d7543ba805b0e8",
+    "upstream": "https://www.python.org/"
+  },
+  {
+    "name": "python3-pyc",
+    "version": "3.12.15-r0",
+    "license": "PSF-2.0",
+    "origin": "python3",
+    "source_commit": "73cda94eb86770bcf80392a179d7543ba805b0e8",
+    "upstream": "https://www.python.org/"
+  },
+  {
+    "name": "python3-pycache-pyc0",
+    "version": "3.12.15-r0",
+    "license": "PSF-2.0",
+    "origin": "python3",
+    "source_commit": "73cda94eb86770bcf80392a179d7543ba805b0e8",
+    "upstream": "https://www.python.org/"
+  },
+  {
+    "name": "rav1e-libs",
+    "version": "0.7.1-r0",
+    "license": "BSD-2-Clause custom",
+    "origin": "rav1e",
+    "source_commit": "daeb1a20c9b7baad9a96a13e3fd3a4cb5270aaf6",
+    "upstream": "https://github.com/xiph/rav1e"
+  },
+  {
+    "name": "readline",
+    "version": "8.2.13-r0",
+    "license": "GPL-3.0-or-later",
+    "origin": "readline",
+    "source_commit": "7dff18068fb2ef6694db4f7bdc447755187e74ab",
+    "upstream": "https://tiswww.cwru.edu/php/chet/readline/rltop.html"
+  },
+  {
+    "name": "scanelf",
+    "version": "1.3.8-r1",
+    "license": "GPL-2.0-only",
+    "origin": "pax-utils",
+    "source_commit": "398a5aee3025ec8a4d0d761e448dc86ac777fa09",
+    "upstream": "https://wiki.gentoo.org/wiki/Hardened/PaX_Utilities"
+  },
+  {
+    "name": "sdl2",
+    "version": "2.30.9-r0",
+    "license": "Zlib",
+    "origin": "sdl2",
+    "source_commit": "92c2a8afe37838a051cfb291ef17f7b43c859f54",
+    "upstream": "https://www.libsdl.org"
+  },
+  {
+    "name": "serd-libs",
+    "version": "0.32.2-r0",
+    "license": "ISC",
+    "origin": "serd",
+    "source_commit": "ab02097e3f3c0a92d846bfc5577d0a6d36d182aa",
+    "upstream": "https://drobilla.net/software/serd"
+  },
+  {
+    "name": "shaderc",
+    "version": "2024.0-r2",
+    "license": "Apache-2.0",
+    "origin": "shaderc",
+    "source_commit": "483f618fd3e0e18a393cccce8d72cc82cc420630",
+    "upstream": "https://github.com/google/shaderc"
+  },
+  {
+    "name": "sord-libs",
+    "version": "0.16.16-r0",
+    "license": "ISC",
+    "origin": "sord",
+    "source_commit": "6db31f7f15f13f76337790a42503bc620a1f8bb9",
+    "upstream": "https://drobilla.net/software/sord"
+  },
+  {
+    "name": "soxr",
+    "version": "0.1.3-r7",
+    "license": "LGPL-2.1-or-later",
+    "origin": "soxr",
+    "source_commit": "46765a0eade20ce05a3b3483d7df3dab282af6fd",
+    "upstream": "https://sourceforge.net/projects/soxr/"
+  },
+  {
+    "name": "speexdsp",
+    "version": "1.2.1-r2",
+    "license": "BSD-3-Clause",
+    "origin": "speexdsp",
+    "source_commit": "33283848034c9885d984c8e8697c645c57324938",
+    "upstream": "https://www.speex.org/"
+  },
+  {
+    "name": "spirv-tools",
+    "version": "1.3.296.0-r0",
+    "license": "Apache-2.0",
+    "origin": "spirv-tools",
+    "source_commit": "927896f8985781856a06144990d6dd1470166186",
+    "upstream": "https://github.com/KhronosGroup/SPIRV-Tools"
+  },
+  {
+    "name": "sqlite-libs",
+    "version": "3.48.0-r4",
+    "license": "blessing",
+    "origin": "sqlite",
+    "source_commit": "ee0eac4d746e3a414cacb3186b3577ccc4342c07",
+    "upstream": "https://www.sqlite.org/"
+  },
+  {
+    "name": "sratom",
+    "version": "0.6.16-r0",
+    "license": "ISC",
+    "origin": "sratom",
+    "source_commit": "c8100564a60c98ffddb6e23176a94c4a8a2ff5c0",
+    "upstream": "https://drobilla.net/software/sratom"
+  },
+  {
+    "name": "ssl_client",
+    "version": "1.37.0-r8",
+    "license": "GPL-2.0-only",
+    "origin": "busybox",
+    "source_commit": "79fddc2aa9c64c47fb3da6edeae9570b4e9caa7e",
+    "upstream": "https://busybox.net/"
+  },
+  {
+    "name": "tdb-libs",
+    "version": "1.4.12-r0",
+    "license": "LGPL-3.0-or-later",
+    "origin": "tdb",
+    "source_commit": "b425c2fd36875d7491c901ee3ec8529a794c0d41",
+    "upstream": "https://tdb.samba.org/"
+  },
+  {
+    "name": "v4l-utils-libs",
+    "version": "1.28.1-r1",
+    "license": "LGPL-2.0-or-later",
+    "origin": "v4l-utils",
+    "source_commit": "49f40e0ee2886446743113cce20a905b3c1cbab1",
+    "upstream": "https://linuxtv.org/"
+  },
+  {
+    "name": "vidstab",
+    "version": "1.1.1-r0",
+    "license": "GPL-2.0-or-later",
+    "origin": "vidstab",
+    "source_commit": "e3154e40c50e665351a01f60d67c302ee4773a69",
+    "upstream": "http://public.hronopik.de/vid.stab/"
+  },
+  {
+    "name": "vulkan-loader",
+    "version": "1.3.296.0-r0",
+    "license": "Apache-2.0",
+    "origin": "vulkan-loader",
+    "source_commit": "c652bb1377df6682b5bfba9cfd433bb897332b1b",
+    "upstream": "https://www.khronos.org/vulkan"
+  },
+  {
+    "name": "wayland-libs-client",
+    "version": "1.23.1-r0",
+    "license": "MIT",
+    "origin": "wayland",
+    "source_commit": "5bf18464a0c23314e8ed449476a179d8c35a325f",
+    "upstream": "https://wayland.freedesktop.org"
+  },
+  {
+    "name": "x264-libs",
+    "version": "0.164.3108-r0",
+    "license": "GPL-2.0-or-later",
+    "origin": "x264",
+    "source_commit": "c4a5997f85f5adc6ddc724b7bf65a8e0c102b60b",
+    "upstream": "https://www.videolan.org/developers/x264.html"
+  },
+  {
+    "name": "x265-libs",
+    "version": "3.6-r0",
+    "license": "GPL-2.0-or-later",
+    "origin": "x265",
+    "source_commit": "6903954acc2e9cf013f0cf17e744b9be25daf84c",
+    "upstream": "https://www.videolan.org/developers/x265.html"
+  },
+  {
+    "name": "xvidcore",
+    "version": "1.3.7-r2",
+    "license": "GPL-2.0-or-later",
+    "origin": "xvidcore",
+    "source_commit": "33283848034c9885d984c8e8697c645c57324938",
+    "upstream": "https://www.xvid.com/"
+  },
+  {
+    "name": "xz-libs",
+    "version": "5.8.4-r0",
+    "license": "GPL-2.0-or-later AND 0BSD AND Public-Domain AND LGPL-2.1-or-later",
+    "origin": "xz",
+    "source_commit": "703710896c49375655df7c22d0a523aa02544f2c",
+    "upstream": "https://tukaani.org/xz/"
+  },
+  {
+    "name": "zimg",
+    "version": "3.0.5-r2",
+    "license": "WTFPL",
+    "origin": "zimg",
+    "source_commit": "1cc5a61ffe22237755c1de81501b6c14ada17c46",
+    "upstream": "https://github.com/sekrit-twc/zimg"
+  },
+  {
+    "name": "zix-libs",
+    "version": "0.4.2-r0",
+    "license": "ISC",
+    "origin": "zix",
+    "source_commit": "9cd2e4f7e4db77e84c383c1f0659259a92f88538",
+    "upstream": "http://drobilla.net/category/zix/"
+  },
+  {
+    "name": "zlib",
+    "version": "1.3.1-r2",
+    "license": "Zlib",
+    "origin": "zlib",
+    "source_commit": "4c2722e7ecc1c5e3ba882429044a101497121223",
+    "upstream": "https://zlib.net/"
+  },
+  {
+    "name": "zstd-libs",
+    "version": "1.5.6-r2",
+    "license": "BSD-3-Clause OR GPL-2.0-or-later",
+    "origin": "zstd",
+    "source_commit": "5c2ddf18f193dafdd25ae7391d96c7e30766eecd",
+    "upstream": "https://facebook.github.io/zstd/"
+  }
+]
