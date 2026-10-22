@@ -97,7 +97,10 @@ cli.setPathSearch('input', ['assets', 'fixtures']);
 
 The last line requires an option named `input` to have been registered. Config is
 line-oriented: `send:port=443`, with `@include relative-file` for includes. Prefixes
-select the program's keys; unknown keys are errors.
+select the program's keys; keys that aren't option names are ignored, so several
+programs can share one file. `--help-json-schema` reports the declaration as
+`config` (`{"option": "config", "prefixes": ["send:"]}`, or `null`), which is
+how `clyops-doc` writes a FILES section.
 
 CLI paths resolve against the working directory; config paths resolve against
 the config file containing the value; default/environment paths resolve against

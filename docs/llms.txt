@@ -4,7 +4,7 @@
 
 Key facts for agents:
 
-- Every clyops program answers `--help`, `--help-json-schema` (JSON with `"clyops": 1`) and `--completion bash|zsh|fish`. Read the schema before running a tool: it gives options, types, choices, ranges, required values, declared effects (`read-only`, `idempotent`, `destructive`, `network`), stdin/stdout MIME types and which options are secrets.
+- Every clyops program answers `--help`, `--help-json-schema` (JSON with `"clyops": 1`) and `--completion bash|zsh|fish`. Read the schema before running a tool: it gives options, types, choices, ranges, required values, declared effects (`read-only`, `idempotent`, `destructive`, `network`), stdin/stdout MIME types, which options are secrets and which option names the config file.
 - Precedence is command line > config file > environment variable (named after the option's variable) > default. Pass secrets through the environment, never on the command line.
 - Exit status 1 means invalid input or a runtime failure, with an exact message on stderr. Exit status 2 (Bash and C) means the tool itself is misdefined.
 - When writing a tool, register everything before `run` and do no work until `run` returns: it exits early for help, schema, completion and every validation error, and tooling probes tools with those flags.
