@@ -248,6 +248,14 @@ _clyops_value___CLYOPS_FUNC__() {
                     [[ -d &quot;$dir&quot; ]] &amp;&amp; COMPREPLY+=($(cd &quot;$dir&quot; &amp;&amp; compgen $flag -- &quot;$cur&quot;))
                 done
             fi ;;
+        command)
+            # A program on PATH, or a path once the word has a slash.
+            if [[ &quot;$cur&quot; == */* ]]; then
+                compopt -o filenames 2&gt;/dev/null
+                COMPREPLY=($(compgen -f -- &quot;$cur&quot;))
+            else
+                COMPREPLY=($(compgen -c -- &quot;$cur&quot;))
+            fi ;;
         host) COMPREPLY=($(compgen -A hostname -- &quot;$cur&quot;)) ;;
         none) COMPREPLY=() ;;
         *) compopt -o default 2&gt;/dev/null; COMPREPLY=() ;;
@@ -320,6 +328,7 @@ _clyops_action___CLYOPS_FUNC__() {
         choice) print -r -- &quot;(${values//,/ })&quot; ;;
         file) if [[ -n &quot;$values&quot; ]]; then print -r -- &quot;{_files; _files -W \&quot;(${values//:/ })\&quot;}&quot;; else print -r -- _files; fi ;;
         dir) if [[ -n &quot;$values&quot; ]]; then print -r -- &quot;{_files -/; _files -/ -W \&quot;(${values//:/ })\&quot;}&quot;; else print -r -- &quot;_files -/&quot;; fi ;;
+        command) print -r -- &#39;{if [[ $PREFIX == */* ]]; then _files; else _command_names -e; fi}&#39; ;;
         host) print -r -- _hosts ;;
         none) print -r -- &quot; &quot; ;;
         *) print -r -- _files ;;
@@ -353,6 +362,13 @@ function __clyops___CLYOPS_FUNC___value --argument-names kind values cur
                         string replace -- &quot;$dir/&quot; &#39;&#39; $f
                     end
                 end
+            end
+        case command
+            # A program on PATH, or a path once the word has a slash.
+            if string match -q -- &#39;*/*&#39; $cur
+                __fish_complete_path $cur
+            else
+                complete -C -- $cur
             end
         case dir
             __fish_complete_directories $cur
@@ -522,6 +538,30 @@ complete -c __CLYOPS_PROG__ -f -a &#39;(__clyops___CLYOPS_FUNC___complete)&#39;
         <li class="public ">
   <span class="summary_signature">
     
+      <a href="#bare_program%3F-class_method" title="bare_program? (class method)">.<strong>bare_program?</strong>(value)  &#x21d2; Boolean </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'>
+<p>Whether a ‘file:executable` value names a program on PATH rather than a path (spec section 5).</p>
+</div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
       <a href="#bool_word-class_method" title="bool_word (class method)">.<strong>bool_word</strong>(value)  &#x21d2; Boolean<sup>?</sup> </a>
     
 
@@ -682,6 +722,54 @@ complete -c __CLYOPS_PROG__ -f -a &#39;(__clyops___CLYOPS_FUNC___complete)&#39;
   
     <span class="summary_desc"><div class='inline'>
 <p>Write an error to stderr.</p>
+</div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#executable%3F-class_method" title="executable? (class method)">.<strong>executable?</strong>(value, env = ENV)  &#x21d2; Boolean </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'>
+<p>Whether ‘value` is a program: a bare name found on PATH, or a path to an executable regular file (spec section 5).</p>
+</div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#executable_file%3F-class_method" title="executable_file? (class method)">.<strong>executable_file?</strong>(path)  &#x21d2; Boolean </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'>
+<p>A regular file the user may run; Windows has no execute bit, so one that exists.</p>
 </div></span>
   
 </li>
@@ -985,7 +1073,86 @@ complete -c __CLYOPS_PROG__ -f -a &#39;(__clyops___CLYOPS_FUNC___complete)&#39;
 
     
       <div class="method_details first">
-  <h3 class="signature first" id="bool_word-class_method">
+  <h3 class="signature first" id="bare_program?-class_method">
+  
+    .<strong>bare_program?</strong>(value)  &#x21d2; <tt>Boolean</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    
+<p>Whether a ‘file:executable` value names a program on PATH rather than a path (spec section 5).</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>value</span>
+      
+      
+        <span class='type'>(<tt>String</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>The value.</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Boolean</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>true for a bare name.</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+265
+266
+267</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 265</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_bare_program?'>bare_program?</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span>
+  <span class='op'>!</span><span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span> <span class='op'>&amp;&amp;</span> <span class='op'>!</span><span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_include?'>include?</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>/</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='op'>&amp;&amp;</span> <span class='op'>!</span><span class='lparen'>(</span><span class='const'>File</span><span class='op'>::</span><span class='const'>ALT_SEPARATOR</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_include?'>include?</span><span class='lparen'>(</span><span class='const'>File</span><span class='op'>::</span><span class='const'>ALT_SEPARATOR</span><span class='rparen'>)</span><span class='rparen'>)</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="bool_word-class_method">
   
     .<strong>bool_word</strong>(value)  &#x21d2; <tt>Boolean</tt><sup>?</sup> 
   
@@ -1230,20 +1397,22 @@ complete -c __CLYOPS_PROG__ -f -a &#39;(__clyops___CLYOPS_FUNC___complete)&#39;
       <pre class="lines">
 
 
-325
-326
-327
-328
-329
-330
-331
-332
-333</pre>
+356
+357
+358
+359
+360
+361
+362
+363
+364
+365</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 325</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 356</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_completion_kind'>completion_kind</span><span class='lparen'>(</span><span class='id identifier rubyid_rule'>rule</span><span class='comma'>,</span> <span class='id identifier rubyid_search_dirs'>search_dirs</span><span class='rparen'>)</span>
+  <span class='kw'>return</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>command</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_search_dirs'>search_dirs</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>:</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='rbracket'>]</span> <span class='kw'>if</span> <span class='id identifier rubyid_rule'>rule</span> <span class='op'>==</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>file:executable</span><span class='tstring_end'>&quot;</span></span>
   <span class='kw'>return</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>file</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_search_dirs'>search_dirs</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>:</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='rbracket'>]</span> <span class='kw'>if</span> <span class='id identifier rubyid_rule'>rule</span> <span class='op'>==</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>path</span><span class='tstring_end'>&quot;</span></span> <span class='op'>||</span> <span class='id identifier rubyid_rule'>rule</span><span class='period'>.</span><span class='id identifier rubyid_start_with?'>start_with?</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>file:</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>dir</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_search_dirs'>search_dirs</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>:</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='rbracket'>]</span> <span class='kw'>if</span> <span class='id identifier rubyid_rule'>rule</span><span class='period'>.</span><span class='id identifier rubyid_start_with?'>start_with?</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>dir:</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>choice</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_rule'>rule</span><span class='lbracket'>[</span><span class='int'>7</span><span class='op'>..</span><span class='rbracket'>]</span><span class='rbracket'>]</span> <span class='kw'>if</span> <span class='id identifier rubyid_rule'>rule</span><span class='period'>.</span><span class='id identifier rubyid_start_with?'>start_with?</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>choice:</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -1642,6 +1811,192 @@ complete -c __CLYOPS_PROG__ -f -a &#39;(__clyops___CLYOPS_FUNC___complete)&#39;
 </div>
     
       <div class="method_details ">
+  <h3 class="signature " id="executable?-class_method">
+  
+    .<strong>executable?</strong>(value, env = ENV)  &#x21d2; <tt>Boolean</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    
+<p>Whether ‘value` is a program: a bare name found on PATH, or a path to an executable regular file (spec section 5).</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>value</span>
+      
+      
+        <span class='type'>(<tt>String</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>The value.</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>env</span>
+      
+      
+        <span class='type'>(<tt>Hash</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>ENV</tt>)</em>
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>The environment holding PATH (and PATHEXT on Windows).</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Boolean</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>true when it can be run.</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+274
+275
+276
+277
+278
+279
+280
+281</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 274</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_executable?'>executable?</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='comma'>,</span> <span class='id identifier rubyid_env'>env</span> <span class='op'>=</span> <span class='const'>ENV</span><span class='rparen'>)</span>
+  <span class='kw'>return</span> <span class='id identifier rubyid_executable_file?'>executable_file?</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span> <span class='kw'>unless</span> <span class='id identifier rubyid_bare_program?'>bare_program?</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span>
+
+  <span class='id identifier rubyid_exts'>exts</span> <span class='op'>=</span> <span class='const'>File</span><span class='op'>::</span><span class='const'>ALT_SEPARATOR</span> <span class='op'>?</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span> <span class='op'>+</span> <span class='id identifier rubyid_env'>env</span><span class='period'>.</span><span class='id identifier rubyid_fetch'>fetch</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>PATHEXT</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>.COM;.EXE;.BAT;.CMD</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_split'>split</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>;</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_reject'>reject</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:empty?</span><span class='rparen'>)</span> <span class='op'>:</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
+  <span class='id identifier rubyid_env'>env</span><span class='period'>.</span><span class='id identifier rubyid_fetch'>fetch</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>PATH</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_split'>split</span><span class='lparen'>(</span><span class='const'>File</span><span class='op'>::</span><span class='const'>PATH_SEPARATOR</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_reject'>reject</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:empty?</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_any?'>any?</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_dir'>dir</span><span class='op'>|</span>
+    <span class='id identifier rubyid_exts'>exts</span><span class='period'>.</span><span class='id identifier rubyid_any?'>any?</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_ext'>ext</span><span class='op'>|</span> <span class='id identifier rubyid_executable_file?'>executable_file?</span><span class='lparen'>(</span><span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span><span class='lparen'>(</span><span class='id identifier rubyid_dir'>dir</span><span class='comma'>,</span> <span class='id identifier rubyid_value'>value</span> <span class='op'>+</span> <span class='id identifier rubyid_ext'>ext</span><span class='rparen'>)</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
+  <span class='kw'>end</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="executable_file?-class_method">
+  
+    .<strong>executable_file?</strong>(path)  &#x21d2; <tt>Boolean</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    
+<p>A regular file the user may run; Windows has no execute bit, so one that exists.</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>path</span>
+      
+      
+        <span class='type'>(<tt>String</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>The path.</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Boolean</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>true when it is one.</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+286
+287
+288</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 286</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_executable_file?'>executable_file?</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span>
+  <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_file?'>file?</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span> <span class='op'>&amp;&amp;</span> <span class='lparen'>(</span><span class='op'>!</span><span class='const'>File</span><span class='op'>::</span><span class='const'>ALT_SEPARATOR</span><span class='period'>.</span><span class='id identifier rubyid_nil?'>nil?</span> <span class='op'>||</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_executable?'>executable?</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span><span class='rparen'>)</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
   <h3 class="signature " id="info-class_method">
   
     .<strong>info</strong>(msg)  &#x21d2; <tt>Integer</tt><sup>?</sup> 
@@ -1905,12 +2260,12 @@ complete -c __CLYOPS_PROG__ -f -a &#39;(__clyops___CLYOPS_FUNC___complete)&#39;
       <pre class="lines">
 
 
-264
-265
-266</pre>
+295
+296
+297</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 264</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 295</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_normpath'>normpath</span><span class='lparen'>(</span><span class='id identifier rubyid_base'>base</span><span class='comma'>,</span> <span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span>
   <span class='const'>Pathname</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='id identifier rubyid_base'>base</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_cleanpath'>cleanpath</span><span class='period'>.</span><span class='id identifier rubyid_to_s'>to_s</span>
@@ -2069,12 +2424,12 @@ complete -c __CLYOPS_PROG__ -f -a &#39;(__clyops___CLYOPS_FUNC___complete)&#39;
       <pre class="lines">
 
 
-317
-318
-319</pre>
+348
+349
+350</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 317</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 348</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_pretty_json'>pretty_json</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span>
   <span class='const'>JSON</span><span class='period'>.</span><span class='id identifier rubyid_pretty_generate'>pretty_generate</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_gsub'>gsub</span><span class='lparen'>(</span><span class='tstring'><span class='regexp_beg'>/</span><span class='tstring_content'>\[\n\s*\]</span><span class='regexp_end'>/</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>[]</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_gsub'>gsub</span><span class='lparen'>(</span><span class='tstring'><span class='regexp_beg'>/</span><span class='tstring_content'>\{\n\s*\}</span><span class='regexp_end'>/</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>{}</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -2182,22 +2537,22 @@ complete -c __CLYOPS_PROG__ -f -a &#39;(__clyops___CLYOPS_FUNC___complete)&#39;
       <pre class="lines">
 
 
-273
-274
-275
-276
-277
-278
-279
-280
-281
-282
-283
-284
-285</pre>
+304
+305
+306
+307
+308
+309
+310
+311
+312
+313
+314
+315
+316</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 273</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 304</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_resolve_path'>resolve_path</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='comma'>,</span> <span class='id identifier rubyid_base'>base</span><span class='comma'>,</span> <span class='id identifier rubyid_search_dirs'>search_dirs</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='id identifier rubyid_value'>value</span> <span class='kw'>if</span> <span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span> <span class='op'>||</span> <span class='qwords_beg'>%w[</span><span class='tstring_content'>-</span><span class='words_sep'> </span><span class='tstring_content'>disabled</span><span class='words_sep'> </span><span class='tstring_content'>optional</span><span class='tstring_end'>]</span></span><span class='period'>.</span><span class='id identifier rubyid_include?'>include?</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span>
@@ -2472,7 +2827,9 @@ complete -c __CLYOPS_PROG__ -f -a &#39;(__clyops___CLYOPS_FUNC___complete)&#39;
 254
 255
 256
-257</pre>
+257
+258
+259</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 173</span>
@@ -2555,6 +2912,8 @@ complete -c __CLYOPS_PROG__ -f -a &#39;(__clyops___CLYOPS_FUNC___complete)&#39;
       <span class='id identifier rubyid_dir'>dir</span> <span class='op'>=</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_dirname'>dirname</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span>
       <span class='id identifier rubyid_fail_with'>fail_with</span><span class='period'>.</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>directory is not writable: </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_dir'>dir</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>unless</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_directory?'>directory?</span><span class='lparen'>(</span><span class='id identifier rubyid_dir'>dir</span><span class='rparen'>)</span> <span class='op'>&amp;&amp;</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_writable?'>writable?</span><span class='lparen'>(</span><span class='id identifier rubyid_dir'>dir</span><span class='rparen'>)</span>
     <span class='kw'>end</span>
+  <span class='kw'>when</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>file:executable</span><span class='tstring_end'>&quot;</span></span>
+    <span class='id identifier rubyid_fail_with'>fail_with</span><span class='period'>.</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>is not an executable: </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_value'>value</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>unless</span> <span class='id identifier rubyid_executable?'>executable?</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span>
   <span class='kw'>when</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>dir:exists</span><span class='tstring_end'>&quot;</span></span>
     <span class='id identifier rubyid_fail_with'>fail_with</span><span class='period'>.</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>directory does not exist: </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_value'>value</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>unless</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_directory?'>directory?</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span>
   <span class='kw'>when</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>dir:writable</span><span class='tstring_end'>&quot;</span></span>
@@ -2728,29 +3087,29 @@ complete -c __CLYOPS_PROG__ -f -a &#39;(__clyops___CLYOPS_FUNC___complete)&#39;
       <pre class="lines">
 
 
-291
-292
-293
-294
-295
-296
-297
-298
-299
-300
-301
-302
-303
-304
-305
-306
-307
-308
-309
-310</pre>
+322
+323
+324
+325
+326
+327
+328
+329
+330
+331
+332
+333
+334
+335
+336
+337
+338
+339
+340
+341</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 291</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 322</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_wrap_text'>wrap_text</span><span class='lparen'>(</span><span class='id identifier rubyid_text'>text</span><span class='comma'>,</span> <span class='id identifier rubyid_width'>width</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_text'>text</span><span class='period'>.</span><span class='id identifier rubyid_split'>split</span><span class='lparen'>(</span><span class='tstring'><span class='regexp_beg'>/</span><span class='tstring_content'>\r?\n</span><span class='regexp_end'>/</span></span><span class='comma'>,</span> <span class='op'>-</span><span class='int'>1</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_flat_map'>flat_map</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_original'>original</span><span class='op'>|</span>
@@ -2782,7 +3141,7 @@ complete -c __CLYOPS_PROG__ -f -a &#39;(__clyops___CLYOPS_FUNC___complete)&#39;
 </div>
 
       <div id="footer">
-  Generated on Thu Oct 22 17:45:28 2026 by
+  Generated on Thu Oct 22 19:16:22 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.38 (ruby-3.3.12).
 </div>

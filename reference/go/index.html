@@ -14,6 +14,10 @@ fmt.Println(v.String(&quot;input&quot;), v.Int(&quot;PORT&quot;), v.Bool(&quot;V
 </section><section id="Die"><h2>Die</h2><pre><code>func Die(code int, format string, args ...any)</code></pre><p>Die logs an error (never suppressed) and exits with code.
 </section><section id="Error"><h2>Error</h2><pre><code>func Error(format string, args ...any)</code></pre><p>Error logs an error to stderr.
 </section><section id="Info"><h2>Info</h2><pre><code>func Info(format string, args ...any)</code></pre><p>Info logs an informational message to stderr.
+</section><section id="IsBareProgram"><h2>IsBareProgram</h2><pre><code>func IsBareProgram(value string) bool</code></pre><p>IsBareProgram reports whether a file:executable value names a program on
+PATH rather than a path (spec section 5).
+</section><section id="IsExecutable"><h2>IsExecutable</h2><pre><code>func IsExecutable(value string) bool</code></pre><p>IsExecutable reports whether value is a program: a bare name found on PATH,
+or a path to an executable regular file (spec section 5).
 </section><section id="ResolvePath"><h2>ResolvePath</h2><pre><code>func ResolvePath(value, base string, searchDirs []string) string</code></pre><p>ResolvePath resolves a path value against base (spec section 6), trying
 searchDirs for bare names that don&apos;t exist under base.
 </section><section id="SetSilent"><h2>SetSilent</h2><pre><code>func SetSilent(value bool)</code></pre><p>SetSilent suppresses Info/Warn/Error/Success output (Die and parse errors still print).
