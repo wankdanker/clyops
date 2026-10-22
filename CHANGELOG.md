@@ -5,12 +5,17 @@ section here.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-22
+
+### Config files in the schema
+
 - `--help-json-schema` reports the config file declaration as a top-level `config`
   (`{"option": "config", "prefixes": ["demo:"]}`, or `null` when there is none), in all
   nine languages. Commands don't have it; output from older versions without it means
   `null`. `clyops-schema` types it as `SchemaConfig`.
-- clyops-doc writes a FILES section for a program with a config file: the option and
-  variable naming it, its default, the line format and prefixes, and an example line.
+
+### clyops-doc: a page per command, whole toolsets and man installation
+
 - clyops-doc `--out-dir DIR` writes page files instead of printing one, listing them unless
   `--execute` is given and leaving unchanged files alone; `--split` writes a page per command,
   git-style (`mytool.1` lists them, `mytool-db-migrate.1` documents one, with SEE ALSO between
@@ -20,21 +25,29 @@ section here.
   API and MCP server find them, with an index page named after the dispatcher (`--name`);
   `--prefix PREFIX` installs man pages into `PREFIX/share/man/manN` and warns when `man`
   won't look there.
+- clyops-doc writes a FILES section for a program with a config file: the option and
+  variable naming it, its default, the line format and prefixes, and an example line.
 - clyops-doc: Markdown pages start with a "generated, do not edit" comment; a level with no
   declared effects says to treat it as possibly destructive; a secret option says to set it
   in the environment, never on the command line.
-- The clyops-skillify skill generates its reference pages with clyops-doc
-  (`npx clyops-doc --format markdown`, or `--root` for a whole tree) instead of its own
-  Python renderer, `scripts/schema-to-reference.py`, which is removed.
 - Spec section 15 documents clyops-doc's contract: input, options, sections, inheritance, page
   names and formats. Its stdout stays `text/plain` (one type per program) and its description
   names `text/troff`, `text/markdown` and `text/html`.
+
+### Stopping tools gracefully
+
 - clyops-tools: `killGraceMs` sets how long a stopped run (abort or timeout) has after
   SIGTERM before its process tree gets SIGKILL (default 200 ms, as before), and a timeout
   now sends SIGTERM first instead of going straight to SIGKILL (`timedOut` is still set,
   and a timed-out tool that exits on SIGTERM reports `signal: 'SIGTERM'`), so tools such
   as ffmpeg wrappers can clean up partial files. clyops-jobs: `runScriptFunction` passes
   `killGraceMs` on.
+
+### Agent skills
+
+- The clyops-skillify skill generates its reference pages with clyops-doc
+  (`npx clyops-doc --format markdown`, or `--root` for a whole tree) instead of its own
+  Python renderer, `scripts/schema-to-reference.py`, which is removed.
 
 ## [0.6.0] - 2026-10-21
 
