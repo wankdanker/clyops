@@ -20,6 +20,12 @@ section here.
   API and MCP server find them, with an index page named after the dispatcher (`--name`);
   `--prefix PREFIX` installs man pages into `PREFIX/share/man/manN` and warns when `man`
   won't look there.
+- clyops-doc: Markdown pages start with a "generated, do not edit" comment; a level with no
+  declared effects says to treat it as possibly destructive; a secret option says to set it
+  in the environment, never on the command line.
+- The clyops-skillify skill generates its reference pages with clyops-doc
+  (`npx clyops-doc --format markdown`, or `--root` for a whole tree) instead of its own
+  Python renderer, `scripts/schema-to-reference.py`, which is removed.
 
 ## [0.6.0] - 2026-10-21
 
