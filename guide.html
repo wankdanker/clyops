@@ -146,7 +146,7 @@ field types in TypeScript, Python or Ruby.</p>
 <code>uuid</code>, <code>date:YYYY-MM-DD</code>, <code>path</code>, <code>file:exists</code>, <code>file:readable</code>, <code>file:writable</code>,
 <code>dir:exists</code> and <code>dir:writable</code>. Parameterized rules include <code>int:1-10</code>,
 <code>float:0-1</code>, <code>string:1-100</code>, <code>choice:red,green,blue</code> and <code>regex:PATTERN</code>.
-See <a href="https://github.com/wankdanker/clyops/blob/ad291e74c899f43cbaf7283754dbf3516bcaaf8b/spec/SPEC.md#5-validation-rules">spec section 5</a> for ranges and exact behavior.</p>
+See <a href="https://github.com/wankdanker/clyops/blob/1260102fd688aa6d4b50cf65d80a9a41ccdcde85/spec/SPEC.md#5-validation-rules">spec section 5</a> for ranges and exact behavior.</p>
 <p>Standalone <code>validate</code> helpers return a typed value or the native validation
 error/result. Unknown registration rules and duplicate names are programming
 errors. Bad CLI values are parse errors. These are separate error paths.</p>
@@ -177,7 +177,7 @@ how <code>clyops-doc</code> writes a FILES section.</p>
 the config file containing the value; default/environment paths resolve against
 the CLI root. Paths are normalized after precedence. <code>-</code> denotes stdin where the
 application supports it. Path validation does not itself open/read files for the
-application. See <a href="https://github.com/wankdanker/clyops/blob/ad291e74c899f43cbaf7283754dbf3516bcaaf8b/spec/SPEC.md#6-paths">spec section 6</a>.</p>
+application. See <a href="https://github.com/wankdanker/clyops/blob/1260102fd688aa6d4b50cf65d80a9a41ccdcde85/spec/SPEC.md#6-paths">spec section 6</a>.</p>
 <h2 id="nested-commands-and-constraints">Nested commands and constraints</h2>
 <pre><code class="language-javascript">const db = cli.command('db', 'Database tasks');
 const migrate = db.command('migrate', 'Apply migrations');
