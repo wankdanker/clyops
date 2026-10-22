@@ -27,7 +27,7 @@ __all__ = [
     "is_executable", "is_bare_program",
     "info", "warn", "error", "success", "die", "set_silent",
 ]
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 
 Scalar = Union[str, int, float, bool]
 Value = Union[Scalar, List[Scalar], None]
