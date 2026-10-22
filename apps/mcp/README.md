@@ -56,7 +56,7 @@ message and correct itself.
 ```
 clyops-mcp --root DIR [--name NAME] [--cwd DIR] [--timeout SECONDS] [--no-watch]
            [--allow GLOB]... [--deny GLOB]... [--read-only] [--paths-within DIR]...
-           [--max-output BYTES] [--audit FILE]
+           [--close-inputs [--allow-executable-inputs]] [--max-output BYTES] [--audit FILE]
 ```
 
 The server watches the tools directory: when a tool is added, changed or removed it tells the
@@ -78,6 +78,11 @@ what it should be able to run:
 - `--read-only`: offer only tools that declare the `read-only` effect.
 - `--paths-within DIR` (repeatable): path arguments (`path`, `file:*`, `dir:*`) must resolve inside
   one of these directories, symlinks followed, before anything runs.
+- `--close-inputs`: don't let the agent set what the server would set itself, as `clyops-api`
+  and its `/mcp` do: `file:executable` inputs (it would choose which program runs), and path
+  inputs unless `--paths-within` confines them. A tool whose required argument is then closed
+  isn't offered. `--allow-executable-inputs` opens `file:executable` again. Over stdio, an agent
+  runs locally, often to try a different program while debugging, so inputs stay open by default.
 - `--max-output BYTES` (default 16 MiB): keep at most this much of a tool's stdout and stderr.
 - `--audit FILE` (`-` for stderr): one JSON line per run with the tool, its command line (secrets
   as `***`), exit status and duration.
