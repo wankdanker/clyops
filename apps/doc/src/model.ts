@@ -322,3 +322,32 @@ export function leafSchema(schema: Schema, leaf: Leaf): Schema {
     roles: leaf.roles, commands: [],
   };
 }
+
+/** One tool of a toolset, for its index page (see `toolsetDoc`). */
+export interface ToolEntry {
+  /** The words after the toolset's name, e.g. ['media', 'to-pcm']. */
+  words: string[];
+  /** The tool's description. */
+  description: string;
+}
+
+/**
+ * The index page of a directory of tools (`--root`): what the dispatcher `name` runs, each tool with
+ * a reference to its own page.
+ */
+export function toolsetDoc(name: string, description: string, tools: ToolEntry[], opts: DocOptions = {}): Doc {
+  const section = opts.section || '1';
+  const page = opts.page || pageName(name);
+  const summary = firstSentence(description);
+  const sections: Section[] = [
+    { title: 'NAME', blocks: [{ kind: 'p', text: summary ? `${page} - ${summary}` : page }] },
+    { title: 'SYNOPSIS', blocks: [{ kind: 'pre', text: tools.map((t) => `${[name, ...t.words].join(' ')} [ARGUMENTS] [OPTIONS]`).join('\n') }] },
+  ];
+  if (description) sections.push({ title: 'DESCRIPTION', blocks: description.split(/\n{2,}/).map((text) => ({ kind: 'p', text })) });
+  sections.push({
+    title: 'TOOLS',
+    blocks: [{ kind: 'dl', items: tools.map((t) => ({ term: [name, ...t.words].join(' '), text: `${sentence(firstSentence(t.description))}See ${pageName(name, t.words)}(${section}).` })) }],
+  });
+  sections.push({ title: 'SEE ALSO', blocks: [{ kind: 'refs', items: tools.map((t) => ({ page: pageName(name, t.words), section })) }] });
+  return { name, page, section, version: opts.version || '', date: opts.date || defaultDate(), summary, sections };
+}

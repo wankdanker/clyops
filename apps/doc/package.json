@@ -43,7 +43,8 @@
   },
   "dependencies": {
     "clyops": "0.6.0",
-    "clyops-schema": "0.6.0"
+    "clyops-schema": "0.6.0",
+    "clyops-tools": "0.6.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
