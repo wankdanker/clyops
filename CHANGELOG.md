@@ -16,6 +16,10 @@ section here.
   git-style (`mytool.1` lists them, `mytool-db-migrate.1` documents one, with SEE ALSO between
   them), also as `pages()` in the library. clyops-doc now declares the `idempotent` and
   `destructive` effects instead of `read-only`, since it can write files.
+- clyops-doc `--root DIR` documents every tool in a directory, found the way the dispatcher,
+  API and MCP server find them, with an index page named after the dispatcher (`--name`);
+  `--prefix PREFIX` installs man pages into `PREFIX/share/man/manN` and warns when `man`
+  won't look there.
 
 ## [0.6.0] - 2026-10-21
 

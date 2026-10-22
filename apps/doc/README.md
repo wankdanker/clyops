@@ -24,9 +24,11 @@ man -l mytool.1
 | `-V, --version` | Version shown in the header |
 | `-d, --date` | Date shown in the header, YYYY-MM-DD (default today, or `SOURCE_DATE_EPOCH` for reproducible builds) |
 | `--schema FILE` | Read the schema from a file instead of stdin |
+| `-r, --root DIR` | Document every tool in a directory (or dispatcher definition), with an index page (needs `--out-dir` or `--prefix`) |
 | `-o, --out-dir DIR` | Write page files into `DIR` (created if missing) instead of to stdout |
-| `--split` | A page per command, git-style (needs `--out-dir`) |
-| `-x, --execute` | Write the files; without it, `--out-dir` only lists them (needs `--out-dir`) |
+| `-p, --prefix PREFIX` | Install man pages into `PREFIX/share/man/manN`, and warn if `man` won't find them |
+| `--split` | A page per command, git-style (needs `--out-dir` or `--prefix`) |
+| `-x, --execute` | Write the files; without it, `--out-dir` and `--prefix` only list them |
 
 Each option can also be set as `CLYOPS_DOC_<OPTION>`. Input that isn't a clyops schema (`"clyops": 1`)
 is rejected with exit status 1.
@@ -44,6 +46,24 @@ stdin, stdout and roles. They refer to each other under SEE ALSO, as links in Ma
 (`.md`, `.html`). A program without commands is one page. Files that already say the same are left
 alone, so a rerun is a no-op. Because it can write files, clyops-doc declares the `idempotent` and
 `destructive` effects, although nothing is written without `--execute`.
+
+## A whole directory of tools
+
+```sh
+clyops-doc --root ~/mytool/scripts --name mytool --prefix ~/.local            # lists the pages
+clyops-doc --root ~/mytool/scripts --name mytool --prefix ~/.local --execute  # installs them
+man mytool-media-to-pcm
+```
+
+`--root` finds tools the way `clyops-dispatch`, `clyops-api` and `clyops-mcp` do (subdirectories
+become command words, `.clyops` files give descriptions and ignores, nested dispatchers are
+followed), asks each for `--help-json-schema`, and writes a page per tool, or with `--split` per
+command, plus an index page named after the dispatcher (`--name`, default the directory's name)
+that lists them all. Executables that aren't clyops tools, or that fail to give a schema, are
+skipped with a warning.
+
+`--prefix` writes into `PREFIX/share/man/man1` (`man8` with `--section 8`) and checks `manpath`
+(or `MANPATH`), saying how to add the directory when `man` won't look there.
 
 ## What goes where
 

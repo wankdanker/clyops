@@ -84,6 +84,9 @@ importers:
       clyops-schema:
         specifier: 0.6.0
         version: link:../../packages/schema
+      clyops-tools:
+        specifier: 0.6.0
+        version: link:../../packages/tools
     devDependencies:
       '@types/node':
         specifier: ^22.0.0

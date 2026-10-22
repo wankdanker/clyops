@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,7 +13,7 @@ const repo = fileURLToPath(new URL('../../..', import.meta.url));
 const schemaOf = (file) => JSON.parse(execFileSync(process.execPath, [join(repo, file), '--help-json-schema'], { encoding: 'utf8' }));
 const tasks = schemaOf('packages/js/examples/tasks.cjs');
 const demo = schemaOf('packages/js/examples/demo.cjs');
-const run = (args, input) => spawnSync(process.execPath, [cli, ...args], { input, encoding: 'utf8' });
+const run = (args, input, env) => spawnSync(process.execPath, [cli, ...args], { input, encoding: 'utf8', env: env ? { ...process.env, ...env } : process.env });
 const hasGroff = spawnSync('groff', ['--version']).status === 0;
 
 /** groff's warnings for a man page (none expected); skipped where groff isn't installed. */
@@ -177,7 +177,7 @@ test('--out-dir: lists the files, writes them with --execute, and leaves unchang
     const mtime = statSync(join(out, 'tasks.1')).mtimeMs;
     writeFileSync(join(out, 'tasks-send.1'), 'old\n');
     const again = run(['--split', '--out-dir', out, '-x', '--date', '2026-10-21'], input);
-    assert.match(again.stderr, /Wrote 4 page\(s\), replacing 1, 3 already up to date in /);
+    assert.match(again.stderr, /Wrote 1 page\(s\) \(replacing 1\); 3 already up to date in /);
     assert.equal(statSync(join(out, 'tasks.1')).mtimeMs, mtime, 'an unchanged page is not rewritten');
     assert.notEqual(readFileSync(join(out, 'tasks-send.1'), 'utf8'), 'old\n');
 
@@ -186,11 +186,61 @@ test('--out-dir: lists the files, writes them with --execute, and leaves unchang
     assert.equal(single.stdout, join(dir, 'demo.md') + '\n');
     assert.match(readFileSync(join(dir, 'demo.md'), 'utf8'), /^# `demo`/);
 
-    for (const args of [['--split'], ['--execute']]) {
-      const bad = run(args, input);
+    for (const flag of ['split', 'execute']) {
+      const bad = run([`--${flag}`], input);
       assert.equal(bad.status, 1);
-      assert.match(bad.stderr, new RegExp(`--${args[0].slice(2)} requires --out-dir`));
+      assert.match(bad.stderr, new RegExp(`--${flag} needs --out-dir or --prefix`));
     }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('--root: a page per tool and an index, found the way the dispatcher finds them', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'clyops-doc-'));
+  try {
+    const tools = join(dir, 'tools');
+    mkdirSync(join(tools, 'db'), { recursive: true });
+    writeFileSync(join(tools, '.clyops'), 'description: Operations tools. Run them as ops TOOL.\n');
+    // A quoted heredoc keeps the schema's own quotes as they are.
+    const tool = (file, schema) => { writeFileSync(file, `#!/bin/sh\n# clyops-tool\n[ "$1" = --help-json-schema ] && cat <<'SCHEMA'\n${JSON.stringify(schema)}\nSCHEMA\n`); chmodSync(file, 0o755); };
+    tool(join(tools, 'send.sh'), { ...demo, script: 'send', description: 'Send a message.' });
+    tool(join(tools, 'db', 'tasks'), tasks);
+    writeFileSync(join(tools, 'notes.sh'), '#!/bin/sh\necho not a clyops tool\n');
+    chmodSync(join(tools, 'notes.sh'), 0o755);
+    writeFileSync(join(tools, 'broken.sh'), '#!/bin/sh\n# clyops-tool\nexit 3\n');
+    chmodSync(join(tools, 'broken.sh'), 0o755);
+
+    const out = join(dir, 'man');
+    const listed = run(['--root', tools, '--name', 'ops', '--out-dir', out, '--date', '2026-10-21']);
+    assert.equal(listed.status, 0, listed.stderr);
+    assert.deepEqual(listed.stdout.trim().split('\n').map((p) => p.slice(out.length + 1)), ['ops.1', 'ops-send.1', 'ops-db-tasks.1']);
+    assert.match(listed.stderr, /Skipping .*notes\.sh: not a clyops tool/);
+    assert.match(listed.stderr, /Skipping .*broken\.sh/);
+
+    const split = run(['--root', tools, '--name', 'ops', '--out-dir', out, '--split', '-x', '--date', '2026-10-21']);
+    assert.equal(split.status, 0, split.stderr);
+    assert.deepEqual(readdirSync(out).sort(), ['ops-db-tasks-db-migrate.1', 'ops-db-tasks-db-status.1', 'ops-db-tasks-send.1', 'ops-db-tasks.1', 'ops-send.1', 'ops.1']);
+    const index = readFileSync(join(out, 'ops.1'), 'utf8');
+    assert.match(index, /^\.SH "NAME"\nops \\- Operations tools$/m);
+    assert.match(index, /^ops send \[ARGUMENTS\] \[OPTIONS\]\nops db tasks \[ARGUMENTS\] \[OPTIONS\]$/m);
+    assert.match(index, /^\\fBops db tasks\\fR\nCommands demo for the clyops conformance suite\. See ops\\-db\\-tasks\(1\)\.$/m);
+    assert.match(readFileSync(join(out, 'ops-db-tasks-db-migrate.1'), 'utf8'), /^ops db tasks db migrate \[<target>\] \[OPTIONS\]$/m);
+    assert.match(readFileSync(join(out, 'ops-send.1'), 'utf8'), /^\.SH "NAME"\nops\\-send \\- Send a message$/m);
+    if (hasGroff) for (const f of readdirSync(out)) assert.equal(groffWarnings(readFileSync(join(out, f), 'utf8')), '', f);
+
+    const prefix = join(dir, 'prefix');
+    const installed = run(['--root', tools, '--name', 'ops', '--prefix', prefix, '-x', '--section', '8'], undefined, { MANPATH: '/nowhere' });
+    assert.equal(installed.status, 0, installed.stderr);
+    assert.ok(existsSync(join(prefix, 'share/man/man8/ops.8')));
+    // manpath(1) honours MANPATH, and without manpath clyops-doc reads MANPATH itself.
+    assert.match(installed.stderr, /man won't find these pages: .*share\/man is not on its search path/);
+    const found = run(['--root', tools, '--name', 'ops', '--prefix', prefix, '--section', '8'], undefined, { MANPATH: join(prefix, 'share/man'), PATH: '/usr/bin:/bin' });
+    assert.equal(found.status, 0, found.stderr);
+    assert.doesNotMatch(found.stderr, /man won't find/);
+    assert.equal(run(['--root', tools, '--prefix', prefix, '--format', 'html']).status, 1);
+    assert.match(run(['--root', tools]).stderr, /--root needs --out-dir or --prefix/);
+    assert.match(run(['--root', join(dir, 'man'), '--out-dir', out]).stderr, /no clyops tools in /);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
