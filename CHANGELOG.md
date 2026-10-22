@@ -11,6 +11,18 @@ section here.
   paths. On Windows a regular file that exists counts, and bare names are also tried with
   `PATHEXT`. Help says `accepts: executable`, the schema has `"type": "path"`, and shells complete
   command names for it (completion kind `command`). `secret:file:executable` works too.
+- **Breaking: clyops-api (REST and `/mcp`) sets some inputs itself instead of taking them from
+  callers** (spec section 13). `file:executable` inputs are closed unless
+  `--allow-executable-inputs` is given. Path inputs are confined to `--cwd` when there is no
+  `--paths-within` (they were unconfined), and closed when `--cwd` is `/`. Closed inputs are left
+  out of the OpenAPI document, the MCP tool list and the web runner, setting one is a `400`, and a
+  tool whose required argument is closed isn't served. Uploaded files are still accepted. A
+  server that already uses `--paths-within` only sees the `file:executable` change.
+- clyops-mcp over stdio keeps inputs open; `--close-inputs` (with `--allow-executable-inputs`)
+  closes them as clyops-api does.
+- clyops-tools: `closedInputs`, `publicSchema`, `closedKeys` and `closedRequirement`, and a
+  `closed` run option; `toArgv`'s `controlled` covers arguments too, and a bare `file:executable`
+  value is neither resolved against `base` nor confined by `within`.
 
 ## [0.7.0] - 2026-10-22
 
