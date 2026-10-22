@@ -60,6 +60,7 @@ Files:
   -d, --data-dir=<value>        Data directory (accepts: existing directory)
       --src=<value>             Source file (accepts: existing file)
       --dest=<value>            Destination file (accepts: writable file, requires: --src)
+      --exec=<value>            Program to run (accepts: executable)
   -I, --include=<value>         Include directory (multiple, accepts: path)
 
 Global:

@@ -305,6 +305,7 @@ positional arguments. Typed implementations convert values as shown in the
 | `file:writable` | writable file, or missing file in writable dir | string | `writable file` | `NAME file is not writable: V` / `NAME directory is not writable: DIR` |
 | `dir:exists` | directory | string | `existing directory` | `NAME directory does not exist: V` |
 | `dir:writable` | writable directory | string | `writable directory` | `NAME directory does not exist or is not writable: V` |
+| `file:executable` | a program: a bare name found on `PATH`, or a path to an executable regular file | string | `executable` | `NAME is not an executable: V` |
 | `ip` | IPv4 dotted quad or IPv6-ish hex groups | string | `IP address` | `NAME must be a valid IP address, got 'V'` |
 | `hostname` | RFC 1123 labels | string | `hostname` | `NAME must be a valid hostname, got 'V'` |
 | `url` | `^https?://[a-zA-Z0-9.-]+(:[0-9]+)?(/.*)?$` | string | `URL` | `NAME must be a valid URL, got 'V'` |
@@ -314,6 +315,17 @@ positional arguments. Typed implementations convert values as shown in the
 | `bool` | `true false yes no 1 0 on off` (any case) | boolean | `true/false, yes/no, 1/0, on/off` | `NAME must be a boolean (true/false, yes/no, 1/0, on/off), got 'V'` |
 | `date:YYYY-MM-DD` | `^[0-9]{4}-[0-9]{2}-[0-9]{2}$` | string | `date: YYYY-MM-DD` | `NAME must be in YYYY-MM-DD format, got 'V'` |
 | `regex:PATTERN` | pattern found anywhere in value | string | `pattern: PATTERN` | `NAME does not match required pattern, got 'V'` |
+
+`file:executable` names a program to run. A *bare name* (no `/`, nor `\` on
+Windows) is looked up in each `PATH` directory in order, skipping empty
+entries; it passes when one holds an executable regular file of that name.
+Otherwise the value is a path, and passes when it is an executable regular
+file. Symlinks are followed, and *executable* means the current user may run
+it (`access(X_OK)`); Windows has no such bit, so there it means a regular file
+that exists, and a bare name is also tried with each extension in `PATHEXT`
+(`ffmpeg` finds `ffmpeg.exe`). A bare name stays as given (`ffmpeg`, not
+`/usr/bin/ffmpeg`), so it is found on `PATH` again when the program runs and a
+config file naming it works on every machine.
 
 Bounds are non-negative decimal numbers. Regex patterns should stay within the
 POSIX ERE subset that every engine (Bash `=~`, JS, Python `re`, Rust `regex`,
@@ -328,7 +340,8 @@ uuid:     ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-
 ## 6. Path resolution
 
 Options and arguments whose rule is `path`, `file:*` or `dir:*` are resolved to
-absolute paths before validation. Resolution is lexical (`.` and `..` are
+absolute paths before validation, except a bare name under `file:executable`
+(section 5), which is a program on `PATH` and stays as given. Resolution is lexical (`.` and `..` are
 collapsed, symlinks are not followed).
 
 These values pass through unchanged: empty, `-`, `disabled`, `optional`,
@@ -491,7 +504,8 @@ Tabs and newlines inside descriptions become spaces. Each flag is followed by a
 
 | Rule | Kind | Values |
 | --- | --- | --- |
-| `path`, `file:*` | `file` | search dirs joined by `:` |
+| `file:executable` | `command` | search dirs joined by `:` |
+| `path`, other `file:*` | `file` | search dirs joined by `:` |
 | `dir:*` | `dir` | search dirs joined by `:` |
 | `choice:*` | `choice` | the choices, comma-separated |
 | `bool` | `choice` | `true,false` |
@@ -520,7 +534,8 @@ the records above, so they never go stale:
 
 * option names, short and long, with descriptions (zsh, fish);
 * option values by kind: choices, files and directories (including the
-  option's search dirs), host names;
+  option's search dirs), commands on `PATH` (and files once the word has a
+  `/`), host names;
 * positional arguments by position, skipping options and their values, with
   the variadic argument repeating.
 
@@ -717,6 +732,24 @@ options and from the root `.clyops` file (both apply); a read-only mode
 serves only tools declaring the `read-only` effect. Path inputs can be
 confined to directories: the value, resolved like above with symlinks
 followed, must lie inside one of them, and values with a scheme are refused.
+
+**Server-set inputs.** A caller who sets a path input chooses which file the
+tool reads or writes, and one who sets a `file:executable` input chooses what
+runs on the host. So a server that takes input over a network (an HTTP API,
+MCP over HTTP) MUST NOT accept these from callers unless its operator opens
+them, and a local one (MCP over stdio, a desktop runner) MAY:
+
+| Rule | Closed unless |
+| --- | --- |
+| `file:executable` | the operator explicitly allows executable inputs |
+| `path`, `file:exists`, `file:readable`, `file:writable`, `dir:exists`, `dir:writable` | path inputs are confined to directories (above); they are then open, and confined |
+
+The `secret:` form of a rule is closed the same way. A closed option is left
+out of the input's JSON Schema, and input that sets it is an error naming the
+option; the tool gets its value from its environment, config file or default.
+An argument has none of those, so a tool whose required argument is closed is
+not served (the server says so when it starts), and an optional one is left
+out like an option.
 
 **JSON Schema.** The input's JSON Schema has one property per argument and
 option (except `help`) under the key above. Types follow the validation rule:

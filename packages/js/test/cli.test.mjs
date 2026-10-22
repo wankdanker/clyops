@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import * as esm from 'clyops';
 
-const { Cli, validate, resolvePath, wrapText, describeRule } = createRequire(import.meta.url)('clyops');
+const { Cli, validate, resolvePath, wrapText, describeRule, isExecutable, isBareProgram } = createRequire(import.meta.url)('clyops');
 
 const make = () => new Cli({ name: 't', env: {}, cwd: '/work', root: '/root' })
   .arg('file', 'File', '', 'path')
@@ -214,3 +214,37 @@ test('roles: commands inherit, help lists their own', () => {
   assert.match(cli.usage(), /\nOutput \[plan\]: Migration plan\n/);
   assert.doesNotMatch(cli.usage(), /\[progress\]/);
 });
+
+test('file:executable: a program on PATH or an executable file, and its secret form', () => {
+  const { chmodSync, mkdtempSync, rmSync, writeFileSync } = createRequire(import.meta.url)('node:fs');
+  const dir = mkdtempSync(`${createRequire(import.meta.url)('node:os').tmpdir()}/clyops-exec-`);
+  try {
+    writeFileSync(`${dir}/prog`, '#!/bin/sh\n');
+    chmodSync(`${dir}/prog`, 0o755);
+    writeFileSync(`${dir}/plain`, 'x');
+    assert.equal(isBareProgram('prog'), true);
+    assert.equal(isBareProgram('./prog'), false);
+    assert.equal(isExecutable('prog', { PATH: `::${dir}` }), true, 'empty PATH entries are skipped');
+    assert.equal(isExecutable('prog', { PATH: '' }), false);
+    assert.equal(isExecutable('plain', { PATH: dir }), false);
+    assert.equal(isExecutable(`${dir}/prog`), true);
+    assert.equal(isExecutable(dir), false, 'a directory is not a program');
+    assert.equal(describeRule('file:executable'), 'executable');
+
+    const cli = () => new Cli({ name: 't', env: { PATH: process.env.PATH }, cwd: dir, root: dir })
+      .opt('TOKEN_TOOL', 'tool', '', 'optional', 'Tool', 'Options', 'secret:file:executable');
+    const ok = cli();
+    assert.deepEqual(ok.parse(['--tool', './prog']), { status: 'ok' });
+    assert.equal(ok.get('TOKEN_TOOL'), `${dir}/prog`);
+    assert.match(ok.valuesJson(), /"TOKEN_TOOL": "\*\*\*"/);
+    const bad = cli().parse(['--tool', './plain']);
+    assert.equal(bad.status, 'error');
+    assert.match(bad.error, /--tool is not an executable: .*\/plain/);
+    // The schema reports a secret rule as the rule plus "secret": true.
+    const [tool] = JSON.parse(ok.jsonSchema()).options;
+    assert.deepEqual([tool.validation, tool.secret, tool.type], ['file:executable', true, 'path']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+

@@ -16,7 +16,9 @@ printf '#!/bin/sh\n# clyops-tool\nexec %s "$@"\n' "$(printf '%q ' "${cmd[@]}")" 
 # The commands demo sits next to the demo, named tasks (tools/conformance.py).
 cmd[${#cmd[@]}-1]=$(sed 's/\(.*\)demo/\1tasks/' <<< "${cmd[${#cmd[@]}-1]}")
 printf '#!/bin/sh\n# clyops-tool\nexec %s "$@"\n' "$(printf '%q ' "${cmd[@]}")" > "$work/bin/tasks"
-chmod +x "$work/bin/demo" "$work/bin/tasks"
+# A program on PATH for --exec (file:executable completes commands).
+printf '#!/bin/sh\n' > "$work/bin/clyopsprogx"
+chmod +x "$work/bin/demo" "$work/bin/tasks" "$work/bin/clyopsprogx"
 touch "$work/root/conf/a.conf" "$work/root/conf/b.conf" "$work/root/in.txt"
 
 # A dispatcher "tools" with a plain command and a "media" group holding the demo.
@@ -64,6 +66,8 @@ check bash "demo in.txt "       "fast slow "               "$(bash_complete "dem
 check bash "demo -n 3 in.txt "  "fast slow "               "$(bash_complete "demo -n 3 in.txt ")"
 check bash "demo --enabled "    "false true "              "$(bash_complete "demo --enabled ")"
 check bash "demo -d "           "conf data "               "$(bash_complete "demo -d ")"
+check bash "demo --exec clyopsprog" "clyopsprogx "         "$(bash_complete "demo --exec clyopsprog")"
+check bash "demo --exec ./c"    "./conf "                  "$(bash_complete "demo --exec ./c")"
 check bash "demo --no-v"        "--no-verbose "            "$(bash_complete "demo --no-v")"
 check bash "tools "                        "hello media "            "$(bash_complete "tools ")"
 check bash "tools --comp"                  "--completion "           "$(bash_complete "tools --comp")"
@@ -97,6 +101,7 @@ EOF
     check fish "demo in.txt "      "fast slow "            "$(fish_complete "demo in.txt ")"
     check fish "demo --enabled "   "false true "           "$(fish_complete "demo --enabled ")"
     check fish "demo -d "          "conf/ data/ "          "$(fish_complete "demo -d ")"
+    check fish "demo --exec clyopsprog" "clyopsprogx "     "$(fish_complete "demo --exec clyopsprog")"
     check fish "tools "                    "hello media "          "$(fish_complete "tools ")"
     check fish "tools media "              "demo tasks "           "$(fish_complete "tools media ")"
     check fish "tools media demo --col"    "--color "              "$(fish_complete "tools media demo --col")"
@@ -144,6 +149,7 @@ EOF
     zsh_offers "demo --color " always auto never
     zsh_offers "demo in.txt " fast slow
     zsh_offers "demo --ena" --enabled
+    zsh_offers "demo --exec clyopsprog" clyopsprogx
     zsh_offers "tools " hello media "Media tools"
     zsh_offers "tools media " demo
     zsh_offers "tools media demo --color " always auto never

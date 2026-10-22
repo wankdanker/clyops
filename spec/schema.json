@@ -276,7 +276,7 @@
     "rule": {
       "description": "Validation rule (spec/SPEC.md section 5), or empty.",
       "type": "string",
-      "pattern": "^(|int|float|string|path|ip|hostname|url|port|email|uuid|bool|date:YYYY-MM-DD|file:(exists|readable|writable)|dir:(exists|writable)|int:([0-9]+-[0-9]*|-[0-9]+)|float:([0-9]*\\.?[0-9]+-([0-9]*\\.?[0-9]+)?|-[0-9]*\\.?[0-9]+)|string:([0-9]+|[0-9]+-[0-9]*|-[0-9]+)|choice:.+|regex:.+)$"
+      "pattern": "^(|int|float|string|path|ip|hostname|url|port|email|uuid|bool|date:YYYY-MM-DD|file:(exists|readable|writable|executable)|dir:(exists|writable)|int:([0-9]+-[0-9]*|-[0-9]+)|float:([0-9]*\\.?[0-9]+-([0-9]*\\.?[0-9]+)?|-[0-9]*\\.?[0-9]+)|string:([0-9]+|[0-9]+-[0-9]*|-[0-9]+)|choice:.+|regex:.+)$"
     },
     "stream": {
       "description": "Declared standard input or output (spec section 1.3), or null.",

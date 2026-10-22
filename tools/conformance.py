@@ -59,7 +59,7 @@ def program(cmd, name):
 def run_case(cmd, case, verbose):
     tmp = os.path.realpath(tempfile.mkdtemp(prefix="clyops-"))
     try:
-        mapping = {"tmp": tmp, "tmp_parent": os.path.dirname(tmp)}
+        mapping = {"tmp": tmp, "tmp_parent": os.path.dirname(tmp), "path": os.environ.get("PATH", "/usr/bin:/bin")}
         for d in case.get("dirs", []):
             os.makedirs(os.path.join(tmp, d), exist_ok=True)
         for rel, content in case.get("files", {}).items():
@@ -67,6 +67,8 @@ def run_case(cmd, case, verbose):
             os.makedirs(os.path.dirname(full), exist_ok=True)
             with open(full, "w", newline="") as fh:
                 fh.write(content)
+        for rel, mode in case.get("modes", {}).items():
+            os.chmod(os.path.join(tmp, rel), int(mode, 8))
 
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LANG": "C.UTF-8",
                "KEY": "secret", "DEMO_ROOT": tmp}
@@ -74,10 +76,11 @@ def run_case(cmd, case, verbose):
             if value is None:
                 env.pop(key, None)
             else:
-                env[key] = value
+                env[key] = substitute(value, mapping)
 
         cwd = os.path.join(tmp, case.get("cwd", ""))
-        argv = cmd + case["args"]
+        # Find the interpreter on the runner's PATH, so a case's own PATH can't stop the demo starting.
+        argv = [shutil.which(cmd[0]) or cmd[0]] + cmd[1:] + substitute(case["args"], mapping)
         fds = case.get("fds", {})
         if fds:
             # Open the requested descriptors with sh, as a runner would: "out" to a file read back

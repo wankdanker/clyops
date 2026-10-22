@@ -410,6 +410,21 @@
       "secret": false
     },
     {
+      "name": "exec",
+      "shortName": "",
+      "variableName": "EXEC",
+      "description": "Program to run",
+      "default": "",
+      "group": "Files",
+      "type": "path",
+      "isFlag": false,
+      "isArray": false,
+      "required": false,
+      "validation": "file:executable",
+      "choices": [],
+      "secret": false
+    },
+    {
       "name": "include",
       "shortName": "I",
       "variableName": "INCLUDE",

@@ -14,7 +14,10 @@ fresh temp directory per case, writes the case's files there, and runs the demo
 with `DEMO_ROOT` set to that directory (the demo passes it as `root`) and the
 working directory set to it (or to the case's `cwd` below it). The environment
 is minimal: `PATH`, `LANG=C.UTF-8`, `KEY=secret`, plus the case's `env`
-(a `null` removes a variable). `{tmp}` in expectations is the temp directory.
+(a `null` removes a variable). `{tmp}` in expectations, `args` and `env` is the
+temp directory, and `{path}` the runner's own `PATH`, so a case can put a
+directory in front of it. The demo's interpreter is found on the runner's
+`PATH`, whatever the case's.
 
 ```sh
 python3 tools/conformance.py js        # one implementation
@@ -31,6 +34,7 @@ python3 tools/conformance.py js -k config   # cases whose name contains "config"
   "env": { "COUNT": "4" },            // optional
   "files": { "demo.conf": "demo:count=5\n" },  // optional, relative to {tmp}
   "dirs": ["data"],                    // optional, created under {tmp}
+  "modes": { "bin/tool": "755" },      // optional: chmod (octal) after writing files
   "cwd": "sub",                        // optional, relative to {tmp}
   "program": "tasks",                  // optional: the commands demo instead of demo
   "fds": { "3": "out", "5": "x\n" },   // optional: open fd 3 for writing and fd 5 for
@@ -107,6 +111,7 @@ Options, in registration order:
 | `DATA_DIR` | `data-dir` | `d` | `optional` | `Data directory` | `Files` | `dir:exists` |
 | `SRC` | `src` | | `optional` | `Source file` | `Files` | `file:exists` |
 | `DEST` | `dest` | | `optional` | `Destination file` | `Files` | `file:writable` |
+| `EXEC` | `exec` | | `optional` | `Program to run` | `Files` | `file:executable` |
 | `INCLUDE` | `include` | `I` | *(array)* | `Include directory` | `Files` | `path` |
 
 The built-in `--help`/`-h` (`HELP`) is added last in group `Global`.

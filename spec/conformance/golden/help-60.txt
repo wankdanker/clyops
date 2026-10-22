@@ -89,6 +89,8 @@ Files:
       --dest=<value>            Destination file (accepts:
                                 writable file, requires:
                                 --src)
+      --exec=<value>            Program to run (accepts:
+                                executable)
   -I, --include=<value>         Include directory (multiple,
                                 accepts: path)
 
