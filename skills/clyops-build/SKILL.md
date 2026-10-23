@@ -69,7 +69,8 @@ So:
   line say what the tool does.
 - **A rule on every option and argument that has one.** Prefer the narrowest:
   `choice:a,b` over free text, `int:1-10` over `int`, `file:readable` over `path`,
-  and `file:executable` for any option that names a program to run.
+  `file:executable` for any option that names a program to run, and `json` for
+  structured input instead of a string the tool parses unchecked.
   Rules become form controls, JSON Schema types/ranges/enums and pre-run
   validation for agents, so a rule is never just cosmetic.
 - **Effects**: `read-only`, `idempotent`, `destructive`, `network` (any

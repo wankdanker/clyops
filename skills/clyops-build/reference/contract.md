@@ -148,6 +148,7 @@ error.
 | `dir:exists`, `dir:writable` | directory checks | string |
 | `ip`, `hostname`, `url` (`http`/`https` only), `email`, `uuid` | format | string |
 | `date:YYYY-MM-DD` | that format | string |
+| `json` | one JSON value (RFC 8259; no `NaN`, comments or trailing commas; at most 512 levels deep). Kept as the text given; parse it yourself. API/MCP callers may send the value itself | string |
 | `regex:PATTERN` | pattern found anywhere (anchor it yourself) | string |
 | `secret`, `secret:RULE` | as `RULE`, masked | as `RULE` |
 
