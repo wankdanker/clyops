@@ -11,7 +11,7 @@ import { declaredRoles, inputKeys, loadSchema, redactArgv, start, shellQuote, ta
 import { createReadStream, createWriteStream } from 'node:fs';
 import { finished } from 'node:stream/promises';
 import { basename, dirname, isAbsolute, resolve } from 'node:path';
-import { renderConfigValue, renderResultMap, renderTemplateString, type TemplateContext } from './template.js';
+import { isUnsetTemplate, renderConfigValue, renderResultMap, renderTemplateString, type TemplateContext, type TemplateOptions } from './template.js';
 import { deepMerge, ensureDir, objectValue, resolveScriptPath, type Json } from './util.js';
 
 /** Where engine diagnostics go; a trigger installs its own with configureLogging. */
@@ -48,6 +48,8 @@ export interface FunctionDefinition {
   artifacts?: unknown;
   /** Task result or configured result templates, according to the containing interface. */
   result?: unknown;
+  /** A missing `params` field in a template is an error instead of unset (default false). */
+  strict_params?: boolean;
   [key: string]: unknown;
 }
 
@@ -94,6 +96,25 @@ export interface CommandOptions {
   defaultPositional?: string;
 }
 
+/** The template options a function's definition asks for. */
+export function functionTemplateOptions(fn: ResolvedFunction): TemplateOptions {
+  return { strict: fn.definition.strict_params === true };
+}
+
+/**
+ * The options with `params` templates that name a missing or null field left
+ * out, so the tool's own default applies: a whole-value template drops the
+ * option, and one in an array drops that item.
+ */
+function withoutUnsetParams(config: Json, context: TemplateContext, opts: TemplateOptions): Json {
+  const out: Json = {};
+  for (const [key, value] of Object.entries(config)) {
+    if (isUnsetTemplate(value, context, opts)) continue;
+    out[key] = Array.isArray(value) ? value.filter((item) => !isUnsetTemplate(item, context, opts)) : value;
+  }
+  return out;
+}
+
 /**
  * The positionals for a function: its `positionals` templates when set
  * (authoritative; `[]` for none), else none here and the schema's arguments
@@ -101,7 +122,7 @@ export interface CommandOptions {
  */
 function explicitPositionals(fn: ResolvedFunction, context?: TemplateContext | null): string[] | undefined {
   if (!Array.isArray(fn.definition.positionals)) return undefined;
-  return fn.definition.positionals.map((item) => String(renderConfigValue(item, context))).filter(Boolean);
+  return fn.definition.positionals.map((item) => String(renderConfigValue(item, context, functionTemplateOptions(fn)))).filter(Boolean);
 }
 
 /** The full command line for a function: [script, ...argv]. */
@@ -113,10 +134,11 @@ export async function buildFunctionCommand(fn: ResolvedFunction, opts: CommandOp
     config[inputKeys(first)[0]] = opts.defaultPositional;
   }
   const context = opts.context;
-  const { argv, unknown, controlled } = toArgv(schema, config, {
+  const templates = functionTemplateOptions(fn);
+  const { argv, unknown, controlled } = toArgv(schema, context ? withoutUnsetParams(config, context, templates) : config, {
     base: opts.configRoot,
     controlled: opts.controlled ?? ['help'],
-    render: context ? (s) => renderTemplateString(s, context) : undefined,
+    render: context ? (s) => renderTemplateString(s, context, templates) : undefined,
     positionals: explicitPositionals(fn, context),
     positionalsOrder: fn.definition.positionals_order,
   });
@@ -147,9 +169,9 @@ export function parseRoleJson(text: string | undefined): unknown {
 }
 
 /** A function's `stdin` or `stdout` template rendered, a relative one against `base`. */
-function streamPath(template: string | undefined, opts: CommandOptions, base: string): string | undefined {
+function streamPath(template: string | undefined, opts: CommandOptions, base: string, templates: TemplateOptions): string | undefined {
   if (!template) return undefined;
-  const rendered = opts.context ? renderTemplateString(template, opts.context) : template;
+  const rendered = opts.context ? renderTemplateString(template, opts.context, templates) : template;
   return isAbsolute(rendered) ? rendered : resolve(base, rendered);
 }
 
@@ -177,8 +199,8 @@ export async function runScriptFunction(
   LOGGER.verbose('command: %s', shellQuote(command));
   // stdin is input, like a path option; stdout is an artifact, found like one.
   const workDir = (opts.context?.paths as { work_dir?: string } | undefined)?.work_dir;
-  const stdinPath = streamPath(fn.definition.stdin, opts, opts.configRoot);
-  const stdoutPath = streamPath(fn.definition.stdout, opts, workDir ?? opts.configRoot);
+  const stdinPath = streamPath(fn.definition.stdin, opts, opts.configRoot, functionTemplateOptions(fn));
+  const stdoutPath = streamPath(fn.definition.stdout, opts, workDir ?? opts.configRoot, functionTemplateOptions(fn));
   // Wire the well-known roles the tool declares: progress onto the record, meta into the run.
   let progress: Record<string, unknown> | undefined;
   const roles: Record<string, RoleOption> = {
@@ -228,6 +250,6 @@ export function buildResultRecord(p: {
     artifact_keys: p.artifactKeys,
     completed_at: p.now,
     config: p.fn.config,
-    ...renderResultMap(p.fn.definition.result, p.context),
+    ...renderResultMap(p.fn.definition.result, p.context, functionTemplateOptions(p.fn)),
   };
 }

@@ -12,8 +12,14 @@ for (const module of ['../dist/index.js', '../clyops-jobs.cjs']) {
         const command = await buildFunctionCommand(fn(template), { configRoot: '/tmp', context: { params: { enabled } } }, schema);
         assert.deepEqual(command, ['/tmp/tool', [true, 'YES', 1].includes(enabled) ? '--verbose' : '--no-verbose']);
       }
-      await assert.rejects(buildFunctionCommand(fn(template), { configRoot: '/tmp', context: { params: {} } }, schema), /unknown template value: params.enabled/);
-      for (const enabled of ['maybe', '', 2, {}, ['true'], null]) {
+      // A missing or null param leaves the flag unset; strict_params makes a missing one an error.
+      for (const params of [{}, { enabled: null }]) {
+        assert.deepEqual(await buildFunctionCommand(fn(template), { configRoot: '/tmp', context: { params } }, schema), ['/tmp/tool']);
+      }
+      const strict = { ...fn(template), definition: { strict_params: true } };
+      await assert.rejects(buildFunctionCommand(strict, { configRoot: '/tmp', context: { params: {} } }, schema), /unknown template value: params.enabled/);
+      await assert.rejects(buildFunctionCommand(strict, { configRoot: '/tmp', context: { params: { enabled: null } } }, schema), /--verbose must be a boolean/);
+      for (const enabled of ['maybe', '', 2, {}, ['true']]) {
         await assert.rejects(buildFunctionCommand(fn(template), { configRoot: '/tmp', context: { params: { enabled } } }, schema), /--verbose must be a boolean/);
       }
     }

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   JobQueue, buildFunctionCommand, buildResultRecord, configureLogging, copyConfiguredArtifacts, deepMerge, findFilesByArtifactPattern,
-  globToRegex, newJobId, newJobRecord, renderConfigValue, renderResultMap, renderTemplateString, resolveConfigPath, resolveFunctionConfig,
+  globToRegex, isUnsetTemplate, newJobId, newJobRecord, renderConfigValue, renderResultMap, renderTemplateString, resolveConfigPath, resolveFunctionConfig,
   runScriptFunction, transitionJobRecord, updateJobProgress,
 } from '../dist/index.js';
 
@@ -35,6 +35,28 @@ test('templates', () => {
   assert.equal(renderConfigValue('${job.id}', null), '${job.id}');
   assert.deepEqual(renderResultMap({ id: '${job.id}', n: 2, nested: { p: ['${media.path}'] } }, ctx), { id: 'j1', n: 2, nested: { p: ['/in/a.wav'] } });
   assert.deepEqual(renderResultMap(['x'], ctx), {});
+  // A missing params field is '' unless strict; other roots stay errors.
+  const req = { ...ctx, params: { lang: 'en', none: null } };
+  assert.equal(renderTemplateString('[${params.lang}|${params.nope}|{{params.none}}]', req), '[en||]');
+  assert.equal(renderTemplateString('${params.nope}', ctx), '');
+  assert.throws(() => renderTemplateString('${params.nope}', req, { strict: true }), /unknown template value: params.nope/);
+  assert.throws(() => renderTemplateString('${paramsx.nope}', req), /unknown template value: paramsx.nope/);
+  for (const v of ['${params.nope}', '{{ params.none }}', '${params.lang.x}']) assert.equal(isUnsetTemplate(v, req), true, v);
+  for (const v of ['${params.lang}', 'x${params.nope}', '${job.nope}', 3, null]) assert.equal(isUnsetTemplate(v, req), false, String(v));
+  assert.equal(isUnsetTemplate('${params.nope}', req, { strict: true }), false);
+});
+
+test('a missing or null params field leaves the option unset', async () => {
+  const root = workspace();
+  const config = {
+    functions: { f: { script: 'scripts/demo.sh', positionals: ['${params.input}'] } },
+    f: { count: '${params.count}', color: '{{params.color}}', out: 'out-${params.name}.txt', tag: ['${params.a}', '${params.b}'], verbose: '${params.verbose}' },
+  };
+  const fn = resolveFunctionConfig(root, config, 'f');
+  const context = { params: { count: 3, color: null, b: 'x' } };
+  assert.deepEqual((await buildFunctionCommand(fn, { configRoot: '/cfg', context })).slice(1), ['--out', '/cfg/out-.txt', '--count', '3', '--tag', 'x']);
+  fn.definition.strict_params = true;
+  await assert.rejects(buildFunctionCommand(fn, { configRoot: '/cfg', context }), /unknown template value: params.input/);
 });
 
 test('helpers', () => {
