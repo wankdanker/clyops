@@ -49,6 +49,7 @@ func main() {
 	cli.Opt("CODE", "code", "", "optional", "Three-letter code", "Validation", "regex:^[A-Z]{3}$")
 	cli.Opt("LEVEL", "level", "", "optional", "Level", "Validation", "int")
 	cli.Opt("SIZE", "size", "", "optional", "Size code", "Validation", "string:4")
+	cli.Opt("PAYLOAD", "payload", "", "optional", "JSON payload", "Validation", "json")
 	cli.Opt("DATA_DIR", "data-dir", "d", "optional", "Data directory", "Files", "dir:exists")
 	cli.Opt("SRC", "src", "", "optional", "Source file", "Files", "file:exists")
 	cli.Opt("DEST", "dest", "", "optional", "Destination file", "Files", "file:writable")
@@ -69,7 +70,7 @@ func main() {
 	cli.Emit("progress", `{"pct":100}`)
 
 	longs := []string{"config", "verbose", "quiet", "color", "out", "notes", "count", "ratio", "enabled", "tag", "no-cache", "key",
-		"host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "data-dir", "src", "dest",
+		"host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "payload", "data-dir", "src", "dest",
 		"exec", "include", "help"}
 	sources := map[string]string{}
 	for _, l := range longs {

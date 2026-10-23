@@ -41,6 +41,7 @@ public class Demo {
         cli.opt("CODE",     "code",     "",  "optional",  "Three-letter code",     "Validation", "regex:^[A-Z]{3}$");
         cli.opt("LEVEL",    "level",    "",  "optional",  "Level",                 "Validation", "int");
         cli.opt("SIZE",     "size",     "",  "optional",  "Size code",             "Validation", "string:4");
+        cli.opt("PAYLOAD",  "payload",  "",  "optional",  "JSON payload",          "Validation", "json");
         cli.opt("DATA_DIR", "data-dir", "d", "optional",  "Data directory",        "Files",      "dir:exists");
         cli.opt("SRC",      "src",      "",  "optional",  "Source file",           "Files",      "file:exists");
         cli.opt("DEST",     "dest",     "",  "optional",  "Destination file",      "Files",      "file:writable");
@@ -57,7 +58,7 @@ public class Demo {
         cli.emit("progress", "{\"pct\":100}");
 
         List<String> longs = List.of("config", "verbose", "quiet", "color", "out", "notes", "count", "ratio", "enabled", "tag", "no-cache", "key",
-            "host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "data-dir", "src", "dest", "exec", "include", "help");
+            "host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "payload", "data-dir", "src", "dest", "exec", "include", "help");
         // valuesJson() is already JSON: indent it into the outer object by hand.
         StringBuilder sources = new StringBuilder();
         for (String l : longs) sources.append(sources.length() == 0 ? "" : ",\n").append("    \"").append(l).append("\": \"").append(cli.source(l)).append('"');
