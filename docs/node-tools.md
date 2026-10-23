@@ -96,7 +96,8 @@ console.log(queue.get(job.record.job_id)?.record.status);
 optional stdin/stdout files. A function run wires the tool's `progress`, `meta` and
 `log` roles (`onProgress`, the run's `meta`), and queue tasks record progress with
 `progress(update)`. Templates use dotted paths in `${expression}` or
-`{{expression}}`. Boolean templates are validated after rendering.
+`{{expression}}`. Boolean templates are validated after rendering. An option that names
+`${params.x}` is left unset when the caller didn't send `x` or sent `null`.
 
 Artifact helpers discover, inspect and copy output files. Record helpers create
 and transition serializable job states. `JobQueue.add` returns a cancellation

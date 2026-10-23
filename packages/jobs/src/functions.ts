@@ -11,7 +11,7 @@ import { declaredRoles, inputKeys, loadSchema, redactArgv, start, shellQuote, ta
 import { createReadStream, createWriteStream } from 'node:fs';
 import { finished } from 'node:stream/promises';
 import { basename, dirname, isAbsolute, resolve } from 'node:path';
-import { renderConfigValue, renderResultMap, renderTemplateString, type TemplateContext } from './template.js';
+import { isUnsetParam, renderConfigValue, renderResultMap, renderTemplateString, type TemplateContext } from './template.js';
 import { deepMerge, ensureDir, objectValue, resolveScriptPath, type Json } from './util.js';
 
 /** Where engine diagnostics go; a trigger installs its own with configureLogging. */
@@ -101,18 +101,24 @@ export interface CommandOptions {
  */
 function explicitPositionals(fn: ResolvedFunction, context?: TemplateContext | null): string[] | undefined {
   if (!Array.isArray(fn.definition.positionals)) return undefined;
-  return fn.definition.positionals.map((item) => String(renderConfigValue(item, context))).filter(Boolean);
+  return fn.definition.positionals
+    .filter((item) => !isUnsetParam(item, context))
+    .map((item) => String(renderConfigValue(item, context)))
+    .filter(Boolean);
 }
 
 /** The full command line for a function: [script, ...argv]. */
 export async function buildFunctionCommand(fn: ResolvedFunction, opts: CommandOptions, schema?: Schema): Promise<string[]> {
   schema ??= await loadSchema(fn.script);
   const config: Json = { ...fn.config };
+  const context = opts.context;
+  // A field the caller didn't send leaves its option unset, as an absent input
+  // does; first, so an argument left unset still takes the default positional
+  for (const key of Object.keys(config)) if (isUnsetParam(config[key], context)) delete config[key];
   const first = schema.arguments[0];
   if (opts.defaultPositional && first && !Array.isArray(fn.definition.positionals) && !inputKeys(first).some((k) => k in config)) {
     config[inputKeys(first)[0]] = opts.defaultPositional;
   }
-  const context = opts.context;
   const { argv, unknown, controlled } = toArgv(schema, config, {
     base: opts.configRoot,
     controlled: opts.controlled ?? ['help'],

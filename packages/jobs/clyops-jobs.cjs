@@ -36,6 +36,7 @@ __export(index_exports, {
   isDirectoryPath: () => isDirectoryPath,
   isEnabled: () => isEnabled,
   isFilePath: () => isFilePath,
+  isUnsetParam: () => isUnsetParam,
   listFilesRecursive: () => listFilesRecursive,
   lookupTemplateValue: () => lookupTemplateValue,
   newJobId: () => newJobId,
@@ -135,16 +136,39 @@ function resolveConfigPath(root, value) {
 var resolveScriptPath = resolveConfigPath;
 
 // packages/jobs/src/template.ts
-function lookupTemplateValue(context, expression) {
+var MISSING = /* @__PURE__ */ Symbol("missing");
+function walk(context, expression) {
   let current = context;
   for (const part of String(expression).split(".").filter(Boolean)) {
-    if (!current || typeof current !== "object" || !Object.prototype.hasOwnProperty.call(current, part)) {
-      throw new Error(`unknown template value: ${expression}`);
-    }
+    if (!current || typeof current !== "object" || !Object.prototype.hasOwnProperty.call(current, part)) return MISSING;
     current = current[part];
+  }
+  return current;
+}
+function isParamsPath(context, expression) {
+  return /^params\./.test(expression) && Object.prototype.hasOwnProperty.call(context, "params");
+}
+function lookupTemplateValue(context, expression) {
+  const current = walk(context, expression);
+  if (current === MISSING) {
+    if (isParamsPath(context, expression)) return "";
+    throw new Error(`unknown template value: ${expression}`);
   }
   if (current === void 0 || current === null) return "";
   return typeof current === "object" ? JSON.stringify(current) : String(current);
+}
+var TEMPLATE = /\$\{\s*([A-Za-z0-9_.-]+)\s*\}|\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g;
+function isUnsetParam(value, context) {
+  if (!context) return false;
+  if (Array.isArray(value)) return value.some((item) => isUnsetParam(item, context));
+  if (typeof value !== "string") return false;
+  for (const m of value.matchAll(TEMPLATE)) {
+    const expression = m[1] || m[2];
+    if (!isParamsPath(context, expression)) continue;
+    const current = walk(context, expression);
+    if (current === MISSING || current === void 0 || current === null) return true;
+  }
+  return false;
 }
 function renderTemplateString(value, context) {
   return String(value).replace(
@@ -602,16 +626,17 @@ function resolveFunctionConfig(scriptRoot, routeConfig, functionName) {
 }
 function explicitPositionals(fn, context) {
   if (!Array.isArray(fn.definition.positionals)) return void 0;
-  return fn.definition.positionals.map((item) => String(renderConfigValue(item, context))).filter(Boolean);
+  return fn.definition.positionals.filter((item) => !isUnsetParam(item, context)).map((item) => String(renderConfigValue(item, context))).filter(Boolean);
 }
 async function buildFunctionCommand(fn, opts, schema) {
   schema ??= await loadSchema(fn.script);
   const config = { ...fn.config };
+  const context = opts.context;
+  for (const key of Object.keys(config)) if (isUnsetParam(config[key], context)) delete config[key];
   const first = schema.arguments[0];
   if (opts.defaultPositional && first && !Array.isArray(fn.definition.positionals) && !inputKeys(first).some((k) => k in config)) {
     config[inputKeys(first)[0]] = opts.defaultPositional;
   }
-  const context = opts.context;
   const { argv, unknown, controlled } = toArgv(schema, config, {
     base: opts.configRoot,
     controlled: opts.controlled ?? ["help"],
@@ -928,6 +953,7 @@ var JobQueue = class {
   isDirectoryPath,
   isEnabled,
   isFilePath,
+  isUnsetParam,
   listFilesRecursive,
   lookupTemplateValue,
   newJobId,

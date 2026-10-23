@@ -5,6 +5,12 @@ section here.
 
 ## [Unreleased]
 
+- clyops-jobs: an option or positional that names a `params` field the caller didn't send, or
+  sent as `null`, is left unset, instead of failing with `unknown template value` or passing
+  `--x ''`, so optional fields work as they do through clyops-api and clyops-mcp. Elsewhere a
+  missing `params` field renders empty; other roots still fail on an unknown path
+  ([#38](https://github.com/wankdanker/clyops/issues/38)).
+
 ## [0.9.0] - 2026-10-22
 
 ### Loading large toolsets

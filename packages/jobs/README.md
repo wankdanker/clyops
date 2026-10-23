@@ -35,7 +35,11 @@ and no `node_modules`. It includes clyops-tools. `require('clyops-jobs')` loads 
 - `positionals` (optional) lists the tool's positional arguments explicitly; otherwise they're
   options keyed by argument name.
 - String values may use `${dot.path}` or `{{dot.path}}` templates against a context you build
-  (`job`, `paths`, whatever the trigger knows).
+  (`job`, `paths`, whatever the trigger knows). An unknown path is an error, except under `params`
+  (the caller's fields): an option or positional that names a field the caller didn't send, or
+  sent as `null`, is left unset (`${params.x}` and `v-${params.x}` alike), so the tool's own
+  default applies, as an absent input does through clyops-api. Elsewhere (a `result` map, a
+  `stdout` path) a missing `params` field renders empty.
 - `artifacts`: glob patterns (`*`, `?`, `**`) relative to `paths.work_dir`, copied into
   `paths.artifacts_dir`, with an optional `required: true` or `min: N`.
 - `stdin`: a template naming a file fed to the tool's stdin (`"${media.path}"`; relative to the

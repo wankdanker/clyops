@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   JobQueue, buildFunctionCommand, buildResultRecord, configureLogging, copyConfiguredArtifacts, deepMerge, findFilesByArtifactPattern,
-  globToRegex, newJobId, newJobRecord, renderConfigValue, renderResultMap, renderTemplateString, resolveConfigPath, resolveFunctionConfig,
+  globToRegex, isUnsetParam, newJobId, newJobRecord, renderConfigValue, renderResultMap, renderTemplateString, resolveConfigPath, resolveFunctionConfig,
   runScriptFunction, transitionJobRecord, updateJobProgress,
 } from '../dist/index.js';
 
@@ -31,6 +31,17 @@ test('templates', () => {
   assert.equal(renderTemplateString('${media.meta}', ctx), '{"rate":16000}');
   assert.equal(renderTemplateString('[${empty}]', ctx), '[]');
   assert.throws(() => renderTemplateString('${job.nope}', ctx), /unknown template value: job.nope/);
+  // A caller's field that wasn't sent renders empty, like null; other roots stay strict
+  assert.equal(renderTemplateString('[${params.nope}]', { ...ctx, params: {} }), '[]');
+  assert.throws(() => renderTemplateString('${params.nope}', ctx), /unknown template value: params.nope/);
+  assert.equal(isUnsetParam('${params.nope}', { params: {} }), true);
+  assert.equal(isUnsetParam('{{ params.gone }}', { params: { gone: null } }), true);
+  assert.equal(isUnsetParam('${params.n}', { params: { n: 0 } }), false);
+  assert.equal(isUnsetParam('x-${params.nope}', { params: {} }), true);
+  assert.equal(isUnsetParam(['a', '${params.nope}'], { params: {} }), true);
+  assert.equal(isUnsetParam('x-${params.n}', { params: { n: 'y' } }), false);
+  assert.equal(isUnsetParam('${job.nope}', { params: {}, job: {} }), false);
+  assert.equal(isUnsetParam('${params.nope}', null), false);
   assert.deepEqual(renderConfigValue(['${job.id}', 3], ctx), ['j1', 3]);
   assert.equal(renderConfigValue('${job.id}', null), '${job.id}');
   assert.deepEqual(renderResultMap({ id: '${job.id}', n: 2, nested: { p: ['${media.path}'] } }, ctx), { id: 'j1', n: 2, nested: { p: ['/in/a.wav'] } });
