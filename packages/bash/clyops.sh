@@ -325,7 +325,7 @@ clyops_path_search() {
 
 _clyops_known_rule() {
     case "$1" in
-        ""|int|float|string|path|ip|hostname|url|port|email|uuid|bool|date:YYYY-MM-DD) return 0 ;;
+        ""|int|float|string|path|ip|hostname|url|port|email|uuid|json|bool|date:YYYY-MM-DD) return 0 ;;
         file:exists|file:readable|file:writable|file:executable|dir:exists|dir:writable) return 0 ;;
         choice:?*|regex:?*) return 0 ;;
     esac
@@ -453,6 +453,68 @@ _clyops_resolve_value() { # rule value base [search-dirs] -> _r
     if [[ "$1" == file:executable && -n "$2" && "$2" != */* ]]; then _r="$2"; else _clyops_resolve "$2" "$3" "${4:-}"; fi
 }
 
+# Exactly one JSON value (spec section 5). Escapes become a plain character,
+# the text is split on quotes so strings and the rest alternate, then the
+# tokens outside strings are walked with `state` (what may come next) and
+# `stack` (the open brackets). Each step is linear in the length.
+_clyops_is_json() {
+    local LC_ALL=C
+    local s="$1" flat="" tok k state="value" stack="" quotes
+    local ctl=$'\x01'-$'\x1f' allowed=$'][{},:0-9.eE+truefalsn \t\n\r-'
+    local -a parts toks
+    s="${s//\\\\/x}"; s="${s//\\\"/x}"; s="${s//\\\//x}"; s="${s//\\[bfnrt]/x}"
+    s="${s//\\u[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]/x}"
+    [[ "$s" != *\\* ]] || return 1
+    quotes="${s//[!\"]/}"
+    (( ${#quotes} % 2 == 0 )) || return 1
+    IFS='"' read -r -d '' -a parts <<< "$s"
+    for (( k = 0; k < ${#parts[@]}; k++ )); do
+        if (( k % 2 )); then
+            [[ "${parts[k]}" != *[$ctl]* ]] || return 1
+            flat+=" S "
+        else
+            [[ "${parts[k]}" != *[!$allowed]* ]] || return 1
+            flat+="${parts[k]}"
+        fi
+    done
+    flat="${flat//\[/ [ }"; flat="${flat//\]/ ] }"; flat="${flat//\{/ \{ }"; flat="${flat//\}/ \} }"
+    flat="${flat//,/ , }"; flat="${flat//:/ : }"
+    IFS=$' \t\n\r' read -r -d '' -a toks <<< "$flat"
+    for tok in "${toks[@]}"; do
+        case "$state" in
+            colon)
+                [[ "$tok" == : ]] || return 1
+                state="value"; continue ;;
+            after)
+                [[ -n "$stack" ]] || return 1
+                case "$tok${stack: -1}" in
+                    ,\{) state="key" ;;
+                    ,\[) state="value" ;;
+                    \]\[|\}\{) stack="${stack%?}" ;;
+                    *) return 1 ;;
+                esac
+                continue ;;
+            key|key_or_close)
+                if [[ "$state" == key_or_close && "$tok" == "}" ]]; then stack="${stack%?}"; state="after"; continue; fi
+                [[ "$tok" == S ]] || return 1
+                state="colon"; continue ;;
+            value_or_close)
+                if [[ "$tok" == "]" ]]; then stack="${stack%?}"; state="after"; continue; fi ;;
+        esac
+        case "$tok" in
+            "{"|"[")
+                (( ${#stack} < 512 )) || return 1
+                stack+="$tok"
+                if [[ "$tok" == "{" ]]; then state="key_or_close"; else state="value_or_close"; fi
+                continue ;;
+            S|true|false|null) ;;
+            *) [[ "$tok" =~ ^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$ ]] || return 1 ;;
+        esac
+        state="after"
+    done
+    [[ "$state" == after && -z "$stack" ]]
+}
+
 # A program: a bare name in a PATH directory (empty entries skipped), or a
 # path to an executable regular file (spec section 5).
 _clyops_is_executable() {
@@ -570,6 +632,8 @@ _clyops_validate() {
         uuid)
             [[ "$v" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] \
                 || { _CLYOPS_ERROR="$name must be a valid UUID, got '$v'"; return 1; } ;;
+        json)
+            _clyops_is_json "$v" || { _CLYOPS_ERROR="$name must be valid JSON, got '$v'"; return 1; } ;;
         date:YYYY-MM-DD)
             [[ "$v" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { _CLYOPS_ERROR="$name must be in YYYY-MM-DD format, got '$v'"; return 1; } ;;
         file:exists)
@@ -600,7 +664,7 @@ _clyops_describe_rule() { # help text for rule $1 into _r
     case "$rule" in
         int) _r="integer" ;; float) _r="number" ;; string) _r="text" ;; path) _r="path" ;;
         ip) _r="IP address" ;; hostname) _r="hostname" ;; url) _r="URL" ;; port) _r="port: 1-65535" ;;
-        email) _r="email address" ;; uuid) _r="UUID" ;; bool) _r="true/false, yes/no, 1/0, on/off" ;;
+        email) _r="email address" ;; uuid) _r="UUID" ;; json) _r="JSON" ;; bool) _r="true/false, yes/no, 1/0, on/off" ;;
         date:YYYY-MM-DD) _r="date: YYYY-MM-DD" ;;
         file:exists) _r="existing file" ;; file:readable) _r="readable file" ;; file:writable) _r="writable file" ;;
         file:executable) _r="executable" ;; dir:exists) _r="existing directory" ;; dir:writable) _r="writable directory" ;;

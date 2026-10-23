@@ -79,7 +79,7 @@ func Die(code int, format string, args ...any) {
 
 var fixedRules = map[string]string{
 	"int": "integer", "float": "number", "string": "text", "path": "path", "ip": "IP address",
-	"hostname": "hostname", "url": "URL", "port": "port: 1-65535", "email": "email address", "uuid": "UUID",
+	"hostname": "hostname", "url": "URL", "port": "port: 1-65535", "email": "email address", "uuid": "UUID", "json": "JSON",
 	"bool": "true/false, yes/no, 1/0, on/off", "date:YYYY-MM-DD": "date: YYYY-MM-DD",
 	"file:exists": "existing file", "file:readable": "readable file", "file:writable": "writable file",
 	"file:executable": "executable", "dir:exists": "existing directory", "dir:writable": "writable directory",
@@ -281,6 +281,10 @@ func Validate(value, rule, name string) (any, error) {
 		if !reEmail.MatchString(value) {
 			return fail("must be a valid email address, got '%s'", value)
 		}
+	case rule == "json":
+		if !IsJSON(value) {
+			return fail("must be valid JSON, got '%s'", value)
+		}
 	case rule == "uuid":
 		if !reUUID.MatchString(value) {
 			return fail("must be a valid UUID, got '%s'", value)
@@ -325,6 +329,160 @@ func Validate(value, rule, name string) (any, error) {
 // PATH rather than a path (spec section 5).
 func IsBareProgram(value string) bool {
 	return value != "" && !strings.Contains(value, "/") && !(runtime.GOOS == "windows" && strings.Contains(value, `\`))
+}
+
+const jsonMaxDepth = 512
+
+// IsJSON reports whether text is exactly one JSON value, by the grammar in
+// spec section 5.
+func IsJSON(text string) bool {
+	p := jsonParser{text: text}
+	if !p.value(0) {
+		return false
+	}
+	p.skipSpace()
+	return p.i == len(text)
+}
+
+type jsonParser struct {
+	text string
+	i    int
+}
+
+func (p *jsonParser) at(k int) byte {
+	if k < len(p.text) {
+		return p.text[k]
+	}
+	return 0
+}
+
+func (p *jsonParser) skipSpace() {
+	for p.i < len(p.text) && strings.IndexByte(" \t\n\r", p.text[p.i]) >= 0 {
+		p.i++
+	}
+}
+
+func (p *jsonParser) digits() bool {
+	start := p.i
+	for p.i < len(p.text) && p.text[p.i] >= '0' && p.text[p.i] <= '9' {
+		p.i++
+	}
+	return p.i > start
+}
+
+func isHex(c byte) bool {
+	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+}
+
+func (p *jsonParser) string() bool {
+	p.i++
+	for p.i < len(p.text) {
+		c := p.text[p.i]
+		switch {
+		case c == '"':
+			p.i++
+			return true
+		case c < 0x20:
+			return false
+		case c == '\\':
+			e := p.at(p.i + 1)
+			if e != 0 && strings.IndexByte(`"\/bfnrt`, e) >= 0 {
+				p.i += 2
+			} else if e == 'u' && isHex(p.at(p.i+2)) && isHex(p.at(p.i+3)) && isHex(p.at(p.i+4)) && isHex(p.at(p.i+5)) {
+				p.i += 6
+			} else {
+				return false
+			}
+		default:
+			p.i++
+		}
+	}
+	return false
+}
+
+func (p *jsonParser) number() bool {
+	if p.at(p.i) == '-' {
+		p.i++
+	}
+	if p.at(p.i) == '0' {
+		p.i++
+	} else if c := p.at(p.i); c < '1' || c > '9' || !p.digits() {
+		return false
+	}
+	if p.at(p.i) == '.' {
+		p.i++
+		if !p.digits() {
+			return false
+		}
+	}
+	if c := p.at(p.i); c == 'e' || c == 'E' {
+		p.i++
+		if c := p.at(p.i); c == '+' || c == '-' {
+			p.i++
+		}
+		if !p.digits() {
+			return false
+		}
+	}
+	return true
+}
+
+func (p *jsonParser) value(depth int) bool {
+	p.skipSpace()
+	c := p.at(p.i)
+	switch {
+	case c == '{' || c == '[':
+		if depth >= jsonMaxDepth {
+			return false
+		}
+		closer := byte(']')
+		if c == '{' {
+			closer = '}'
+		}
+		p.i++
+		p.skipSpace()
+		if p.at(p.i) == closer {
+			p.i++
+			return true
+		}
+		for {
+			if c == '{' {
+				p.skipSpace()
+				if p.at(p.i) != '"' || !p.string() {
+					return false
+				}
+				p.skipSpace()
+				if p.at(p.i) != ':' {
+					return false
+				}
+				p.i++
+			}
+			if !p.value(depth + 1) {
+				return false
+			}
+			p.skipSpace()
+			switch p.at(p.i) {
+			case ',':
+				p.i++
+			case closer:
+				p.i++
+				return true
+			default:
+				return false
+			}
+		}
+	case c == '"':
+		return p.string()
+	case c == '-' || (c >= '0' && c <= '9'):
+		return p.number()
+	}
+	for _, word := range []string{"true", "false", "null"} {
+		if strings.HasPrefix(p.text[p.i:], word) {
+			p.i += len(word)
+			return true
+		}
+	}
+	return false
 }
 
 // IsExecutable reports whether value is a program: a bare name found on PATH,
