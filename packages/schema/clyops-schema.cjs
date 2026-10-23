@@ -82,6 +82,8 @@ function valueSchema(validation, choices = []) {
       return { type: "string", enum: choices.length ? choices : spec.split(",") };
     case "regex":
       return { type: "string", pattern: spec };
+    case "json":
+      return { contentMediaType: "application/json" };
     default:
       return { type: "string" };
   }
