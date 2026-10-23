@@ -312,6 +312,7 @@ positional arguments. Typed implementations convert values as shown in the
 | `port` | integer 1–65535 | integer | `port: 1-65535` | `NAME must be a valid port (1-65535), got 'V'` |
 | `email` | `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$` | string | `email address` | `NAME must be a valid email address, got 'V'` |
 | `uuid` | 8-4-4-4-12 hex | string | `UUID` | `NAME must be a valid UUID, got 'V'` |
+| `json` | one JSON value (below) | string | `JSON` | `NAME must be valid JSON, got 'V'` |
 | `bool` | `true false yes no 1 0 on off` (any case) | boolean | `true/false, yes/no, 1/0, on/off` | `NAME must be a boolean (true/false, yes/no, 1/0, on/off), got 'V'` |
 | `date:YYYY-MM-DD` | `^[0-9]{4}-[0-9]{2}-[0-9]{2}$` | string | `date: YYYY-MM-DD` | `NAME must be in YYYY-MM-DD format, got 'V'` |
 | `regex:PATTERN` | pattern found anywhere in value | string | `pattern: PATTERN` | `NAME does not match required pattern, got 'V'` |
@@ -326,6 +327,21 @@ that exists, and a bare name is also tried with each extension in `PATHEXT`
 (`ffmpeg` finds `ffmpeg.exe`). A bare name stays as given (`ffmpeg`, not
 `/usr/bin/ffmpeg`), so it is found on `PATH` again when the program runs and a
 config file naming it works on every machine.
+
+`json` accepts exactly one JSON value (RFC 8259): an object, array, string,
+number, `true`, `false` or `null`, with optional whitespace (space, tab, line
+feed, carriage return) around it and between tokens. The value stays the text
+as given; the program parses it. Every implementation checks the grammar
+itself, so they agree on the edges:
+
+* numbers are `-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?`, so `NaN`,
+  `Infinity`, `+1`, `01`, `1.` and `.5` are rejected;
+* strings use double quotes; a character below U+0020 must be escaped, and the
+  escapes are `\" \\ \/ \b \f \n \r \t` and `\u` with four hex digits
+  (surrogate pairing is not checked). Other bytes are taken as they are;
+* comments, trailing commas, single quotes and anything after the value are
+  rejected;
+* nesting deeper than 512 arrays and objects is rejected.
 
 Bounds are non-negative decimal numbers. Regex patterns should stay within the
 POSIX ERE subset that every engine (Bash `=~`, JS, Python `re`, Rust `regex`,
@@ -510,7 +526,7 @@ Tabs and newlines inside descriptions become spaces. Each flag is followed by a
 | `choice:*` | `choice` | the choices, comma-separated |
 | `bool` | `choice` | `true,false` |
 | `hostname`, `ip` | `host` | |
-| `int*`, `float*`, `port`, `uuid`, `url`, `email`, `date:*`, `regex:*`, `string*` | `none` | |
+| `int*`, `float*`, `port`, `uuid`, `url`, `email`, `json`, `date:*`, `regex:*`, `string*` | `none` | |
 | none | `default` | |
 
 ### 9.1 Shell completion scripts
@@ -689,7 +705,11 @@ an error. A `null` value is the same as leaving the key out.
 * any other option becomes `--name VALUE`, repeated for each element when the
   value is an array (array options);
 * values are strings as given, numbers and booleans in their JSON spelling,
-  objects as JSON text.
+  objects as JSON text;
+* a `json` input takes any JSON value: a string is passed as given (it is the
+  JSON text), anything else as its JSON text. An array given to a `json`
+  option that is not an array option, or to a `json` argument that is not
+  variadic, is one value, not a list.
 
 **Positionals** come first by default, without an option terminator, so
 legacy wrappers taking their input as `$1` work too. When any positional
@@ -757,7 +777,8 @@ option (except `help`) under the key above. Types follow the validation rule:
 `number`, `port` → `integer` 1–65535, `bool` and flags → `boolean`, `choice` →
 string `enum`, `string:` bounds → `minLength`/`maxLength`, `regex:` →
 `pattern`, and `ip`, `hostname`, `url`, `email`, `uuid` and `date` → `pattern`
-with the section 5 regex; everything else is a string. Array options and
+with the section 5 regex, `json` → any JSON value (no `type`) with
+`contentMediaType: "application/json"`; everything else is a string. Array options and
 variadics are arrays of that. Descriptions and typed defaults are carried
 over; secret options are marked `writeOnly: true` and `format: "password"`.
 Required arguments are required; options are not, since a tool may get
