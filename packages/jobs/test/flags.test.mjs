@@ -24,6 +24,22 @@ for (const module of ['../dist/index.js', '../clyops-jobs.cjs']) {
       }
     }
   });
+  test(`${module}: an option or positional built from a field the caller didn't send is unset`, async () => {
+    const run = (config, params, positionals) => buildFunctionCommand(
+      { functionName: 'f', key: 'f', script: '/tmp/tool', config, definition: positionals ? { positionals } : {} },
+      { configRoot: '/tmp', context: { params, job: { id: 'j' } } }, schema);
+    const config = { tag: 'v-${params.v}', notes: '${params.notes}', count: '${params.n}' };
+    assert.deepEqual(await run(config, { v: '1', notes: 'hi', n: 4 }), ['/tmp/tool', '--notes', 'hi', '--count', '4', '--tag', 'v-1']);
+    assert.deepEqual(await run({ notes: '${params.notes}', count: '${params.n}' }, { notes: null }), ['/tmp/tool']);
+    assert.deepEqual(await run({}, { a: 'in.wav' }, ['${params.a}', '${params.mode}']), ['/tmp/tool', 'in.wav']);
+    // An argument left unset still takes the default positional.
+    const withInput = await buildFunctionCommand(
+      { functionName: 'f', key: 'f', script: '/tmp/tool', config: { input: '${params.input}' }, definition: {} },
+      { configRoot: '/tmp', context: { params: {}, paths: { input: '/w/in.wav' } }, defaultPositional: '${paths.input}' }, schema);
+    assert.deepEqual(withInput, ['/tmp/tool', '/w/in.wav']);
+    // Other roots are the definition's own: an unknown path is still an error.
+    await assert.rejects(run({ notes: '${job.nope}' }, {}), /unknown template value: job.nope/);
+  });
   test(`${module}: invalid flag shapes reject, absent and controlled flags stay skipped`, async () => {
     for (const value of ['maybe', [], ['true'], {}, { on: true }, 2]) {
       await assert.rejects(buildFunctionCommand(fn(value), { configRoot: '/tmp' }, schema), /--verbose must be a boolean/);

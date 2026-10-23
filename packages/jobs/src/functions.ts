@@ -128,14 +128,15 @@ function explicitPositionals(fn: ResolvedFunction, context?: TemplateContext | n
 /** The full command line for a function: [script, ...argv]. */
 export async function buildFunctionCommand(fn: ResolvedFunction, opts: CommandOptions, schema?: Schema): Promise<string[]> {
   schema ??= await loadSchema(fn.script);
-  const config: Json = { ...fn.config };
+  const context = opts.context;
+  const templates = functionTemplateOptions(fn);
+  // First, so an argument left unset still takes the default positional.
+  const config: Json = context ? withoutUnsetParams(fn.config, context, templates) : { ...fn.config };
   const first = schema.arguments[0];
   if (opts.defaultPositional && first && !Array.isArray(fn.definition.positionals) && !inputKeys(first).some((k) => k in config)) {
     config[inputKeys(first)[0]] = opts.defaultPositional;
   }
-  const context = opts.context;
-  const templates = functionTemplateOptions(fn);
-  const { argv, unknown, controlled } = toArgv(schema, context ? withoutUnsetParams(config, context, templates) : config, {
+  const { argv, unknown, controlled } = toArgv(schema, config, {
     base: opts.configRoot,
     controlled: opts.controlled ?? ['help'],
     render: context ? (s) => renderTemplateString(s, context, templates) : undefined,

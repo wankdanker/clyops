@@ -638,14 +638,14 @@ function explicitPositionals(fn, context) {
 }
 async function buildFunctionCommand(fn, opts, schema) {
   schema ??= await loadSchema(fn.script);
-  const config = { ...fn.config };
+  const context = opts.context;
+  const templates = functionTemplateOptions(fn);
+  const config = context ? withoutUnsetParams(fn.config, context, templates) : { ...fn.config };
   const first = schema.arguments[0];
   if (opts.defaultPositional && first && !Array.isArray(fn.definition.positionals) && !inputKeys(first).some((k) => k in config)) {
     config[inputKeys(first)[0]] = opts.defaultPositional;
   }
-  const context = opts.context;
-  const templates = functionTemplateOptions(fn);
-  const { argv, unknown, controlled } = toArgv(schema, context ? withoutUnsetParams(config, context, templates) : config, {
+  const { argv, unknown, controlled } = toArgv(schema, config, {
     base: opts.configRoot,
     controlled: opts.controlled ?? ["help"],
     render: context ? (s) => renderTemplateString(s, context, templates) : void 0,
