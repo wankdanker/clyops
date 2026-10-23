@@ -354,6 +354,7 @@ const FIXED_RULES: &[&str] = &[
     "port",
     "email",
     "uuid",
+    "json",
     "bool",
     "date:YYYY-MM-DD",
     "file:exists",
@@ -396,6 +397,7 @@ pub fn describe_rule(rule: &str) -> String {
         "port" => "port: 1-65535",
         "email" => "email address",
         "uuid" => "UUID",
+        "json" => "JSON",
         "bool" => "true/false, yes/no, 1/0, on/off",
         "date:YYYY-MM-DD" => "date: YYYY-MM-DD",
         "file:exists" => "existing file",
@@ -453,6 +455,147 @@ fn access(path: &str, mode: i32) -> bool {
 const R_OK: i32 = 4;
 const W_OK: i32 = 2;
 const X_OK: i32 = 1;
+
+const JSON_MAX_DEPTH: usize = 512;
+
+/// Whether `text` is exactly one JSON value, by the grammar in spec section 5.
+pub fn is_json(text: &str) -> bool {
+    let mut p = JsonGrammar { b: text.as_bytes(), i: 0 };
+    if !p.value(0) {
+        return false;
+    }
+    p.skip_space();
+    p.i == p.b.len()
+}
+
+struct JsonGrammar<'a> {
+    b: &'a [u8],
+    i: usize,
+}
+
+impl JsonGrammar<'_> {
+    fn at(&self, k: usize) -> u8 {
+        self.b.get(k).copied().unwrap_or(0)
+    }
+
+    fn skip_space(&mut self) {
+        while matches!(self.at(self.i), b' ' | b'\t' | b'\n' | b'\r') {
+            self.i += 1;
+        }
+    }
+
+    fn digits(&mut self) -> bool {
+        let start = self.i;
+        while self.at(self.i).is_ascii_digit() {
+            self.i += 1;
+        }
+        self.i > start
+    }
+
+    fn string(&mut self) -> bool {
+        self.i += 1;
+        while self.i < self.b.len() {
+            match self.b[self.i] {
+                b'"' => {
+                    self.i += 1;
+                    return true;
+                }
+                c if c < 0x20 => return false,
+                b'\\' => match self.at(self.i + 1) {
+                    b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't' => self.i += 2,
+                    b'u' if (2..6).all(|k| self.at(self.i + k).is_ascii_hexdigit()) => self.i += 6,
+                    _ => return false,
+                },
+                _ => self.i += 1,
+            }
+        }
+        false
+    }
+
+    fn number(&mut self) -> bool {
+        if self.at(self.i) == b'-' {
+            self.i += 1;
+        }
+        match self.at(self.i) {
+            b'0' => self.i += 1,
+            b'1'..=b'9' => {
+                self.digits();
+            }
+            _ => return false,
+        }
+        if self.at(self.i) == b'.' {
+            self.i += 1;
+            if !self.digits() {
+                return false;
+            }
+        }
+        if matches!(self.at(self.i), b'e' | b'E') {
+            self.i += 1;
+            if matches!(self.at(self.i), b'+' | b'-') {
+                self.i += 1;
+            }
+            if !self.digits() {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn value(&mut self, depth: usize) -> bool {
+        self.skip_space();
+        let c = self.at(self.i);
+        match c {
+            b'{' | b'[' => {
+                if depth >= JSON_MAX_DEPTH {
+                    return false;
+                }
+                let close = if c == b'{' { b'}' } else { b']' };
+                self.i += 1;
+                self.skip_space();
+                if self.at(self.i) == close {
+                    self.i += 1;
+                    return true;
+                }
+                loop {
+                    if c == b'{' {
+                        self.skip_space();
+                        if self.at(self.i) != b'"' || !self.string() {
+                            return false;
+                        }
+                        self.skip_space();
+                        if self.at(self.i) != b':' {
+                            return false;
+                        }
+                        self.i += 1;
+                    }
+                    if !self.value(depth + 1) {
+                        return false;
+                    }
+                    self.skip_space();
+                    match self.at(self.i) {
+                        b',' => self.i += 1,
+                        x if x == close => {
+                            self.i += 1;
+                            return true;
+                        }
+                        _ => return false,
+                    }
+                }
+            }
+            b'"' => self.string(),
+            b'-' | b'0'..=b'9' => self.number(),
+            _ => {
+                for word in [&b"true"[..], b"false", b"null"] {
+                    if self.b[self.i..].starts_with(word) {
+                        self.i += word.len();
+                        return true;
+                    }
+                }
+                false
+            }
+        }
+    }
+}
 
 /// Whether a `file:executable` value names a program on PATH rather than a path (spec section 5).
 pub fn is_bare_program(value: &str) -> bool {
@@ -573,6 +716,7 @@ pub fn validate(value: &str, rule: &str, name: &str) -> Result<Value, String> {
         "email" => full(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", value),
         "uuid" => full("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", value),
         "date:YYYY-MM-DD" => full("[0-9]{4}-[0-9]{2}-[0-9]{2}", value),
+        "json" => is_json(value),
         _ => true,
     };
     if !ok {
@@ -582,6 +726,7 @@ pub fn validate(value: &str, rule: &str, name: &str) -> Result<Value, String> {
             "url" => "must be a valid URL".to_string(),
             "email" => "must be a valid email address".to_string(),
             "uuid" => "must be a valid UUID".to_string(),
+            "json" => "must be valid JSON".to_string(),
             _ => "must be in YYYY-MM-DD format".to_string(),
         };
         return fail(format!("{what}, got '{value}'"));

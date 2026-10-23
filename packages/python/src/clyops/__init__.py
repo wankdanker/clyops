@@ -24,7 +24,7 @@ from ._completions import SCRIPTS as _COMPLETION_SCRIPTS
 
 __all__ = [
     "Cli", "Values", "ParseResult", "ValidationError", "validate", "resolve_path", "describe_rule", "wrap_text",
-    "is_executable", "is_bare_program",
+    "is_executable", "is_bare_program", "is_json",
     "info", "warn", "error", "success", "die", "set_silent",
 ]
 __version__ = "0.9.0"
@@ -88,9 +88,123 @@ def die(code: int, msg: str) -> NoReturn:
 _TRUE = ("true", "yes", "1", "on")
 _FALSE = ("false", "no", "0", "off")
 _FIXED_RULES = {
-    "int", "float", "string", "path", "ip", "hostname", "url", "port", "email", "uuid", "bool",
+    "int", "float", "string", "path", "ip", "hostname", "url", "port", "email", "uuid", "json", "bool",
     "date:YYYY-MM-DD", "file:exists", "file:readable", "file:writable", "file:executable", "dir:exists", "dir:writable",
 }
+_JSON_MAX_DEPTH = 512
+_JSON_HEX = re.compile(r"[0-9a-fA-F]{4}")
+
+
+def is_json(text: str) -> bool:
+    """Whether ``text`` is exactly one JSON value, by the grammar in spec section 5."""
+    n = len(text)
+    i = 0
+
+    def skip_space() -> None:
+        nonlocal i
+        while i < n and text[i] in " \t\n\r":
+            i += 1
+
+    def at(k: int) -> str:
+        return text[k] if k < n else ""
+
+    def digits() -> bool:
+        nonlocal i
+        start = i
+        while i < n and "0" <= text[i] <= "9":
+            i += 1
+        return i > start
+
+    def string() -> bool:
+        nonlocal i
+        i += 1
+        while i < n:
+            c = text[i]
+            if c == '"':
+                i += 1
+                return True
+            if c < " ":
+                return False
+            if c == "\\":
+                e = at(i + 1)
+                if e and e in '"\\/bfnrt':
+                    i += 2
+                elif e == "u" and _JSON_HEX.fullmatch(text[i + 2:i + 6]):
+                    i += 6
+                else:
+                    return False
+            else:
+                i += 1
+        return False
+
+    def number() -> bool:
+        nonlocal i
+        if at(i) == "-":
+            i += 1
+        if at(i) == "0":
+            i += 1
+        elif not ("1" <= at(i) <= "9") or not digits():
+            return False
+        if at(i) == ".":
+            i += 1
+            if not digits():
+                return False
+        if at(i) in ("e", "E"):
+            i += 1
+            if at(i) in ("+", "-"):
+                i += 1
+            if not digits():
+                return False
+        return True
+
+    def value(depth: int) -> bool:
+        nonlocal i
+        skip_space()
+        c = at(i)
+        if c in ("{", "["):
+            if depth >= _JSON_MAX_DEPTH:
+                return False
+            close = "}" if c == "{" else "]"
+            i += 1
+            skip_space()
+            if at(i) == close:
+                i += 1
+                return True
+            while True:
+                if c == "{":
+                    skip_space()
+                    if at(i) != '"' or not string():
+                        return False
+                    skip_space()
+                    if at(i) != ":":
+                        return False
+                    i += 1
+                if not value(depth + 1):
+                    return False
+                skip_space()
+                if at(i) == ",":
+                    i += 1
+                    continue
+                if at(i) == close:
+                    i += 1
+                    return True
+                return False
+        if c == '"':
+            return string()
+        if c == "-" or "0" <= c <= "9":
+            return number()
+        for word in ("true", "false", "null"):
+            if text.startswith(word, i):
+                i += len(word)
+                return True
+        return False
+
+    if not value(0):
+        return False
+    skip_space()
+    return i == n
+
+
 _HOSTNAME = r"[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*"
 
 
@@ -159,7 +273,7 @@ def describe_rule(rule: str) -> str:
     """Help text for a validation rule (spec section 5)."""
     fixed = {
         "int": "integer", "float": "number", "string": "text", "path": "path", "ip": "IP address",
-        "hostname": "hostname", "url": "URL", "port": "port: 1-65535", "email": "email address", "uuid": "UUID",
+        "hostname": "hostname", "url": "URL", "port": "port: 1-65535", "email": "email address", "uuid": "UUID", "json": "JSON",
         "bool": "true/false, yes/no, 1/0, on/off", "date:YYYY-MM-DD": "date: YYYY-MM-DD",
         "file:exists": "existing file", "file:readable": "readable file", "file:writable": "writable file",
         "file:executable": "executable", "dir:exists": "existing directory", "dir:writable": "writable directory",
@@ -262,6 +376,9 @@ def validate(value: str, rule: str, name: str) -> Scalar:
     elif rule == "uuid":
         if not re.fullmatch(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", value):
             fail(f"must be a valid UUID, got '{value}'")
+    elif rule == "json":
+        if not is_json(value):
+            fail(f"must be valid JSON, got '{value}'")
     elif rule == "date:YYYY-MM-DD":
         if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
             fail(f"must be in YYYY-MM-DD format, got '{value}'")
