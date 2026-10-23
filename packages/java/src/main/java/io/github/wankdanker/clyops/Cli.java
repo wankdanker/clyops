@@ -53,7 +53,7 @@ public class Cli {
         Map.entry("int", "integer"), Map.entry("float", "number"), Map.entry("string", "text"),
         Map.entry("path", "path"), Map.entry("ip", "IP address"), Map.entry("hostname", "hostname"),
         Map.entry("url", "URL"), Map.entry("port", "port: 1-65535"), Map.entry("email", "email address"),
-        Map.entry("uuid", "UUID"), Map.entry("bool", "true/false, yes/no, 1/0, on/off"),
+        Map.entry("uuid", "UUID"), Map.entry("json", "JSON"), Map.entry("bool", "true/false, yes/no, 1/0, on/off"),
         Map.entry("date:YYYY-MM-DD", "date: YYYY-MM-DD"), Map.entry("file:exists", "existing file"),
         Map.entry("file:readable", "readable file"), Map.entry("file:writable", "writable file"),
         Map.entry("file:executable", "executable"),
@@ -206,6 +206,9 @@ public class Cli {
             case "uuid" -> {
                 if (!UUID.matcher(value).matches()) throw fail(name, "must be a valid UUID, got '" + value + "'");
             }
+            case "json" -> {
+                if (!isJson(value)) throw fail(name, "must be valid JSON, got '" + value + "'");
+            }
             case "date:YYYY-MM-DD" -> {
                 if (!DATE.matcher(value).matches()) throw fail(name, "must be in YYYY-MM-DD format, got '" + value + "'");
             }
@@ -310,6 +313,135 @@ public class Cli {
      */
     public static boolean isBareProgram(String value) {
         return !value.isEmpty() && !value.contains("/") && !(WINDOWS && value.contains("\\"));
+    }
+
+    /**
+     * Whether {@code text} is exactly one JSON value, by the grammar in spec section 5.
+     *
+     * @param text the value
+     * @return true when it is valid JSON
+     */
+    public static boolean isJson(String text) {
+        JsonGrammar p = new JsonGrammar(text);
+        if (!p.value(0)) return false;
+        p.skipSpace();
+        return p.i == text.length();
+    }
+
+    // A JSON grammar check (spec section 5).
+    private static final class JsonGrammar {
+        private static final int MAX_DEPTH = 512;
+        private final String s;
+        private int i;
+
+        JsonGrammar(String s) {
+            this.s = s;
+        }
+
+        private char at(int k) {
+            return k < s.length() ? s.charAt(k) : '\0';
+        }
+
+        void skipSpace() {
+            while (i < s.length() && " \t\n\r".indexOf(s.charAt(i)) >= 0) i++;
+        }
+
+        private boolean digits() {
+            int start = i;
+            while (i < s.length() && s.charAt(i) >= '0' && s.charAt(i) <= '9') i++;
+            return i > start;
+        }
+
+        private static boolean hex(char c) {
+            return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+        }
+
+        private boolean string() {
+            i++;
+            while (i < s.length()) {
+                char c = s.charAt(i);
+                if (c == '"') {
+                    i++;
+                    return true;
+                }
+                if (c < 0x20) return false;
+                if (c == '\\') {
+                    char e = at(i + 1);
+                    if (e != '\0' && "\"\\/bfnrt".indexOf(e) >= 0) {
+                        i += 2;
+                    } else if (e == 'u' && hex(at(i + 2)) && hex(at(i + 3)) && hex(at(i + 4)) && hex(at(i + 5))) {
+                        i += 6;
+                    } else {
+                        return false;
+                    }
+                } else {
+                    i++;
+                }
+            }
+            return false;
+        }
+
+        private boolean number() {
+            if (at(i) == '-') i++;
+            if (at(i) == '0') {
+                i++;
+            } else if (at(i) < '1' || at(i) > '9' || !digits()) {
+                return false;
+            }
+            if (at(i) == '.') {
+                i++;
+                if (!digits()) return false;
+            }
+            if (at(i) == 'e' || at(i) == 'E') {
+                i++;
+                if (at(i) == '+' || at(i) == '-') i++;
+                if (!digits()) return false;
+            }
+            return true;
+        }
+
+        boolean value(int depth) {
+            skipSpace();
+            char c = at(i);
+            if (c == '{' || c == '[') {
+                if (depth >= MAX_DEPTH) return false;
+                char close = c == '{' ? '}' : ']';
+                i++;
+                skipSpace();
+                if (at(i) == close) {
+                    i++;
+                    return true;
+                }
+                while (true) {
+                    if (c == '{') {
+                        skipSpace();
+                        if (at(i) != '"' || !string()) return false;
+                        skipSpace();
+                        if (at(i) != ':') return false;
+                        i++;
+                    }
+                    if (!value(depth + 1)) return false;
+                    skipSpace();
+                    if (at(i) == ',') {
+                        i++;
+                    } else if (at(i) == close) {
+                        i++;
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+            }
+            if (c == '"') return string();
+            if (c == '-' || (c >= '0' && c <= '9')) return number();
+            for (String word : List.of("true", "false", "null")) {
+                if (s.startsWith(word, i)) {
+                    i += word.length();
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     /**

@@ -62,7 +62,7 @@ field types in TypeScript, Python or Ruby.
 ## Validation
 
 Rules include `int`, `float`, `bool`, `port`, `ip`, `hostname`, `url`, `email`,
-`uuid`, `date:YYYY-MM-DD`, `path`, `file:exists`, `file:readable`, `file:writable`,
+`uuid`, `json`, `date:YYYY-MM-DD`, `path`, `file:exists`, `file:readable`, `file:writable`,
 `file:executable`, `dir:exists` and `dir:writable`. Parameterized rules include `int:1-10`,
 `float:0-1`, `string:1-100`, `choice:red,green,blue` and `regex:PATTERN`.
 See [spec section 5](../spec/SPEC.md#5-validation-rules) for ranges and exact behavior.
@@ -72,6 +72,11 @@ name must be on `PATH` and stays as given, and anything with a `/` must be an ex
 file. It also tells servers that run tools for remote callers not to take that option
 from them ([spec section 13](../spec/SPEC.md#13-json-input-toargv)), and shells complete
 command names for it.
+
+Use `json` for an option that takes structured data (`--meta '{"lang": "en"}'`): the
+value must be one JSON value, and stays the text as given for the program to parse.
+Every language checks it the same way, with no dependencies. Through the HTTP API and
+MCP server a caller can send the object itself; it reaches the tool as JSON text.
 
 Standalone `validate` helpers return a typed value or the native validation
 error/result. Unknown registration rules and duplicate names are programming

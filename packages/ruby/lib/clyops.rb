@@ -81,7 +81,7 @@ module Clyops
   FIXED_RULES = {
     "int" => "integer", "float" => "number", "string" => "text", "path" => "path", "ip" => "IP address",
     "hostname" => "hostname", "url" => "URL", "port" => "port: 1-65535", "email" => "email address", "uuid" => "UUID",
-    "bool" => "true/false, yes/no, 1/0, on/off", "date:YYYY-MM-DD" => "date: YYYY-MM-DD",
+    "json" => "JSON", "bool" => "true/false, yes/no, 1/0, on/off", "date:YYYY-MM-DD" => "date: YYYY-MM-DD",
     "file:exists" => "existing file", "file:readable" => "readable file", "file:writable" => "writable file",
     "file:executable" => "executable", "dir:exists" => "existing directory", "dir:writable" => "writable directory"
   }.freeze
@@ -235,6 +235,8 @@ module Clyops
       unless value.match?(/\A[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\z/)
         fail_with.("must be a valid UUID, got '#{value}'")
       end
+    when "json"
+      fail_with.("must be valid JSON, got '#{value}'") unless json?(value)
     when "date:YYYY-MM-DD"
       fail_with.("must be in YYYY-MM-DD format, got '#{value}'") unless value.match?(/\A[0-9]{4}-[0-9]{2}-[0-9]{2}\z/)
     when "file:exists"
@@ -256,6 +258,140 @@ module Clyops
       fail_with.("directory does not exist or is not writable: #{value}") unless File.directory?(value) && File.writable?(value)
     end
     value
+  end
+
+  # Whether `text` is exactly one JSON value, by the grammar in spec section 5.
+  # @param text [String] The value.
+  # @return [Boolean] true when it is valid JSON.
+  def json?(text)
+    JsonGrammar.new(text).valid?
+  end
+
+  # @private
+  # A JSON grammar check over the bytes of a string (spec section 5).
+  class JsonGrammar
+    MAX_DEPTH = 512
+    SPACE = " \t\n\r".bytes.freeze
+    ESCAPES = '"\\/bfnrt'.bytes.freeze
+    HEX = "0123456789abcdefABCDEF".bytes.freeze
+    WORDS = %w[true false null].freeze
+
+    def initialize(text)
+      @text = text.b
+      @i = 0
+    end
+
+    def valid?
+      return false unless value(0)
+
+      skip_space
+      @i == @text.bytesize
+    end
+
+    private
+
+    def at(k = @i)
+      @text.getbyte(k)
+    end
+
+    def skip_space
+      @i += 1 while SPACE.include?(at)
+    end
+
+    def digits
+      start = @i
+      @i += 1 while (c = at) && c.between?(48, 57)
+      @i > start
+    end
+
+    def string
+      @i += 1
+      while (c = at)
+        if c == 34
+          @i += 1
+          return true
+        end
+        return false if c < 0x20
+
+        if c == 92
+          e = at(@i + 1)
+          if e && ESCAPES.include?(e)
+            @i += 2
+          elsif e == 117 && (2..5).all? { |k| HEX.include?(at(@i + k)) }
+            @i += 6
+          else
+            return false
+          end
+        else
+          @i += 1
+        end
+      end
+      false
+    end
+
+    def number
+      @i += 1 if at == 45
+      if at == 48
+        @i += 1
+      else
+        return false unless (c = at) && c.between?(49, 57) && digits
+      end
+      if at == 46
+        @i += 1
+        return false unless digits
+      end
+      if [101, 69].include?(at)
+        @i += 1
+        @i += 1 if [43, 45].include?(at)
+        return false unless digits
+      end
+      true
+    end
+
+    def value(depth)
+      skip_space
+      c = at
+      if [123, 91].include?(c)
+        return false if depth >= MAX_DEPTH
+
+        close = c == 123 ? 125 : 93
+        @i += 1
+        skip_space
+        if at == close
+          @i += 1
+          return true
+        end
+        loop do
+          if c == 123
+            skip_space
+            return false unless at == 34 && string
+
+            skip_space
+            return false unless at == 58
+
+            @i += 1
+          end
+          return false unless value(depth + 1)
+
+          skip_space
+          case at
+          when 44 then @i += 1
+          when close
+            @i += 1
+            return true
+          else return false
+          end
+        end
+      end
+      return string if c == 34
+      return number if c == 45 || (c && c.between?(48, 57))
+
+      word = WORDS.find { |w| @text.byteslice(@i, w.bytesize) == w }
+      return false unless word
+
+      @i += word.bytesize
+      true
+    end
   end
 
   # Whether a `file:executable` value names a program on PATH rather than a

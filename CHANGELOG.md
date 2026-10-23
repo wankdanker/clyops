@@ -5,6 +5,15 @@ section here.
 
 ## [Unreleased]
 
+- A `json` validation rule, in all nine languages (spec section 5). The value must be one
+  JSON value (RFC 8259), checked by each library's own grammar check with no dependencies,
+  so they agree on the edges: no `NaN`/`Infinity`, comments, trailing commas, single quotes
+  or raw control characters in strings, and at most 512 levels of nesting. The value stays
+  the text as given. Help shows `JSON`; the error is `NAME must be valid JSON, got 'V'`. In
+  the input JSON Schema a `json` input takes any JSON value (`contentMediaType:
+  application/json`), and `toArgv` passes a string as its JSON text and serializes anything
+  else, an array included (#41). The conformance demo has a `--payload` option.
+
 ## [0.9.0] - 2026-10-22
 
 ### Loading large toolsets

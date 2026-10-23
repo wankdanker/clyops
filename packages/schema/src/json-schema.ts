@@ -42,6 +42,9 @@ export function valueSchema(validation: string, choices: string[] = []): JsonSch
       return { type: 'string', enum: choices.length ? choices : spec.split(',') };
     case 'regex':
       return { type: 'string', pattern: spec };
+    case 'json':
+      // Any JSON value: toArgv passes a string as its JSON text, anything else serialized.
+      return { contentMediaType: 'application/json' };
     default:
       return { type: 'string' };
   }

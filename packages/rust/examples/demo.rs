@@ -42,6 +42,7 @@ fn main() {
     cli.opt("CODE",     "code",     "",  "optional",  "Three-letter code").group("Validation").rule("regex:^[A-Z]{3}$");
     cli.opt("LEVEL",    "level",    "",  "optional",  "Level").group("Validation").rule("int");
     cli.opt("SIZE",     "size",     "",  "optional",  "Size code").group("Validation").rule("string:4");
+    cli.opt("PAYLOAD",  "payload",  "",  "optional",  "JSON payload").group("Validation").rule("json");
     cli.opt("DATA_DIR", "data-dir", "d", "optional",  "Data directory").group("Files").rule("dir:exists");
     cli.opt("SRC",      "src",      "",  "optional",  "Source file").group("Files").rule("file:exists");
     cli.opt("DEST",     "dest",     "",  "optional",  "Destination file").group("Files").rule("file:writable");
@@ -58,7 +59,7 @@ fn main() {
     cli.emit("progress", r#"{"pct":100}"#);
 
     let longs = ["config", "verbose", "quiet", "color", "out", "notes", "count", "ratio", "enabled", "tag", "no-cache", "key",
-        "host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "data-dir", "src", "dest", "exec", "include", "help"];
+        "host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "payload", "data-dir", "src", "dest", "exec", "include", "help"];
     let sources: Vec<String> = longs.iter().map(|l| format!("\"{l}\": \"{}\"", cli.source(l))).collect();
     println!("{{\"values\": {}, \"sources\": {{{}}}}}", cli.values_json(), sources.join(", "));
 }

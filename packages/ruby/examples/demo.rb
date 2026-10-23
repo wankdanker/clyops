@@ -42,6 +42,7 @@ cli.opt "DATE",     "date",     "",  "optional",  "Start date",            "Vali
 cli.opt "CODE",     "code",     "",  "optional",  "Three-letter code",     "Validation", "regex:^[A-Z]{3}$"
 cli.opt "LEVEL",    "level",    "",  "optional",  "Level",                 "Validation", "int"
 cli.opt "SIZE",     "size",     "",  "optional",  "Size code",             "Validation", "string:4"
+cli.opt "PAYLOAD",  "payload",  "",  "optional",  "JSON payload",          "Validation", "json"
 cli.opt "DATA_DIR", "data-dir", "d", "optional",  "Data directory",        "Files",      "dir:exists"
 cli.opt "SRC",      "src",      "",  "optional",  "Source file",           "Files",      "file:exists"
 cli.opt "DEST",     "dest",     "",  "optional",  "Destination file",      "Files",      "file:writable"
@@ -58,5 +59,5 @@ cli.emit("meta", cli.fd_open("extra") ? '{"extra":true}' : '{"extra":false}')
 cli.emit("progress", '{"pct":100}')
 
 longs = %w[config verbose quiet color out notes count ratio enabled tag no-cache key host port endpoint addr id email date
-           code level size data-dir src dest exec include help]
+           code level size payload data-dir src dest exec include help]
 puts JSON.pretty_generate({ "values" => JSON.parse(cli.values_json), "sources" => longs.to_h { |l| [l, cli.source(l)] } })

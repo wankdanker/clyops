@@ -357,6 +357,8 @@ function valueSchema(validation, choices = []) {
       return { type: "string", enum: choices.length ? choices : spec.split(",") };
     case "regex":
       return { type: "string", pattern: spec };
+    case "json":
+      return { contentMediaType: "application/json" };
     default:
       return { type: "string" };
   }
@@ -426,6 +428,9 @@ function isPathValued(validation, type) {
 function isBareProgram(validation, value) {
   return validation === "file:executable" && value !== "" && !value.includes("/") && !(process.platform === "win32" && value.includes("\\"));
 }
+function oneJsonValue(validation, many) {
+  return validation === "json" && !many;
+}
 var TRUE = /^(true|1|yes|on)$/i;
 var FALSE = /^(false|0|no|off)$/i;
 function toArgv(schema, input, opts = {}) {
@@ -473,7 +478,7 @@ function toArgv(schema, input, opts = {}) {
       out.env[option.variableName] = text(found.value, isPathValued(option.validation, option.type), `--${option.name}`, option.validation);
       continue;
     }
-    for (const item of Array.isArray(found.value) ? found.value : [found.value]) {
+    for (const item of Array.isArray(found.value) && !oneJsonValue(option.validation, option.isArray) ? found.value : [found.value]) {
       out.argv.push(`--${option.name}`, text(item, isPathValued(option.validation, option.type), `--${option.name}`, option.validation));
     }
   }
@@ -499,7 +504,7 @@ function toArgv(schema, input, opts = {}) {
         positionals.push(text(gap.default, false));
       }
       skipped = [];
-      const values = Array.isArray(found.value) ? found.value : [found.value];
+      const values = Array.isArray(found.value) && !oneJsonValue(argument.validation, argument.isVariadic) ? found.value : [found.value];
       positionals.push(...values.map((v) => text(v, isPathValued(argument.validation), argument.name, argument.validation)));
     }
   }

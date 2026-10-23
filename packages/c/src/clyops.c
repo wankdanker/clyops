@@ -585,9 +585,113 @@ void clyops_path_search(clyops_t* cli, const char* long_name, const char* dirs) 
     if (empty(o->rule)) set_str(&o->rule, "path");
 }
 
+/* A JSON grammar check (spec section 5): each step advances *p past what it read. */
+#define JSON_MAX_DEPTH 512
+
+static void json_space(const char** p) {
+    while (**p == ' ' || **p == '\t' || **p == '\n' || **p == '\r') (*p)++;
+}
+
+static int json_digits(const char** p) {
+    const char* start = *p;
+    while (**p >= '0' && **p <= '9') (*p)++;
+    return *p > start;
+}
+
+static int json_string(const char** p) {
+    const unsigned char* s = (const unsigned char*)*p + 1;
+    for (;;) {
+        if (*s == '"') {
+            *p = (const char*)s + 1;
+            return 1;
+        }
+        if (*s < 0x20) return 0; /* a control character, or the end */
+        if (*s == '\\') {
+            if (s[1] && strchr("\"\\/bfnrt", s[1])) {
+                s += 2;
+            } else if (s[1] == 'u' && isxdigit(s[2]) && isxdigit(s[3]) && isxdigit(s[4]) && isxdigit(s[5])) {
+                s += 6;
+            } else {
+                return 0;
+            }
+        } else {
+            s++;
+        }
+    }
+}
+
+static int json_number(const char** p) {
+    if (**p == '-') (*p)++;
+    if (**p == '0') (*p)++;
+    else if (**p < '1' || **p > '9' || !json_digits(p)) return 0;
+    if (**p == '.') {
+        (*p)++;
+        if (!json_digits(p)) return 0;
+    }
+    if (**p == 'e' || **p == 'E') {
+        (*p)++;
+        if (**p == '+' || **p == '-') (*p)++;
+        if (!json_digits(p)) return 0;
+    }
+    return 1;
+}
+
+static int json_value(const char** p, int depth) {
+    json_space(p);
+    char c = **p;
+    if (c == '{' || c == '[') {
+        if (depth >= JSON_MAX_DEPTH) return 0;
+        char close = c == '{' ? '}' : ']';
+        (*p)++;
+        json_space(p);
+        if (**p == close) {
+            (*p)++;
+            return 1;
+        }
+        for (;;) {
+            if (c == '{') {
+                json_space(p);
+                if (**p != '"' || !json_string(p)) return 0;
+                json_space(p);
+                if (**p != ':') return 0;
+                (*p)++;
+            }
+            if (!json_value(p, depth + 1)) return 0;
+            json_space(p);
+            if (**p == ',') {
+                (*p)++;
+            } else if (**p == close) {
+                (*p)++;
+                return 1;
+            } else {
+                return 0;
+            }
+        }
+    }
+    if (c == '"') return json_string(p);
+    if (c == '-' || (c >= '0' && c <= '9')) return json_number(p);
+    static const char* words[] = {"true", "false", "null"};
+    for (size_t i = 0; i < sizeof words / sizeof *words; i++) {
+        size_t n = strlen(words[i]);
+        if (strncmp(*p, words[i], n) == 0) {
+            *p += n;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Whether `text` is exactly one JSON value. */
+static int is_json(const char* text) {
+    const char* p = text;
+    if (!json_value(&p, 0)) return 0;
+    json_space(&p);
+    return *p == '\0';
+}
+
 static int known_rule(const char* r) {
-    static const char* fixed[] = {"int", "float", "string", "path", "ip", "hostname", "url", "port", "email", "uuid", "bool",
-                                  "date:YYYY-MM-DD", "file:exists", "file:readable", "file:writable", "file:executable", "dir:exists", "dir:writable"};
+    static const char* fixed[] = {"int", "float", "string", "path", "ip", "hostname", "url", "port", "email", "uuid", "json",
+                                  "bool", "date:YYYY-MM-DD", "file:exists", "file:readable", "file:writable", "file:executable", "dir:exists", "dir:writable"};
     if (empty(r)) return 1;
     for (size_t i = 0; i < sizeof fixed / sizeof *fixed; i++) if (streq(r, fixed[i])) return 1;
     if (re_match("^int:([0-9]+-[0-9]*|-[0-9]+)$", r)) return 1;
@@ -696,7 +800,7 @@ static void bounds(const char* rule, char** lo, char** hi) {
 static char* describe_rule(const char* r) {
     static const char* fixed[][2] = {
         {"int", "integer"}, {"float", "number"}, {"string", "text"}, {"path", "path"}, {"ip", "IP address"},
-        {"hostname", "hostname"}, {"url", "URL"}, {"port", "port: 1-65535"}, {"email", "email address"}, {"uuid", "UUID"},
+        {"hostname", "hostname"}, {"url", "URL"}, {"port", "port: 1-65535"}, {"email", "email address"}, {"uuid", "UUID"}, {"json", "JSON"},
         {"bool", "true/false, yes/no, 1/0, on/off"}, {"date:YYYY-MM-DD", "date: YYYY-MM-DD"},
         {"file:exists", "existing file"}, {"file:readable", "readable file"}, {"file:writable", "writable file"},
         {"file:executable", "executable"}, {"dir:exists", "existing directory"}, {"dir:writable", "writable directory"},
@@ -801,6 +905,8 @@ static char* validate(const char* v, const char* rule, const char* name, const c
     } else if (streq(rule, "uuid")) {
         if (!re_match("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", v))
             err = fmt("%s must be a valid UUID, got '%s'", name, v);
+    } else if (streq(rule, "json")) {
+        if (!is_json(v)) err = fmt("%s must be valid JSON, got '%s'", name, v);
     } else if (streq(rule, "date:YYYY-MM-DD")) {
         if (!re_match("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", v)) err = fmt("%s must be in YYYY-MM-DD format, got '%s'", name, v);
     } else {
