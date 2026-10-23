@@ -5,6 +5,13 @@ section here.
 
 ## [Unreleased]
 
+- clyops-jobs: a function option set to `${params.x}` (or `{{params.x}}`) whose field the caller
+  left out, or sent as null, is now unset, so the tool's own default applies; it used to fail the
+  job with `unknown template value: params.x` (or pass `--x ''` for null). A missing `params`
+  field inside a longer string or a positional renders as `''`. Other template roots (`job`,
+  `paths`, ...) still fail on an unknown path. `strict_params: true` on a function keeps the old
+  error for a missing field (#38).
+
 ## [0.9.0] - 2026-10-22
 
 ### Loading large toolsets
