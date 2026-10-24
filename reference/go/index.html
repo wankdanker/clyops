@@ -18,6 +18,8 @@ fmt.Println(v.String(&quot;input&quot;), v.Int(&quot;PORT&quot;), v.Bool(&quot;V
 PATH rather than a path (spec section 5).
 </section><section id="IsExecutable"><h2>IsExecutable</h2><pre><code>func IsExecutable(value string) bool</code></pre><p>IsExecutable reports whether value is a program: a bare name found on PATH,
 or a path to an executable regular file (spec section 5).
+</section><section id="IsJSON"><h2>IsJSON</h2><pre><code>func IsJSON(text string) bool</code></pre><p>IsJSON reports whether text is exactly one JSON value, by the grammar in
+spec section 5.
 </section><section id="ResolvePath"><h2>ResolvePath</h2><pre><code>func ResolvePath(value, base string, searchDirs []string) string</code></pre><p>ResolvePath resolves a path value against base (spec section 6), trying
 searchDirs for bare names that don&apos;t exist under base.
 </section><section id="SetSilent"><h2>SetSilent</h2><pre><code>func SetSilent(value bool)</code></pre><p>SetSilent suppresses Info/Warn/Error/Success output (Die and parse errors still print).
