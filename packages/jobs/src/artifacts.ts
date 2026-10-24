@@ -2,7 +2,7 @@
 import { existsSync, readdirSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, normalize, parse, resolve } from 'node:path';
 import type { ResolvedFunction } from './functions.js';
-import { renderTemplateString, type TemplateContext } from './template.js';
+import { renderTemplateString, type TemplateContext, type TemplateOptions } from './template.js';
 import { copyFileEnsuringDir, isDirectoryPath, isFilePath, statFollowingSymlinks, truthy } from './util.js';
 
 // A small glob subset as a regex: `*`, `?`, `**` and `**/` (which also matches no
@@ -53,8 +53,8 @@ export function listFilesRecursive(dir: string, visited = new Set<string>()): st
 }
 
 /** Files matching a templated glob; relative patterns start at `paths.work_dir`. */
-export function findFilesByArtifactPattern(pattern: string, context: TemplateContext & { paths: { work_dir: string } }): string[] {
-  const rendered = renderTemplateString(pattern, context);
+export function findFilesByArtifactPattern(pattern: string, context: TemplateContext & { paths: { work_dir: string } }, opts?: TemplateOptions): string[] {
+  const rendered = renderTemplateString(pattern, context, opts);
   const absolute = isAbsolute(rendered) ? rendered : resolve(context.paths.work_dir, rendered);
   if (!/[*?]/.test(absolute)) return isFilePath(absolute) ? [absolute] : [];
   const regex = globToRegex(absolute);
@@ -118,7 +118,7 @@ export function copyConfiguredArtifacts(
   const seen = new Set<string>();
   const copied: CopiedArtifact[] = [];
   for (const pattern of patterns) {
-    for (const source of findFilesByArtifactPattern(pattern, context)) {
+    for (const source of findFilesByArtifactPattern(pattern, context, { strict: fn.definition.strict_params === true })) {
       if (seen.has(source)) continue;
       seen.add(source);
       const destination = join(dir, basename(source));

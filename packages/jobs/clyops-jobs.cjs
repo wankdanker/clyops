@@ -32,10 +32,12 @@ __export(index_exports, {
   deepMerge: () => deepMerge,
   ensureDir: () => ensureDir,
   findFilesByArtifactPattern: () => findFilesByArtifactPattern,
+  functionTemplateOptions: () => functionTemplateOptions,
   globToRegex: () => globToRegex,
   isDirectoryPath: () => isDirectoryPath,
   isEnabled: () => isEnabled,
   isFilePath: () => isFilePath,
+  isUnsetTemplate: () => isUnsetTemplate,
   listFilesRecursive: () => listFilesRecursive,
   lookupTemplateValue: () => lookupTemplateValue,
   newJobId: () => newJobId,
@@ -135,40 +137,59 @@ function resolveConfigPath(root, value) {
 var resolveScriptPath = resolveConfigPath;
 
 // packages/jobs/src/template.ts
-function lookupTemplateValue(context, expression) {
+var OPTIONAL_ROOTS = ["params"];
+var TEMPLATE = /\$\{\s*([A-Za-z0-9_.-]+)\s*\}|\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g;
+var WHOLE_TEMPLATE = /^(?:\$\{\s*([A-Za-z0-9_.-]+)\s*\}|\{\{\s*([A-Za-z0-9_.-]+)\s*\}\})$/;
+var MISSING = /* @__PURE__ */ Symbol("missing");
+function resolvePath(context, expression) {
   let current = context;
   for (const part of String(expression).split(".").filter(Boolean)) {
-    if (!current || typeof current !== "object" || !Object.prototype.hasOwnProperty.call(current, part)) {
-      throw new Error(`unknown template value: ${expression}`);
-    }
+    if (!current || typeof current !== "object" || !Object.prototype.hasOwnProperty.call(current, part)) return MISSING;
     current = current[part];
+  }
+  return current;
+}
+function optionalRoot(expression, opts) {
+  return !opts?.strict && OPTIONAL_ROOTS.includes(String(expression).split(".").filter(Boolean)[0] ?? "");
+}
+function lookupTemplateValue(context, expression, opts) {
+  const current = resolvePath(context, expression);
+  if (current === MISSING) {
+    if (optionalRoot(expression, opts)) return "";
+    throw new Error(`unknown template value: ${expression}`);
   }
   if (current === void 0 || current === null) return "";
   return typeof current === "object" ? JSON.stringify(current) : String(current);
 }
-function renderTemplateString(value, context) {
-  return String(value).replace(
-    /\$\{\s*([A-Za-z0-9_.-]+)\s*\}|\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g,
-    (_, dollar, brace) => lookupTemplateValue(context, dollar || brace)
-  );
+function isUnsetTemplate(value, context, opts) {
+  if (typeof value !== "string") return false;
+  const match = WHOLE_TEMPLATE.exec(value.trim());
+  if (!match) return false;
+  const expression = match[1] || match[2];
+  if (!optionalRoot(expression, opts)) return false;
+  const current = resolvePath(context, expression);
+  return current === MISSING || current === void 0 || current === null;
 }
-function renderConfigValue(value, context) {
+function renderTemplateString(value, context, opts) {
+  return String(value).replace(TEMPLATE, (_, dollar, brace) => lookupTemplateValue(context, dollar || brace, opts));
+}
+function renderConfigValue(value, context, opts) {
   if (!context) return value;
-  if (typeof value === "string") return renderTemplateString(value, context);
-  if (Array.isArray(value)) return value.map((item) => renderConfigValue(item, context));
+  if (typeof value === "string") return renderTemplateString(value, context, opts);
+  if (Array.isArray(value)) return value.map((item) => renderConfigValue(item, context, opts));
   return value;
 }
-function renderResultValue(value, context) {
-  if (typeof value === "string") return renderTemplateString(value, context);
-  if (Array.isArray(value)) return value.map((item) => renderResultValue(item, context));
+function renderResultValue(value, context, opts) {
+  if (typeof value === "string") return renderTemplateString(value, context, opts);
+  if (Array.isArray(value)) return value.map((item) => renderResultValue(item, context, opts));
   if (value && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, renderResultValue(v, context)]));
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, renderResultValue(v, context, opts)]));
   }
   return value;
 }
-function renderResultMap(resultMap, context) {
+function renderResultMap(resultMap, context, opts) {
   if (!resultMap || typeof resultMap !== "object" || Array.isArray(resultMap)) return {};
-  return renderResultValue(resultMap, context);
+  return renderResultValue(resultMap, context, opts);
 }
 
 // packages/tools/src/schema.ts
@@ -600,22 +621,34 @@ function resolveFunctionConfig(scriptRoot, routeConfig, functionName) {
   const config = deepMerge(objectValue(objectValue(routeConfig.defaults)[key]), objectValue(routeConfig[key]));
   return { functionName, key, script: resolveScriptPath(scriptRoot, script), config, definition };
 }
+function functionTemplateOptions(fn) {
+  return { strict: fn.definition.strict_params === true };
+}
+function withoutUnsetParams(config, context, opts) {
+  const out = {};
+  for (const [key, value] of Object.entries(config)) {
+    if (isUnsetTemplate(value, context, opts)) continue;
+    out[key] = Array.isArray(value) ? value.filter((item) => !isUnsetTemplate(item, context, opts)) : value;
+  }
+  return out;
+}
 function explicitPositionals(fn, context) {
   if (!Array.isArray(fn.definition.positionals)) return void 0;
-  return fn.definition.positionals.map((item) => String(renderConfigValue(item, context))).filter(Boolean);
+  return fn.definition.positionals.map((item) => String(renderConfigValue(item, context, functionTemplateOptions(fn)))).filter(Boolean);
 }
 async function buildFunctionCommand(fn, opts, schema) {
   schema ??= await loadSchema(fn.script);
-  const config = { ...fn.config };
+  const context = opts.context;
+  const templates = functionTemplateOptions(fn);
+  const config = context ? withoutUnsetParams(fn.config, context, templates) : { ...fn.config };
   const first = schema.arguments[0];
   if (opts.defaultPositional && first && !Array.isArray(fn.definition.positionals) && !inputKeys(first).some((k) => k in config)) {
     config[inputKeys(first)[0]] = opts.defaultPositional;
   }
-  const context = opts.context;
   const { argv, unknown, controlled } = toArgv(schema, config, {
     base: opts.configRoot,
     controlled: opts.controlled ?? ["help"],
-    render: context ? (s) => renderTemplateString(s, context) : void 0,
+    render: context ? (s) => renderTemplateString(s, context, templates) : void 0,
     positionals: explicitPositionals(fn, context),
     positionalsOrder: fn.definition.positionals_order
   });
@@ -632,9 +665,9 @@ function parseRoleJson(text) {
     return void 0;
   }
 }
-function streamPath(template, opts, base) {
+function streamPath(template, opts, base, templates) {
   if (!template) return void 0;
-  const rendered = opts.context ? renderTemplateString(template, opts.context) : template;
+  const rendered = opts.context ? renderTemplateString(template, opts.context, templates) : template;
   return (0, import_node_path3.isAbsolute)(rendered) ? rendered : (0, import_node_path3.resolve)(base, rendered);
 }
 async function runScriptFunction(fn, opts) {
@@ -643,8 +676,8 @@ async function runScriptFunction(fn, opts) {
   const command = [file, ...redactArgv(schema, argv)];
   LOGGER.verbose("command: %s", shellQuote(command));
   const workDir = opts.context?.paths?.work_dir;
-  const stdinPath = streamPath(fn.definition.stdin, opts, opts.configRoot);
-  const stdoutPath = streamPath(fn.definition.stdout, opts, workDir ?? opts.configRoot);
+  const stdinPath = streamPath(fn.definition.stdin, opts, opts.configRoot, functionTemplateOptions(fn));
+  const stdoutPath = streamPath(fn.definition.stdout, opts, workDir ?? opts.configRoot, functionTemplateOptions(fn));
   let progress;
   const roles = {
     progress: {
@@ -688,7 +721,7 @@ function buildResultRecord(p) {
     artifact_keys: p.artifactKeys,
     completed_at: p.now,
     config: p.fn.config,
-    ...renderResultMap(p.fn.definition.result, p.context)
+    ...renderResultMap(p.fn.definition.result, p.context, functionTemplateOptions(p.fn))
   };
 }
 
@@ -734,8 +767,8 @@ function listFilesRecursive(dir, visited = /* @__PURE__ */ new Set()) {
   }
   return files;
 }
-function findFilesByArtifactPattern(pattern, context) {
-  const rendered = renderTemplateString(pattern, context);
+function findFilesByArtifactPattern(pattern, context, opts) {
+  const rendered = renderTemplateString(pattern, context, opts);
   const absolute = (0, import_node_path4.isAbsolute)(rendered) ? rendered : (0, import_node_path4.resolve)(context.paths.work_dir, rendered);
   if (!/[*?]/.test(absolute)) return isFilePath(absolute) ? [absolute] : [];
   const regex = globToRegex(absolute);
@@ -774,7 +807,7 @@ function copyConfiguredArtifacts(fn, context, opts = {}) {
   const seen = /* @__PURE__ */ new Set();
   const copied = [];
   for (const pattern of patterns) {
-    for (const source of findFilesByArtifactPattern(pattern, context)) {
+    for (const source of findFilesByArtifactPattern(pattern, context, { strict: fn.definition.strict_params === true })) {
       if (seen.has(source)) continue;
       seen.add(source);
       const destination = (0, import_node_path4.join)(dir, (0, import_node_path4.basename)(source));
@@ -924,10 +957,12 @@ var JobQueue = class {
   deepMerge,
   ensureDir,
   findFilesByArtifactPattern,
+  functionTemplateOptions,
   globToRegex,
   isDirectoryPath,
   isEnabled,
   isFilePath,
+  isUnsetTemplate,
   listFilesRecursive,
   lookupTemplateValue,
   newJobId,
