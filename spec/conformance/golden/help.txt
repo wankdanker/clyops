@@ -54,6 +54,7 @@ Validation:
       --code=<value>            Three-letter code (accepts: pattern: ^[A-Z]{3}$)
       --level=<value>           Level (accepts: integer)
       --size=<value>            Size code (accepts: text: 4 chars)
+      --payload=<value>         JSON payload (accepts: JSON)
 
 Files:
   -d, --data-dir=<value>        Data directory (accepts: existing directory)

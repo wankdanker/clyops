@@ -37,6 +37,7 @@ __export(index_exports, {
   info: () => info,
   isBareProgram: () => isBareProgram,
   isExecutable: () => isExecutable,
+  isJson: () => isJson,
   isPathRule: () => isPathRule,
   resolvePath: () => resolvePath,
   setSilent: () => setSilent,
@@ -247,6 +248,7 @@ var FIXED_RULES = /* @__PURE__ */ new Set([
   "port",
   "email",
   "uuid",
+  "json",
   "bool",
   "date:YYYY-MM-DD",
   "file:exists",
@@ -292,6 +294,7 @@ function describeRule(rule) {
     port: "port: 1-65535",
     email: "email address",
     uuid: "UUID",
+    json: "JSON",
     bool: "true/false, yes/no, 1/0, on/off",
     "date:YYYY-MM-DD": "date: YYYY-MM-DD",
     "file:exists": "existing file",
@@ -343,6 +346,97 @@ function isExecutable(value, env = process.env) {
     for (const ext of exts) if (isExecutableFile(path.join(dir, value + ext))) return true;
   }
   return false;
+}
+var JSON_MAX_DEPTH = 512;
+function isJson(text) {
+  let i = 0;
+  const skipSpace = () => {
+    while (i < text.length && " 	\n\r".includes(text[i])) i++;
+  };
+  const digits = () => {
+    const start = i;
+    while (text[i] >= "0" && text[i] <= "9") i++;
+    return i > start;
+  };
+  const string = () => {
+    i++;
+    while (i < text.length) {
+      const c = text[i];
+      if (c === '"') {
+        i++;
+        return true;
+      }
+      if (c < " ") return false;
+      if (c === "\\") {
+        const e = text[i + 1] ?? "";
+        if (e && '"\\/bfnrt'.includes(e)) i += 2;
+        else if (e === "u" && /^[0-9a-fA-F]{4}$/.test(text.slice(i + 2, i + 6))) i += 6;
+        else return false;
+      } else i++;
+    }
+    return false;
+  };
+  const number = () => {
+    if (text[i] === "-") i++;
+    if (text[i] === "0") i++;
+    else if (!(text[i] >= "1" && text[i] <= "9") || !digits()) return false;
+    if (text[i] === ".") {
+      i++;
+      if (!digits()) return false;
+    }
+    if (text[i] === "e" || text[i] === "E") {
+      i++;
+      if (text[i] === "+" || text[i] === "-") i++;
+      if (!digits()) return false;
+    }
+    return true;
+  };
+  const value = (depth) => {
+    skipSpace();
+    const c = text[i];
+    if (c === "{" || c === "[") {
+      if (depth >= JSON_MAX_DEPTH) return false;
+      const close = c === "{" ? "}" : "]";
+      i++;
+      skipSpace();
+      if (text[i] === close) {
+        i++;
+        return true;
+      }
+      for (; ; ) {
+        if (c === "{") {
+          skipSpace();
+          if (text[i] !== '"' || !string()) return false;
+          skipSpace();
+          if (text[i] !== ":") return false;
+          i++;
+        }
+        if (!value(depth + 1)) return false;
+        skipSpace();
+        if (text[i] === ",") {
+          i++;
+          continue;
+        }
+        if (text[i] === close) {
+          i++;
+          return true;
+        }
+        return false;
+      }
+    }
+    if (c === '"') return string();
+    if (c === "-" || c >= "0" && c <= "9") return number();
+    for (const word of ["true", "false", "null"]) {
+      if (text.startsWith(word, i)) {
+        i += word.length;
+        return true;
+      }
+    }
+    return false;
+  };
+  if (!value(0)) return false;
+  skipSpace();
+  return i === text.length;
 }
 function validate(value, rule, name) {
   const fail = (msg) => {
@@ -419,6 +513,9 @@ function validate(value, rule, name) {
       if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value)) {
         fail(`must be a valid UUID, got '${value}'`);
       }
+      return value;
+    case "json":
+      if (!isJson(value)) fail(`must be valid JSON, got '${value}'`);
       return value;
     case "date:YYYY-MM-DD":
       if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) fail(`must be in YYYY-MM-DD format, got '${value}'`);
@@ -1385,6 +1482,7 @@ var Cli = class _Cli {
   info,
   isBareProgram,
   isExecutable,
+  isJson,
   isPathRule,
   resolvePath,
   setSilent,

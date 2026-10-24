@@ -108,6 +108,7 @@ Options, in registration order:
 | `CODE` | `code` | | `optional` | `Three-letter code` | `Validation` | `regex:^[A-Z]{3}$` |
 | `LEVEL` | `level` | | `optional` | `Level` | `Validation` | `int` |
 | `SIZE` | `size` | | `optional` | `Size code` | `Validation` | `string:4` |
+| `PAYLOAD` | `payload` | | `optional` | `JSON payload` | `Validation` | `json` |
 | `DATA_DIR` | `data-dir` | `d` | `optional` | `Data directory` | `Files` | `dir:exists` |
 | `SRC` | `src` | | `optional` | `Source file` | `Files` | `file:exists` |
 | `DEST` | `dest` | | `optional` | `Destination file` | `Files` | `file:writable` |

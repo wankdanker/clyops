@@ -43,6 +43,7 @@ int main(int argc, char** argv) {
     clyops_opt(cli, "CODE",     "code",     "optional",                     .description = "Three-letter code",     .group = "Validation", .rule = "regex:^[A-Z]{3}$");
     clyops_opt(cli, "LEVEL",    "level",    "optional",                     .description = "Level",                 .group = "Validation", .rule = "int");
     clyops_opt(cli, "SIZE",     "size",     "optional",                     .description = "Size code",             .group = "Validation", .rule = "string:4");
+    clyops_opt(cli, "PAYLOAD",  "payload",  "optional",                     .description = "JSON payload",          .group = "Validation", .rule = "json");
     clyops_opt(cli, "DATA_DIR", "data-dir", "optional",  .short_name = 'd', .description = "Data directory",        .group = "Files",      .rule = "dir:exists");
     clyops_opt(cli, "SRC",      "src",      "optional",                     .description = "Source file",           .group = "Files",      .rule = "file:exists");
     clyops_opt(cli, "DEST",     "dest",     "optional",                     .description = "Destination file",      .group = "Files",      .rule = "file:writable");
@@ -59,7 +60,7 @@ int main(int argc, char** argv) {
     clyops_emit(cli, "progress", "{\"pct\":100}");
 
     static const char* longs[] = {"config", "verbose", "quiet", "color", "out", "notes", "count", "ratio", "enabled", "tag",
-        "no-cache", "key", "host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "data-dir",
+        "no-cache", "key", "host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "payload", "data-dir",
         "src", "dest", "exec", "include", "help"};
     char* values = clyops_values_json(cli);
     printf("{\"values\": %s, \"sources\": {", values);

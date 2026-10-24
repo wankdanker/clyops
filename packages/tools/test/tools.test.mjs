@@ -179,6 +179,20 @@ test('toJsonSchema', () => {
   assert.match('10.0.0.1', new RegExp(p.addr.pattern));
   assert.doesNotMatch('mail@x', new RegExp(p.email.pattern));
   assert.ok(p.no_cache && p.data_dir && p.key);
+  assert.deepEqual(p.payload, { contentMediaType: 'application/json', description: 'JSON payload' });
+});
+
+test('toArgv: a json input takes any JSON value, and a string as its JSON text', async () => {
+  const argv = (payload) => toArgv(golden, { input: 'in.txt', payload }).argv.slice(1);
+  assert.deepEqual(argv({ a: [1, 'x'] }), ['--payload', '{"a":[1,"x"]}']);
+  assert.deepEqual(argv([1, 2]), ['--payload', '[1,2]']);
+  assert.deepEqual(argv('{"b": true}'), ['--payload', '{"b": true}']);
+  assert.deepEqual(argv(3), ['--payload', '3']);
+  assert.deepEqual(argv(null), []);
+  const root = tree();
+  const result = await run(join(root, 'demo.sh'), toArgv(golden, { input: 'in.txt', payload: { k: 'v' } }).argv, { cwd: root, env: { PATH: process.env.PATH, DEMO_ROOT: root, KEY: 'k' } });
+  assert.equal(result.exitCode, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).values.PAYLOAD, '{"k":"v"}');
 });
 
 test('watchTools reloads when tools change', { timeout: 30_000 }, async () => {

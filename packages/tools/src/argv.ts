@@ -64,6 +64,11 @@ function isBareProgram(validation: string, value: string): boolean {
   return validation === 'file:executable' && value !== '' && !value.includes('/') && !(process.platform === 'win32' && value.includes('\\'));
 }
 
+// An array given to a single `json` input is one JSON value, not a list (spec section 13).
+function oneJsonValue(validation: string, many: boolean): boolean {
+  return validation === 'json' && !many;
+}
+
 const TRUE = /^(true|1|yes|on)$/i;
 const FALSE = /^(false|0|no|off)$/i;
 
@@ -121,7 +126,7 @@ export function toArgv(schema: Schema, input: Input, opts: ArgvOptions = {}): Ar
       out.env[option.variableName] = text(found.value, isPathValued(option.validation, option.type), `--${option.name}`, option.validation);
       continue;
     }
-    for (const item of Array.isArray(found.value) ? found.value : [found.value]) {
+    for (const item of Array.isArray(found.value) && !oneJsonValue(option.validation, option.isArray) ? found.value : [found.value]) {
       out.argv.push(`--${option.name}`, text(item, isPathValued(option.validation, option.type), `--${option.name}`, option.validation));
     }
   }
@@ -150,7 +155,7 @@ export function toArgv(schema: Schema, input: Input, opts: ArgvOptions = {}): Ar
         positionals.push(text(gap.default, false));
       }
       skipped = [];
-      const values = Array.isArray(found.value) ? found.value : [found.value];
+      const values = Array.isArray(found.value) && !oneJsonValue(argument.validation, argument.isVariadic) ? found.value : [found.value];
       positionals.push(...values.map((v) => text(v, isPathValued(argument.validation), argument.name, argument.validation)));
     }
   }

@@ -365,6 +365,21 @@
       "secret": false
     },
     {
+      "name": "payload",
+      "shortName": "",
+      "variableName": "PAYLOAD",
+      "description": "JSON payload",
+      "default": "",
+      "group": "Validation",
+      "type": "string",
+      "isFlag": false,
+      "isArray": false,
+      "required": false,
+      "validation": "json",
+      "choices": [],
+      "secret": false
+    },
+    {
       "name": "data-dir",
       "shortName": "d",
       "variableName": "DATA_DIR",

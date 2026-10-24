@@ -250,7 +250,7 @@ Global:
 | --- | --- |
 | **Parsing** | `--opt value`, `--opt=value`, `-o value`, `-ovalue`, clustered flags `-vq`, `--no-flag`, `--` to end options, repeatable array options, optional and variadic positionals |
 | **Precedence** | command line > config file > environment variable (named after the option's variable) > default |
-| **Validation** | `int`, `int:1-10`, `float:0-1`, `string:1-8`, `choice:a,b`, `bool`, `port`, `ip`, `hostname`, `url`, `email`, `uuid`, `date:YYYY-MM-DD`, `regex:…`, `path`, `file:exists`, `file:readable`, `file:writable`, `dir:exists`, `dir:writable`. Typed languages get converted values (`PORT` is an integer). |
+| **Validation** | `int`, `int:1-10`, `float:0-1`, `string:1-8`, `choice:a,b`, `bool`, `port`, `ip`, `hostname`, `url`, `email`, `uuid`, `json`, `date:YYYY-MM-DD`, `regex:…`, `path`, `file:exists`, `file:readable`, `file:writable`, `file:executable`, `dir:exists`, `dir:writable`. Typed languages get converted values (`PORT` is an integer). |
 | **Paths** | path values become absolute, relative to wherever they came from: the cwd for the command line, the config file's directory for config values, the project root for defaults; optional search directories for bare names |
 | **Config files** | `prefix:key=value` lines, several prefixes per program, `@include` with cycle detection |
 | **Help** | generated `--help`, grouped and wrapped, showing defaults, accepted values and config values |
