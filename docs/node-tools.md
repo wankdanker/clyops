@@ -95,7 +95,7 @@ console.log(queue.get(job.record.job_id)?.record.status);
 `buildFunctionCommand` renders arguments; `runScriptFunction` executes it with
 optional stdin/stdout files, or a function's `steps` in order, each step's outputs
 (`${steps.NAME.result.field}`, `${steps.NAME.stdout}`) feeding the templates after
-it. A function run wires the tool's `progress`, `meta`, `result` and
+it, and `succeed`/`fail`/`error` branches to later steps. A function run wires the tool's `progress`, `meta`, `result` and
 `log` roles (`onProgress`, the run's `meta` and `result`), and queue tasks record progress with
 `progress(update)`. Templates use dotted paths in `${expression}` or
 `{{expression}}`. Boolean templates are validated after rendering. A missing

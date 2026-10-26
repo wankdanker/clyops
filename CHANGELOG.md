@@ -12,6 +12,8 @@ section here.
   `.exit_code`) feed the templates after it, the first failing step stops the chain and is
   its `failedStep`, `continue_on_exit` lets a partial exit go on, and `timeoutMs`, a step's
   `timeout_ms` and `signal` bound and stop it (#46).
+- Branches in steps: `succeed`, `fail` and `error` on a step name a later step to go to
+  (a fallback, a cleanup), and `succeed: "$end"` ends the chain (#46).
 - A function run's `result` is the tool's `result` role, or its stdout, parsed as JSON.
 - `functionParamNames(fn)` lists the `params` fields a function's templates use.
 

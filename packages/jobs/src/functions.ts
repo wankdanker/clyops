@@ -64,8 +64,14 @@ export interface StepDefinition extends FunctionDefinition {
   key?: string;
   /** This step's time limit; the whole chain also stays within the run's `timeoutMs`. */
   timeout_ms?: number;
-  /** Exit codes besides 0 that let the chain go on; the chain then reports the first of them. */
+  /** Exit codes besides 0 that count as success; the chain then reports the first of them. */
   continue_on_exit?: number[];
+  /** The later step to run after this one succeeds instead of the next, or `$end` to end the chain there. */
+  succeed?: string;
+  /** The later step to run when this one exits nonzero or times out, instead of ending the chain. */
+  fail?: string;
+  /** The later step to run when this one can't start (a template, stdin or schema error), instead of throwing. */
+  error?: string;
 }
 
 /** A configured function with resolved executable and merged defaults and overrides. */
@@ -93,6 +99,8 @@ export interface ResolvedStep extends ResolvedFunction {
 }
 
 const STEP_NAME = /^[A-Za-z0-9_-]+$/;
+// The `succeed` target that ends a chain; `$` can't start a step name.
+const END = '$end';
 
 /**
  * The binding for `functionName` in a merged config, or null when the config
@@ -113,6 +121,16 @@ export function resolveFunctionConfig(scriptRoot: string, routeConfig: Json, fun
     if (steps.some((s) => s.stepName === name)) throw new Error(`function ${functionName} has two steps named ${name}`);
     const where = `function ${functionName} step ${name}`;
     steps.push({ ...resolveBinding(scriptRoot, routeConfig, functionName, String(step.key || name), step, where), stepName: name, definition: step });
+  }
+  // Branches go forward to a step that exists, so a chain always ends.
+  for (const [i, step] of steps.entries()) {
+    for (const outcome of ['succeed', 'fail', 'error'] as const) {
+      const target = step.definition[outcome];
+      if (target === undefined || (outcome === 'succeed' && target === END)) continue;
+      const at = steps.findIndex((s) => s.stepName === target);
+      if (at < 0) throw new Error(`function ${functionName} step ${step.stepName}: ${outcome} names no step ${String(target)}`);
+      if (at <= i) throw new Error(`function ${functionName} step ${step.stepName}: ${outcome} must name a later step, not ${String(target)}`);
+    }
   }
   const config = Object.fromEntries(steps.map((s) => [s.stepName, s.config]));
   return { functionName, key, script: steps[steps.length - 1].script, config, definition, steps };
@@ -227,7 +245,7 @@ export interface FunctionRun extends RunResult {
   steps?: Record<string, StepOutput>;
   /** A chain's runs, one per step that ran, in order. */
   stepRuns?: Array<FunctionRun & { step: string }>;
-  /** The step that stopped a chain: a nonzero exit (not in its `continue_on_exit`), a timeout or a signal. */
+  /** The step that stopped a chain: a nonzero exit (not in its `continue_on_exit`) or timeout with no `fail` branch, or a signal. */
   failedStep?: string;
 }
 
@@ -243,6 +261,8 @@ export interface StepOutput {
   meta?: unknown;
   /** Its last `progress` update. */
   progress?: Record<string, unknown>;
+  /** Why it couldn't start, when it has an `error` branch. */
+  error?: string;
 }
 
 /** Options for running a function's tool, or each tool of a chain. */
@@ -280,8 +300,9 @@ function streamPath(template: string | undefined, opts: CommandOptions, base: st
  * result), and stderr is collected. Secret options are `***` in `command`.
  *
  * A function with `steps` runs them in order with one context, each seeing the
- * earlier ones as `steps.NAME`. The first step that fails stops the chain and
- * is its `failedStep`; the run is otherwise that of the last step that ran.
+ * earlier ones as `steps.NAME`. A step's `succeed`, `fail` and `error` name a
+ * later step to go to instead. A failure with no `fail` branch stops the chain
+ * and is its `failedStep`; the run is that of the last step that ran.
  */
 export async function runScriptFunction(fn: ResolvedFunction, opts: RunFunctionOptions): Promise<FunctionRun> {
   return fn.steps ? runSteps(fn.steps, opts) : (await runTool(fn, opts)).run;
@@ -336,8 +357,14 @@ async function runSteps(steps: ResolvedStep[], opts: RunFunctionOptions): Promis
   const deadline = opts.timeoutMs ? Date.now() + opts.timeoutMs : undefined;
   const outputs: Record<string, StepOutput> = {};
   const stepRuns: Array<FunctionRun & { step: string }> = [];
+  const byName = new Map(steps.map((step, i) => [step.stepName, i]));
+  // The step after `i` on an outcome: its branch when set ($end ends the chain), else the next step on success.
+  const after = (i: number, branch: string | undefined, fallthrough: boolean): number | undefined =>
+    branch === END ? undefined : branch ? byName.get(branch) : fallthrough && i + 1 < steps.length ? i + 1 : undefined;
   let continued: number | undefined;
-  for (const step of steps) {
+  let last: FunctionRun | undefined;
+  for (let i: number | undefined = 0; i !== undefined;) {
+    const step = steps[i];
     const name = step.stepName;
     const limits = [step.definition.timeout_ms, deadline && Math.max(1, deadline - Date.now())].filter((ms): ms is number => Number(ms) > 0);
     const context = opts.context ? { ...opts.context, steps: { ...outputs } } : opts.context;
@@ -346,7 +373,11 @@ async function runSteps(steps: ResolvedStep[], opts: RunFunctionOptions): Promis
     try {
       ran = await runTool(step, { ...opts, context, onProgress, timeoutMs: limits.length ? Math.min(...limits) : undefined });
     } catch (error) {
-      throw new Error(`step ${name}: ${(error as Error).message}`, { cause: error });
+      const message = `step ${name}: ${(error as Error).message}`;
+      if (!step.definition.error) throw new Error(message, { cause: error });
+      outputs[name] = { exit_code: null, stdout: '', error: message };
+      i = byName.get(step.definition.error);
+      continue;
     }
     const { run, stdoutPath } = ran;
     stepRuns.push({ ...run, step: name });
@@ -357,13 +388,21 @@ async function runSteps(steps: ResolvedStep[], opts: RunFunctionOptions): Promis
       ...(run.meta !== undefined ? { meta: run.meta } : {}),
       ...(run.progress ? { progress: run.progress } : {}),
     };
-    const goesOn = run.exitCode === 0 || (run.exitCode !== null && !run.timedOut && (step.definition.continue_on_exit ?? []).includes(run.exitCode));
-    const last = { ...run, steps: outputs, stepRuns, durationMs: stepRuns.reduce((ms, r) => ms + r.durationMs, 0) };
-    if (!goesOn) return { ...last, failedStep: name };
-    if (run.exitCode !== 0) continued ??= run.exitCode ?? undefined;
-    if (step === steps[steps.length - 1]) return { ...last, exitCode: run.exitCode || continued || 0 };
+    last = { ...run, steps: outputs, stepRuns, durationMs: stepRuns.reduce((ms, r) => ms + r.durationMs, 0) };
+    const ok = run.exitCode === 0 || (run.exitCode !== null && !run.timedOut && (step.definition.continue_on_exit ?? []).includes(run.exitCode));
+    if (ok) {
+      if (run.exitCode !== 0) continued ??= run.exitCode ?? undefined;
+      i = after(i, step.definition.succeed, true);
+      if (i === undefined) return { ...last, exitCode: run.exitCode || continued || 0 };
+      continue;
+    }
+    // A cancelled or out-of-time chain stops here, whatever the step's `fail` says.
+    const stopped = opts.signal?.aborted || (deadline !== undefined && Date.now() >= deadline);
+    i = stopped ? undefined : after(i, step.definition.fail, false);
+    if (i === undefined) return { ...last, failedStep: name };
   }
-  throw new Error('unreachable: a chain has at least one step');
+  if (!last) throw new Error('unreachable: a chain ends after a step that ran');
+  return last;
 }
 
 /** The result record every function shares, plus its rendered `result` map. */

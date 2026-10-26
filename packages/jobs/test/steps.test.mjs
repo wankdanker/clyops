@@ -69,6 +69,9 @@ test('resolveFunctionConfig resolves steps', () => {
   assert.throws(bad({ steps: [{ name: 'a b', script: 'a' }] }), /function f step 1 needs a name/);
   assert.throws(bad({ steps: [{ name: 'a', script: 'a' }, { name: 'a', script: 'b' }] }), /function f has two steps named a/);
   assert.throws(bad({ steps: [{ name: 'a' }] }), /function f step a does not define a script/);
+  assert.throws(bad({ steps: [{ name: 'a', script: 'a', fail: 'z' }] }), /step a: fail names no step z/);
+  assert.throws(bad({ steps: [{ name: 'a', script: 'a' }, { name: 'b', script: 'b', succeed: 'a' }] }), /step b: succeed must name a later step, not a/);
+  assert.throws(bad({ steps: [{ name: 'a', script: 'a', error: '$end' }] }), /step a: error names no step \$end/);
   // strict_params carries into steps unless a step sets its own.
   const strict = resolveFunctionConfig('/srv', { functions: { f: { strict_params: true, steps: [{ name: 'a', script: 'a' }, { name: 'b', script: 'b', strict_params: false }] } } }, 'f');
   assert.deepEqual(strict.steps.map((s) => s.definition.strict_params), [true, false]);
@@ -135,10 +138,55 @@ test('step and chain time limits', { skip, timeout: 10_000 }, async () => {
     assert.equal(result.failedStep, 'slow');
     assert.ok(result.durationMs < 2000, String(result.durationMs));
   }
+  // A chain out of time doesn't take a fail branch.
+  const branching = steps({ fail: 'after' });
+  branching.functions.f.steps.push({ name: 'after', script: 'scripts/fetch.sh' });
+  const late = await run(branching, 300);
+  assert.deepEqual([late.failedStep, late.stepRuns.length], ['slow', 2]);
   // Cancelling stops the running step.
   const abort = new AbortController();
   setTimeout(() => abort.abort(), 200);
   const cancelled = await runScriptFunction(resolveFunctionConfig(root, steps(), 'f'), { configRoot: root, env, cwd: root, signal: abort.signal });
   assert.equal(cancelled.failedStep, 'slow');
   assert.ok(cancelled.signal);
+});
+
+test('succeed, fail and error branch to a later step', { skip }, async () => {
+  const root = workspace();
+  // try: fail with --code; fallback and cleanup are reached only through branches.
+  const config = (code, tryMore = {}) => ({
+    functions: { f: { steps: [
+      { name: 'try', script: 'scripts/fail.sh', fail: 'fallback', succeed: 'use', ...tryMore },
+      { name: 'fallback', script: 'scripts/fetch.sh', succeed: 'use' },
+      { name: 'cleanup', script: 'scripts/fail.sh' },
+      { name: 'use', script: 'scripts/download.sh', succeed: '$end' },
+      { name: 'never', script: 'scripts/fail.sh' },
+    ] } },
+    try: { code }, fallback: { id: 'b' }, cleanup: { code: 4 }, use: { url: '${steps.try.exit_code}' },
+  });
+  const run = (cfg) => runScriptFunction(resolveFunctionConfig(root, cfg, 'f'), { configRoot: root, context: {}, env, cwd: root });
+
+  const ok = await run(config(0));
+  assert.deepEqual(ok.stepRuns.map((r) => r.step), ['try', 'use']);
+  assert.equal(ok.exitCode, 0);
+
+  // A failure with a fail branch goes on; the chain's exit is its last step's.
+  const fellBack = await run(config(3));
+  assert.deepEqual(fellBack.stepRuns.map((r) => r.step), ['try', 'fallback', 'use']);
+  assert.deepEqual([fellBack.exitCode, fellBack.failedStep, fellBack.stdout], [0, undefined, 'got 3']);
+
+  // A handler that fails ends the chain on itself.
+  const handled = await run(config(3, { fail: 'cleanup' }));
+  assert.deepEqual(handled.stepRuns.map((r) => r.step), ['try', 'cleanup']);
+  assert.deepEqual([handled.exitCode, handled.failedStep], [4, 'cleanup']);
+
+  // A step that can't start goes to its error branch, which sees why.
+  const broken = config(0, { error: 'cleanup' });
+  broken.try.code = '${steps.nope.stdout}';
+  broken.cleanup.code = 0;
+  broken.functions.f.steps[2].succeed = '$end';
+  const errored = await run(broken);
+  assert.deepEqual(errored.stepRuns.map((r) => r.step), ['cleanup']);
+  assert.equal(errored.exitCode, 0);
+  assert.deepEqual(errored.steps.try, { exit_code: null, stdout: '', error: 'step try: unknown template value: steps.nope.stdout' });
 });

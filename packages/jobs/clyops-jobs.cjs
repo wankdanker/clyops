@@ -628,6 +628,7 @@ function configureLogging(opts) {
   Object.assign(LOGGER, Object.fromEntries(Object.entries(opts).filter(([, v]) => v)));
 }
 var STEP_NAME = /^[A-Za-z0-9_-]+$/;
+var END = "$end";
 function resolveFunctionConfig(scriptRoot, routeConfig, functionName) {
   const definition = objectValue(objectValue(routeConfig.functions)[functionName]);
   if (Object.keys(definition).length === 0) return null;
@@ -643,6 +644,15 @@ function resolveFunctionConfig(scriptRoot, routeConfig, functionName) {
     if (steps.some((s) => s.stepName === name)) throw new Error(`function ${functionName} has two steps named ${name}`);
     const where = `function ${functionName} step ${name}`;
     steps.push({ ...resolveBinding(scriptRoot, routeConfig, functionName, String(step.key || name), step, where), stepName: name, definition: step });
+  }
+  for (const [i, step] of steps.entries()) {
+    for (const outcome of ["succeed", "fail", "error"]) {
+      const target = step.definition[outcome];
+      if (target === void 0 || outcome === "succeed" && target === END) continue;
+      const at = steps.findIndex((s) => s.stepName === target);
+      if (at < 0) throw new Error(`function ${functionName} step ${step.stepName}: ${outcome} names no step ${String(target)}`);
+      if (at <= i) throw new Error(`function ${functionName} step ${step.stepName}: ${outcome} must name a later step, not ${String(target)}`);
+    }
   }
   const config = Object.fromEntries(steps.map((s) => [s.stepName, s.config]));
   return { functionName, key, script: steps[steps.length - 1].script, config, definition, steps };
@@ -771,8 +781,12 @@ async function runSteps(steps, opts) {
   const deadline = opts.timeoutMs ? Date.now() + opts.timeoutMs : void 0;
   const outputs = {};
   const stepRuns = [];
+  const byName = new Map(steps.map((step, i) => [step.stepName, i]));
+  const after = (i, branch, fallthrough) => branch === END ? void 0 : branch ? byName.get(branch) : fallthrough && i + 1 < steps.length ? i + 1 : void 0;
   let continued;
-  for (const step of steps) {
+  let last;
+  for (let i = 0; i !== void 0; ) {
+    const step = steps[i];
     const name = step.stepName;
     const limits = [step.definition.timeout_ms, deadline && Math.max(1, deadline - Date.now())].filter((ms) => Number(ms) > 0);
     const context = opts.context ? { ...opts.context, steps: { ...outputs } } : opts.context;
@@ -781,7 +795,11 @@ async function runSteps(steps, opts) {
     try {
       ran = await runTool(step, { ...opts, context, onProgress, timeoutMs: limits.length ? Math.min(...limits) : void 0 });
     } catch (error) {
-      throw new Error(`step ${name}: ${error.message}`, { cause: error });
+      const message = `step ${name}: ${error.message}`;
+      if (!step.definition.error) throw new Error(message, { cause: error });
+      outputs[name] = { exit_code: null, stdout: "", error: message };
+      i = byName.get(step.definition.error);
+      continue;
     }
     const { run, stdoutPath } = ran;
     stepRuns.push({ ...run, step: name });
@@ -792,13 +810,20 @@ async function runSteps(steps, opts) {
       ...run.meta !== void 0 ? { meta: run.meta } : {},
       ...run.progress ? { progress: run.progress } : {}
     };
-    const goesOn = run.exitCode === 0 || run.exitCode !== null && !run.timedOut && (step.definition.continue_on_exit ?? []).includes(run.exitCode);
-    const last = { ...run, steps: outputs, stepRuns, durationMs: stepRuns.reduce((ms, r) => ms + r.durationMs, 0) };
-    if (!goesOn) return { ...last, failedStep: name };
-    if (run.exitCode !== 0) continued ??= run.exitCode ?? void 0;
-    if (step === steps[steps.length - 1]) return { ...last, exitCode: run.exitCode || continued || 0 };
+    last = { ...run, steps: outputs, stepRuns, durationMs: stepRuns.reduce((ms, r) => ms + r.durationMs, 0) };
+    const ok = run.exitCode === 0 || run.exitCode !== null && !run.timedOut && (step.definition.continue_on_exit ?? []).includes(run.exitCode);
+    if (ok) {
+      if (run.exitCode !== 0) continued ??= run.exitCode ?? void 0;
+      i = after(i, step.definition.succeed, true);
+      if (i === void 0) return { ...last, exitCode: run.exitCode || continued || 0 };
+      continue;
+    }
+    const stopped = opts.signal?.aborted || deadline !== void 0 && Date.now() >= deadline;
+    i = stopped ? void 0 : after(i, step.definition.fail, false);
+    if (i === void 0) return { ...last, failedStep: name };
   }
-  throw new Error("unreachable: a chain has at least one step");
+  if (!last) throw new Error("unreachable: a chain ends after a step that ran");
+  return last;
 }
 function buildResultRecord(p) {
   return {

@@ -82,9 +82,27 @@ tools that already exist (fetch some JSON, download what it names, process the f
   `result` role or else its collected stdout parsed as JSON; `meta`; `progress`. A
   `${steps...}` path that isn't there, such as a later step or a field the JSON lacks, is an
   error naming the step.
-- The first step that exits nonzero, times out or is stopped ends the chain; the run is that
-  step's, with `failedStep` naming it. `continue_on_exit: [2]` on a step lets those codes go
-  on, and the chain then exits with the first of them (a partial result).
+- After a step that succeeds the chain goes on to the next step, or ends after the last one.
+  A step that exits nonzero, times out or is stopped ends the chain; the run is that step's,
+  with `failedStep` naming it. A step that can't start (a template, stdin or schema error)
+  rejects the run. `continue_on_exit: [2]` on a step makes those codes a success, and the
+  chain then exits with the first of them (a partial result).
+- Branches change where a step leads: `succeed`, `fail` (a nonzero exit or timeout) and
+  `error` (it couldn't start) each name a later step, and `succeed: "$end"` ends the chain.
+  Branches only go forward, so a chain always ends. A step reached only through a branch,
+  such as a fallback or a cleanup, still sits in the list, so the step before it usually
+  needs a `succeed`. The chain's exit code is its last step's: a fallback that succeeds
+  makes the job succeed, and a cleanup that should leave it failed exits nonzero. A step
+  that took its `error` branch is `steps.NAME.error` (the message), with `exit_code: null`.
+  A cancelled chain, or one out of time, takes no branch.
+
+  ```json
+  "steps": [
+    { "name": "fetch",    "script": "tools/http-get-json", "fail": "mirror", "succeed": "process" },
+    { "name": "mirror",   "script": "tools/http-get-json" },
+    { "name": "process",  "script": "tools/media-to-fp" }
+  ]
+  ```
 - `timeoutMs` limits the whole chain and a step's `timeout_ms` that step; `signal` stops the
   running step. `onProgress` gets each step's updates with `step` and a default `stage`.
 - The run is the last step's, plus `steps` (the outputs by name) and `stepRuns`. Render
