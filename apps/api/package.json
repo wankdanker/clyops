@@ -38,7 +38,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/copy-ui.mjs && chmod +x dist/cli.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test test/*.test.mjs",
+    "test": "node --import ../../tools/test-leaks.mjs --test test/*.test.mjs",
     "prepublishOnly": "pnpm run build && pnpm test"
   },
   "dependencies": {

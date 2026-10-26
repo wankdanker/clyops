@@ -40,7 +40,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.cjs.json && tsc -p tsconfig.esm.json && node scripts/mark-dist.mjs && tsc -p tsconfig.examples.json",
     "typecheck": "tsc -p tsconfig.cjs.json --noEmit",
-    "test": "node --test test/*.test.mjs",
+    "test": "node --import ../../tools/test-leaks.mjs --test test/*.test.mjs",
     "prepublishOnly": "pnpm run build && pnpm test"
   },
   "devDependencies": {

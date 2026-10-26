@@ -11,7 +11,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "svelte-kit sync && vite build",
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "test": "node --test test/*.test.mjs",
+    "test": "node --import ../../tools/test-leaks.mjs --test test/*.test.mjs",
     "test:browser": "playwright test"
   },
   "dependencies": {
