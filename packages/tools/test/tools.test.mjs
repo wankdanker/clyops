@@ -9,6 +9,8 @@ import { allowed, checkWithin, classify, closedInputs, closedKeys, closedRequire
 const repo = fileURLToPath(new URL('../../..', import.meta.url));
 const golden = JSON.parse(readFileSync(join(repo, 'spec/conformance/golden/schema.json'), 'utf8'));
 const tasksGolden = JSON.parse(readFileSync(join(repo, 'spec/conformance/golden/tasks-schema.json'), 'utf8'));
+// The schema file the golden's "json schema" case writes for the demo's --shape.
+const shapeSchema = JSON.parse(readFileSync(join(repo, 'spec/conformance/cases.json'), 'utf8')).find((c) => c.name === 'json schema').files['shape.json'];
 
 function file(path, text, exec = true) {
   writeFileSync(path, text);
@@ -18,7 +20,8 @@ function file(path, text, exec = true) {
 // A tools tree around the JavaScript conformance demo.
 function tree() {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'clyops-tools-')));
-  const demo = `#!/bin/sh\n# clyops-tool\nexec node ${join(repo, 'packages/js/examples/demo.cjs')} "$@"\n`;
+  // The demo's root is the tree, which holds the schema file its --shape names (json:shape.json).
+  const demo = `#!/bin/sh\n# clyops-tool\nDEMO_ROOT="\${DEMO_ROOT:-${root}}" exec node ${join(repo, 'packages/js/examples/demo.cjs')} "$@"\n`;
   mkdirSync(join(root, 'media/fp'), { recursive: true });
   mkdirSync(join(root, 'empty'));
   mkdirSync(join(root, 'lib'));
@@ -29,6 +32,7 @@ function tree() {
   file(join(root, 'hello'), '#!/bin/sh\necho hello\n');
   file(join(root, 'skipped.sh'), demo);
   file(join(root, 'notes.txt'), 'not executable\n', false);
+  file(join(root, 'shape.json'), shapeSchema, false);
   file(join(root, '.hidden'), demo);
   file(join(root, 'media.sh'), demo); // shadowed by the media group
   file(join(root, 'media/to-pcm.py'), demo);
@@ -180,6 +184,8 @@ test('toJsonSchema', () => {
   assert.doesNotMatch('mail@x', new RegExp(p.email.pattern));
   assert.ok(p.no_cache && p.data_dir && p.key);
   assert.deepEqual(p.payload, { contentMediaType: 'application/json', description: 'JSON payload' });
+  assert.deepEqual(p.shape, { type: 'object', properties: { w: { type: 'integer' } }, contentMediaType: 'application/json', description: 'JSON shape' });
+  assert.deepEqual(p.event, { $comment: 'JSON Schema: https://example.com/event.json', contentMediaType: 'application/json', description: 'JSON event' });
 });
 
 test('toArgv: a json input takes any JSON value, and a string as its JSON text', async () => {
@@ -189,6 +195,7 @@ test('toArgv: a json input takes any JSON value, and a string as its JSON text',
   assert.deepEqual(argv('{"b": true}'), ['--payload', '{"b": true}']);
   assert.deepEqual(argv(3), ['--payload', '3']);
   assert.deepEqual(argv(null), []);
+  assert.deepEqual(toArgv(golden, { input: 'in.txt', shape: [1, 2], filter: '{"a": 1}' }).argv.slice(1), ['--filter', '{"a": 1}', '--shape', '[1,2]']);
   const root = tree();
   const result = await run(join(root, 'demo.sh'), toArgv(golden, { input: 'in.txt', payload: { k: 'v' } }).argv, { cwd: root, env: { PATH: process.env.PATH, DEMO_ROOT: root, KEY: 'k' } });
   assert.equal(result.exitCode, 0, result.stderr);

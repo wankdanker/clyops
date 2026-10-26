@@ -31,6 +31,7 @@ __export(index_exports, {
   isBareFlag: () => isBareFlag,
   isTextType: () => isTextType,
   optionGiven: () => optionGiven,
+  parseJsonInputs: () => parseJsonInputs,
   toJsonSchema: () => toJsonSchema,
   valueSchema: () => valueSchema,
   withoutSecrets: () => withoutSecrets
@@ -83,7 +84,7 @@ function valueSchema(validation, choices = []) {
     case "regex":
       return { type: "string", pattern: spec };
     case "json":
-      return { contentMediaType: "application/json" };
+      return { contentMediaType: JSON_TYPE };
     default:
       return { type: "string" };
   }
@@ -91,10 +92,41 @@ function valueSchema(validation, choices = []) {
 function typedDefault(value, schema) {
   if (schema.type === "integer" || schema.type === "number") return Number(value);
   if (schema.type === "boolean") return /^(true|1|yes|on)$/i.test(value);
+  if (schema.contentMediaType === JSON_TYPE) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
   return value;
 }
-function property(item, many, flag) {
-  const value = flag ? { type: "boolean" } : valueSchema(item.validation, "choices" in item ? item.choices : []);
+var JSON_TYPE = "application/json";
+var token = (key) => key.replace(/~/g, "~0").replace(/\//g, "~1");
+function embedSchema(schema, pointer) {
+  if (schema === true || schema === null || schema === void 0) return {};
+  if (schema === false) return { not: {} };
+  if (typeof schema !== "object" || Array.isArray(schema)) return {};
+  const walk = (node) => {
+    if (Array.isArray(node)) return node.map(walk);
+    if (!node || typeof node !== "object") return node;
+    const out = {};
+    for (const [k, v] of Object.entries(node)) {
+      if (k === "$ref" && typeof v === "string") {
+        if (v.startsWith("#")) out.$ref = pointer + v.slice(1);
+        else out.$comment = `JSON Schema: ${v}`;
+      } else {
+        out[k] = walk(v);
+      }
+    }
+    return out;
+  };
+  const { $schema: _schema, $id: _id, ...rest } = walk(schema);
+  return rest;
+}
+function property(item, many, flag, pointer) {
+  const rule = valueSchema(item.validation, "choices" in item ? item.choices : []);
+  const value = flag ? { type: "boolean" } : item.validation.startsWith("json:") && item.schema !== void 0 && item.schema !== null ? { ...embedSchema(item.schema, many ? `${pointer}/items` : pointer), contentMediaType: JSON_TYPE } : rule;
   const out = many ? { type: "array", items: value } : { ...value };
   if (item.description) out.description = item.description;
   if (item.default !== "" && !many && !("secret" in item && item.secret)) out.default = typedDefault(item.default, value);
@@ -106,12 +138,12 @@ function toJsonSchema(schema, naming = "input") {
   const properties = {};
   const required = [];
   for (const argument of schema.arguments) {
-    properties[key(argument.name)] = property(argument, argument.isVariadic, false);
+    properties[key(argument.name)] = property(argument, argument.isVariadic, false, `#/properties/${token(key(argument.name))}`);
     if (argument.required) required.push(key(argument.name));
   }
   for (const option of schema.options) {
     if (option.name === "help") continue;
-    properties[key(option.name)] = property(option, option.isArray, isBareFlag(option));
+    properties[key(option.name)] = property(option, option.isArray, isBareFlag(option), `#/properties/${token(key(option.name))}`);
   }
   const given = (long) => {
     const option = schema.options.find((o) => o.name === long);
@@ -140,6 +172,28 @@ function toJsonSchema(schema, naming = "input") {
     ...allOf.length ? { allOf } : {},
     additionalProperties: false
   };
+}
+function parseJsonInputs(inputSchema, input) {
+  const properties = inputSchema.properties ?? {};
+  const value = { ...input };
+  for (const [key, prop] of Object.entries(properties)) {
+    const many = prop.type === "array" && prop.items?.contentMediaType === JSON_TYPE;
+    if (!(key in value) || prop.contentMediaType !== JSON_TYPE && !many) continue;
+    const parse = (v) => {
+      if (typeof v !== "string") return v;
+      try {
+        return JSON.parse(v);
+      } catch {
+        throw new Error(`${key} must be valid JSON`);
+      }
+    };
+    try {
+      value[key] = many && Array.isArray(value[key]) ? value[key].map(parse) : parse(value[key]);
+    } catch (err) {
+      return { error: err.message };
+    }
+  }
+  return { value };
 }
 
 // packages/schema/src/forms.ts
@@ -230,6 +284,7 @@ function fdsEnv(mapping) {
   isBareFlag,
   isTextType,
   optionGiven,
+  parseJsonInputs,
   toJsonSchema,
   valueSchema,
   withoutSecrets

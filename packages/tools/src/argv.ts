@@ -64,9 +64,9 @@ function isBareProgram(validation: string, value: string): boolean {
   return validation === 'file:executable' && value !== '' && !value.includes('/') && !(process.platform === 'win32' && value.includes('\\'));
 }
 
-// An array given to a single `json` input is one JSON value, not a list (spec section 13).
+// An array given to a single `json` or `json:SCHEMA` input is one JSON value, not a list (spec section 13).
 function oneJsonValue(validation: string, many: boolean): boolean {
-  return validation === 'json' && !many;
+  return (validation === 'json' || validation.startsWith('json:')) && !many;
 }
 
 const TRUE = /^(true|1|yes|on)$/i;

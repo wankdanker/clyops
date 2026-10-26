@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { Cli } from '../../js/dist/esm/index.js';
-import { formFields, formSchema, toJsonSchema, constraintIssues, withoutSecrets, effectiveRoles, fdsEnv } from '../dist/index.js';
+import { formFields, formSchema, toJsonSchema, constraintIssues, withoutSecrets, effectiveRoles, fdsEnv, parseJsonInputs } from '../dist/index.js';
 
 function program() {
   const cli = new Cli({ name: 'forms' });
@@ -93,4 +93,27 @@ test('effectiveRoles: the nearest declaration wins by name', () => {
   assert.deepEqual(formSchema(schema)['x-clyops'].roles, schema.roles);
   assert.deepEqual(effectiveRoles({ ...schema, roles: undefined }), []);
   assert.equal(fdsEnv({ progress: 4, meta: 3 }), 'progress:4,meta:3');
+});
+
+test('a json:SCHEMA input is its schema, with references pointed into the input and URLs not fetched', () => {
+  const cli = new Cli({ name: 'events' });
+  const event = { $schema: 'https://json-schema.org/draft/2020-12/schema', $id: 'https://example.com/event.json', type: 'object',
+    properties: { at: { $ref: '#/$defs/time' }, by: { $ref: 'https://example.com/user.json', description: 'Who' } }, $defs: { time: { type: 'string' } } };
+  cli.opt('EVENT', 'event', '', 'optional', 'The event', '', `json:${JSON.stringify(event)}`);
+  cli.optArray('NODE', 'node', '', 'Nodes', '', 'json:{"type":"object","properties":{"next":{"$ref":"#"}}}');
+  cli.opt('ANY', 'any', '', '{"a": 1}', 'Anything', '', 'json');
+  cli.opt('LATER', 'later', '', 'optional', 'Fetched by nobody', '', 'json:https://example.com/later.json');
+  const p = toJsonSchema(JSON.parse(cli.jsonSchema())).properties;
+  assert.deepEqual(p.event, {
+    type: 'object', properties: { at: { $ref: '#/properties/event/$defs/time' }, by: { $comment: 'JSON Schema: https://example.com/user.json', description: 'Who' } },
+    $defs: { time: { type: 'string' } }, contentMediaType: 'application/json', description: 'The event',
+  });
+  assert.deepEqual(p.node.items, { type: 'object', properties: { next: { $ref: '#/properties/node/items' } }, contentMediaType: 'application/json' });
+  assert.deepEqual(p.any, { contentMediaType: 'application/json', description: 'Anything', default: { a: 1 } });
+  assert.deepEqual(p.later, { $comment: 'JSON Schema: https://example.com/later.json', contentMediaType: 'application/json', description: 'Fetched by nobody' });
+
+  const input = toJsonSchema(JSON.parse(cli.jsonSchema()));
+  assert.deepEqual(parseJsonInputs(input, { any: '{"a": [1]}', event: { at: 'x' }, node: ['{}', { next: {} }], other: '{' }),
+    { value: { any: { a: [1] }, event: { at: 'x' }, node: [{}, { next: {} }], other: '{' } });
+  assert.deepEqual(parseJsonInputs(input, { node: ['{'] }), { error: 'node must be valid JSON' });
 });

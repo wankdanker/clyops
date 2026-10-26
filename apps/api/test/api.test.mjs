@@ -11,6 +11,8 @@ import { createApi } from '../dist/index.js';
 const repo = fileURLToPath(new URL('../../..', import.meta.url));
 process.env.KEY = 'k'; // the demo's required --key, from its environment
 delete process.env.COLOR; // npm sets COLOR=0 for scripts, which the demo would read as --color
+// The schema file the demo's --shape names (json:shape.json), as the "json schema" conformance case writes it.
+const shapeSchema = JSON.parse(readFileSync(join(repo, 'spec/conformance/cases.json'), 'utf8')).find((c) => c.name === 'json schema').files['shape.json'];
 
 function tree() {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'clyops-api-')));
@@ -20,7 +22,8 @@ function tree() {
     writeFileSync(join(root, path), text);
     chmodSync(join(root, path), 0o755);
   };
-  tool('media/demo', `#!/bin/sh\n# clyops-tool\nexec node ${join(repo, 'packages/js/examples/demo.cjs')} "$@"\n`);
+  writeFileSync(join(root, 'shape.json'), shapeSchema);
+  tool('media/demo', `#!/bin/sh\n# clyops-tool\nDEMO_ROOT='${root}' exec node ${join(repo, 'packages/js/examples/demo.cjs')} "$@"\n`);
   tool('hello', '#!/bin/sh\necho hello\n'); // not a clyops tool: not served
   tool('slow', '#!/bin/sh\n# clyops-tool\n[ "$1" = --help-json-schema ] && exec node ' +
     `${join(repo, 'packages/js/examples/demo.cjs')} --help-json-schema\nsleep 5\n`);
@@ -82,6 +85,29 @@ test('input is validated against the schema', async () => {
   assert.equal(body.error, 'Validation failed');
   const paths = body.issues.map((i) => i.path.join('.') || i.keys?.join(','));
   for (const p of ['input', 'count', 'color', 'bogus']) assert.ok(paths.includes(p), `${p} in ${paths}`);
+});
+
+test('a json input takes any JSON value, a string being its text, and is checked against its schema', async () => {
+  const values = async (input) => {
+    const res = await post('/tools/media/demo', { input: 'in.txt', ...input });
+    const body = await res.json();
+    assert.equal(res.status, 200, JSON.stringify(body));
+    return body.json.values;
+  };
+  const issues = async (input) => {
+    const res = await post('/tools/media/demo', { input: 'in.txt', ...input });
+    assert.equal(res.status, 400);
+    return (await res.json()).issues.map((i) => `${i.path.join('.')}: ${i.message}`);
+  };
+  assert.equal((await values({ payload: { k: [1, 'v'] } })).PAYLOAD, '{"k":[1,"v"]}');
+  assert.equal((await values({ payload: '{"k": 1}' })).PAYLOAD, '{"k": 1}');
+  assert.deepEqual(await issues({ payload: '{"k": ' }), ['payload: must be valid JSON']);
+  // --shape is json:shape.json, --filter json:{"type":"object"}, --event a URL nobody fetches.
+  assert.equal((await values({ shape: { w: 2 } })).SHAPE, '{"w":2}');
+  assert.equal((await values({ shape: '{"w": 2}' })).SHAPE, '{"w": 2}');
+  assert.deepEqual(await issues({ shape: '{"w": "x"}' }), ['shape: /w must be integer']);
+  assert.deepEqual(await issues({ filter: [1] }), ['filter: must be object']);
+  assert.equal((await values({ event: 'true' })).EVENT, 'true');
 });
 
 test('async runs return a job to poll', async () => {

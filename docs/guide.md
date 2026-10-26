@@ -62,7 +62,7 @@ field types in TypeScript, Python or Ruby.
 ## Validation
 
 Rules include `int`, `float`, `bool`, `port`, `ip`, `hostname`, `url`, `email`,
-`uuid`, `json`, `date:YYYY-MM-DD`, `path`, `file:exists`, `file:readable`, `file:writable`,
+`uuid`, `json`, `json:SCHEMA`, `date:YYYY-MM-DD`, `path`, `file:exists`, `file:readable`, `file:writable`,
 `file:executable`, `dir:exists` and `dir:writable`. Parameterized rules include `int:1-10`,
 `float:0-1`, `string:1-100`, `choice:red,green,blue` and `regex:PATTERN`.
 See [spec section 5](../spec/SPEC.md#5-validation-rules) for ranges and exact behavior.
@@ -77,6 +77,14 @@ Use `json` for an option that takes structured data (`--meta '{"lang": "en"}'`):
 value must be one JSON value, and stays the text as given for the program to parse.
 Every language checks it the same way, with no dependencies. Through the HTTP API and
 MCP server a caller can send the object itself; it reaches the tool as JSON text.
+
+`json:SCHEMA` adds the JSON Schema the value should match: inline
+(`json:{"type":"object","required":["lang"]}`), a file relative to `root`
+(`json:schemas/meta.json`), or a URL (`json:https://example.com/meta.json`). The program
+still checks only that the value is JSON. The schema goes into `--help-json-schema`, a
+file being read only then (a missing one is a warning, not an error), and the HTTP API
+and MCP server check input against it before the tool runs. They don't fetch URLs: a
+URL schema documents the input but isn't checked.
 
 Standalone `validate` helpers return a typed value or the native validation
 error/result. Unknown registration rules and duplicate names are programming
