@@ -1,0 +1,49 @@
+# clyops
+
+> clyops is a one-line-per-option CLI library, with identical behavior in Bash, JavaScript/TypeScript, Python, Rust, C, Go, Ruby and Java. A program's registrations become a machine-readable contract (`--help-json-schema`) that drives help text, validation, config files, shell completion, a dispatcher for directories of tools, an HTTP API, an MCP server for AI agents, and desktop and web runners.
+
+Key facts for agents:
+
+- Every clyops program answers `--help`, `--help-json-schema` (JSON with `"clyops": 1`) and `--completion bash|zsh|fish`. Read the schema before running a tool: it gives options, types, choices, ranges, required values, declared effects (`read-only`, `idempotent`, `destructive`, `network`), stdin/stdout MIME types, which options are secrets and which option names the config file.
+- Precedence is command line > config file > environment variable (named after the option's variable) > default. Pass secrets through the environment, never on the command line.
+- Exit status 1 means invalid input or a runtime failure, with an exact message on stderr. Exit status 2 (Bash and C) means the tool itself is misdefined.
+- When writing a tool, register everything before `run` and do no work until `run` returns: it exits early for help, schema, completion and every validation error, and tooling probes tools with those flags.
+- Tools served over MCP (`clyops-mcp --root DIR`) are already validated against their schema; declared effects become MCP tool annotations.
+
+## Agent skills
+
+- [clyops-build](https://raw.githubusercontent.com/wankdanker/clyops/main/skills/clyops-build/SKILL.md): writing tools with any of the nine libraries, with a reference and complete example per language
+- [clyops-use](https://raw.githubusercontent.com/wankdanker/clyops/main/skills/clyops-use/SKILL.md): running clyops tools safely from a shell by reading their contract
+- [clyops-skillify](https://raw.githubusercontent.com/wankdanker/clyops/main/skills/clyops-skillify/SKILL.md): generating skills for a repository's own clyops tools
+
+## Specification
+
+- [Specification](https://raw.githubusercontent.com/wankdanker/clyops/main/spec/SPEC.md): the behavior contract every implementation follows, including parsing, validation rules, paths, help, schema, dispatchers and JSON input
+- [Schema format](https://raw.githubusercontent.com/wankdanker/clyops/main/spec/schema.json): JSON Schema of the `--help-json-schema` output
+
+## Guides
+
+- [Concepts and behavior](https://raw.githubusercontent.com/wankdanker/clyops/main/docs/guide.md): registration, values, validation, config files, commands, relationships, secrets, effects and streams
+- [Bash](https://raw.githubusercontent.com/wankdanker/clyops/main/docs/languages/bash.md)
+- [JavaScript / TypeScript](https://raw.githubusercontent.com/wankdanker/clyops/main/docs/languages/javascript.md)
+- [Python](https://raw.githubusercontent.com/wankdanker/clyops/main/docs/languages/python.md)
+- [Rust](https://raw.githubusercontent.com/wankdanker/clyops/main/docs/languages/rust.md)
+- [C](https://raw.githubusercontent.com/wankdanker/clyops/main/docs/languages/c.md)
+- [Go](https://raw.githubusercontent.com/wankdanker/clyops/main/docs/languages/go.md)
+- [Ruby](https://raw.githubusercontent.com/wankdanker/clyops/main/docs/languages/ruby.md)
+- [Java](https://raw.githubusercontent.com/wankdanker/clyops/main/docs/languages/java.md)
+
+## Running tools
+
+- [Dispatcher](https://raw.githubusercontent.com/wankdanker/clyops/main/apps/dispatch/README.md): a directory of tools as one command with subcommands, and which programs it will probe
+- [MCP server](https://raw.githubusercontent.com/wankdanker/clyops/main/apps/mcp/README.md): a directory of tools as MCP tools, with allow/deny, read-only mode and path confinement
+- [HTTP API](https://raw.githubusercontent.com/wankdanker/clyops/main/apps/api/README.md): a directory of tools as REST endpoints with OpenAPI, jobs and MCP over HTTP
+- [Documentation](https://raw.githubusercontent.com/wankdanker/clyops/main/apps/doc/README.md): `clyops-doc`, man pages, Markdown or HTML from any tool's `--help-json-schema`, a page per command with `--split`, or a whole tools directory with `--root`
+- [Node tools, jobs, API and MCP](https://raw.githubusercontent.com/wankdanker/clyops/main/docs/node-tools.md): the Node packages behind them
+
+## Optional
+
+- [Examples](https://raw.githubusercontent.com/wankdanker/clyops/main/examples/README.md): clone-and-run Bash and Python tools
+- [Shell completion](https://raw.githubusercontent.com/wankdanker/clyops/main/docs/completion.md)
+- [Web runner](https://raw.githubusercontent.com/wankdanker/clyops/main/docs/web-runner.md)
+- [API references](https://clyops.io/reference.html): generated per-language API references

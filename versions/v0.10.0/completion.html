@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bash, Zsh and Fish completion · clyops</title>
+  <link rel="stylesheet" href="/versions/v0.10.0/assets/docs.css">
+  <script defer src="/versions/v0.10.0/assets/search.js"></script>
+</head>
+<body data-search-index="/versions/v0.10.0/search-index.json">
+  <a class="skip" href="#content">Skip to content</a>
+  <header><a href="/versions/v0.10.0/"><strong>clyops</strong></a><span>Documentation · 0.10.0</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <div class="shell">
+    <nav aria-label="Documentation">
+      <a href="/versions/v0.10.0/guide.html">Concepts and behavior</a>
+      <a href="/versions/v0.10.0/reference.html">API references</a>
+      <a href="/versions/v0.10.0/examples.html">Clone-and-run examples</a>
+      <a href="/versions/v0.10.0/linux-lab.html">Linux lab in your browser</a>
+      <a href="/versions/v0.10.0/completion.html">Bash, Zsh and Fish completion</a>
+      <h2>Languages</h2>
+      <a href="/versions/v0.10.0/languages/javascript.html">JavaScript / TypeScript</a><a href="/versions/v0.10.0/languages/python.html">Python</a><a href="/versions/v0.10.0/languages/rust.html">Rust</a><a href="/versions/v0.10.0/languages/go.html">Go</a><a href="/versions/v0.10.0/languages/java.html">Java</a><a href="/versions/v0.10.0/languages/ruby.html">Ruby</a><a href="/versions/v0.10.0/languages/c.html">C</a><a href="/versions/v0.10.0/languages/bash.html">Bash</a>
+      <h2>Tools and servers</h2>
+      <a href="/versions/v0.10.0/node-tools.html">Node tools, jobs, API and MCP</a>
+      <a href="/versions/v0.10.0/web-runner.html">Web runner and shared schema</a>
+      <a href="/versions/v0.10.0/applications.html">Dispatcher and desktop runner</a>
+      <a href="/versions/v0.10.0/maintaining.html">Maintaining the docs</a>
+      <a href="/versions/v0.10.0/versions.html">Release documentation</a>
+      <form action="/versions/v0.10.0/search.html" role="search"><label for="search">Search guides</label><input id="search" name="q" type="search"><button>Search</button></form>
+    </nav>
+    <main id="content"><h1 id="bash-zsh-and-fish-completion">Bash, Zsh and Fish completion</h1>
+<p>Every clyops tool generates its own shell completion. Options, enum values, file
+and directory paths, hosts, nested commands and inherited options come from the
+tool's current declarations. No hand-maintained completion file is needed when
+you change its options.</p>
+<p>For a tool installed on PATH, replace <code>plan.py</code> below with its executable name.
+To use the <a href="/versions/v0.10.0/examples.html">cloned examples</a>, first run the PATH setup from your
+shell while you are in the repository root. These commands enable the current
+shell session. Put PATH and initialization lines in your startup file to retain
+them, using the absolute checkout path rather than <code>$PWD</code> there.</p>
+<h2 id="bash">Bash</h2>
+<p>Use Bash 4.3+; on macOS put a current Bash on PATH and start it first.</p>
+<pre><code class="language-bash">export PATH=&quot;$PWD/examples/scripts:$PATH&quot;
+eval &quot;$(plan.py --completion bash)&quot;
+</code></pre>
+<p>Type <code>plan.py --env </code> and press Tab to complete <code>staging</code> or <code>production</code>.</p>
+<p>For future sessions, add to <code>~/.bashrc</code> after adjusting the checkout path:</p>
+<pre><code class="language-bash">export PATH=&quot;/absolute/path/to/clyops/examples/scripts:$PATH&quot;
+eval &quot;$(plan.py --completion bash)&quot;
+</code></pre>
+<p>Your login shell may need to source <code>~/.bashrc</code> from <code>~/.bash_profile</code>.
+The generated function queries the executable when you complete; keep the tool
+on PATH and use the registered executable name. To enable the other samples,
+run the corresponding command, e.g. <code>eval &quot;$(transcode.sh --completion bash)&quot;</code>.</p>
+<h2 id="zsh">Zsh</h2>
+<p>Initialize Zsh's completion system before registering the tool:</p>
+<pre><code class="language-zsh">export PATH=&quot;$PWD/examples/scripts:$PATH&quot;
+autoload -Uz compinit
+compinit
+eval &quot;$(plan.py --completion zsh)&quot;
+</code></pre>
+<p>Put the same lines in <code>~/.zshrc</code>, replacing <code>$PWD</code> with the absolute checkout
+path. If your shell framework already runs <code>compinit</code>, add only the PATH and
+<code>eval</code> lines after that initialization.</p>
+<h2 id="fish">Fish</h2>
+<p>In Fish, from the checkout root:</p>
+<pre><code class="language-fish">fish_add_path &quot;$PWD/examples/scripts&quot;
+mkdir -p ~/.config/fish/completions
+plan.py --completion fish &gt; ~/.config/fish/completions/plan.py.fish
+</code></pre>
+<p>Fish automatically loads that file for <code>plan.py</code>. For just the current session:</p>
+<pre><code class="language-fish">plan.py --completion fish | source
+</code></pre>
+<p>The saved script asks the tool for its current declarations at completion time.
+Repeat the install command for each tool, using its executable name as the filename.</p>
+<h2 id="a-directory-of-tools">A directory of tools</h2>
+<p>The <a href="/versions/v0.10.0/applications.html#dispatcher">dispatcher</a> also generates completion:</p>
+<pre><code class="language-sh">clyops-dispatch --root ./examples/scripts --help
+clyops-dispatch --root ./examples/scripts --name ops --completion bash
+</code></pre>
+<p>For convenient completion, use a wrapper that always supplies the root:</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+exec clyops-dispatch --root /absolute/path/to/clyops/examples/scripts --name ops &quot;$@&quot;
+</code></pre>
+<p>Save this as an executable named <code>ops</code> on PATH. Enable it with
+<code>eval &quot;$(ops --completion bash)&quot;</code>, <code>eval &quot;$(ops --completion zsh)&quot;</code> after <code>compinit</code>,
+or <code>ops --completion fish &gt; ~/.config/fish/completions/ops.fish</code>.
+The dispatcher completes directory groups and tool names, then the selected
+tool's own options. Inspect <code>ops --help</code> for the command names it discovered.</p>
+<h2 id="inspect-and-troubleshoot">Inspect and troubleshoot</h2>
+<p><code>plan.py --completion bash</code> prints shell source; <code>plan.py --bash-completion</code>
+prints the tab-separated records the generated completion script consumes.
+The internal protocol's historical name is used by all three shells.
+Try <code>command -v plan.py</code> and <code>plan.py --help</code> if completion does not appear.
+When using an interpreter directly, completion belongs to the tool's executable
+name rather than a global <code>python</code> command; prefer an executable shebang script.
+See the <a href="/versions/v0.10.0/guide.html#help-schema-and-shell-completion">shared behavior guide</a>.</p>
+</main>
+  </div>
+  <footer>Guides are Markdown. API references come from the published source interfaces.</footer>
+</body>
+</html>
