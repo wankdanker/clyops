@@ -68,6 +68,14 @@
           },
           "validation": {
             "$ref": "#/$defs/rule"
+          },
+          "schema": {
+            "description": "JSON Schema of a json:SCHEMA rule (spec section 5), or null.",
+            "type": [
+              "object",
+              "boolean",
+              "null"
+            ]
           }
         }
       }
@@ -150,6 +158,14 @@
           "secret": {
             "type": "boolean",
             "description": "Holds a secret (spec section 1.5): mask it in logs and use a password field."
+          },
+          "schema": {
+            "description": "JSON Schema of a json:SCHEMA rule (spec section 5), or null.",
+            "type": [
+              "object",
+              "boolean",
+              "null"
+            ]
           }
         }
       }
@@ -276,7 +292,7 @@
     "rule": {
       "description": "Validation rule (spec/SPEC.md section 5), or empty.",
       "type": "string",
-      "pattern": "^(|int|float|string|path|ip|hostname|url|port|email|uuid|json|bool|date:YYYY-MM-DD|file:(exists|readable|writable|executable)|dir:(exists|writable)|int:([0-9]+-[0-9]*|-[0-9]+)|float:([0-9]*\\.?[0-9]+-([0-9]*\\.?[0-9]+)?|-[0-9]*\\.?[0-9]+)|string:([0-9]+|[0-9]+-[0-9]*|-[0-9]+)|choice:.+|regex:.+)$"
+      "pattern": "^(|int|float|string|path|ip|hostname|url|port|email|uuid|json|json:.+|bool|date:YYYY-MM-DD|file:(exists|readable|writable|executable)|dir:(exists|writable)|int:([0-9]+-[0-9]*|-[0-9]+)|float:([0-9]*\\.?[0-9]+-([0-9]*\\.?[0-9]+)?|-[0-9]*\\.?[0-9]+)|string:([0-9]+|[0-9]+-[0-9]*|-[0-9]+)|choice:.+|regex:.+)$"
     },
     "stream": {
       "description": "Declared standard input or output (spec section 1.3), or null.",
@@ -406,6 +422,14 @@
               },
               "validation": {
                 "$ref": "#/$defs/rule"
+              },
+              "schema": {
+                "description": "JSON Schema of a json:SCHEMA rule (spec section 5), or null.",
+                "type": [
+                  "object",
+                  "boolean",
+                  "null"
+                ]
               }
             }
           }
@@ -488,6 +512,14 @@
               "secret": {
                 "type": "boolean",
                 "description": "Holds a secret (spec section 1.5): mask it in logs and use a password field."
+              },
+              "schema": {
+                "description": "JSON Schema of a json:SCHEMA rule (spec section 5), or null.",
+                "type": [
+                  "object",
+                  "boolean",
+                  "null"
+                ]
               }
             }
           }

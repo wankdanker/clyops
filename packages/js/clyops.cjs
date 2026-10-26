@@ -272,7 +272,23 @@ function isKnownRule(rule) {
       return false;
     }
   }
+  if (/^json:./s.test(rule)) return !rule.startsWith("json:{") || isJson(rule.slice(5));
   return false;
+}
+var SCHEME = /^[A-Za-z][A-Za-z0-9+.-]+:/;
+function ruleSchema(rule, root, name) {
+  if (!rule.startsWith("json:")) return null;
+  const spec = rule.slice(5);
+  if (spec.startsWith("{")) return JSON.parse(spec);
+  if (SCHEME.test(spec)) return { $ref: spec };
+  const file = path.resolve(root, spec);
+  try {
+    const text = fs.readFileSync(file, "utf8");
+    if (isJson(text)) return JSON.parse(text);
+  } catch {
+  }
+  emit("warning", `${name} schema is not a readable JSON file: ${file}`, true);
+  return null;
 }
 function bounds(rule) {
   const range = rule.slice(rule.indexOf(":") + 1);
@@ -314,6 +330,7 @@ function describeRule(rule) {
   }
   if (rule.startsWith("choice:")) return `choices: ${rule.slice(7).split(",").join(", ")}`;
   if (rule.startsWith("regex:")) return `pattern: ${rule.slice(6)}`;
+  if (rule.startsWith("json:")) return rule.startsWith("json:{") ? "JSON" : `JSON: ${rule.slice(5)}`;
   return rule;
 }
 function isWritable(p, mode = fs.constants.W_OK) {
@@ -479,6 +496,7 @@ function validate(value, rule, name) {
     if (!new RegExp(rule.slice(6)).test(value)) fail(`does not match required pattern, got '${value}'`);
     return value;
   }
+  if (rule.startsWith("json:")) rule = "json";
   switch (rule) {
     case "string":
     case "path":
@@ -1393,7 +1411,8 @@ var Cli = class _Cli {
         required: !a.variadic && !a.defaultValue,
         isVariadic: a.variadic,
         default: a.defaultValue,
-        validation: a.validation
+        validation: a.validation,
+        schema: ruleSchema(a.validation, this.root, a.name)
       })),
       options: this.options.map((o) => ({
         name: o.long,
@@ -1408,6 +1427,7 @@ var Cli = class _Cli {
         required: o.required,
         validation: o.validation,
         choices: o.validation.startsWith("choice:") ? o.validation.slice(7).split(",") : [],
+        schema: ruleSchema(o.validation, this.root, `--${o.long}`),
         secret: o.secret
       })),
       ...this.parent ? {} : { config: this.configOption ? { option: this.configOption, prefixes: this.configPrefixes } : null },

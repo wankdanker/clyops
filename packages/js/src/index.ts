@@ -18,7 +18,7 @@ export type Source = 'cli' | 'config' | 'env' | 'default' | 'unset';
 export type Validation =
   | '' | 'int' | 'float' | 'string' | 'path' | 'ip' | 'hostname' | 'url' | 'port' | 'email' | 'uuid' | 'json' | 'bool'
   | 'date:YYYY-MM-DD' | 'file:exists' | 'file:readable' | 'file:writable' | 'file:executable' | 'dir:exists' | 'dir:writable'
-  | `int:${string}` | `float:${string}` | `string:${string}` | `choice:${string}` | `regex:${string}`
+  | `int:${string}` | `float:${string}` | `string:${string}` | `choice:${string}` | `regex:${string}` | `json:${string}`
   | 'secret' | `secret:${string}`;
 
 /** What running a program does (spec section 1.3). */
@@ -182,7 +182,30 @@ function isKnownRule(rule: string): boolean {
   if (/^regex:.+/.test(rule)) {
     try { new RegExp(rule.slice(6)); return true; } catch { return false; }
   }
+  if (/^json:./s.test(rule)) return !rule.startsWith('json:{') || isJson(rule.slice(5));
   return false;
+}
+
+// A scheme such as `https:` (spec section 6).
+const SCHEME = /^[A-Za-z][A-Za-z0-9+.-]+:/;
+
+/**
+ * The JSON Schema a `json:SCHEMA` rule names (spec section 5), or null: inline
+ * JSON, `{"$ref": URL}`, or a file read relative to `root`. A file that can't
+ * be read or isn't JSON is a warning and null.
+ */
+function ruleSchema(rule: string, root: string, name: string): unknown {
+  if (!rule.startsWith('json:')) return null;
+  const spec = rule.slice(5);
+  if (spec.startsWith('{')) return JSON.parse(spec);
+  if (SCHEME.test(spec)) return { $ref: spec };
+  const file = path.resolve(root, spec);
+  try {
+    const text = fs.readFileSync(file, 'utf8');
+    if (isJson(text)) return JSON.parse(text);
+  } catch { /* reported below */ }
+  emit('warning', `${name} schema is not a readable JSON file: ${file}`, true);
+  return null;
 }
 
 /** Split "MIN-MAX" into its (possibly empty) bounds. */
@@ -216,6 +239,7 @@ export function describeRule(rule: string): string {
   }
   if (rule.startsWith('choice:')) return `choices: ${rule.slice(7).split(',').join(', ')}`;
   if (rule.startsWith('regex:')) return `pattern: ${rule.slice(6)}`;
+  if (rule.startsWith('json:')) return rule.startsWith('json:{') ? 'JSON' : `JSON: ${rule.slice(5)}`;
   return rule;
 }
 
@@ -365,6 +389,7 @@ export function validate(value: string, rule: string, name: string): Scalar {
     if (!new RegExp(rule.slice(6)).test(value)) fail(`does not match required pattern, got '${value}'`);
     return value;
   }
+  if (rule.startsWith('json:')) rule = 'json';
 
   switch (rule) {
     case 'string':
@@ -1278,12 +1303,14 @@ export class Cli {
       arguments: this.args.map((a) => ({
         name: a.name, description: a.description, required: !a.variadic && !a.defaultValue,
         isVariadic: a.variadic, default: a.defaultValue, validation: a.validation,
+        schema: ruleSchema(a.validation, this.root, a.name),
       })),
       options: this.options.map((o) => ({
         name: o.long, shortName: o.short, variableName: o.varName, description: o.description,
         default: o.kind === 'flag' ? 'false' : o.defaultValue, group: o.group, type: type(o),
         isFlag: o.kind === 'flag', isArray: o.kind === 'array', required: o.required, validation: o.validation,
-        choices: o.validation.startsWith('choice:') ? o.validation.slice(7).split(',') : [], secret: o.secret,
+        choices: o.validation.startsWith('choice:') ? o.validation.slice(7).split(',') : [],
+        schema: ruleSchema(o.validation, this.root, `--${o.long}`), secret: o.secret,
       })),
       ...(this.parent ? {} : { config: this.configOption ? { option: this.configOption, prefixes: this.configPrefixes } : null }),
       requiredCommands: this.commands.map((c) => ({ command: c.command, description: c.description, installHint: c.installHint })),

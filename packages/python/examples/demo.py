@@ -46,6 +46,9 @@ cli.opt("CODE",     "code",     "",  "optional",  "Three-letter code",     "Vali
 cli.opt("LEVEL",    "level",    "",  "optional",  "Level",                 "Validation", "int")
 cli.opt("SIZE",     "size",     "",  "optional",  "Size code",             "Validation", "string:4")
 cli.opt("PAYLOAD",  "payload",  "",  "optional",  "JSON payload",          "Validation", "json")
+cli.opt("FILTER",   "filter",   "",  "optional",  "JSON filter",           "Validation", "json:{\"type\":\"object\"}")
+cli.opt("SHAPE",    "shape",    "",  "optional",  "JSON shape",            "Validation", "json:shape.json")
+cli.opt("EVENT",    "event",    "",  "optional",  "JSON event",            "Validation", "json:https://example.com/event.json")
 cli.opt("DATA_DIR", "data-dir", "d", "optional",  "Data directory",        "Files",      "dir:exists")
 cli.opt("SRC",      "src",      "",  "optional",  "Source file",           "Files",      "file:exists")
 cli.opt("DEST",     "dest",     "",  "optional",  "Destination file",      "Files",      "file:writable")
@@ -62,6 +65,6 @@ cli.emit("meta", '{"extra":true}' if cli.fd_open("extra") is not None else '{"ex
 cli.emit("progress", '{"pct":100}')
 
 longs = ["config", "verbose", "quiet", "color", "out", "notes", "count", "ratio", "enabled", "tag", "no-cache", "key",
-         "host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "payload", "data-dir", "src", "dest",
+         "host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "payload", "filter", "shape", "event", "data-dir", "src", "dest",
          "exec", "include", "help"]
 print(json.dumps({"values": json.loads(cli.values_json()), "sources": {k: cli.source(k) for k in longs}}, indent=2))

@@ -26,6 +26,9 @@ opt	--code	-	value	none	-	Three-letter code
 opt	--level	-	value	none	-	Level
 opt	--size	-	value	none	-	Size code
 opt	--payload	-	value	none	-	JSON payload
+opt	--filter	-	value	none	-	JSON filter
+opt	--shape	-	value	none	-	JSON shape
+opt	--event	-	value	none	-	JSON event
 opt	--data-dir	-d	value	dir	-	Data directory
 opt	--src	-	value	file	-	Source file
 opt	--dest	-	value	file	-	Destination file

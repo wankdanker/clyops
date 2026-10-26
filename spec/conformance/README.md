@@ -109,6 +109,9 @@ Options, in registration order:
 | `LEVEL` | `level` | | `optional` | `Level` | `Validation` | `int` |
 | `SIZE` | `size` | | `optional` | `Size code` | `Validation` | `string:4` |
 | `PAYLOAD` | `payload` | | `optional` | `JSON payload` | `Validation` | `json` |
+| `FILTER` | `filter` | | `optional` | `JSON filter` | `Validation` | `json:{"type":"object"}` |
+| `SHAPE` | `shape` | | `optional` | `JSON shape` | `Validation` | `json:shape.json` |
+| `EVENT` | `event` | | `optional` | `JSON event` | `Validation` | `json:https://example.com/event.json` |
 | `DATA_DIR` | `data-dir` | `d` | `optional` | `Data directory` | `Files` | `dir:exists` |
 | `SRC` | `src` | | `optional` | `Source file` | `Files` | `file:exists` |
 | `DEST` | `dest` | | `optional` | `Destination file` | `Files` | `file:writable` |

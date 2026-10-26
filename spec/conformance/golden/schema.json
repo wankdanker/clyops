@@ -10,7 +10,8 @@
       "required": true,
       "isVariadic": false,
       "default": "",
-      "validation": "path"
+      "validation": "path",
+      "schema": null
     },
     {
       "name": "mode",
@@ -18,7 +19,8 @@
       "required": false,
       "isVariadic": false,
       "default": "fast",
-      "validation": "choice:fast,slow"
+      "validation": "choice:fast,slow",
+      "schema": null
     },
     {
       "name": "rest",
@@ -26,7 +28,8 @@
       "required": false,
       "isVariadic": true,
       "default": "",
-      "validation": ""
+      "validation": "",
+      "schema": null
     }
   ],
   "options": [
@@ -43,6 +46,7 @@
       "required": false,
       "validation": "path",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -58,6 +62,7 @@
       "required": false,
       "validation": "",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -73,6 +78,7 @@
       "required": false,
       "validation": "",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -92,6 +98,7 @@
         "always",
         "never"
       ],
+      "schema": null,
       "secret": false
     },
     {
@@ -107,6 +114,7 @@
       "required": false,
       "validation": "path",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -122,6 +130,7 @@
       "required": false,
       "validation": "",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -137,6 +146,7 @@
       "required": false,
       "validation": "int:1-10",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -152,6 +162,7 @@
       "required": false,
       "validation": "float:0-1",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -167,6 +178,7 @@
       "required": false,
       "validation": "bool",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -182,6 +194,7 @@
       "required": false,
       "validation": "string:1-8",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -197,6 +210,7 @@
       "required": false,
       "validation": "",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -212,6 +226,7 @@
       "required": true,
       "validation": "",
       "choices": [],
+      "schema": null,
       "secret": true
     },
     {
@@ -227,6 +242,7 @@
       "required": false,
       "validation": "hostname",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -242,6 +258,7 @@
       "required": false,
       "validation": "port",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -257,6 +274,7 @@
       "required": false,
       "validation": "url",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -272,6 +290,7 @@
       "required": false,
       "validation": "ip",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -287,6 +306,7 @@
       "required": false,
       "validation": "uuid",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -302,6 +322,7 @@
       "required": false,
       "validation": "email",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -317,6 +338,7 @@
       "required": false,
       "validation": "date:YYYY-MM-DD",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -332,6 +354,7 @@
       "required": false,
       "validation": "regex:^[A-Z]{3}$",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -347,6 +370,7 @@
       "required": false,
       "validation": "int",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -362,6 +386,7 @@
       "required": false,
       "validation": "string:4",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -377,6 +402,66 @@
       "required": false,
       "validation": "json",
       "choices": [],
+      "schema": null,
+      "secret": false
+    },
+    {
+      "name": "filter",
+      "shortName": "",
+      "variableName": "FILTER",
+      "description": "JSON filter",
+      "default": "",
+      "group": "Validation",
+      "type": "string",
+      "isFlag": false,
+      "isArray": false,
+      "required": false,
+      "validation": "json:{\"type\":\"object\"}",
+      "choices": [],
+      "schema": {
+        "type": "object"
+      },
+      "secret": false
+    },
+    {
+      "name": "shape",
+      "shortName": "",
+      "variableName": "SHAPE",
+      "description": "JSON shape",
+      "default": "",
+      "group": "Validation",
+      "type": "string",
+      "isFlag": false,
+      "isArray": false,
+      "required": false,
+      "validation": "json:shape.json",
+      "choices": [],
+      "schema": {
+        "type": "object",
+        "properties": {
+          "w": {
+            "type": "integer"
+          }
+        }
+      },
+      "secret": false
+    },
+    {
+      "name": "event",
+      "shortName": "",
+      "variableName": "EVENT",
+      "description": "JSON event",
+      "default": "",
+      "group": "Validation",
+      "type": "string",
+      "isFlag": false,
+      "isArray": false,
+      "required": false,
+      "validation": "json:https://example.com/event.json",
+      "choices": [],
+      "schema": {
+        "$ref": "https://example.com/event.json"
+      },
       "secret": false
     },
     {
@@ -392,6 +477,7 @@
       "required": false,
       "validation": "dir:exists",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -407,6 +493,7 @@
       "required": false,
       "validation": "file:exists",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -422,6 +509,7 @@
       "required": false,
       "validation": "file:writable",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -437,6 +525,7 @@
       "required": false,
       "validation": "file:executable",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -452,6 +541,7 @@
       "required": false,
       "validation": "path",
       "choices": [],
+      "schema": null,
       "secret": false
     },
     {
@@ -467,6 +557,7 @@
       "required": false,
       "validation": "",
       "choices": [],
+      "schema": null,
       "secret": false
     }
   ],

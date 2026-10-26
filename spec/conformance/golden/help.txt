@@ -55,6 +55,9 @@ Validation:
       --level=<value>           Level (accepts: integer)
       --size=<value>            Size code (accepts: text: 4 chars)
       --payload=<value>         JSON payload (accepts: JSON)
+      --filter=<value>          JSON filter (accepts: JSON)
+      --shape=<value>           JSON shape (accepts: JSON: shape.json)
+      --event=<value>           JSON event (accepts: JSON: https://example.com/event.json)
 
 Files:
   -d, --data-dir=<value>        Data directory (accepts: existing directory)
