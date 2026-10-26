@@ -1,6 +1,6 @@
 {
   "name": "clyops-runner",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "private": true,
   "description": "Desktop UI that builds forms for clyops tools and runs them",
   "type": "module",
@@ -21,7 +21,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tailwind-merge": "^2.2.0",
-    "clyops-schema": "0.9.0"
+    "clyops-schema": "0.10.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",

@@ -5,13 +5,13 @@ section here.
 
 ## [Unreleased]
 
-- clyops-jobs: a function option set to `${params.x}` (or `{{params.x}}`) whose field the caller
-  left out, or sent as null, is now unset, so the tool's own default applies; it used to fail the
-  job with `unknown template value: params.x` (or pass `--x ''` for null). This holds inside a
-  longer string too (`v-${params.v}` is unset, never `v-`), and for `positionals`; in `result`,
-  `stdin`/`stdout` and artifact patterns a missing field renders as `''`. Other template roots (`job`,
-  `paths`, ...) still fail on an unknown path. `strict_params: true` on a function keeps the old
-  error for a missing field (#38).
+## [0.10.0] - 2026-10-26
+
+### JSON input
+
+A `json` rule checks that a value is valid JSON, and `json:SCHEMA` names the JSON Schema it
+should match, which clyops-api and clyops-mcp check before running the tool.
+
 - A `json` validation rule, in all nine languages (spec section 5). The value must be one
   JSON value (RFC 8259), checked by each library's own grammar check with no dependencies,
   so they agree on the edges: no `NaN`/`Infinity`, comments, trailing commas, single quotes
@@ -31,10 +31,18 @@ section here.
   what's checked, and the tool gets the text as given. In the input JSON Schema, the tool's
   schema is embedded with its `#` references rewritten to point into the input schema. URLs are
   never fetched, so a URL reference becomes a `$comment` and that part isn't checked (#45).
-- clyops-api accepted only a string for a `json` input, though its input schema allows any JSON
-  value; it now takes any value, and a string has to be valid JSON (#41).
 - The conformance demo has `--filter`, `--shape` and `--event` options for the three
   `json:SCHEMA` forms.
+
+### clyops-jobs
+
+- clyops-jobs: a function option set to `${params.x}` (or `{{params.x}}`) whose field the caller
+  left out, or sent as null, is now unset, so the tool's own default applies; it used to fail the
+  job with `unknown template value: params.x` (or pass `--x ''` for null). This holds inside a
+  longer string too (`v-${params.v}` is unset, never `v-`), and for `positionals`; in `result`,
+  `stdin`/`stdout` and artifact patterns a missing field renders as `''`. Other template roots (`job`,
+  `paths`, ...) still fail on an unknown path. `strict_params: true` on a function keeps the old
+  error for a missing field (#38).
 
 ## [0.9.0] - 2026-10-22
 
