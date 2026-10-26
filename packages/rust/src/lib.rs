@@ -373,6 +373,30 @@ fn known_rule(rule: &str) -> bool {
         || full(r"string:(\d+|\d+-\d*|-\d+)", rule)
         || (rule.starts_with("choice:") && rule.len() > 7)
         || (rule.starts_with("regex:") && rule.len() > 6 && Regex::new(&rule[6..]).is_ok())
+        || (rule.starts_with("json:") && rule.len() > 5 && (!rule.starts_with("json:{") || is_json(&rule[5..])))
+}
+
+/// The JSON Schema a `json:SCHEMA` rule names (spec section 5), as JSON text, or
+/// None: inline JSON, `{"$ref": URL}`, or a file read relative to `root`. A file
+/// that can't be read or isn't JSON is a warning and None.
+fn rule_schema(rule: &str, root: &str, name: &str) -> Option<String> {
+    let spec = rule.strip_prefix("json:")?;
+    if spec.starts_with('{') {
+        return Some(spec.to_string());
+    }
+    if re("^[A-Za-z][A-Za-z0-9+.-]+:").is_match(spec) {
+        let mut text = String::new();
+        Json::Obj(vec![("$ref", Json::Str(spec.to_string()))]).render(0, &mut text);
+        return Some(text);
+    }
+    let path = join_norm(root, spec);
+    match std::fs::read_to_string(&path) {
+        Ok(text) if is_json(&text) => Some(text),
+        _ => {
+            emit("warning", &format!("{name} schema is not a readable JSON file: {path}"), true);
+            None
+        }
+    }
 }
 
 fn bounds(rule: &str) -> (&str, &str) {
@@ -429,6 +453,9 @@ pub fn describe_rule(rule: &str) -> String {
     }
     if let Some(p) = rule.strip_prefix("regex:") {
         return format!("pattern: {p}");
+    }
+    if let Some(p) = rule.strip_prefix("json:") {
+        return if p.starts_with('{') { "JSON".to_string() } else { format!("JSON: {p}") };
     }
     rule.to_string()
 }
@@ -696,6 +723,7 @@ pub fn validate(value: &str, rule: &str, name: &str) -> Result<Value, String> {
         }
         return Ok(Value::Str(value.into()));
     }
+    let rule = if rule.starts_with("json:") { "json" } else { rule };
 
     let ok = match rule {
         "bool" => {
@@ -2128,6 +2156,7 @@ impl Cli {
                                 ("isVariadic", Json::Bool(a.variadic)),
                                 ("default", s(&a.default)),
                                 ("validation", s(&a.rule)),
+                                ("schema", rule_schema(&a.rule, &self.root, &a.name).map(Json::Raw).unwrap_or(Json::Null)),
                             ])
                         })
                         .collect(),
@@ -2156,6 +2185,12 @@ impl Cli {
                                     Json::Arr(
                                         o.rule.strip_prefix("choice:").map(|c| c.split(',').map(s).collect()).unwrap_or_default(),
                                     ),
+                                ),
+                                (
+                                    "schema",
+                                    rule_schema(&o.rule, &self.root, &format!("--{}", o.long))
+                                        .map(Json::Raw)
+                                        .unwrap_or(Json::Null),
                                 ),
                                 ("secret", Json::Bool(o.secret)),
                             ])

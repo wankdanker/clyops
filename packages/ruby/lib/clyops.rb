@@ -126,6 +126,8 @@ module Clyops
         return false
       end
     end
+    return !rule.start_with?("json:{") || json?(rule[5..]) if rule.start_with?("json:") && rule.length > 5
+
     false
   end
 
@@ -160,6 +162,7 @@ module Clyops
     end
     return "choices: #{rule[7..].split(',', -1).join(', ')}" if rule.start_with?("choice:")
     return "pattern: #{rule[6..]}" if rule.start_with?("regex:")
+    return rule.start_with?("json:{") ? "JSON" : "JSON: #{rule[5..]}" if rule.start_with?("json:")
 
     rule
   end
@@ -210,6 +213,7 @@ module Clyops
       fail_with.("does not match required pattern, got '#{value}'") unless value.match?(Regexp.new(rule[6..]))
       return value
     end
+    rule = "json" if rule.start_with?("json:")
 
     case rule
     when "bool"
@@ -265,6 +269,31 @@ module Clyops
   # @return [Boolean] true when it is valid JSON.
   def json?(text)
     JsonGrammar.new(text).valid?
+  end
+
+  # The JSON Schema a `json:SCHEMA` rule names (spec section 5), or nil: inline
+  # JSON, `{"$ref" => URL}`, or a file read relative to `root`. A file that
+  # can't be read or isn't JSON is a warning and nil.
+  # @param rule [String] The validation rule.
+  # @param root [String] The base directory for a relative path.
+  # @param name [String] The option or argument name, for the warning.
+  # @return [Object, nil] the schema.
+  def rule_schema(rule, root, name)
+    return nil unless rule.start_with?("json:")
+
+    spec = rule[5..]
+    return JSON.parse(spec) if spec.start_with?("{")
+    return { "$ref" => spec } if spec.match?(/\A[A-Za-z][A-Za-z0-9+.-]+:/)
+
+    path = normpath(root, spec)
+    begin
+      text = File.read(path, encoding: "UTF-8")
+      return JSON.parse(text) if text.valid_encoding? && json?(text)
+    rescue SystemCallError, IOError
+      nil
+    end
+    Clyops.emit("warning", "#{name} schema is not a readable JSON file: #{path}", force: true)
+    nil
   end
 
   # @private
@@ -1139,14 +1168,15 @@ module Clyops
         "epilog" => @epilog,
         "arguments" => @args.map do |a|
           { "name" => a.name, "description" => a.description, "required" => !a.variadic && a.default.empty?,
-            "isVariadic" => a.variadic, "default" => a.default, "validation" => a.rule }
+            "isVariadic" => a.variadic, "default" => a.default, "validation" => a.rule,
+            "schema" => Clyops.rule_schema(a.rule, @root, a.name) }
         end,
         "options" => @options.map do |o|
           { "name" => o.long, "shortName" => o.short, "variableName" => o.var, "description" => o.description,
             "default" => o.kind == "flag" ? "false" : o.default, "group" => o.group, "type" => type_of.(o),
             "isFlag" => o.kind == "flag", "isArray" => o.kind == "array", "required" => o.required,
             "validation" => o.rule, "choices" => o.rule.start_with?("choice:") ? o.rule[7..].split(",", -1) : [],
-            "secret" => o.secret }
+            "schema" => Clyops.rule_schema(o.rule, @root, "--#{o.long}"), "secret" => o.secret }
         end,
         **(@parent ? {} : { "config" => @config_option.empty? ? nil : { "option" => @config_option, "prefixes" => @config_prefixes.dup } }),
         "requiredCommands" => @commands.map { |c, d, h| { "command" => c, "description" => d, "installHint" => h } },

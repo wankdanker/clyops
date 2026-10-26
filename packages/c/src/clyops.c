@@ -704,6 +704,7 @@ static int known_rule(const char* r) {
         regfree(&re);
         return 1;
     }
+    if (starts(r, "json:") && r[5]) return r[5] != '{' || is_json(r + 5);
     return 0;
 }
 
@@ -828,6 +829,7 @@ static char* describe_rule(const char* r) {
         return sb_take(&b);
     }
     if (starts(r, "regex:")) return fmt("pattern: %s", r + 6);
+    if (starts(r, "json:")) return r[5] == '{' ? xstrdup("JSON") : fmt("JSON: %s", r + 5);
     return xstrdup(r);
 }
 
@@ -905,7 +907,7 @@ static char* validate(const char* v, const char* rule, const char* name, const c
     } else if (streq(rule, "uuid")) {
         if (!re_match("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", v))
             err = fmt("%s must be a valid UUID, got '%s'", name, v);
-    } else if (streq(rule, "json")) {
+    } else if (streq(rule, "json") || starts(rule, "json:")) {
         if (!is_json(v)) err = fmt("%s must be valid JSON, got '%s'", name, v);
     } else if (streq(rule, "date:YYYY-MM-DD")) {
         if (!re_match("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", v)) err = fmt("%s must be in YYYY-MM-DD format, got '%s'", name, v);
@@ -1907,8 +1909,51 @@ static void json_stream(sbuf* b, const char* desc, const char* type) {
     sb_putc(b, '}');
 }
 
-/* The schema fields of `cli` from "description" on (spec section 8), without the braces. */
-static void schema_node(sbuf* b, const clyops_t* cli) {
+/* The whole of a file as a string, or NULL when it can't be read. */
+static char* read_file(const char* path) {
+    FILE* f = fopen(path, "rb");
+    if (!f) return NULL;
+    sbuf b = {0};
+    char chunk[4096];
+    size_t n;
+    while ((n = fread(chunk, 1, sizeof chunk, f)) > 0) for (size_t i = 0; i < n; i++) sb_putc(&b, chunk[i]);
+    int failed = ferror(f) || memchr(b.s ? b.s : "", 0, b.len) != NULL;
+    fclose(f);
+    char* text = sb_take(&b);
+    if (failed) { free(text); return NULL; }
+    return text;
+}
+
+/* The JSON Schema a `json:SCHEMA` rule names (spec section 5), or null: inline JSON,
+   {"$ref": URL}, or a file read relative to `root`. A file that can't be read or isn't
+   JSON is a warning and null. */
+static void rule_schema(sbuf* b, const char* rule, const char* root, const char* name) {
+    if (!starts(rule, "json:")) { sb_put(b, "null"); return; }
+    const char* spec = rule + 5;
+    if (spec[0] == '{') { sb_put(b, spec); return; }
+    if (re_match("^[A-Za-z][A-Za-z0-9+.-]+:", spec)) {
+        sb_put(b, "{\"$ref\": ");
+        json_str(b, spec);
+        sb_putc(b, '}');
+        return;
+    }
+    char* path = join_norm(root, spec);
+    char* text = read_file(path);
+    if (text && is_json(text)) {
+        sb_put(b, text);
+    } else {
+        char* msg = fmt("%s schema is not a readable JSON file: %s", name, path);
+        emit("warning", msg, 1);
+        free(msg);
+        sb_put(b, "null");
+    }
+    free(text);
+    free(path);
+}
+
+/* The schema fields of `cli` from "description" on (spec section 8), without the braces;
+   `root` is the absolute directory json:SCHEMA paths are relative to. */
+static void schema_node(sbuf* b, const clyops_t* cli, const char* root) {
     sb_put(b, "  \"description\": ");
     json_str(b, cli->description ? cli->description : "");
     sb_put(b, ",\n  \"epilog\": ");
@@ -1925,6 +1970,8 @@ static void schema_node(sbuf* b, const clyops_t* cli) {
         json_str(b, a->dflt);
         sb_put(b, ",\n      \"validation\": ");
         json_str(b, a->rule);
+        sb_put(b, ",\n      \"schema\": ");
+        rule_schema(b, a->rule, root, a->name);
         sb_put(b, "\n    }");
     }
     sb_put(b, cli->nargs ? "\n  ],\n  \"options\": [" : "],\n  \"options\": [");
@@ -1968,7 +2015,11 @@ static void schema_node(sbuf* b, const clyops_t* cli) {
             }
             sb_put(b, "\n      ");
         }
-        sb_printf(b, "],\n      \"secret\": %s\n    }", o->secret ? "true" : "false");
+        sb_put(b, "],\n      \"schema\": ");
+        char* label = fmt("--%s", o->long_name);
+        rule_schema(b, r, root, label);
+        free(label);
+        sb_printf(b, ",\n      \"secret\": %s\n    }", o->secret ? "true" : "false");
     }
     sb_put(b, "\n  ],");
     if (!cli->parent) {
@@ -2033,7 +2084,7 @@ static void schema_node(sbuf* b, const clyops_t* cli) {
         sb_put(b, i ? ", {\n  \"name\": " : "{\n  \"name\": ");
         json_str(b, cli->kids[i]->word);
         sb_put(b, ",\n");
-        schema_node(b, cli->kids[i]);
+        schema_node(b, cli->kids[i], root);
         sb_put(b, "\n}");
     }
     sb_putc(b, ']');
@@ -2045,7 +2096,10 @@ char* clyops_json_schema(clyops_t* cli) {
     sb_put(&b, "{\n  \"clyops\": 1,\n  \"script\": ");
     json_str(&b, cli->name ? cli->name : "cli");
     sb_put(&b, ",\n");
-    schema_node(&b, cli);
+    char buf[PATH_MAX];
+    char* root = join_norm(getcwd(buf, sizeof buf) ? buf : "/", cli->root);
+    schema_node(&b, cli, root);
+    free(root);
     sb_put(&b, "\n}");
     return sb_take(&b);
 }
