@@ -19,6 +19,8 @@ section here.
   step, and `runContext(context, run)` adds it and `steps` for the result map.
 - A function run's `result` is the tool's `result` role, or its stdout, parsed as JSON.
 - `functionParamNames(fn)` lists the `params` fields a function's templates use.
+- A JSON Schema for the config file, for editor completion and checks: `"$schema":
+  "https://clyops.io/schemas/clyops-jobs.json"`, also shipped as `clyops-jobs/config.schema.json`.
 
 ## [0.10.0] - 2026-10-26
 

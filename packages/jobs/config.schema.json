@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clyops.io/schemas/clyops-jobs.json",
+  "title": "clyops-jobs config",
+  "description": "Functions bound to clyops tools, their default options and their option blocks. Every other top-level key is an options block, named by a function's or step's `key`.",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string", "description": "This schema's URL, for editors: https://clyops.io/schemas/clyops-jobs.json" },
+    "functions": {
+      "type": "object",
+      "description": "The functions a trigger can run, by name.",
+      "additionalProperties": { "$ref": "#/$defs/function" }
+    },
+    "defaults": {
+      "type": "object",
+      "description": "Default options by block key, merged under the block of the same key.",
+      "additionalProperties": { "$ref": "#/$defs/options" }
+    }
+  },
+  "additionalProperties": { "$ref": "#/$defs/options" },
+  "$defs": {
+    "template": {
+      "type": "string",
+      "description": "Text with `${dot.path}` or `{{dot.path}}` templates rendered against the trigger's context (`job`, `paths`, `params`, `steps`, ...)."
+    },
+    "stepName": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+    "options": {
+      "type": "object",
+      "description": "Tool options keyed like the tool's options (`out_dir` or `out-dir`) or arguments, mapped onto its command line through --help-json-schema. String values are templates; an option naming a missing `params` field is left unset."
+    },
+    "binding": {
+      "type": "object",
+      "properties": {
+        "key": { "type": "string", "description": "The options block (a top-level key and a `defaults` key); default: the function's or step's name." },
+        "script": { "type": "string", "description": "The tool, relative to the script root." },
+        "positionals": {
+          "type": "array",
+          "description": "The tool's positional arguments as templates, in order; `[]` for none. Without it, arguments are options keyed by argument name.",
+          "items": { "type": ["string", "number", "boolean"] }
+        },
+        "positionals_order": { "enum": ["first", "last"], "description": "Positionals before (default) or after the options." },
+        "stdin": { "$ref": "#/$defs/template", "description": "A template naming the file fed to the tool's stdin, relative to the config root." },
+        "stdout": { "$ref": "#/$defs/template", "description": "A template naming the file the tool's stdout is written to, relative to `paths.work_dir`." },
+        "strict_params": { "type": "boolean", "description": "A missing `params` field is an error instead of leaving the option unset (default false)." }
+      },
+      "patternProperties": { "^x-": { "description": "Free for triggers and comments; clyops-jobs ignores it." } }
+    },
+    "function": {
+      "description": "A function runs one tool (`script`) or several in order (`steps`).",
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/binding" }],
+      "properties": {
+        "key": true, "script": true, "positionals": true, "positionals_order": true, "stdin": true, "stdout": true, "strict_params": true,
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Tools run in order with one context; each step's outputs are `steps.NAME` (`exit_code`, `stdout`, `result`, `meta`, `progress`, `error`) in the templates after it.",
+          "items": { "$ref": "#/$defs/step" }
+        },
+        "artifacts": { "$ref": "#/$defs/artifacts" },
+        "result": { "type": "object", "description": "Templates added to the result record; nested objects and arrays are rendered too." }
+      },
+      "patternProperties": { "^x-": true },
+      "additionalProperties": false,
+      "oneOf": [
+        { "required": ["script"], "not": { "required": ["steps"] } },
+        { "required": ["steps"], "not": { "required": ["script"] } }
+      ]
+    },
+    "step": {
+      "description": "One tool in a function's `steps`.",
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/binding" }],
+      "required": ["name", "script"],
+      "properties": {
+        "key": true, "script": true, "positionals": true, "positionals_order": true, "stdin": true, "stdout": true, "strict_params": true,
+        "name": { "$ref": "#/$defs/stepName", "description": "Names the step in `${steps.NAME...}` templates, branches and errors." },
+        "timeout_ms": { "type": "integer", "exclusiveMinimum": 0, "description": "This step's time limit; the whole chain also stays within the run's timeoutMs." },
+        "continue_on_exit": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "description": "Exit codes besides 0 that count as success; the chain then reports the first of them, e.g. [2] for a partial result."
+        },
+        "succeed": {
+          "anyOf": [{ "$ref": "#/$defs/stepName" }, { "const": "$end" }],
+          "description": "The later step to run after this one succeeds, instead of the next; `$end` ends the chain."
+        },
+        "fail": { "$ref": "#/$defs/stepName", "description": "The later step to run when this one exits nonzero or times out, instead of ending the chain." },
+        "error": { "$ref": "#/$defs/stepName", "description": "The later step to run when this one can't start (a template, stdin or schema error), instead of failing the run." }
+      },
+      "patternProperties": { "^x-": true },
+      "additionalProperties": false
+    },
+    "artifacts": {
+      "description": "Files copied from `paths.work_dir` into `paths.artifacts_dir` after the run: glob patterns (`*`, `?`, `**`), or an object with them and a requirement.",
+      "anyOf": [
+        { "$ref": "#/$defs/template" },
+        { "type": "array", "items": { "$ref": "#/$defs/template" } },
+        {
+          "type": "object",
+          "properties": {
+            "include": { "anyOf": [{ "$ref": "#/$defs/template" }, { "type": "array", "items": { "$ref": "#/$defs/template" } }], "description": "Glob patterns relative to `paths.work_dir`." },
+            "includes": { "$ref": "#/$defs/artifacts/anyOf/2/properties/include", "description": "Same as include." },
+            "patterns": { "$ref": "#/$defs/artifacts/anyOf/2/properties/include", "description": "Same as include." },
+            "required": { "type": ["boolean", "string"], "description": "At least one file must match." },
+            "min": { "type": "integer", "minimum": 0, "description": "At least this many files must match." }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}
