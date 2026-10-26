@@ -1,6 +1,6 @@
 {
   "name": "clyops-tools",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Discover, describe and run a directory of clyops tools from Node: schemas, JSON input to argv, JSON Schema.",
   "license": "MIT",
   "repository": {
@@ -45,6 +45,6 @@
   },
   "homepage": "https://clyops.io/node-tools.html",
   "dependencies": {
-    "clyops-schema": "0.9.0"
+    "clyops-schema": "0.10.0"
   }
 }
