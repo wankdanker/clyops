@@ -162,7 +162,7 @@ export function functionParamNames(fn: ResolvedFunction): string[] {
 export interface CommandOptions {
   /** Directory relative path options resolve against. */
   configRoot: string;
-  /** Values available to dotted-path templates; null disables context-based rendering. */
+  /** Values available to dotted-path templates; null disables context-based rendering, except in a chain's steps. */
   context?: TemplateContext | null;
   /** Options the trigger sets itself; config keys for them are ignored with a warning. Default: ['help']. */
   controlled?: string[];
@@ -367,7 +367,8 @@ async function runSteps(steps: ResolvedStep[], opts: RunFunctionOptions): Promis
     const step = steps[i];
     const name = step.stepName;
     const limits = [step.definition.timeout_ms, deadline && Math.max(1, deadline - Date.now())].filter((ms): ms is number => Number(ms) > 0);
-    const context = opts.context ? { ...opts.context, steps: { ...outputs } } : opts.context;
+    // A chain always renders: its steps reach each other through `steps` even without a caller context.
+    const context = { ...opts.context, steps: { ...outputs } };
     const onProgress = opts.onProgress && ((update: Record<string, unknown>) => opts.onProgress?.({ stage: name, ...update, step: name }));
     let ran: Awaited<ReturnType<typeof runTool>>;
     try {
@@ -389,7 +390,8 @@ async function runSteps(steps: ResolvedStep[], opts: RunFunctionOptions): Promis
       ...(run.progress ? { progress: run.progress } : {}),
     };
     last = { ...run, steps: outputs, stepRuns, durationMs: stepRuns.reduce((ms, r) => ms + r.durationMs, 0) };
-    const ok = run.exitCode === 0 || (run.exitCode !== null && !run.timedOut && (step.definition.continue_on_exit ?? []).includes(run.exitCode));
+    // A timed-out step failed, even when it exits 0 on SIGTERM.
+    const ok = !run.timedOut && (run.exitCode === 0 || (run.exitCode !== null && (step.definition.continue_on_exit ?? []).includes(run.exitCode)));
     if (ok) {
       if (run.exitCode !== 0) continued ??= run.exitCode ?? undefined;
       i = after(i, step.definition.succeed, true);

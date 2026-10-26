@@ -789,7 +789,7 @@ async function runSteps(steps, opts) {
     const step = steps[i];
     const name = step.stepName;
     const limits = [step.definition.timeout_ms, deadline && Math.max(1, deadline - Date.now())].filter((ms) => Number(ms) > 0);
-    const context = opts.context ? { ...opts.context, steps: { ...outputs } } : opts.context;
+    const context = { ...opts.context, steps: { ...outputs } };
     const onProgress = opts.onProgress && ((update) => opts.onProgress?.({ stage: name, ...update, step: name }));
     let ran;
     try {
@@ -811,7 +811,7 @@ async function runSteps(steps, opts) {
       ...run.progress ? { progress: run.progress } : {}
     };
     last = { ...run, steps: outputs, stepRuns, durationMs: stepRuns.reduce((ms, r) => ms + r.durationMs, 0) };
-    const ok = run.exitCode === 0 || run.exitCode !== null && !run.timedOut && (step.definition.continue_on_exit ?? []).includes(run.exitCode);
+    const ok = !run.timedOut && (run.exitCode === 0 || run.exitCode !== null && (step.definition.continue_on_exit ?? []).includes(run.exitCode));
     if (ok) {
       if (run.exitCode !== 0) continued ??= run.exitCode ?? void 0;
       i = after(i, step.definition.succeed, true);
