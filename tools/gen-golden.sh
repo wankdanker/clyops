@@ -17,6 +17,9 @@ args=(--help); demo > "$golden/help.txt"
 args=(--help); demo CLYOPS_MAX_WIDTH=60 > "$golden/help-60.txt"
 printf 'demo:count=5\nshared:host=example.com\ndemo:key=topsecret\n' > "$tmp/demo.conf"
 args=(--help -c demo.conf); demo > "$golden/help-config.txt"
+# The json:shape.json schema the "json schema" case also writes (spec/conformance/cases.json).
+python3 -c "import json,sys; c=[c for c in json.load(open(sys.argv[1])) if c['name']=='json schema'][0]; open(sys.argv[2],'w').write(c['files']['shape.json'])" \
+    "$here/spec/conformance/cases.json" "$tmp/shape.json"
 args=(--help-json-schema); demo > "$golden/schema.json"
 args=(--bash-completion); demo | sed "s|$tmp|{tmp}|g" > "$golden/completion.txt"
 

@@ -6,7 +6,7 @@ import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv
 import type { JsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/types.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
-  closedInputs, closedRequirement, InputError, isTextType, publicSchema, runTool, tail, toJsonSchema,
+  closedInputs, closedRequirement, InputError, isTextType, parseJsonInputs, publicSchema, runTool, tail, toJsonSchema,
   type AuditEntry, type InputPolicy, type JsonSchema, type Tool, type ToolResult,
 } from 'clyops-tools';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -172,9 +172,15 @@ export function createMcpServer(opts: McpOptions): Server {
     const served = servedTools(opts).find(({ tool }) => toolName(tool) === request.params.name);
     if (!served) return { content: [{ type: 'text', text: `Unknown tool: ${request.params.name}` }], isError: true };
     const { tool, closed } = served;
-    const checked = prepare(tool, closed).validate(request.params.arguments ?? {});
+    // A json input given as a string is its JSON text: its parsed value is what the schema checks,
+    // and the tool still gets the text as given.
+    const args = request.params.arguments ?? {};
+    const { inputSchema, validate } = prepare(tool, closed);
+    const parsed = parseJsonInputs(inputSchema, args);
+    if ('error' in parsed) return { content: [{ type: 'text', text: `Invalid arguments: ${parsed.error}` }], isError: true };
+    const checked = validate(parsed.value);
     if (!checked.valid) return { content: [{ type: 'text', text: `Invalid arguments: ${checked.errorMessage}` }], isError: true };
-    const { stdin, ...input } = checked.data;
+    const { stdin, ...input } = args;
     const declared = tool.schema.stdin;
     const stdinData = declared && typeof stdin === 'string' ? (isTextType(declared.contentType) ? stdin : Buffer.from(stdin, 'base64')) : undefined;
     // With a progress token, the tool's progress role becomes progress notifications.

@@ -20,6 +20,21 @@ section here.
   the input JSON Schema a `json` input takes any JSON value (`contentMediaType:
   application/json`), and `toArgv` passes a string as its JSON text and serializes anything
   else, an array included (#41). The conformance demo has a `--payload` option.
+- `json:SCHEMA`: a `json` rule that names the JSON Schema the value should match, inline
+  (`json:{"type":"object"}`), as a file relative to `root`, or as a URL, in all nine languages
+  (spec section 5). The program still checks only the JSON grammar. Every argument and option in
+  `--help-json-schema` has a new `schema` field: the inline schema, the file's JSON (read only
+  then; a missing or invalid file is a warning and `null`), `{"$ref": URL}`, or `null` for any
+  other rule. Help shows `JSON: FILE` or `JSON: URL` (#44).
+- clyops-api and clyops-mcp check a `json:SCHEMA` input against its schema before running the
+  tool (clyops-api now depends on ajv). A string is the JSON text: it must parse, its value is
+  what's checked, and the tool gets the text as given. In the input JSON Schema, the tool's
+  schema is embedded with its `#` references rewritten to point into the input schema. URLs are
+  never fetched, so a URL reference becomes a `$comment` and that part isn't checked (#45).
+- clyops-api accepted only a string for a `json` input, though its input schema allows any JSON
+  value; it now takes any value, and a string has to be valid JSON (#41).
+- The conformance demo has `--filter`, `--shape` and `--event` options for the three
+  `json:SCHEMA` forms.
 
 ## [0.9.0] - 2026-10-22
 

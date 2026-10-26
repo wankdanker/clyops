@@ -43,6 +43,9 @@ fn main() {
     cli.opt("LEVEL",    "level",    "",  "optional",  "Level").group("Validation").rule("int");
     cli.opt("SIZE",     "size",     "",  "optional",  "Size code").group("Validation").rule("string:4");
     cli.opt("PAYLOAD",  "payload",  "",  "optional",  "JSON payload").group("Validation").rule("json");
+    cli.opt("FILTER",   "filter",   "",  "optional",  "JSON filter").group("Validation").rule("json:{\"type\":\"object\"}");
+    cli.opt("SHAPE",    "shape",    "",  "optional",  "JSON shape").group("Validation").rule("json:shape.json");
+    cli.opt("EVENT",    "event",    "",  "optional",  "JSON event").group("Validation").rule("json:https://example.com/event.json");
     cli.opt("DATA_DIR", "data-dir", "d", "optional",  "Data directory").group("Files").rule("dir:exists");
     cli.opt("SRC",      "src",      "",  "optional",  "Source file").group("Files").rule("file:exists");
     cli.opt("DEST",     "dest",     "",  "optional",  "Destination file").group("Files").rule("file:writable");
@@ -59,7 +62,7 @@ fn main() {
     cli.emit("progress", r#"{"pct":100}"#);
 
     let longs = ["config", "verbose", "quiet", "color", "out", "notes", "count", "ratio", "enabled", "tag", "no-cache", "key",
-        "host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "payload", "data-dir", "src", "dest", "exec", "include", "help"];
+        "host", "port", "endpoint", "addr", "id", "email", "date", "code", "level", "size", "payload", "filter", "shape", "event", "data-dir", "src", "dest", "exec", "include", "help"];
     let sources: Vec<String> = longs.iter().map(|l| format!("\"{l}\": \"{}\"", cli.source(l))).collect();
     println!("{{\"values\": {}, \"sources\": {{{}}}}}", cli.values_json(), sources.join(", "));
 }

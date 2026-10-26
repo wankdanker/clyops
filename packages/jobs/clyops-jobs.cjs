@@ -258,7 +258,7 @@ function isBareProgram(validation, value) {
   return validation === "file:executable" && value !== "" && !value.includes("/") && !(process.platform === "win32" && value.includes("\\"));
 }
 function oneJsonValue(validation, many) {
-  return validation === "json" && !many;
+  return (validation === "json" || validation.startsWith("json:")) && !many;
 }
 var TRUE = /^(true|1|yes|on)$/i;
 var FALSE = /^(false|0|no|off)$/i;

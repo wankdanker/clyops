@@ -130,7 +130,36 @@ func knownRule(rule string) bool {
 		_, err := regexp.Compile(rule[6:])
 		return err == nil
 	}
+	if strings.HasPrefix(rule, "json:") && len(rule) > 5 {
+		return !strings.HasPrefix(rule, "json:{") || IsJSON(rule[5:])
+	}
 	return false
+}
+
+// ruleSchema is the JSON Schema a `json:SCHEMA` rule names (spec section 5), or
+// nil: inline JSON, {"$ref": URL}, or a file read relative to root. A file that
+// can't be read or isn't JSON is a warning and nil.
+func ruleSchema(rule, root, name string) json.RawMessage {
+	if !strings.HasPrefix(rule, "json:") {
+		return nil
+	}
+	spec := rule[5:]
+	if strings.HasPrefix(spec, "{") {
+		return json.RawMessage(spec)
+	}
+	if reScheme.MatchString(spec) {
+		ref, _ := json.Marshal(map[string]string{"$ref": spec})
+		return ref
+	}
+	path := filepath.Clean(spec)
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(root, spec)
+	}
+	if text, err := os.ReadFile(path); err == nil && utf8.Valid(text) && IsJSON(string(text)) {
+		return json.RawMessage(text)
+	}
+	emit("warning", fmt.Sprintf("%s schema is not a readable JSON file: %s", name, path), true)
+	return nil
 }
 
 func bounds(rule string) (lo, hi string) {
@@ -170,6 +199,12 @@ func DescribeRule(rule string) string {
 	}
 	if strings.HasPrefix(rule, "regex:") {
 		return "pattern: " + rule[6:]
+	}
+	if strings.HasPrefix(rule, "json:{") {
+		return "JSON"
+	}
+	if strings.HasPrefix(rule, "json:") {
+		return "JSON: " + rule[5:]
 	}
 	return rule
 }
@@ -281,7 +316,7 @@ func Validate(value, rule, name string) (any, error) {
 		if !reEmail.MatchString(value) {
 			return fail("must be a valid email address, got '%s'", value)
 		}
-	case rule == "json":
+	case rule == "json" || strings.HasPrefix(rule, "json:"):
 		if !IsJSON(value) {
 			return fail("must be valid JSON, got '%s'", value)
 		}
@@ -1961,28 +1996,30 @@ func (c *Cli) Usage() string {
 
 // Field order matters: it is the order of the JSON output (spec section 8).
 type schemaArgument struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Required    bool   `json:"required"`
-	IsVariadic  bool   `json:"isVariadic"`
-	Default     string `json:"default"`
-	Validation  string `json:"validation"`
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Required    bool            `json:"required"`
+	IsVariadic  bool            `json:"isVariadic"`
+	Default     string          `json:"default"`
+	Validation  string          `json:"validation"`
+	Schema      json.RawMessage `json:"schema"`
 }
 
 type schemaOption struct {
-	Name         string   `json:"name"`
-	ShortName    string   `json:"shortName"`
-	VariableName string   `json:"variableName"`
-	Description  string   `json:"description"`
-	Default      string   `json:"default"`
-	Group        string   `json:"group"`
-	Type         string   `json:"type"`
-	IsFlag       bool     `json:"isFlag"`
-	IsArray      bool     `json:"isArray"`
-	Required     bool     `json:"required"`
-	Validation   string   `json:"validation"`
-	Choices      []string `json:"choices"`
-	Secret       bool     `json:"secret"`
+	Name         string          `json:"name"`
+	ShortName    string          `json:"shortName"`
+	VariableName string          `json:"variableName"`
+	Description  string          `json:"description"`
+	Default      string          `json:"default"`
+	Group        string          `json:"group"`
+	Type         string          `json:"type"`
+	IsFlag       bool            `json:"isFlag"`
+	IsArray      bool            `json:"isArray"`
+	Required     bool            `json:"required"`
+	Validation   string          `json:"validation"`
+	Choices      []string        `json:"choices"`
+	Schema       json.RawMessage `json:"schema"`
+	Secret       bool            `json:"secret"`
 }
 
 type schemaCommand struct {
@@ -2040,7 +2077,8 @@ func (c *Cli) schemaBody() schemaBody {
 		RequiredCommands: []schemaCommand{}, Effects: append([]string{}, c.effects...),
 		Constraints: append([]constraint{}, c.constraints...), Stdin: c.stdin, Stdout: c.stdout, Roles: append([]roleDecl{}, c.roles...), Commands: []schemaNode{}}
 	for _, a := range c.args {
-		s.Arguments = append(s.Arguments, schemaArgument{a.name, a.description, !a.variadic && a.def == "", a.variadic, a.def, a.rule})
+		s.Arguments = append(s.Arguments, schemaArgument{a.name, a.description, !a.variadic && a.def == "", a.variadic, a.def, a.rule,
+			ruleSchema(a.rule, c.root(), a.name)})
 	}
 	for _, o := range c.options {
 		def, typ, choices := o.def, "string", []string{}
@@ -2064,7 +2102,7 @@ func (c *Cli) schemaBody() schemaBody {
 			choices = strings.Split(r[7:], ",")
 		}
 		s.Options = append(s.Options, schemaOption{o.long, o.short, o.variable, o.description, def, o.group, typ,
-			o.kind == "flag", o.kind == "array", o.required, r, choices, o.secret})
+			o.kind == "flag", o.kind == "array", o.required, r, choices, ruleSchema(r, c.root(), "--"+o.long), o.secret})
 	}
 	for _, cmd := range c.commands {
 		s.RequiredCommands = append(s.RequiredCommands, schemaCommand{cmd.name, cmd.description, cmd.hint})

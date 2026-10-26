@@ -44,21 +44,62 @@ export function valueSchema(validation: string, choices: string[] = []): JsonSch
       return { type: 'string', pattern: spec };
     case 'json':
       // Any JSON value: toArgv passes a string as its JSON text, anything else serialized.
-      return { contentMediaType: 'application/json' };
+      return { contentMediaType: JSON_TYPE };
     default:
       return { type: 'string' };
   }
 }
 
-/** A default as the JSON value the schema describes (`"3"` -> 3). */
+/** A default as the JSON value the schema describes (`"3"` -> 3, a `json` default parsed). */
 function typedDefault(value: string, schema: JsonSchema): unknown {
   if (schema.type === 'integer' || schema.type === 'number') return Number(value);
   if (schema.type === 'boolean') return /^(true|1|yes|on)$/i.test(value);
+  if (schema.contentMediaType === JSON_TYPE) {
+    try { return JSON.parse(value); } catch { return value; }
+  }
   return value;
 }
 
-function property(item: SchemaOption | SchemaArgument, many: boolean, flag: boolean): JsonSchema {
-  const value = flag ? { type: 'boolean' } : valueSchema(item.validation, 'choices' in item ? item.choices : []);
+const JSON_TYPE = 'application/json';
+
+// A JSON Pointer token (RFC 6901).
+const token = (key: string) => key.replace(/~/g, '~0').replace(/\//g, '~1');
+
+/**
+ * A tool's `json:SCHEMA` schema placed at `pointer` in the input's schema
+ * (spec section 13): `$schema` and `$id` removed (two tools may share one
+ * schema), `#` references pointed at its new place, and other references,
+ * which consumers don't fetch, kept only as a `$comment`.
+ */
+function embedSchema(schema: unknown, pointer: string): JsonSchema {
+  if (schema === true || schema === null || schema === undefined) return {};
+  if (schema === false) return { not: {} };
+  if (typeof schema !== 'object' || Array.isArray(schema)) return {};
+  const walk = (node: unknown): unknown => {
+    if (Array.isArray(node)) return node.map(walk);
+    if (!node || typeof node !== 'object') return node;
+    const out: JsonSchema = {};
+    for (const [k, v] of Object.entries(node)) {
+      if (k === '$ref' && typeof v === 'string') {
+        if (v.startsWith('#')) out.$ref = pointer + v.slice(1);
+        else out.$comment = `JSON Schema: ${v}`;
+      } else {
+        out[k] = walk(v);
+      }
+    }
+    return out;
+  };
+  const { $schema: _schema, $id: _id, ...rest } = walk(schema) as JsonSchema;
+  return rest;
+}
+
+function property(item: SchemaOption | SchemaArgument, many: boolean, flag: boolean, pointer: string): JsonSchema {
+  const rule = valueSchema(item.validation, 'choices' in item ? item.choices : []);
+  const value = flag
+    ? { type: 'boolean' }
+    : item.validation.startsWith('json:') && item.schema !== undefined && item.schema !== null
+      ? { ...embedSchema(item.schema, many ? `${pointer}/items` : pointer), contentMediaType: JSON_TYPE }
+      : rule;
   const out: JsonSchema = many ? { type: 'array', items: value } : { ...value };
   if (item.description) out.description = item.description;
   if (item.default !== '' && !many && !('secret' in item && item.secret)) out.default = typedDefault(item.default, value);
@@ -76,12 +117,12 @@ export function toJsonSchema(schema: Schema, naming: 'input' | 'declared' = 'inp
   const properties: Record<string, JsonSchema> = {};
   const required: string[] = [];
   for (const argument of schema.arguments) {
-    properties[key(argument.name)] = property(argument, argument.isVariadic, false);
+    properties[key(argument.name)] = property(argument, argument.isVariadic, false, `#/properties/${token(key(argument.name))}`);
     if (argument.required) required.push(key(argument.name));
   }
   for (const option of schema.options) {
     if (option.name === 'help') continue;
-    properties[key(option.name)] = property(option, option.isArray, isBareFlag(option));
+    properties[key(option.name)] = property(option, option.isArray, isBareFlag(option), `#/properties/${token(key(option.name))}`);
   }
   // Exclusive options can't both be given (spec section 1.6). The other
   // relationships are left to the tool: like required options, they may be
@@ -113,4 +154,30 @@ export function toJsonSchema(schema: Schema, naming: 'input' | 'declared' = 'inp
     ...(allOf.length ? { allOf } : {}),
     additionalProperties: false,
   };
+}
+
+/**
+ * `input` with each `json` value given as a string parsed (spec section 13),
+ * for validating against `inputSchema` (from toJsonSchema): a string is the
+ * JSON text, so its value is what the schema checks. Run the tool with the
+ * original input, which keeps the text as given. A string that isn't JSON is
+ * an error naming the key.
+ */
+export function parseJsonInputs(inputSchema: JsonSchema, input: Record<string, unknown>): { value: Record<string, unknown> } | { error: string } {
+  const properties = (inputSchema.properties ?? {}) as Record<string, JsonSchema>;
+  const value: Record<string, unknown> = { ...input };
+  for (const [key, prop] of Object.entries(properties)) {
+    const many = prop.type === 'array' && (prop.items as JsonSchema | undefined)?.contentMediaType === JSON_TYPE;
+    if (!(key in value) || (prop.contentMediaType !== JSON_TYPE && !many)) continue;
+    const parse = (v: unknown): unknown => {
+      if (typeof v !== 'string') return v;
+      try { return JSON.parse(v); } catch { throw new Error(`${key} must be valid JSON`); }
+    };
+    try {
+      value[key] = many && Array.isArray(value[key]) ? (value[key] as unknown[]).map(parse) : parse(value[key]);
+    } catch (err) {
+      return { error: (err as Error).message };
+    }
+  }
+  return { value };
 }

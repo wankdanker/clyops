@@ -98,7 +98,29 @@ public class Cli {
                 return false;
             }
         }
+        if (rule.startsWith("json:") && rule.length() > 5) return !rule.startsWith("json:{") || isJson(rule.substring(5));
         return false;
+    }
+
+    /**
+     * The JSON Schema a {@code json:SCHEMA} rule names (spec section 5), or null: inline
+     * JSON, {@code {"$ref": URL}}, or a file read relative to {@code root}. A file that
+     * can't be read or isn't JSON is a warning and null.
+     */
+    static Object ruleSchema(String rule, String root, String name) {
+        if (!rule.startsWith("json:")) return null;
+        String spec = rule.substring(5);
+        if (spec.startsWith("{")) return new Json.Raw(spec);
+        if (SCHEME.matcher(spec).find()) return Map.of("$ref", spec);
+        String path = normpath(root, spec);
+        try {
+            String text = Files.readString(Paths.get(path), StandardCharsets.UTF_8);
+            if (isJson(text)) return new Json.Raw(text);
+        } catch (IOException e) {
+            // reported below
+        }
+        Log.emit("warning", name + " schema is not a readable JSON file: " + path, true);
+        return null;
     }
 
     private static String[] bounds(String rule) {
@@ -128,6 +150,7 @@ public class Cli {
         }
         if (rule.startsWith("choice:")) return "choices: " + String.join(", ", splitAll(rule.substring(7), ","));
         if (rule.startsWith("regex:")) return "pattern: " + rule.substring(6);
+        if (rule.startsWith("json:")) return rule.startsWith("json:{") ? "JSON" : "JSON: " + rule.substring(5);
         return rule;
     }
 
@@ -179,6 +202,7 @@ public class Cli {
             }
             return value;
         }
+        if (rule.startsWith("json:")) rule = "json";
         switch (rule) {
             case "bool" -> {
                 Boolean b = boolWord(value);
@@ -1475,6 +1499,7 @@ public class Cli {
             m.put("isVariadic", a.variadic());
             m.put("default", a.def());
             m.put("validation", a.rule());
+            m.put("schema", ruleSchema(a.rule(), root, a.name()));
             argList.add(m);
         }
         out.put("arguments", argList);
@@ -1499,6 +1524,7 @@ public class Cli {
             m.put("required", o.required);
             m.put("validation", r);
             m.put("choices", r.startsWith("choice:") ? splitAll(r.substring(7), ",") : List.of());
+            m.put("schema", ruleSchema(r, root, "--" + o.lng));
             m.put("secret", o.secret);
             optList.add(m);
         }

@@ -70,7 +70,9 @@ So:
 - **A rule on every option and argument that has one.** Prefer the narrowest:
   `choice:a,b` over free text, `int:1-10` over `int`, `file:readable` over `path`,
   `file:executable` for any option that names a program to run, and `json` for
-  structured input instead of a string the tool parses unchecked.
+  structured input instead of a string the tool parses unchecked (`json:SCHEMA`,
+  with an inline schema, a schema file or a URL, when its shape is known, so the
+  API and MCP server check it before the tool runs).
   Rules become form controls, JSON Schema types/ranges/enums and pre-run
   validation for agents, so a rule is never just cosmetic.
 - **Effects**: `read-only`, `idempotent`, `destructive`, `network` (any

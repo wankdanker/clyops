@@ -14,12 +14,15 @@ import { mcpHttpHandler, mcpProgress } from '../dist/index.js';
 
 const repo = fileURLToPath(new URL('../../..', import.meta.url));
 const cli = fileURLToPath(new URL('../dist/cli.js', import.meta.url));
+// The schema file the demo's --shape names (json:shape.json), as the "json schema" conformance case writes it.
+const shapeSchema = JSON.parse(readFileSync(join(repo, 'spec/conformance/cases.json'), 'utf8')).find((c) => c.name === 'json schema').files['shape.json'];
 
 function tree() {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'clyops-mcp-')));
   mkdirSync(join(root, 'media'));
   writeFileSync(join(root, '.clyops'), 'description: Test tools\n');
-  writeFileSync(join(root, 'media/demo'), `#!/bin/sh\n# clyops-tool\nexec node ${join(repo, 'packages/js/examples/demo.cjs')} "$@"\n`);
+  writeFileSync(join(root, 'shape.json'), shapeSchema);
+  writeFileSync(join(root, 'media/demo'), `#!/bin/sh\n# clyops-tool\nDEMO_ROOT='${root}' exec node ${join(repo, 'packages/js/examples/demo.cjs')} "$@"\n`);
   chmodSync(join(root, 'media/demo'), 0o755);
   return root;
 }
@@ -54,6 +57,16 @@ async function exercise(client) {
   const invalid = await client.callTool({ name: 'media_demo', arguments: { count: 40, bogus: 1 } });
   assert.equal(invalid.isError, true);
   assert.match(invalid.content[0].text, /^Invalid arguments: /);
+
+  // A json input: a string is its JSON text, kept as given, and its value must match the schema.
+  assert.deepEqual(demo.inputSchema.properties.shape.properties, { w: { type: 'integer' } });
+  const shaped = await client.callTool({ name: 'media_demo', arguments: { input: 'in.txt', shape: '{"w": 2}', payload: { k: 1 } } });
+  assert.equal(shaped.isError, false, JSON.stringify(shaped.content));
+  assert.deepEqual([shaped.structuredContent.values.SHAPE, shaped.structuredContent.values.PAYLOAD], ['{"w": 2}', '{"k":1}']);
+  const misshapen = await client.callTool({ name: 'media_demo', arguments: { input: 'in.txt', shape: '{"w": "x"}' } });
+  assert.match(misshapen.content[0].text, /^Invalid arguments: .*must be integer/);
+  const garbled = await client.callTool({ name: 'media_demo', arguments: { input: 'in.txt', payload: '{' } });
+  assert.equal(garbled.content[0].text, 'Invalid arguments: payload must be valid JSON');
 
   const unknown = await client.callTool({ name: 'nope', arguments: {} });
   assert.match(unknown.content[0].text, /Unknown tool: nope/);

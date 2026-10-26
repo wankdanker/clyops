@@ -116,6 +116,9 @@
     "expect": {
       "exit": 0,
       "stdout": "@schema.json"
+    },
+    "files": {
+      "shape.json": "{\n  \"type\": \"object\",\n  \"properties\": { \"w\": { \"type\": \"integer\" } }\n}\n"
     }
   },
   {
@@ -2032,6 +2035,151 @@
       "exit": 1,
       "stderr": [
         "--payload must be valid JSON, got 'True'"
+      ]
+    }
+  },
+  {
+    "name": "json:SCHEMA takes valid JSON",
+    "args": [
+      "in.txt",
+      "--filter",
+      "{\"a\": 1}",
+      "--shape",
+      "[]",
+      "--event",
+      "\"x\""
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "FILTER": "{\"a\": 1}",
+        "SHAPE": "[]",
+        "EVENT": "\"x\""
+      },
+      "sources": {
+        "filter": "cli",
+        "shape": "cli",
+        "event": "cli"
+      }
+    }
+  },
+  {
+    "name": "json:SCHEMA checks only the JSON grammar",
+    "args": [
+      "in.txt",
+      "--filter",
+      "[1, 2]"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "FILTER": "[1, 2]"
+      }
+    }
+  },
+  {
+    "name": "json:SCHEMA invalid inline",
+    "args": [
+      "in.txt",
+      "--filter",
+      "{a: 1}"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--filter must be valid JSON, got '{a: 1}'"
+      ]
+    }
+  },
+  {
+    "name": "json:SCHEMA invalid with a URL",
+    "args": [
+      "in.txt",
+      "--event",
+      "nope"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--event must be valid JSON, got 'nope'"
+      ]
+    }
+  },
+  {
+    "name": "json:SCHEMA invalid with a file",
+    "args": [
+      "in.txt",
+      "--shape",
+      "{\"w\": 1,}"
+    ],
+    "expect": {
+      "exit": 1,
+      "stderr": [
+        "--shape must be valid JSON, got '{\"w\": 1,}'"
+      ]
+    }
+  },
+  {
+    "name": "json:SCHEMA does not read the file to validate",
+    "args": [
+      "in.txt",
+      "--shape",
+      "{}"
+    ],
+    "expect": {
+      "exit": 0,
+      "values": {
+        "SHAPE": "{}"
+      },
+      "stderrNot": [
+        "schema is not a readable JSON file"
+      ]
+    }
+  },
+  {
+    "name": "json:SCHEMA schema file missing",
+    "args": [
+      "--help-json-schema"
+    ],
+    "expect": {
+      "exit": 0,
+      "stderr": [
+        "--shape schema is not a readable JSON file: {tmp}/shape.json"
+      ]
+    }
+  },
+  {
+    "name": "json:SCHEMA schema file not JSON",
+    "args": [
+      "--help-json-schema"
+    ],
+    "files": {
+      "shape.json": "{\"type\": object}\n"
+    },
+    "expect": {
+      "exit": 0,
+      "stderr": [
+        "--shape schema is not a readable JSON file: {tmp}/shape.json"
+      ]
+    }
+  },
+  {
+    "name": "json:SCHEMA schema file under root",
+    "args": [
+      "--help-json-schema"
+    ],
+    "cwd": "sub",
+    "dirs": [
+      "sub"
+    ],
+    "files": {
+      "shape.json": "{\n  \"type\": \"object\",\n  \"properties\": { \"w\": { \"type\": \"integer\" } }\n}\n"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "@schema.json",
+      "stderrNot": [
+        "schema is not a readable JSON file"
       ]
     }
   },

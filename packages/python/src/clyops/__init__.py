@@ -234,7 +234,36 @@ def _known_rule(rule: str) -> bool:
             return True
         except re.error:
             return False
+    if rule.startswith("json:") and len(rule) > 5:
+        return not rule.startswith("json:{") or is_json(rule[5:])
     return False
+
+
+# A scheme such as `https:` (spec section 6).
+_SCHEME = re.compile(r"[A-Za-z][A-Za-z0-9+.-]+:")
+
+
+def _rule_schema(rule: str, root: str, name: str) -> object:
+    """The JSON Schema a `json:SCHEMA` rule names (spec section 5), or None: inline
+    JSON, `{"$ref": URL}`, or a file read relative to `root`. A file that can't be
+    read or isn't JSON is a warning and None."""
+    if not rule.startswith("json:"):
+        return None
+    spec = rule[5:]
+    if spec.startswith("{"):
+        return json.loads(spec)
+    if _SCHEME.match(spec):
+        return {"$ref": spec}
+    path = os.path.normpath(os.path.join(root, spec))
+    try:
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+        if is_json(text):
+            return json.loads(text)
+    except (OSError, UnicodeDecodeError):
+        pass
+    _emit("warning", f"{name} schema is not a readable JSON file: {path}", force=True)
+    return None
 
 
 def _bounds(rule: str):
@@ -292,6 +321,8 @@ def describe_rule(rule: str) -> str:
         return "choices: " + ", ".join(rule[7:].split(","))
     if rule.startswith("regex:"):
         return "pattern: " + rule[6:]
+    if rule.startswith("json:"):
+        return "JSON" if rule.startswith("json:{") else "JSON: " + rule[5:]
     return rule
 
 
@@ -350,6 +381,8 @@ def validate(value: str, rule: str, name: str) -> Scalar:
         if not re.search(rule[6:], value):
             fail(f"does not match required pattern, got '{value}'")
         return value
+    if rule.startswith("json:"):
+        rule = "json"
 
     if rule == "bool":
         b = _bool_word(value)
@@ -1315,13 +1348,14 @@ class Cli:
             "arguments": [{
                 "name": a.name, "description": a.description, "required": not a.variadic and not a.default,
                 "isVariadic": a.variadic, "default": a.default, "validation": a.rule,
+                "schema": _rule_schema(a.rule, self.root, a.name),
             } for a in self._args],
             "options": [{
                 "name": o.long, "shortName": o.short, "variableName": o.var, "description": o.description,
                 "default": "false" if o.kind == "flag" else o.default, "group": o.group, "type": type_of(o),
                 "isFlag": o.kind == "flag", "isArray": o.kind == "array", "required": o.required,
                 "validation": o.rule, "choices": o.rule[7:].split(",") if o.rule.startswith("choice:") else [],
-                "secret": o.secret,
+                "schema": _rule_schema(o.rule, self.root, f"--{o.long}"), "secret": o.secret,
             } for o in self._options],
             **({} if self._parent else {"config": {"option": self._config_option, "prefixes": list(self._config_prefixes)}
                                         if self._config_option else None}),

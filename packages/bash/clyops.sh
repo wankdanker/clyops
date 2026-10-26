@@ -328,6 +328,8 @@ _clyops_known_rule() {
         ""|int|float|string|path|ip|hostname|url|port|email|uuid|json|bool|date:YYYY-MM-DD) return 0 ;;
         file:exists|file:readable|file:writable|file:executable|dir:exists|dir:writable) return 0 ;;
         choice:?*|regex:?*) return 0 ;;
+        json:\{*) _clyops_is_json "${1#json:}"; return ;;
+        json:?*) return 0 ;;
     esac
     [[ "$1" =~ ^int:([0-9]+-[0-9]*|-[0-9]+)$ ]] && return 0
     [[ "$1" =~ ^float:([0-9]*\.?[0-9]+-([0-9]*\.?[0-9]+)?|-[0-9]*\.?[0-9]+)$ ]] && return 0
@@ -632,7 +634,7 @@ _clyops_validate() {
         uuid)
             [[ "$v" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] \
                 || { _CLYOPS_ERROR="$name must be a valid UUID, got '$v'"; return 1; } ;;
-        json)
+        json|json:*)
             _clyops_is_json "$v" || { _CLYOPS_ERROR="$name must be valid JSON, got '$v'"; return 1; } ;;
         date:YYYY-MM-DD)
             [[ "$v" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { _CLYOPS_ERROR="$name must be in YYYY-MM-DD format, got '$v'"; return 1; } ;;
@@ -670,6 +672,8 @@ _clyops_describe_rule() { # help text for rule $1 into _r
         file:executable) _r="executable" ;; dir:exists) _r="existing directory" ;; dir:writable) _r="writable directory" ;;
         choice:*) _r="${rule#choice:}"; _r="choices: ${_r//,/, }" ;;
         regex:*) _r="pattern: ${rule#regex:}" ;;
+        json:\{*) _r="JSON" ;;
+        json:*) _r="JSON: ${rule#json:}" ;;
         int:*|float:*|string:*)
             case "$rule" in int:*) noun=integer ;; float:*) noun=number ;; *) noun=text; suffix=" chars" ;; esac
             if [[ "$rule" != *-* ]]; then _r="$noun: ${rule#*:}$suffix"; return; fi
@@ -1364,6 +1368,22 @@ _clyops_json_list() { # JSON array of the arguments into _r
     local IFS=,; _r="[${items[*]}]"
 }
 
+# The JSON Schema a json:SCHEMA rule names (spec section 5), as JSON into _r, or null:
+# inline JSON, {"$ref": URL}, or a file read relative to the root. A file that can't
+# be read or isn't JSON is a warning and null.
+_clyops_rule_schema() { # rule name -> _r
+    local spec="${1#json:}" text
+    if [[ "$1" != json:* ]]; then _r=null; return; fi
+    if [[ "$spec" == \{* ]]; then _r="$spec"; return; fi
+    if [[ "$spec" =~ ^[A-Za-z][A-Za-z0-9+.-]+: ]]; then _clyops_json_str "$spec"; _r="{\"\$ref\": $_r}"; return; fi
+    _clyops_abspath "${_CLYOPS_ROOT:-.}" "$PWD"
+    _clyops_abspath "$spec" "$_r"
+    local path="$_r"
+    if [[ -f "$path" && -r "$path" ]] && text=$(<"$path") && _clyops_is_json "$text"; then _r="$text"; return; fi
+    _clyops_log warning "$2 schema is not a readable JSON file: $path" 1
+    _r=null
+}
+
 _clyops_json_stream() { # (description content-type) or nothing -> JSON into _r
     if (( $# == 0 )); then _r=null; return; fi
     local d
@@ -1387,7 +1407,8 @@ _clyops_schema_node() {
         _clyops_json_str "${_CLYOPS_ARG_DESC[i]}"; printf '      "description": %s,\n' "$_r"
         printf '      "required": %s,\n      "isVariadic": %s,\n' "$required" "$variadic"
         _clyops_json_str "${_CLYOPS_ARG_DEFAULT[i]}"; printf '      "default": %s,\n' "$_r"
-        _clyops_json_str "${_CLYOPS_ARG_RULE[i]}"; printf '      "validation": %s\n    }' "$_r"
+        _clyops_json_str "${_CLYOPS_ARG_RULE[i]}"; printf '      "validation": %s,\n' "$_r"
+        _clyops_rule_schema "${_CLYOPS_ARG_RULE[i]}" "${_CLYOPS_ARGS[i]}"; printf '      "schema": %s\n    }' "$_r"
         sep=","
     done
     [[ -n "$sep" ]] && printf '\n  '
@@ -1421,6 +1442,7 @@ _clyops_schema_node() {
             unset IFS
         fi
         _clyops_json_list "${choices[@]}"; printf '      "choices": %s,\n' "$_r"
+        _clyops_rule_schema "$rule" "--$long"; printf '      "schema": %s,\n' "$_r"
         printf '      "secret": %s\n    }' "$([[ -n "${_CLYOPS_SECRET[$long]:-}" ]] && echo true || echo false)"
         sep=","
     done

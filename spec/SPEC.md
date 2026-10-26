@@ -313,6 +313,7 @@ positional arguments. Typed implementations convert values as shown in the
 | `email` | `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$` | string | `email address` | `NAME must be a valid email address, got 'V'` |
 | `uuid` | 8-4-4-4-12 hex | string | `UUID` | `NAME must be a valid UUID, got 'V'` |
 | `json` | one JSON value (below) | string | `JSON` | `NAME must be valid JSON, got 'V'` |
+| `json:SCHEMA` | as `json`; `SCHEMA` is for tooling (below) | string | `JSON: SCHEMA`, or `JSON` when `SCHEMA` is inline | as `json` |
 | `bool` | `true false yes no 1 0 on off` (any case) | boolean | `true/false, yes/no, 1/0, on/off` | `NAME must be a boolean (true/false, yes/no, 1/0, on/off), got 'V'` |
 | `date:YYYY-MM-DD` | `^[0-9]{4}-[0-9]{2}-[0-9]{2}$` | string | `date: YYYY-MM-DD` | `NAME must be in YYYY-MM-DD format, got 'V'` |
 | `regex:PATTERN` | pattern found anywhere in value | string | `pattern: PATTERN` | `NAME does not match required pattern, got 'V'` |
@@ -342,6 +343,23 @@ itself, so they agree on the edges:
 * comments, trailing commas, single quotes and anything after the value are
   rejected;
 * nesting deeper than 512 arrays and objects is rejected.
+
+`json:SCHEMA` names the JSON Schema the value should match, for the tooling
+that reads `--help-json-schema` (section 8): servers and agents validate input
+against it (section 13), and documentation can show it. The program itself
+checks only the `json` grammar. `SCHEMA` is one of:
+
+* inline JSON Schema, when it starts with `{`: `json:{"type":"object"}`. It
+  must be valid JSON (an unknown rule otherwise);
+* a URL, when it starts with a scheme (`^[A-Za-z][A-Za-z0-9+.-]+:`, as in
+  section 6): `json:https://example.com/event.json`. It becomes
+  `{"$ref": "URL"}` and is never fetched;
+* otherwise a path to a JSON Schema file, relative to `root` (lexically, as in
+  section 6) unless absolute. It is read only when `--help-json-schema` runs.
+  A file that can't be read or isn't valid JSON gives the warning
+  `NAME schema is not a readable JSON file: PATH` (`PATH` resolved) on stderr,
+  and the schema is `null`; the program still answers, so tooling that probes
+  it keeps working.
 
 Bounds are non-negative decimal numbers. Regex patterns should stay within the
 POSIX ERE subset that every engine (Bash `=~`, JS, Python `re`, Rust `regex`,
@@ -441,12 +459,13 @@ line of its own).
   "description": "…",
   "epilog": "…",
   "arguments": [
-    { "name": "", "description": "", "required": true, "isVariadic": false, "default": "", "validation": "" }
+    { "name": "", "description": "", "required": true, "isVariadic": false, "default": "", "validation": "",
+      "schema": null }
   ],
   "options": [
     { "name": "", "shortName": "", "variableName": "", "description": "", "default": "",
       "group": "", "type": "string", "isFlag": false, "isArray": false, "required": false,
-      "validation": "", "choices": [] }
+      "validation": "", "choices": [], "schema": null }
   ],
   "config": { "option": "config", "prefixes": ["demo:", "shared:"] },
   "requiredCommands": [
@@ -472,7 +491,11 @@ line of its own).
 `default` is `"false"` for flags and `""` for `optional`. `type` is
 `boolean` (flags and `bool`), `integer` (`int*`, `port`), `number` (`float*`),
 `choice` (`choice:*`), `path` (`path`, `file:*`, `dir:*`) or `string`.
-`choices` lists the `choice:` values. Options also have `"secret"` (1.5).
+`choices` lists the `choice:` values. `schema` is the JSON Schema of a
+`json:SCHEMA` rule (section 5), as given inline, `{"$ref": "URL"}` or the
+file's JSON as written, and `null` for every other rule (or a file that
+couldn't be read); a consumer reading the output of an older version without
+`schema` treats it as `null`. Options also have `"secret"` (1.5).
 `config` is the declared config file (1.3, section 4): `option` the long name
 of the option holding its path and `prefixes` the line prefixes in the order
 given (empty when every line is read), or `null` when the program declares
@@ -526,7 +549,7 @@ Tabs and newlines inside descriptions become spaces. Each flag is followed by a
 | `choice:*` | `choice` | the choices, comma-separated |
 | `bool` | `choice` | `true,false` |
 | `hostname`, `ip` | `host` | |
-| `int*`, `float*`, `port`, `uuid`, `url`, `email`, `json`, `date:*`, `regex:*`, `string*` | `none` | |
+| `int*`, `float*`, `port`, `uuid`, `url`, `email`, `json`, `json:*`, `date:*`, `regex:*`, `string*` | `none` | |
 | none | `default` | |
 
 ### 9.1 Shell completion scripts
@@ -706,8 +729,8 @@ an error. A `null` value is the same as leaving the key out.
   value is an array (array options);
 * values are strings as given, numbers and booleans in their JSON spelling,
   objects as JSON text;
-* a `json` input takes any JSON value: a string is passed as given (it is the
-  JSON text), anything else as its JSON text. An array given to a `json`
+* a `json` or `json:SCHEMA` input takes any JSON value: a string is passed as
+  given (it is the JSON text), anything else as its JSON text. An array given to a `json`
   option that is not an array option, or to a `json` argument that is not
   variadic, is one value, not a list.
 
@@ -778,7 +801,17 @@ option (except `help`) under the key above. Types follow the validation rule:
 string `enum`, `string:` bounds → `minLength`/`maxLength`, `regex:` →
 `pattern`, and `ip`, `hostname`, `url`, `email`, `uuid` and `date` → `pattern`
 with the section 5 regex, `json` → any JSON value (no `type`) with
-`contentMediaType: "application/json"`; everything else is a string. Array options and
+`contentMediaType: "application/json"`; everything else is a string. A
+`json:SCHEMA` input is its `schema` (section 8) with
+`contentMediaType: "application/json"` added and `$schema` and `$id` removed
+(tools may share a schema). Inside it, a `$ref` starting with `#` is rewritten
+to point into the input's schema (`#/$defs/x` under the `payload` key becomes
+`#/properties/payload/$defs/x`, or `#/properties/payload/items/$defs/x` for an
+array), and any other `$ref` (a URL) becomes `"$comment": "JSON Schema: URL"`,
+since consumers don't fetch schemas. A
+`null` schema is the same as `json`. A server validates a `json` input given
+as a string by parsing it first: input that isn't valid JSON is an error, and
+the parsed value must match the schema. Array options and
 variadics are arrays of that. Descriptions and typed defaults are carried
 over; secret options are marked `writeOnly: true` and `format: "password"`.
 Required arguments are required; options are not, since a tool may get

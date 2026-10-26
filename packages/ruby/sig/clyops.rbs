@@ -26,6 +26,7 @@ module Clyops
   def self.executable?: (String value, ?Hash[String, String] env) -> bool
   def self.executable_file?: (String path) -> bool
   def self.json?: (String text) -> bool
+  def self.rule_schema: (String rule, String root, String name) -> untyped
   def self.resolve_path: (String value, String base, ?Array[String] search_dirs) -> String
   def self.wrap_text: (String text, Integer width) -> Array[String]
   def self.pretty_json: (untyped value) -> String

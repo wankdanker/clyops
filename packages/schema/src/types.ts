@@ -12,6 +12,8 @@ export interface SchemaArgument {
   default: string;
   /** Validation rule in the shared specification. */
   validation: string;
+  /** JSON Schema of a `json:SCHEMA` rule (spec section 8); null or absent otherwise. */
+  schema?: unknown;
 }
 
 /** An option as declared by a tool schema. */
@@ -42,6 +44,8 @@ export interface SchemaOption {
   choices: string[];
   /** Holds a secret (spec section 1.5); absent in schemas from before 0.2. */
   secret?: boolean;
+  /** JSON Schema of a `json:SCHEMA` rule (spec section 8); null or absent otherwise. */
+  schema?: unknown;
 }
 
 /** What running a tool does (spec section 1.3). */

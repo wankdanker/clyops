@@ -1,6 +1,7 @@
 // The JSON Schema from clyops-tools' toJsonSchema as a zod schema, so
 // plus-express validates request bodies and documents them in OpenAPI from
 // the same source the MCP server uses.
+import { Ajv, type ValidateFunction } from 'ajv';
 import type { JsonSchema } from 'clyops-tools';
 import { z } from 'plus-express';
 
@@ -9,7 +10,56 @@ type Js = JsonSchema & {
   minimum?: number; maximum?: number; minLength?: number; maxLength?: number;
   properties?: Record<string, Js>; required?: string[];
   allOf?: { not?: { required?: string[]; properties?: Record<string, Js & { const?: unknown; not?: unknown }> }; description?: string }[];
+  contentMediaType?: string;
 };
+
+// Where a property sits in the input's schema, which json inputs are validated against.
+interface At { root: Js; pointer: string }
+
+// A JSON Pointer token (RFC 6901).
+const token = (key: string) => key.replace(/~/g, '~0').replace(/\//g, '~1');
+
+// The input schemas json inputs are checked against, compiled once each: a
+// json:SCHEMA schema's own `#` references point into the whole input schema.
+const compiled = new WeakMap<Js, { ajv: Ajv; id: string }>();
+let schemas = 0;
+function validator(at: At): ValidateFunction {
+  let entry = compiled.get(at.root);
+  if (!entry) {
+    entry = { ajv: new Ajv({ strict: false, validateFormats: false, validateSchema: false, allErrors: true }), id: `clyops-input-${++schemas}` };
+    entry.ajv.addSchema(at.root, entry.id);
+    compiled.set(at.root, entry);
+  }
+  return entry.ajv.getSchema(`${entry.id}#${at.pointer}`) as ValidateFunction;
+}
+
+// Keywords that only document a json input; anything else is a schema to check.
+const DOCUMENTATION = new Set(['contentMediaType', 'description', 'default', 'writeOnly', 'format']);
+
+/**
+ * A json input (spec section 13): any JSON value, a string being its JSON
+ * text, whose value must match the tool's schema when it has one.
+ */
+function jsonValue(schema: Js, at: At): z.ZodType {
+  const checked = Object.keys(schema).some((k) => !DOCUMENTATION.has(k));
+  return z.unknown().superRefine((input, ctx) => {
+    let value = input;
+    if (typeof input === 'string') {
+      try {
+        value = JSON.parse(input);
+      } catch {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'must be valid JSON' });
+        return;
+      }
+    }
+    if (!checked) return;
+    const validate = validator(at);
+    if (validate(value)) return;
+    for (const e of validate.errors ?? []) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: [e.instancePath, e.message].filter(Boolean).join(' ') });
+    }
+  });
+}
 
 /** Whether `value` matches one of the "given" shapes toJsonSchema uses for exclusive options. */
 function given(value: unknown, shape: { const?: unknown; type?: string; minItems?: number; not?: unknown } | undefined): boolean {
@@ -21,9 +71,12 @@ function given(value: unknown, shape: { const?: unknown; type?: string; minItems
 }
 
 /** Convert a tool input JSON Schema to a Zod validator used by HTTP routes. */
-export function toZod(schema: Js): z.ZodType {
+export function toZod(schema: Js, at: At = { root: schema, pointer: '' }): z.ZodType {
   let out: z.ZodType;
-  switch (schema.type) {
+  switch (schema.contentMediaType === 'application/json' ? 'json' : schema.type) {
+    case 'json':
+      out = jsonValue(schema, at);
+      break;
     case 'integer':
     case 'number': {
       let n = schema.type === 'integer' ? z.number().int() : z.number();
@@ -36,12 +89,15 @@ export function toZod(schema: Js): z.ZodType {
       out = z.boolean();
       break;
     case 'array':
-      out = z.array(toZod(schema.items ?? {}));
+      out = z.array(toZod(schema.items ?? {}, { root: at.root, pointer: `${at.pointer}/items` }));
       break;
     case 'object': {
       const required = new Set(schema.required ?? []);
       const shape = Object.fromEntries(
-        Object.entries(schema.properties ?? {}).map(([key, prop]) => [key, required.has(key) ? toZod(prop) : toZod(prop).optional()]),
+        Object.entries(schema.properties ?? {}).map(([key, prop]) => {
+          const value = toZod(prop, { root: at.root, pointer: `${at.pointer}/properties/${token(key)}` });
+          return [key, required.has(key) ? value : value.optional()];
+        }),
       );
       out = z.strictObject(shape);
       // Exclusive options (allOf: [{ not: { required: [a, b] } }]) can't both be given.

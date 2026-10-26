@@ -149,6 +149,7 @@ error.
 | `ip`, `hostname`, `url` (`http`/`https` only), `email`, `uuid` | format | string |
 | `date:YYYY-MM-DD` | that format | string |
 | `json` | one JSON value (RFC 8259; no `NaN`, comments or trailing commas; at most 512 levels deep). Kept as the text given; parse it yourself. API/MCP callers may send the value itself | string |
+| `json:SCHEMA` | as `json`, plus a JSON Schema for tooling: inline (`json:{"type":"object"}`), a file relative to `root`, or a URL (`{"$ref": URL}`, never fetched). In `--help-json-schema` as the option's `schema`; the API and MCP server validate input against it, the program doesn't | string |
 | `regex:PATTERN` | pattern found anywhere (anchor it yourself) | string |
 | `secret`, `secret:RULE` | as `RULE`, masked | as `RULE` |
 
@@ -173,8 +174,9 @@ Top level: `clyops` (1), `script`, `description`, `epilog`, `arguments[]`,
 `stdout`, `roles[]` (`name`, `direction`, `description`, `contentType`,
 `schema`), `commands[]`. Each option has `name`, `shortName`, `variableName`,
 `description`, `default`, `group`, `type` (`boolean|integer|number|choice|path|string`),
-`isFlag`, `isArray`, `required`, `validation`, `choices`, `secret`. Each argument
-has `name`, `description`, `required`, `isVariadic`, `default`, `validation`.
+`isFlag`, `isArray`, `required`, `validation`, `choices`, `schema`, `secret`. Each argument
+has `name`, `description`, `required`, `isVariadic`, `default`, `validation`, `schema`
+(`schema` is a `json:SCHEMA` rule's JSON Schema, else `null`).
 Commands repeat the shape with `name` and only their own options. The formal
 JSON Schema is `spec/schema.json`.
 
