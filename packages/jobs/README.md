@@ -48,6 +48,50 @@ and no `node_modules`. It includes clyops-tools. `require('clyops-jobs')` loads 
   (`"${paths.work_dir}/out.mp3"`; relative to `paths.work_dir`), which also counts as an artifact.
 - `result`: a template map added to the result record.
 
+### Steps
+
+A function can run several tools in order instead of one `script`, so a definition chains
+tools that already exist (fetch some JSON, download what it names, process the file):
+
+```json
+{
+  "functions": {
+    "fingerprint": {
+      "steps": [
+        { "name": "fetch",    "script": "tools/http-get-json" },
+        { "name": "download", "script": "tools/download", "stdout": "${job.id}/media" },
+        { "name": "fp",       "script": "tools/media-to-fp", "stdin": "${steps.download.stdout}" }
+      ],
+      "artifacts": { "include": ["${job.id}/*.fp"], "required": true },
+      "result": { "size": "${steps.fetch.result.size}" }
+    }
+  },
+  "fetch":    { "url": "https://media.example.com/recording/${params.uuid}", "token": "${secrets.token}" },
+  "download": { "url": "${steps.fetch.result.signedUrl}" }
+}
+```
+
+- Each step is a binding like a function: `name` (letters, digits, `_`, `-`), `script`, and
+  optionally `key` (its options block, default the step name), `positionals`,
+  `positionals_order`, `stdin`, `stdout` and `strict_params` (default the function's).
+  `artifacts` and `result` belong to the function, as do the caller-input rules: a caller
+  reaches a step only through `params` fields its options name.
+- Every step shares the context, `paths.work_dir` included, so files pass by path. A step's
+  outputs are `steps.NAME` in the templates after it: `exit_code`; `stdout`, the path of its
+  `stdout` file or else its collected output without trailing newlines; `result`, its
+  `result` role or else its collected stdout parsed as JSON; `meta`; `progress`. A
+  `${steps...}` path that isn't there, such as a later step or a field the JSON lacks, is an
+  error naming the step.
+- The first step that exits nonzero, times out or is stopped ends the chain; the run is that
+  step's, with `failedStep` naming it. `continue_on_exit: [2]` on a step lets those codes go
+  on, and the chain then exits with the first of them (a partial result).
+- `timeoutMs` limits the whole chain and a step's `timeout_ms` that step; `signal` stops the
+  running step. `onProgress` gets each step's updates with `step` and a default `stage`.
+- The run is the last step's, plus `steps` (the outputs by name) and `stepRuns`. Render
+  artifacts and the result with them: `{ ...context, steps: run.steps }`.
+- `functionParamNames(fn)` lists the `params` fields a function's templates use, steps
+  included, for describing its caller inputs.
+
 ```js
 import { resolveFunctionConfig, runScriptFunction, copyConfiguredArtifacts, buildResultRecord,
          newJobId, newJobRecord, transitionJobRecord, timestampIso } from 'clyops-jobs';
@@ -73,6 +117,7 @@ record = transitionJobRecord(record, { status: 'done', completedAt: timestampIso
 When the tool declares the well-known [roles](https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md#14-roles-on-file-descriptors),
 the run wires them up: each `progress` object goes to `onProgress` (and the last one is the run's
 `progress`), `log` lines to `onLog`, and the `meta` document is parsed into the run's `meta`.
+The run's `result` is the `result` role parsed as JSON, or else the collected stdout when it is JSON.
 `updateJobProgress(record, update)` puts an update on a record as `progress` (and its `stage`, if
 any) without a history entry; the queue's tasks get it as `progress(update)`:
 

@@ -5,6 +5,16 @@ section here.
 
 ## [Unreleased]
 
+### clyops-jobs
+
+- Multi-step functions: `steps` on a function runs several tools in order with one context
+  and work directory. Each step's outputs (`steps.NAME.stdout`, `.result`, `.meta`,
+  `.exit_code`) feed the templates after it, the first failing step stops the chain and is
+  its `failedStep`, `continue_on_exit` lets a partial exit go on, and `timeoutMs`, a step's
+  `timeout_ms` and `signal` bound and stop it (#46).
+- A function run's `result` is the tool's `result` role, or its stdout, parsed as JSON.
+- `functionParamNames(fn)` lists the `params` fields a function's templates use.
+
 ## [0.10.0] - 2026-10-26
 
 ### JSON input
