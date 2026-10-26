@@ -103,8 +103,8 @@ export function functionTemplateOptions(fn: ResolvedFunction): TemplateOptions {
 
 /**
  * The options with `params` templates that name a missing or null field left
- * out, so the tool's own default applies: a whole-value template drops the
- * option, and one in an array drops that item.
+ * out, so the tool's own default applies: such an option is dropped, alone or
+ * inside a longer string, and so is such an item in an array.
  */
 function withoutUnsetParams(config: Json, context: TemplateContext, opts: TemplateOptions): Json {
   const out: Json = {};
@@ -122,7 +122,11 @@ function withoutUnsetParams(config: Json, context: TemplateContext, opts: Templa
  */
 function explicitPositionals(fn: ResolvedFunction, context?: TemplateContext | null): string[] | undefined {
   if (!Array.isArray(fn.definition.positionals)) return undefined;
-  return fn.definition.positionals.map((item) => String(renderConfigValue(item, context, functionTemplateOptions(fn)))).filter(Boolean);
+  const templates = functionTemplateOptions(fn);
+  return fn.definition.positionals
+    .filter((item) => !context || !isUnsetTemplate(item, context, templates))
+    .map((item) => String(renderConfigValue(item, context, templates)))
+    .filter(Boolean);
 }
 
 /** The full command line for a function: [script, ...argv]. */

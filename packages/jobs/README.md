@@ -36,10 +36,11 @@ and no `node_modules`. It includes clyops-tools. `require('clyops-jobs')` loads 
   options keyed by argument name.
 - String values may use `${dot.path}` or `{{dot.path}}` templates against a context you build
   (`job`, `paths`, whatever the trigger knows). An unknown path is an error, so a typo fails
-  loudly, except under `params` (the caller's fields): an option whose whole value is
-  `${params.x}` and the field is missing or null is left unset, so the tool's default applies,
-  and a missing field inside a longer string renders as `''`. `strict_params: true` on a function
-  makes a missing `params` field an error too.
+  loudly, except under `params` (the caller's fields): an option or positional that names a
+  missing or null `params` field is left unset, so the tool's default applies. That holds for
+  `${params.x}` alone and inside a longer string (`v-${params.x}`), so a value is never half
+  filled. Elsewhere (`result`, `stdin`, `stdout`, artifact patterns) a missing field renders as
+  `''`. `strict_params: true` on a function makes a missing `params` field an error too.
 - `artifacts`: glob patterns (`*`, `?`, `**`) relative to `paths.work_dir`, copied into
   `paths.artifacts_dir`, with an optional `required: true` or `min: N`.
 - `stdin`: a template naming a file fed to the tool's stdin (`"${media.path}"`; relative to the

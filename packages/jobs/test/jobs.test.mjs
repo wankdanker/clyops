@@ -41,8 +41,8 @@ test('templates', () => {
   assert.equal(renderTemplateString('${params.nope}', ctx), '');
   assert.throws(() => renderTemplateString('${params.nope}', req, { strict: true }), /unknown template value: params.nope/);
   assert.throws(() => renderTemplateString('${paramsx.nope}', req), /unknown template value: paramsx.nope/);
-  for (const v of ['${params.nope}', '{{ params.none }}', '${params.lang.x}']) assert.equal(isUnsetTemplate(v, req), true, v);
-  for (const v of ['${params.lang}', 'x${params.nope}', '${job.nope}', 3, null]) assert.equal(isUnsetTemplate(v, req), false, String(v));
+  for (const v of ['${params.nope}', '{{ params.none }}', '${params.lang.x}', 'x${params.nope}', '${params.lang}-{{params.none}}']) assert.equal(isUnsetTemplate(v, req), true, v);
+  for (const v of ['${params.lang}', 'x-${params.lang}', '${job.nope}', 'plain', 3, null]) assert.equal(isUnsetTemplate(v, req), false, String(v));
   assert.equal(isUnsetTemplate('${params.nope}', req, { strict: true }), false);
 });
 
@@ -54,7 +54,7 @@ test('a missing or null params field leaves the option unset', async () => {
   };
   const fn = resolveFunctionConfig(root, config, 'f');
   const context = { params: { count: 3, color: null, b: 'x' } };
-  assert.deepEqual((await buildFunctionCommand(fn, { configRoot: '/cfg', context })).slice(1), ['--out', '/cfg/out-.txt', '--count', '3', '--tag', 'x']);
+  assert.deepEqual((await buildFunctionCommand(fn, { configRoot: '/cfg', context })).slice(1), ['--count', '3', '--tag', 'x']);
   fn.definition.strict_params = true;
   await assert.rejects(buildFunctionCommand(fn, { configRoot: '/cfg', context }), /unknown template value: params.input/);
 });
