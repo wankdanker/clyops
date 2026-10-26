@@ -4,14 +4,13 @@ export type TemplateContext = { [key: string]: unknown };
 
 /** How templates treat missing values. */
 export interface TemplateOptions {
-  /** Every unknown path is an error, `params` too (default false: a missing `params` field renders `''`). */
+  /** Every unknown path is an error, `params` too (default false: a missing `params` field renders `''`, and an option naming one is unset). */
   strict?: boolean;
 }
 
 // Caller-supplied fields: one a request leaves out is unset, not a config error.
 const OPTIONAL_ROOTS = ['params'];
 const TEMPLATE = /\$\{\s*([A-Za-z0-9_.-]+)\s*\}|\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g;
-const WHOLE_TEMPLATE = /^(?:\$\{\s*([A-Za-z0-9_.-]+)\s*\}|\{\{\s*([A-Za-z0-9_.-]+)\s*\}\})$/;
 
 // The value at a dot path, or MISSING when the path is not there.
 const MISSING = Symbol('missing');
@@ -44,18 +43,19 @@ export function lookupTemplateValue(context: TemplateContext, expression: string
 }
 
 /**
- * True when `value` is exactly one `params` template (`${params.x}`) whose
- * field is missing or null, so an option set to it is left unset. Always
- * false with `opts.strict`.
+ * True when `value` names a `params` field that is missing or null, alone
+ * (`${params.x}`) or inside a longer string (`v-${params.x}`), so an option
+ * or positional set to it is left unset. Always false with `opts.strict`.
  */
 export function isUnsetTemplate(value: unknown, context: TemplateContext, opts?: TemplateOptions): boolean {
   if (typeof value !== 'string') return false;
-  const match = WHOLE_TEMPLATE.exec(value.trim());
-  if (!match) return false;
-  const expression = match[1] || match[2];
-  if (!optionalRoot(expression, opts)) return false;
-  const current = resolvePath(context, expression);
-  return current === MISSING || current === undefined || current === null;
+  for (const [, dollar, brace] of value.matchAll(TEMPLATE)) {
+    const expression = dollar || brace;
+    if (!optionalRoot(expression, opts)) continue;
+    const current = resolvePath(context, expression);
+    if (current === MISSING || current === undefined || current === null) return true;
+  }
+  return false;
 }
 
 /** Replace dotted-path ${expression} and {{expression}} templates using the context. */

@@ -32,6 +32,9 @@ for (const module of ['../dist/index.js', '../clyops-jobs.cjs']) {
     assert.deepEqual(await run(config, { v: '1', notes: 'hi', n: 4 }), ['/tmp/tool', '--notes', 'hi', '--count', '4', '--tag', 'v-1']);
     assert.deepEqual(await run({ notes: '${params.notes}', count: '${params.n}' }, { notes: null }), ['/tmp/tool']);
     assert.deepEqual(await run({}, { a: 'in.wav' }, ['${params.a}', '${params.mode}']), ['/tmp/tool', 'in.wav']);
+    // A missing field inside a longer string unsets the whole option or positional, not half of it.
+    assert.deepEqual(await run(config, { notes: 'hi' }), ['/tmp/tool', '--notes', 'hi']);
+    assert.deepEqual(await run({}, { a: 'in' }, ['${params.a}.wav', 'a-${params.x}']), ['/tmp/tool', 'in.wav']);
     // An argument left unset still takes the default positional.
     const withInput = await buildFunctionCommand(
       { functionName: 'f', key: 'f', script: '/tmp/tool', config: { input: '${params.input}' }, definition: {} },

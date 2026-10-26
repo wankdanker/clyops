@@ -97,8 +97,9 @@ optional stdin/stdout files. A function run wires the tool's `progress`, `meta` 
 `log` roles (`onProgress`, the run's `meta`), and queue tasks record progress with
 `progress(update)`. Templates use dotted paths in `${expression}` or
 `{{expression}}`. Boolean templates are validated after rendering. A missing
-`params` field leaves its option unset instead of failing the job (a function's
-`strict_params: true` makes it an error); other unknown paths are errors.
+`params` field leaves an option or positional that names it unset, even inside a
+longer string, instead of failing the job (a function's `strict_params: true` makes
+it an error); other unknown paths are errors.
 
 Artifact helpers discover, inspect and copy output files. Record helpers create
 and transition serializable job states. `JobQueue.add` returns a cancellation

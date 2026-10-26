@@ -139,7 +139,6 @@ var resolveScriptPath = resolveConfigPath;
 // packages/jobs/src/template.ts
 var OPTIONAL_ROOTS = ["params"];
 var TEMPLATE = /\$\{\s*([A-Za-z0-9_.-]+)\s*\}|\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g;
-var WHOLE_TEMPLATE = /^(?:\$\{\s*([A-Za-z0-9_.-]+)\s*\}|\{\{\s*([A-Za-z0-9_.-]+)\s*\}\})$/;
 var MISSING = /* @__PURE__ */ Symbol("missing");
 function resolvePath(context, expression) {
   let current = context;
@@ -163,12 +162,13 @@ function lookupTemplateValue(context, expression, opts) {
 }
 function isUnsetTemplate(value, context, opts) {
   if (typeof value !== "string") return false;
-  const match = WHOLE_TEMPLATE.exec(value.trim());
-  if (!match) return false;
-  const expression = match[1] || match[2];
-  if (!optionalRoot(expression, opts)) return false;
-  const current = resolvePath(context, expression);
-  return current === MISSING || current === void 0 || current === null;
+  for (const [, dollar, brace] of value.matchAll(TEMPLATE)) {
+    const expression = dollar || brace;
+    if (!optionalRoot(expression, opts)) continue;
+    const current = resolvePath(context, expression);
+    if (current === MISSING || current === void 0 || current === null) return true;
+  }
+  return false;
 }
 function renderTemplateString(value, context, opts) {
   return String(value).replace(TEMPLATE, (_, dollar, brace) => lookupTemplateValue(context, dollar || brace, opts));
@@ -637,7 +637,8 @@ function withoutUnsetParams(config, context, opts) {
 }
 function explicitPositionals(fn, context) {
   if (!Array.isArray(fn.definition.positionals)) return void 0;
-  return fn.definition.positionals.map((item) => String(renderConfigValue(item, context, functionTemplateOptions(fn)))).filter(Boolean);
+  const templates = functionTemplateOptions(fn);
+  return fn.definition.positionals.filter((item) => !context || !isUnsetTemplate(item, context, templates)).map((item) => String(renderConfigValue(item, context, templates))).filter(Boolean);
 }
 async function buildFunctionCommand(fn, opts, schema) {
   schema ??= await loadSchema(fn.script);
