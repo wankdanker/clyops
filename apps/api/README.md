@@ -140,12 +140,22 @@ clyops-api --root DIR [--name NAME] [--cwd DIR] [--timeout SECONDS] [--concurren
            [--host 127.0.0.1] [--port 8080] [--api-key KEY] [--keys FILE] [--no-mcp] [--no-watch] [--no-ui]
            [--allow GLOB]... [--deny GLOB]... [--read-only] [--paths-within DIR]... [--allow-executable-inputs]
            [--max-body BYTES] [--max-output BYTES] [--audit FILE]
+           [--no-fetch-schemas] [--schema-depth N] [--schema-hosts HOST]... [--schema-cache SECONDS]
+           [--schema-timeout SECONDS] [--schema-max-bytes BYTES]
 ```
 
 It listens on localhost unless told otherwise. Every option can also come from the environment as
 `CLYOPS_API_<OPTION>`. Tools run in `--cwd` (default: where the server was started), so relative
 paths in the input resolve there. Each operation in the OpenAPI document carries the tool's
 declared effects as `x-clyops-effects`.
+
+**URL schemas.** A `json:https://...` input's schema, and the schemas it references (three levels,
+`--schema-depth`; 0 fetches none), is fetched when the tools load, cached for `--schema-cache`
+seconds (default 3600) and checked like an inline one. `--schema-hosts` fetches only from the hosts
+given (`*.example.com` for subdomains; redirects are checked too), and `--schema-timeout` (5 s) and
+`--schema-max-bytes` (1 MiB) bound each fetch. A schema that can't be fetched is a warning: the tool
+is still served, with that input documented but unchecked. `--no-fetch-schemas` turns fetching
+off. The reserved example domains (`example.com`, `.test`, `.invalid`, ...) are never fetched.
 
 ## Security
 

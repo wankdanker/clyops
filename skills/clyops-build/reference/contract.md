@@ -149,7 +149,7 @@ error.
 | `ip`, `hostname`, `url` (`http`/`https` only), `email`, `uuid` | format | string |
 | `date:YYYY-MM-DD` | that format | string |
 | `json` | one JSON value (RFC 8259; no `NaN`, comments or trailing commas; at most 512 levels deep). Kept as the text given; parse it yourself. API/MCP callers may send the value itself | string |
-| `json:SCHEMA` | as `json`, plus a JSON Schema for tooling: inline (`json:{"type":"object"}`), a file relative to `root`, or a URL (`{"$ref": URL}`, never fetched). In `--help-json-schema` as the option's `schema`; the API and MCP server validate input against it, the program doesn't | string |
+| `json:SCHEMA` | as `json`, plus a JSON Schema for tooling: inline (`json:{"type":"object"}`), a file relative to `root`, or a URL (`{"$ref": URL}`, never fetched by the program; the API and MCP server fetch it when they load tools). In `--help-json-schema` as the option's `schema`; the API and MCP server validate input against it, the program doesn't | string |
 | `regex:PATTERN` | pattern found anywhere (anchor it yourself) | string |
 | `secret`, `secret:RULE` | as `RULE`, masked | as `RULE` |
 

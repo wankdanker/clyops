@@ -5,6 +5,18 @@ section here.
 
 ## [Unreleased]
 
+### JSON input
+
+- clyops-api and clyops-mcp fetch the URL schemas `json:SCHEMA` inputs reference when
+  they load tools, and the schemas those reference (`--schema-depth`, default 3), so
+  those inputs are checked, not only documented (#51). On by default:
+  `--no-fetch-schemas` turns it off, `--schema-hosts` limits the hosts (redirects
+  included), `--schema-cache` (seconds, default 3600), `--schema-timeout` (5) and
+  `--schema-max-bytes` (1 MiB) bound it. A schema that can't be fetched is a warning and
+  leaves its input unchecked. The reserved example domains (RFC 2606) are never fetched.
+  In clyops-tools: `loadTools`/`watchTools` take `schemas`, plus `fetchSchemaRefs`,
+  `inlineSchemaRefs`, `clearSchemaCache` and `SchemaFetchError`.
+
 ## [0.11.0] - 2026-10-26
 
 Multi-step job functions with branches, and a JSON Schema for the clyops-jobs config file.

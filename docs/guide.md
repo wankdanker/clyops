@@ -83,8 +83,12 @@ MCP server a caller can send the object itself; it reaches the tool as JSON text
 (`json:schemas/meta.json`), or a URL (`json:https://example.com/meta.json`). The program
 still checks only that the value is JSON. The schema goes into `--help-json-schema`, a
 file being read only then (a missing one is a warning, not an error), and the HTTP API
-and MCP server check input against it before the tool runs. They don't fetch URLs: a
-URL schema documents the input but isn't checked.
+and MCP server check input against it before the tool runs. They fetch a URL schema
+when they load the tools, and the schemas it references, three levels deep, so it is
+checked too. `--no-fetch-schemas`, `--schema-depth`, `--schema-hosts`,
+`--schema-cache`, `--schema-timeout` and `--schema-max-bytes` control that. A schema
+that can't be fetched leaves the input documented but unchecked, with a warning, and
+the reserved example domains (`example.com`, `.test`, ...) are never fetched.
 
 Standalone `validate` helpers return a typed value or the native validation
 error/result. Unknown registration rules and duplicate names are programming

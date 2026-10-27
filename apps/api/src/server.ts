@@ -2,7 +2,7 @@
 // validated and documented from its --help-json-schema.
 import {
   allowed, closedInputs, closedKeys, closedRequirement, InputError, inputKeys, isTextType, loadTools, publicSchema, runTool, startTool, tail,
-  toJsonSchema, watchTools, type InputPolicy,
+  SchemaFetchError, toJsonSchema, watchTools, type InputPolicy, type SchemaFetchOptions,
   type AuditEntry, type Command, type Group, type RunResult, type Tool, type ToolFilter, type ToolResult, type ToolRunOptions,
 } from 'clyops-tools';
 import { JobQueue, parseRoleJson, type JobRecord } from 'clyops-jobs';
@@ -74,6 +74,8 @@ export interface ApiOptions {
   probeConcurrency?: number;
   /** How long each schema probe may take, in milliseconds (default: clyops-tools' `PROBE_TIMEOUT_MS`). */
   probeTimeoutMs?: number;
+  /** How the URL schemas `json:SCHEMA` inputs reference are fetched, so they are checked (default: on; see clyops-tools' `SchemaFetchOptions`). */
+  schemas?: SchemaFetchOptions;
   /** Called after each reload when watching. */
   onReload?: (loaded: { /** Discovered directory tree. */ tree: Group; /** Discovered, schema-loaded tools offered by the server. */ tools: ApiTool[] }) => void;
   /** Server version advertised to clients. */
@@ -295,7 +297,9 @@ export async function createApi(opts: ApiOptions) {
       jobDirs.delete(record.job_id);
     },
   });
-  const onError = (cmd: Command | null, err: Error) => process.emitWarning(cmd ? `skipping ${cmd.words.join(' ')}: ${err.message}` : err.message);
+  const onError = (cmd: Command | null, err: Error) => process.emitWarning(
+    err instanceof SchemaFetchError && cmd ? `${cmd.words.join(' ')}: ${err.message}; serving it with that input unchecked`
+      : cmd ? `skipping ${cmd.words.join(' ')}: ${err.message}` : err.message);
   const withPaths = (tools: Tool[]): ApiTool[] => tools
     .filter((t) => {
       const arg = closedRequirement(t.schema, closedOf(opts, t));
@@ -308,7 +312,7 @@ export async function createApi(opts: ApiOptions) {
   let api: ReturnType<typeof buildRoutes>;
   const swap = (loaded: { tree: Group; tools: Tool[] }) => (api = buildRoutes(opts, ctx, loaded.tree, withPaths(loaded.tools)));
   const ctx = { queue, jobDirs, maxBody, events };
-  const loading = { name: opts.name, filter: opts.filter, onError, concurrency: opts.probeConcurrency, timeoutMs: opts.probeTimeoutMs };
+  const loading = { name: opts.name, filter: opts.filter, onError, concurrency: opts.probeConcurrency, timeoutMs: opts.probeTimeoutMs, schemas: opts.schemas };
   const watcher = opts.watch
     ? await watchTools(opts.root, { ...loading, onChange: (loaded) => opts.onReload?.(swap(loaded)) })
     : undefined;
