@@ -26,12 +26,14 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./clyops-jobs.cjs"
-    }
+    },
+    "./config.schema.json": "./config.schema.json"
   },
   "files": [
     "dist",
     "src",
-    "clyops-jobs.cjs"
+    "clyops-jobs.cjs",
+    "config.schema.json"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -41,7 +43,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "ajv": "^8.20.0"
   },
   "dependencies": {
     "clyops-tools": "0.10.0"
