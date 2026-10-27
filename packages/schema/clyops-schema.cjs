@@ -21,20 +21,28 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // packages/schema/src/index.ts
 var index_exports = {};
 __export(index_exports, {
+  SCHEMA_FETCH_DEFAULTS: () => SCHEMA_FETCH_DEFAULTS,
+  SchemaFetchError: () => SchemaFetchError,
+  clearSchemaCache: () => clearSchemaCache,
   constraintIssues: () => constraintIssues,
   effectiveRoles: () => effectiveRoles,
   fdsEnv: () => fdsEnv,
+  fetchSchemaRefs: () => fetchSchemaRefs,
   formFields: () => formFields,
   formSchema: () => formSchema,
+  inlineSchemaRefs: () => inlineSchemaRefs,
   inputIssues: () => inputIssues,
   inputKey: () => inputKey,
   inputKeys: () => inputKeys,
   isBareFlag: () => isBareFlag,
+  isReservedSchemaHost: () => isReservedSchemaHost,
   isTextType: () => isTextType,
   jsonSample: () => jsonSample,
   jsonSchemaView: () => jsonSchemaView,
   optionGiven: () => optionGiven,
   parseJsonInputs: () => parseJsonInputs,
+  parseSchemaDocument: () => parseSchemaDocument,
+  schemaHostAllowed: () => schemaHostAllowed,
   toJsonSchema: () => toJsonSchema,
   valueSchema: () => valueSchema,
   withoutSecrets: () => withoutSecrets
@@ -306,22 +314,153 @@ function effectiveRoles(schema, path = []) {
 function fdsEnv(mapping) {
   return Object.entries(mapping).map(([name, fd]) => `${name}:${fd}`).join(",");
 }
+
+// packages/schema/src/schema-refs.ts
+var SCHEMA_FETCH_DEFAULTS = { depth: 3, cacheTtlMs: 36e5, timeoutMs: 5e3, maxBytes: 1048576 };
+var SchemaFetchError = class extends Error {
+  /** The schema's URL, without a fragment. */
+  url;
+  /** An error for the schema at `url`, saying why it couldn't be fetched. */
+  constructor(url, reason) {
+    super(`schema ${url}: ${reason}`);
+    this.name = "SchemaFetchError";
+    this.url = url;
+  }
+};
+function isReservedSchemaHost(url) {
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  return /(^|\.)example\.(com|net|org)$/.test(host) || /\.(example|invalid|test)$/.test(host) || ["example", "invalid", "test"].includes(host);
+}
+var FAILURE_TTL_MS = 6e4;
+var cache = /* @__PURE__ */ new Map();
+function clearSchemaCache() {
+  cache.clear();
+}
+function schemaHostAllowed(url, hosts) {
+  if (!hosts?.length) return true;
+  const host = url.hostname.toLowerCase();
+  return hosts.some((entry) => {
+    const allowed = entry.trim().toLowerCase();
+    return allowed.startsWith("*.") ? host.endsWith(allowed.slice(1)) : host === allowed;
+  });
+}
+function parseSchemaDocument(text) {
+  let doc;
+  try {
+    doc = JSON.parse(text);
+  } catch {
+    throw new Error("not JSON");
+  }
+  if (typeof doc !== "boolean" && (!doc || typeof doc !== "object" || Array.isArray(doc))) throw new Error("not a JSON Schema (an object or a boolean)");
+  return doc;
+}
+async function documentAt(url, opts, onError) {
+  const ttl = opts.cacheTtlMs ?? SCHEMA_FETCH_DEFAULTS.cacheTtlMs;
+  const hit = cache.get(url);
+  if (hit && Date.now() - hit.at < (hit.error ? Math.min(ttl, FAILURE_TTL_MS) : ttl)) {
+    if (hit.error) throw hit.error;
+    return hit.doc;
+  }
+  try {
+    if (!opts.download) throw new Error("no download configured");
+    const doc = await opts.download(url, opts);
+    if (ttl > 0) cache.set(url, { at: Date.now(), doc });
+    return doc;
+  } catch (err) {
+    const error = new SchemaFetchError(url, err.name === "TimeoutError" ? "timed out" : err.message);
+    if (ttl > 0) cache.set(url, { at: Date.now(), error });
+    onError(error);
+    throw error;
+  }
+}
+var token2 = (key) => key.replace(/~/g, "~0").replace(/\//g, "~1");
+async function inlineSchemaRefs(schema, opts = {}, onError = () => {
+}) {
+  const depth = opts.fetch === false || !opts.download ? 0 : opts.depth ?? SCHEMA_FETCH_DEFAULTS.depth;
+  if (depth <= 0 || !schema || typeof schema !== "object" || Array.isArray(schema)) return schema;
+  const defs = {};
+  const failed = /* @__PURE__ */ new Set();
+  const pointTo = async (ref, base, level) => {
+    if (ref.startsWith("#")) return base && (ref === "#" || ref.startsWith("#/")) ? `#/$defs/${encodeURIComponent(token2(base))}${ref.slice(1)}` : ref;
+    let url;
+    try {
+      url = new URL(ref, base);
+    } catch {
+      return ref;
+    }
+    const absolute = url.href;
+    if (url.protocol !== "http:" && url.protocol !== "https:" || isReservedSchemaHost(url)) return absolute;
+    const fragment = url.hash.slice(1);
+    url.hash = "";
+    const doc = url.href;
+    if (level >= depth || failed.has(doc) || fragment && !fragment.startsWith("/")) return absolute;
+    if (!(doc in defs)) {
+      defs[doc] = true;
+      try {
+        defs[doc] = await visit(stripIds(await documentAt(doc, opts, onError)), doc, level + 1);
+      } catch {
+        delete defs[doc];
+        failed.add(doc);
+        return absolute;
+      }
+    }
+    return `#/$defs/${encodeURIComponent(token2(doc))}${fragment}`;
+  };
+  const visit = async (node, base, level) => {
+    if (Array.isArray(node)) return Promise.all(node.map((item) => visit(item, base, level)));
+    if (!node || typeof node !== "object") return node;
+    const out = {};
+    for (const [key, value] of Object.entries(node)) {
+      out[key] = key === "$ref" && typeof value === "string" ? await pointTo(value, base, level) : await visit(value, base, level);
+    }
+    return out;
+  };
+  const root = await visit(schema, void 0, 0);
+  if (Object.keys(defs).length === 0) return root;
+  return { ...root, $defs: { ...root.$defs, ...defs } };
+}
+function stripIds(node) {
+  if (Array.isArray(node)) return node.map(stripIds);
+  if (!node || typeof node !== "object") return node;
+  return Object.fromEntries(Object.entries(node).filter(([k]) => k !== "$id" && k !== "$schema").map(([k, v]) => [k, stripIds(v)]));
+}
+async function fetchSchemaRefs(schema, opts = {}, onError = () => {
+}) {
+  const body = async (level) => {
+    const items = async (list) => Promise.all(list.map(async (item) => item.validation.startsWith("json:") && item.schema ? { ...item, schema: await inlineSchemaRefs(item.schema, opts, onError) } : item));
+    return {
+      ...level,
+      arguments: await items(level.arguments),
+      options: await items(level.options),
+      ...level.commands ? { commands: await Promise.all(level.commands.map((c) => body(c))) } : {}
+    };
+  };
+  return body(schema);
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  SCHEMA_FETCH_DEFAULTS,
+  SchemaFetchError,
+  clearSchemaCache,
   constraintIssues,
   effectiveRoles,
   fdsEnv,
+  fetchSchemaRefs,
   formFields,
   formSchema,
+  inlineSchemaRefs,
   inputIssues,
   inputKey,
   inputKeys,
   isBareFlag,
+  isReservedSchemaHost,
   isTextType,
   jsonSample,
   jsonSchemaView,
   optionGiven,
   parseJsonInputs,
+  parseSchemaDocument,
+  schemaHostAllowed,
   toJsonSchema,
   valueSchema,
   withoutSecrets

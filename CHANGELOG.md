@@ -5,6 +5,15 @@ section here.
 
 ## [Unreleased]
 
+### Breaking
+
+- clyops-api serves OpenAPI 3.1 (was 3.0), whose schemas are JSON Schema 2020-12: nullable
+  fields are `type: [T, "null"]` rather than `nullable: true`, binary bodies are strings
+  with a `contentMediaType` rather than `format: binary`, and a json input in the query
+  string is JSON text with its schema as `contentSchema`. A client generator that only reads
+  3.0 needs a 3.1-aware version. clyops-api generates it with zod-to-openapi's 3.1
+  generator, from plus-express's registry.
+
 ### JSON input
 
 - clyops-api and clyops-mcp fetch the URL schemas `json:SCHEMA` inputs reference when
@@ -23,10 +32,17 @@ section here.
   `examples` entry. clyops-schema's `inputIssues` does the parsing and messages with any
   ajv-shaped validator, so the package keeps no dependencies; `jsonSchemaView`,
   `jsonSample` and `FormField.json` go with it.
+- The desktop runner fetches the URL schemas `json:SCHEMA` inputs reference when a tool loads
+  (from Rust: the webview's fetch is bound by CORS), with the server flags as settings: fetch
+  on or off, depth, allowed hosts, cache, timeout and size limit (#51). The inlining moved
+  into clyops-schema (`inlineSchemaRefs`, `fetchSchemaRefs` with a `download` option), so
+  clyops-tools and the desktop runner share it.
 - clyops-doc prints a `json:SCHEMA` input's schema under it in man pages, Markdown and HTML
   (#52).
-- clyops-api's OpenAPI document gives a `json:SCHEMA` input's schema as
-  `x-clyops-json-schema`, with its `#` references pointing into itself (#52).
+- clyops-api's OpenAPI document gives a `json:SCHEMA` input's schema inline, with its `#`
+  references pointing at where it sits in the document (#52).
+- Fixed: the desktop runner dropped every `json:SCHEMA` input's schema when it read a tool's
+  `--help-json-schema`.
 - Fixed: the web runner rejected every `json:SCHEMA` field whose schema wasn't a string
   schema, because it checked the field's text rather than its parsed value.
 

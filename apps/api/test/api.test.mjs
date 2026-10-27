@@ -8,6 +8,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createApi } from '../dist/index.js';
 import { clearSchemaCache } from 'clyops-tools';
+import { createRequire } from 'node:module';
+const Ajv2020 = createRequire(import.meta.url)('ajv/dist/2020').default;
 
 const repo = fileURLToPath(new URL('../../..', import.meta.url));
 process.env.KEY = 'k'; // the demo's required --key, from its environment
@@ -161,12 +163,18 @@ test('OpenAPI document', async () => {
   const body = op.requestBody.content['application/json'].schema;
   assert.deepEqual(body.properties.count, { type: 'integer', minimum: 1, maximum: 10, default: 3, description: 'Number of iterations' });
   // A json:SCHEMA input carries its schema; a URL one (never fetched from example.com) names it.
-  // A json:SCHEMA input's schema is in x-clyops-json-schema (OpenAPI 3.0 schema objects are a JSON
-  // Schema subset); a URL one that isn't fetched (example.com never is) names the URL.
-  assert.deepEqual(body.properties.shape['x-clyops-json-schema'], JSON.parse(shapeSchema));
-  assert.deepEqual(body.properties.filter['x-clyops-json-schema'], { type: 'object' });
-  assert.deepEqual(body.properties.event['x-clyops-json-schema'], { $comment: 'JSON Schema: https://example.com/event.json' });
-  assert.equal(body.properties.payload['x-clyops-json-schema'], undefined);
+  // OpenAPI 3.1 schemas are JSON Schema: a json:SCHEMA input's schema is inline; a URL one that
+  // isn't fetched (example.com never is) names the URL. In the query string it is JSON text.
+  assert.equal(doc.openapi, '3.1.0');
+  assert.deepEqual(body.properties.shape, { ...JSON.parse(shapeSchema), description: 'JSON shape' });
+  assert.deepEqual(body.properties.filter, { type: 'object', description: 'JSON filter' });
+  assert.deepEqual(body.properties.event, { $comment: 'JSON Schema: https://example.com/event.json', description: 'JSON event' });
+  assert.deepEqual(body.properties.payload, { description: 'JSON payload' });
+  const query = Object.fromEntries(op.parameters.map((p) => [p.name, p.schema]));
+  assert.deepEqual(query.shape, { type: 'string', contentMediaType: 'application/json', contentSchema: { $ref: '#/paths/~1tools~1media~1demo/post/requestBody/content/application~1json/schema/properties/shape' }, description: 'JSON shape' });
+  // Nullable fields are type arrays now.
+  assert.deepEqual(doc.paths['/jobs/{id}'].get.responses['200'].content['application/json'].schema.properties.error.type, ['string', 'null']);
+  assertOpenApi31(doc);
   assert.deepEqual(body.required, ['input']);
   assert.ok(doc.paths['/jobs/{id}'].get);
 });
@@ -276,6 +284,26 @@ read.on('data', (d) => (text += d));
 read.on('end', () => process.stdout.write(JSON.stringify({ out: (v.PREFIX + text.toUpperCase()).repeat(v.COUNT), tags: v.TAG })));
 `);
   return root;
+}
+
+/**
+ * What can be checked of an OpenAPI 3.1 document offline: every schema object is JSON Schema
+ * 2020-12, every `#` reference resolves inside it, and none of 3.0's forms are left.
+ */
+function assertOpenApi31(doc) {
+  assert.equal(doc.openapi, '3.1.0');
+  const meta = new Ajv2020({ strict: false });
+  const at = (ref) => ref.slice(2).split('/').map((part) => decodeURIComponent(part).replace(/~1/g, '/').replace(/~0/g, '~')).reduce((node, key) => node?.[key], doc);
+  (function walk(node, path) {
+    if (!node || typeof node !== 'object') return;
+    for (const [key, value] of Object.entries(node)) {
+      if ((key === 'schema' || key === 'contentSchema') && value && typeof value === 'object') assert.ok(meta.validateSchema(value), `${path}/${key}: ${JSON.stringify(meta.errors)}`);
+      if (key === '$ref' && typeof value === 'string' && value.startsWith('#/')) assert.notEqual(at(value), undefined, `${path}: ${value} resolves`);
+      assert.notEqual(key, 'nullable', `${path}: 3.0's nullable`);
+      if (key === 'format') assert.notEqual(value, 'binary', `${path}: 3.0's format: binary`);
+      walk(value, `${path}/${key}`);
+    }
+  })(doc, '');
 }
 
 async function serve(opts) {
@@ -464,7 +492,9 @@ test('OpenAPI documents stdin, multipart, binary output and effects', async () =
     const png = doc.paths['/tools/media/png'].post;
     assert.deepEqual(png['x-clyops-effects'], ['read-only']);
     assert.deepEqual(Object.keys(png.requestBody.content).sort(), ['application/json', 'multipart/form-data', 'text/plain']);
-    assert.equal(png.responses['200'].content['image/png'].schema.format, 'binary');
+    assert.deepEqual(png.responses['200'].content['image/png'].schema, { type: 'string', contentMediaType: 'image/png', description: 'Picture' });
+    assert.equal(png.requestBody.content['text/plain'].schema.contentMediaType, 'text/plain');
+    assertOpenApi31(doc);
     assert.ok(png.parameters.some((p) => p.in === 'query' && p.name === 'fail'));
     assert.deepEqual(doc.paths['/tools/tasks/db/migrate'].post['x-clyops-effects'], ['destructive']);
     assert.equal(doc.paths['/tools/tasks/send'], undefined, 'the filter applies');
@@ -769,6 +799,9 @@ process.stdout.write(v.EVENT);
     } finally {
       off.close();
     }
+  }
+});
+
 test('OpenAPI: a json input\'s schema stands on its own, its # references pointing into itself', async (t) => {
   const root = mkdtempSync(join(tmpdir(), 'clyops-api-refs-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -783,8 +816,11 @@ process.stdout.write(String(v.BOX));
   try {
     const doc = await (await fetch(`${api.at}/openapi.json`)).json();
     const props = doc.paths['/tools/box'].post.requestBody.content['application/json'].schema.properties;
-    assert.deepEqual(props.box['x-clyops-json-schema'], schema);
-    assert.deepEqual(props.item.items['x-clyops-json-schema'], schema);
+    // Its # references point at where it sits in the document.
+    const at = '#/paths/~1tools~1box/post/requestBody/content/application~1json/schema/properties';
+    assert.deepEqual(props.box, { ...schema, properties: { w: { $ref: `${at}/box/$defs/w` } }, description: 'Box' });
+    assert.deepEqual(props.item.items, { ...schema, properties: { w: { $ref: `${at}/item/items/$defs/w` } } });
+    assertOpenApi31(doc);
     // Validation still follows the reference as rewritten into the input schema.
     const res = await fetch(`${api.at}/tools/box`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ box: { w: 0 } }) });
     assert.deepEqual((await res.json()).issues.map((i) => `${i.path.join('.')}: ${i.message}`), ['box: /w must be >= 1']);

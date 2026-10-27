@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod probe;
+mod schema_fetch;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -58,6 +59,9 @@ struct Argument {
     is_variadic: bool,
     default: String,
     validation: String,
+    /// A `json:SCHEMA` input's JSON Schema (spec section 8), for the form to check it.
+    #[serde(default)]
+    schema: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,6 +85,9 @@ struct ScriptOption {
     choices: Vec<String>,
     #[serde(default)]
     secret: bool,
+    /// A `json:SCHEMA` input's JSON Schema (spec section 8), for the form to check it.
+    #[serde(default)]
+    schema: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -167,6 +174,10 @@ impl LegacyTemplate {
 struct AppConfig {
     scripts_dir: Option<String>,
     templates_dir: Option<String>,
+    /// How URL schemas are fetched (`fetch`, `depth`, `hosts`, `cache_secs`, `timeout_secs`,
+    /// `max_bytes`); kept as the frontend writes it.
+    #[serde(default)]
+    schemas: Option<serde_json::Value>,
 }
 
 impl Default for AppConfig {
@@ -174,6 +185,7 @@ impl Default for AppConfig {
         Self {
             scripts_dir: None,
             templates_dir: None,
+            schemas: None,
         }
     }
 }
@@ -827,6 +839,13 @@ fn sanitize_filename(name: &str) -> String {
         .to_lowercase()
 }
 
+/// One URL schema a `json:SCHEMA` input references (#51), fetched here because the webview's
+/// fetch is bound by CORS. The frontend inlines it and caches it.
+#[tauri::command]
+async fn fetch_schema(url: String, hosts: Vec<String>, timeout_ms: u64, max_bytes: usize) -> Result<serde_json::Value, String> {
+    schema_fetch::fetch(&url, &hosts, timeout_ms, max_bytes).await
+}
+
 #[tauri::command]
 fn get_config(app: tauri::AppHandle) -> Result<AppConfig, String> {
     let config_dir = app.path()
@@ -886,6 +905,7 @@ async fn main() {
             get_scripts_dir,
             discover_scripts,
             get_script_schema,
+            fetch_schema,
             run_script,
             stop_script,
             get_running_scripts,
@@ -915,6 +935,12 @@ mod tests {
         assert!(schema.arguments.iter().any(|a| a.name == "rest" && a.is_variadic));
         assert!(schema.options.iter().any(|o| o.name == "key" && o.required));
         assert!(schema.options.iter().any(|o| o.name == "tag" && o.is_array));
+        // A json:SCHEMA input's schema reaches the form, which checks it (#52).
+        let option = |name: &str| schema.options.iter().find(|o| o.name == name).expect(name);
+        assert_eq!(option("filter").schema, Some(serde_json::json!({ "type": "object" })));
+        assert_eq!(option("event").schema, Some(serde_json::json!({ "$ref": "https://example.com/event.json" })));
+        let back = serde_json::to_value(&schema).unwrap();
+        assert_eq!(back["options"].as_array().unwrap().iter().find(|o| o["name"] == "filter").unwrap()["schema"], serde_json::json!({ "type": "object" }));
     }
 
     /// Discover and load a real clyops tool: the C conformance demo

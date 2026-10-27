@@ -67,7 +67,7 @@ and checked against the input's schema as you type, as the API checks it, so
 while the field is enabled. "Expected JSON" shows the schema, and an enabled
 field starts from the schema's `default`, else its first `examples` entry. The
 desktop runner does the same. A URL schema is checked when the API has fetched
-it.
+it (`--fetch-schemas`, on by default); the desktop runner fetches it itself.
 
 The JSON editor applies the same input schema as the API. It omits secrets;
 password values remain in their dedicated controls. Templates save only known,

@@ -8,6 +8,7 @@ import { ScriptForm, type RunIo } from './components/ScriptForm';
 import { ScriptOutput } from './components/ScriptOutput';
 import { displayedRoles } from './lib/utils';
 import { SettingsModal } from './components/SettingsModal';
+import { withFetchedSchemas, type SchemaSettings } from './lib/schemas';
 import { Card, CardContent } from './components/Card';
 import { Button } from './components/Button';
 import { Input } from './components/Input';
@@ -21,6 +22,8 @@ function App() {
   const [selectedRunningScript, setSelectedRunningScript] = useState<RunningScript | null>(null);
   const [isLoadingSchema, setIsLoadingSchema] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [schemaSettings, setSchemaSettings] = useState<SchemaSettings>({});
+  const [schemaNotices, setSchemaNotices] = useState<string[]>([]);
   const [view, setView] = useState<'scripts' | 'running'>('scripts');
   const [eventUnlisteners, setEventUnlisteners] = useState<Map<string, UnlistenFn>>(new Map());
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -63,6 +66,9 @@ function App() {
       const tplDir = await invoke<string>('get_templates_dir');
       setTemplatesDir(tplDir);
 
+      const config = await invoke<AppConfig>('get_config');
+      setSchemaSettings(config.schemas ?? {});
+
       const discoveredScripts = await invoke<ScriptInfo[]>('discover_scripts', {
         scriptsDir: dir,
       });
@@ -81,9 +87,13 @@ function App() {
     setError(null);
     setSelectedTemplate(null); // Clear template when loading a new script
     try {
-      const schema = await invoke<ScriptSchema>('get_script_schema', {
+      const probed = await invoke<ScriptSchema>('get_script_schema', {
         scriptPath: script.path,
       });
+      // URL schemas are fetched so the form checks those inputs; one that can't be is a notice.
+      const unfetched: string[] = [];
+      const schema = await withFetchedSchemas(probed, schemaSettings, (err) => unfetched.push(err.message));
+      setSchemaNotices(unfetched);
       setScriptSchema(schema);
       setSelectedScript(script);
     } catch (err) {
@@ -346,15 +356,17 @@ function App() {
     );
   };
 
-  const handleSaveSettings = async (newScriptsDir: string, newTemplatesDir: string) => {
+  const handleSaveSettings = async (newScriptsDir: string, newTemplatesDir: string, newSchemas: SchemaSettings) => {
     try {
       // Save the config
       await invoke('save_config', {
         config: {
           scripts_dir: newScriptsDir,
           templates_dir: newTemplatesDir || undefined,
+          schemas: newSchemas,
         } as AppConfig,
       });
+      setSchemaSettings(newSchemas);
 
       // Reload the app with new scripts directory
       setScriptsDir(newScriptsDir);
@@ -408,6 +420,13 @@ function App() {
         {error && (
           <div className="bg-destructive/10 border-b border-destructive/50 px-6 py-3">
             <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
+        {schemaNotices.length > 0 && (
+          <div className="bg-accent/50 border-b border-border px-6 py-3">
+            {schemaNotices.map((notice) => (
+              <p key={notice} className="text-xs text-muted-foreground">{notice}; that input isn't checked here.</p>
+            ))}
           </div>
         )}
 
@@ -675,6 +694,7 @@ function App() {
         onSave={handleSaveSettings}
         currentScriptsDir={scriptsDir}
         currentTemplatesDir={templatesDir}
+        currentSchemas={schemaSettings}
       />
     </div>
   );

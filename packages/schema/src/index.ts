@@ -4,3 +4,4 @@ export * from './names.js';
 export * from './json-schema.js';
 export * from './forms.js';
 export * from './roles.js';
+export * from './schema-refs.js';

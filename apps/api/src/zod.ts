@@ -62,10 +62,10 @@ function jsonValue(schema: Js, at: At): z.ZodType {
 }
 
 /**
- * A json input's schema for its OpenAPI `x-clyops-json-schema`, standing on its own: without the
- * keywords that only document it, and with the `#` references that point into the whole input
- * schema (`#/properties/shape/$defs/x`) pointing into itself (`#/$defs/x`). OpenAPI 3.0 schema
- * objects are a subset of JSON Schema, so the full schema goes in an extension.
+ * A json input's schema for the OpenAPI document, standing on its own: without the keywords that
+ * only document it, and with the `#` references that point into the whole input schema
+ * (`#/properties/shape/$defs/x`) pointing into itself (`#/$defs/x`). The document rebases them
+ * onto where it puts the schema (see documentStreams).
  */
 function selfContained(schema: Js, pointer: string): unknown {
   const prefix = `#${pointer}`;
@@ -148,8 +148,7 @@ export function toZod(schema: Js, at: At = { root: schema, pointer: '' }): z.Zod
   const meta: Record<string, unknown> = {};
   if (schema.description) meta.description = schema.description;
   if (schema.default !== undefined) meta.default = schema.default;
-  if (schema.contentMediaType === 'application/json' && Object.keys(schema).some((k) => !DOCUMENTATION.has(k))) {
-    meta['x-clyops-json-schema'] = selfContained(schema, at.pointer);
-  }
+  // OpenAPI 3.1 schemas are JSON Schema: a json input's schema goes in as it is.
+  if (schema.contentMediaType === 'application/json') Object.assign(meta, selfContained(schema, at.pointer));
   return Object.keys(meta).length ? out.openapi(meta) : out;
 }

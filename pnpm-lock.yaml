@@ -35,6 +35,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@asteasolutions/zod-to-openapi':
+        specifier: ^8.5.0
+        version: 8.5.0(zod@4.6.5)
       ajv:
         specifier: ^8.20.0
         version: 8.20.0

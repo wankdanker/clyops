@@ -124,7 +124,7 @@ successfully listening.
 | | |
 | --- | --- |
 | `GET /ui/` | Static web runner |
-| `GET /openapi.json` | OpenAPI 3 document of everything below |
+| `GET /openapi.json` | OpenAPI 3.1 document of everything below |
 | `GET /tools` | The tools: name, words, path, description |
 | `GET /tools/<words>` | A tool's clyops schema and the JSON Schema of its input |
 | `POST /tools/<words>[?async=true]` | Run it |
@@ -147,8 +147,10 @@ clyops-api --root DIR [--name NAME] [--cwd DIR] [--timeout SECONDS] [--concurren
 It listens on localhost unless told otherwise. Every option can also come from the environment as
 `CLYOPS_API_<OPTION>`. Tools run in `--cwd` (default: where the server was started), so relative
 paths in the input resolve there. Each operation in the OpenAPI document carries the tool's
-declared effects as `x-clyops-effects`, and a `json:SCHEMA` input carries its schema as
-`x-clyops-json-schema`, standing on its own (OpenAPI 3.0 schema objects are a subset of JSON Schema).
+declared effects as `x-clyops-effects`. Its schemas are JSON Schema 2020-12, so a `json:SCHEMA` input's
+schema is there as it is (with its `#` references pointing at where it sits in the document), and in
+the query string it is JSON text with that schema as its `contentSchema`. Binary bodies are strings
+with a `contentMediaType`.
 
 **URL schemas.** A `json:https://...` input's schema, and the schemas it references (three levels,
 `--schema-depth`; 0 fetches none), is fetched when the tools load, cached for `--schema-cache`
