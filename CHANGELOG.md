@@ -5,6 +5,11 @@ section here.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-26
+
+URL schemas fetched and checked everywhere `json:SCHEMA` inputs are used, schemas shown and
+checked in the web and desktop runners and in clyops-doc, and OpenAPI 3.1.
+
 ### Breaking
 
 - clyops-api serves OpenAPI 3.1 (was 3.0), whose schemas are JSON Schema 2020-12: nullable

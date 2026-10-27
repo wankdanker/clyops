@@ -1,6 +1,6 @@
 {
   "name": "clyops-runner",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "private": true,
   "description": "Desktop UI that builds forms for clyops tools and runs them",
   "type": "module",
@@ -18,7 +18,7 @@
     "ajv": "^8.20.0",
     "ansi-to-react": "^6.1.6",
     "clsx": "^2.0.0",
-    "clyops-schema": "0.11.0",
+    "clyops-schema": "0.12.0",
     "lucide-react": "^0.294.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
