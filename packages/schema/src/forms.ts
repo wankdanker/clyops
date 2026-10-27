@@ -1,5 +1,5 @@
 import { inputKey, isBareFlag } from './names.js';
-import { toJsonSchema, type JsonSchema } from './json-schema.js';
+import { parseJsonInputs, toJsonSchema, type JsonSchema } from './json-schema.js';
 import type { Schema, SchemaConstraint, SchemaOption } from './types.js';
 
 /** A scalar value's JSON Schema properties used by form controls. */
@@ -44,6 +44,8 @@ export interface FormField {
   secret: boolean;
   /** Whether this accepts a path on the server's filesystem. */
   path: boolean;
+  /** Whether its value is JSON text (`json` or `json:SCHEMA`), checked against `schema` once parsed. */
+  json: boolean;
   /** Original rule for explanations and server-only checks. */
   validation: string;
   /** Converted JSON Schema of the submitted field. */
@@ -62,9 +64,56 @@ export function formFields(schema: Schema, naming: 'input' | 'declared' = 'input
       key, name: item.name, description: item.description, group: item.group,
       positional: item.positional, required: item.required, many: item.many, secret: item.secret,
       path: item.valueType === 'path' || /^(path|file:|dir:)/.test(item.validation),
+      json: item.validation === 'json' || item.validation.startsWith('json:'),
       validation: item.validation, schema: properties[key],
     };
   });
+}
+
+/** A compiled JSON Schema validator in ajv's shape: true when valid, else its `errors`. */
+export interface InputValidator {
+  (data: unknown): boolean;
+  /** The last call's errors. */
+  errors?: { /** JSON Pointer to the value. */ instancePath: string; message?: string; /** Keyword details, e.g. `missingProperty`. */ params: Record<string, unknown> }[] | null;
+}
+
+/**
+ * The problems with supplied inputs against their input schema (from toJsonSchema), using a
+ * validator compiled from it (e.g. ajv's), so this package stays free of dependencies. A `json`
+ * field's text is parsed first, as servers do (spec section 13), so its value is what its schema
+ * checks, each field on its own so one that isn't JSON doesn't hide the others: `shape: /w must be
+ * integer`, `shape: must be valid JSON`.
+ */
+export function inputIssues(inputSchema: JsonSchema, input: Record<string, unknown>, validate: InputValidator): string[] {
+  const issues: string[] = [];
+  const parsed: Record<string, unknown> = {};
+  const unparsed = new Set<string>();
+  for (const [key, value] of Object.entries(input)) {
+    const one = parseJsonInputs(inputSchema, { [key]: value });
+    if ('error' in one) { issues.push(`${key}: must be valid JSON`); unparsed.add(key); } else parsed[key] = one.value[key];
+  }
+  if (validate(parsed)) return issues;
+  for (const error of validate.errors ?? []) {
+    const [key = '', ...rest] = error.instancePath.slice(1).split('/').map(part => part.replace(/~1/g, '/').replace(/~0/g, '~'));
+    const missing = error.params.missingProperty as string | undefined;
+    if (missing && !key && unparsed.has(missing)) continue;
+    issues.push(`${key || missing || 'Input'}: ${rest.length ? `/${rest.join('/')} ` : ''}${error.message ?? 'is invalid'}`);
+  }
+  return issues;
+}
+
+/** A `json` field's schema as shown to people: what it checks, without the form's own annotations. */
+export function jsonSchemaView(field: FormField): string | undefined {
+  if (!field.json) return undefined;
+  const { contentMediaType: _type, description: _description, default: _default, ...rest } = (field.many ? field.schema.items ?? {} : field.schema) as Record<string, unknown>;
+  return Object.keys(rest).length ? JSON.stringify(rest, null, 2) : undefined;
+}
+
+/** The text a `json` field starts with when it is enabled, or shows as a hint: its default, else its first example. */
+export function jsonSample(field: FormField): string {
+  const schema = (field.many ? field.schema.items ?? {} : field.schema) as { default?: unknown; examples?: unknown[] };
+  const sample = schema.default !== undefined ? schema.default : Array.isArray(schema.examples) ? schema.examples[0] : undefined;
+  return sample === undefined ? '' : JSON.stringify(sample, null, 2);
 }
 
 /** An input conflict or an unresolved requirement that the tool may satisfy from config/environment. */

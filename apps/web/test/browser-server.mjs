@@ -22,6 +22,8 @@ cli.opt('WEBHOOK','webhook','','optional','Webhook URL','Delivery');
 cli.opt('EMAIL','email','','optional','Email address','Delivery');
 cli.oneOf('webhook','email'); cli.exclusive('webhook','email'); cli.requires('webhook','key');
 cli.setEffects('read-only'); cli.setStdout('Plan','application/json');`, `console.log(JSON.stringify({mode:args.MODE,count:args.COUNT,ratio:args.RATIO,levels:args.LEVEL,dry_run:args.DRY_RUN,email:args.EMAIL,webhook:args.WEBHOOK}));`);
+tool('shape', `cli.setDescription('Describe a shape.'); cli.setEffects('read-only');
+cli.opt('SHAPE','shape','','optional','The shape','Shape','json:{"type":"object","required":["w"],"properties":{"w":{"type":"integer","minimum":1}},"examples":[{"w":3}]}');`, `console.log('shape is ' + args.SHAPE);`);
 tool('wait', `cli.setDescription('Wait for cancellation.'); cli.setEffects('read-only');`, `setTimeout(()=>console.log('finished'),30000);`);
 tool('colors', `cli.setDescription('Colored stdout and stderr.'); cli.setEffects('read-only');`, `process.stdout.write('\\x1b[1;31mred stdout\\x1b[0m plain <img src=x onerror=alert(1)>\\n'); process.stderr.write('\\x1b[38;2;12;34;56mcolored stderr\\x1b[0m\\n');`);
 tool('erase', `cli.setDescription('Demonstrate destructive confirmation.'); cli.setEffects('destructive');`, `console.log('confirmed');`);

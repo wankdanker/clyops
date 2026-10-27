@@ -1,7 +1,9 @@
-import Ajv from 'ajv';
-import { formFields, withoutSecrets, type Schema, type ValueSpec, type FormField } from 'clyops-schema';
+import Ajv, { type ValidateFunction } from 'ajv';
+import { formFields, inputIssues, jsonSample, jsonSchemaView, withoutSecrets, type JsonSchema, type Schema, type ValueSpec, type FormField } from 'clyops-schema';
 
 const ajv = new Ajv({ allErrors: true, strict: false });
+// The form checks on every change; compile each tool's input schema once.
+const validators = new WeakMap<object, ValidateFunction>();
 
 /** Convert a scalar control's text without turning an empty numeric input into zero. */
 export function controlValue(value: string, schema: ValueSpec): unknown {
@@ -14,18 +16,20 @@ export function controlValue(value: string, schema: ValueSpec): unknown {
 export function controlAttributes(field: FormField) {
   const value = field.many ? field.schema.items ?? {} : field.schema;
   return {
-    type: field.secret ? 'password' : value.type === 'integer' || value.type === 'number' ? 'number' : field.validation === 'date:YYYY-MM-DD' ? 'date' : 'text',
-    min: value.minimum, max: value.maximum, step: value.type === 'integer' ? 1 : 'any',
-    minlength: value.minLength, maxlength: value.maxLength,
+    // A json value is text, whatever type its schema checks once it is parsed.
+    type: field.secret ? 'password' : field.json ? 'text' : value.type === 'integer' || value.type === 'number' ? 'number' : field.validation === 'date:YYYY-MM-DD' ? 'date' : 'text',
+    ...(field.json ? {} : { min: value.minimum, max: value.maximum, step: value.type === 'integer' ? 1 : 'any', minlength: value.minLength, maxlength: value.maxLength }),
   };
 }
 
-/** Validate only supplied JSON inputs; the tool resolves inheritance and remaining requirements. */
+/** Validate only supplied inputs (see clyops-schema's inputIssues); the tool resolves inheritance and remaining requirements. */
 export function inputErrors(inputSchema: object, input: Record<string, unknown>): string[] {
-  const validate = ajv.compile(inputSchema);
-  if (validate(input)) return [];
-  return (validate.errors ?? []).map(error => `${error.instancePath.slice(1) || (error.params.missingProperty as string) || 'Input'}: ${error.message}`);
+  let validate = validators.get(inputSchema);
+  if (!validate) validators.set(inputSchema, (validate = ajv.compile(inputSchema)));
+  return inputIssues(inputSchema as JsonSchema, input, validate);
 }
+
+export { jsonSample, jsonSchemaView };
 
 export interface SavedTemplate { id: string; name: string; api: string; tool: string; values: Record<string, unknown>; }
 export const TEMPLATE_STORAGE = 'clyops.web.templates.v1';

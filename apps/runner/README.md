@@ -16,6 +16,12 @@ it, and streams the output, so any program built with any clyops package gets a 
   for the chosen command with the options it inherits.
 - **Effects and relationships:** the tool's declared effects show as badges, and a `destructive`
   tool asks before it runs. Options that conflict, or that need another option, are flagged.
+- **JSON inputs:** a `json` or `json:SCHEMA` field is a text area, parsed and checked against its
+  schema as you type; problems block the run, and "Expected JSON" shows the schema. A URL schema
+  (and the schemas it references) is fetched when the tool loads, by the Rust side since the
+  webview's fetch is bound by CORS. Settings → URL schemas mirrors clyops-api's flags: fetch on or
+  off, reference depth (3), allowed hosts (redirects checked too), cache (3600 s), timeout (5 s)
+  and size limit (1 MiB). One that can't be fetched is a notice, and that input is only checked as JSON.
 - **stdin and stdout:** a tool that reads stdin gets a text box (or a file to read it from); one
   that writes binary output (an image, audio) gets a "save output to" field.
 - **Progress and metadata:** a tool that declares the `progress` role

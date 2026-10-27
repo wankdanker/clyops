@@ -61,6 +61,14 @@ exclusive conflicts block submission. Requirements that may be satisfied by
 config/environment are advisory, and the tool validates effective values.
 Destructive tools require confirmation before execution.
 
+A `json` or `json:SCHEMA` field is a text area for its JSON. The text is parsed
+and checked against the input's schema as you type, as the API checks it, so
+`shape: /w must be integer` or `shape: must be valid JSON` blocks submission
+while the field is enabled. "Expected JSON" shows the schema, and an enabled
+field starts from the schema's `default`, else its first `examples` entry. The
+desktop runner does the same. A URL schema is checked when the API has fetched
+it (`--fetch-schemas`, on by default); the desktop runner fetches it itself.
+
 The JSON editor applies the same input schema as the API. It omits secrets;
 password values remain in their dedicated controls. Templates save only known,
 non-secret overrides in this browser, scoped by API and tool. Files and stdin are

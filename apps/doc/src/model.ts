@@ -7,7 +7,7 @@ import type { Schema, SchemaArgument, SchemaBody, SchemaConfig, SchemaOption, Sc
 export type Block =
   | { /** A paragraph of plain text. */ kind: 'p'; text: string }
   | { /** Text shown as is, in a fixed-width font. */ kind: 'pre'; text: string }
-  | { /** A list of terms, each with its description. */ kind: 'dl'; items: { term: string; text: string }[] }
+  | { /** A list of terms, each with its description and, for a `json:SCHEMA` input, its schema as indented JSON. */ kind: 'dl'; items: { term: string; text: string; schema?: string }[] }
   | { /** A subsection heading, e.g. one per command. */ kind: 'h'; text: string }
   | { /** Other pages, as SEE ALSO lists them: `page(section)`, linked in Markdown and HTML. */ kind: 'refs'; items: { page: string; section: string }[] };
 
@@ -148,6 +148,25 @@ function argumentText(a: SchemaArgument): string {
   return notes.length ? `${a.description}${a.description ? ' ' : ''}(${notes.join('; ')})` : a.description;
 }
 
+/**
+ * A `json:SCHEMA` input's schema as indented JSON, without `$schema`; none for an input
+ * without one or one that only references a URL, which `accepts:` already names.
+ */
+export function schemaText(item: SchemaOption | SchemaArgument): string | undefined {
+  const schema = item.schema;
+  if (!item.validation.startsWith('json:') || schema === null || schema === undefined) return undefined;
+  if (typeof schema !== 'object' || Array.isArray(schema)) return JSON.stringify(schema);
+  const { $schema: _version, ...rest } = schema as Record<string, unknown>;
+  const keys = Object.keys(rest);
+  if (keys.length === 0 || (keys.length === 1 && keys[0] === '$ref')) return undefined;
+  return JSON.stringify(rest, null, 2);
+}
+
+const withSchema = (item: SchemaOption | SchemaArgument, term: string, text: string) => {
+  const schema = schemaText(item);
+  return schema ? { term, text, schema } : { term, text };
+};
+
 function stream(s: SchemaStream): string {
   return [s.description, s.contentType && `(${s.contentType})`].filter(Boolean).join(' ') || 'Declared, without a description.';
 }
@@ -167,7 +186,7 @@ const EFFECTS: Record<string, string> = {
 
 /** A leaf's parts: its arguments, options and streams as definition lists, and notes as text. */
 function leafParts(leaf: Leaf): { args?: Block; options?: Block; streams?: Block; notes: Block[] } {
-  const dl = (items: { term: string; text: string }[]): Block | undefined => (items.length ? { kind: 'dl', items } : undefined);
+  const dl = (items: { term: string; text: string; schema?: string }[]): Block | undefined => (items.length ? { kind: 'dl', items } : undefined);
   const streams = [
     ...(leaf.stdin ? [{ term: 'stdin', text: stream(leaf.stdin) }] : []),
     ...(leaf.stdout ? [{ term: 'stdout', text: stream(leaf.stdout) }] : []),
@@ -181,8 +200,8 @@ function leafParts(leaf: Leaf): { args?: Block; options?: Block; streams?: Block
     ...leaf.requiredCommands.map((r) => `Needs ${r.command} on PATH: ${r.description}${r.installHint ? ` (${r.installHint})` : ''}.`),
   ].filter(Boolean);
   return {
-    args: dl(leaf.arguments.map((a) => ({ term: a.isVariadic ? `<${a.name}...>` : `<${a.name}>`, text: argumentText(a) }))),
-    options: dl(leaf.options.filter((o) => o.name !== 'help').map((o) => ({ term: optionLabel(o), text: optionText(o) }))),
+    args: dl(leaf.arguments.map((a) => withSchema(a, a.isVariadic ? `<${a.name}...>` : `<${a.name}>`, argumentText(a)))),
+    options: dl(leaf.options.filter((o) => o.name !== 'help').map((o) => withSchema(o, optionLabel(o), optionText(o)))),
     streams: dl(streams),
     notes: notes.map((text) => ({ kind: 'p', text })),
   };

@@ -16,6 +16,7 @@ import { basename, join, parse, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Readable, Transform } from 'node:stream';
 import { finished, pipeline } from 'node:stream/promises';
+import { OpenApiGeneratorV31 } from '@asteasolutions/zod-to-openapi';
 import { plus, z } from 'plus-express';
 import { toZod } from './zod.js';
 
@@ -339,7 +340,11 @@ export async function createApi(opts: ApiOptions) {
     });
   }
   app.get('/openapi.json', (_req: Request, res: Response) => {
-    res.json(documentStreams(opts, api.registry.generateOpenAPIDocument(opts.apiKey || keys.length ? { security: [{ apiKey: [] }] } : {}), api.tools));
+    // OpenAPI 3.1, whose schemas are JSON Schema, so a json:SCHEMA input's schema goes in as it is.
+    // plus-express generates 3.0; its registry's definitions feed the 3.1 generator instead.
+    const generator = new OpenApiGeneratorV31(api.registry.getRawRegistry().definitions);
+    const doc = generator.generateDocument({ openapi: '3.1.0', info: api.info, ...(opts.apiKey || keys.length ? { security: [{ apiKey: [] }] } : {}) });
+    res.json(documentStreams(opts, doc as Parameters<typeof documentStreams>[1], api.tools));
   });
   // A key only sees and runs the tools it may.
   app.use((req: Request, res: Response, next: NextFunction) => {
@@ -570,13 +575,30 @@ async function respond(opts: ApiOptions, ctx: Ctx, tool: ApiTool, input: Record<
   res.end();
 }
 
+const token = (key: string) => key.replace(/~/g, '~0').replace(/\//g, '~1');
+
+/** A schema with its local `#` references (`#/$defs/x`) pointed at `base` in the document. */
+function rebase(schema: Record<string, unknown>, base: string): Record<string, unknown> {
+  const walk = (node: unknown): unknown => {
+    if (Array.isArray(node)) return node.map(walk);
+    if (!node || typeof node !== 'object') return node;
+    return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, k === '$ref' && typeof v === 'string' && (v === '#' || v.startsWith('#/')) ? `${base}${v.slice(1)}` : walk(v)]));
+  };
+  return walk(schema) as Record<string, unknown>;
+}
+
 /**
  * The OpenAPI document with what plus-express can't express: the other
  * request bodies (a tool's stdin, multipart), the query parameters they take,
- * declared binary stdout and the tools' effects.
+ * declared binary stdout (as 3.1 does, a string with its media type), the
+ * tools' effects, and json inputs' references placed in the document.
  */
 function documentStreams(opts: ApiOptions, doc: { paths?: Record<string, Record<string, Record<string, unknown>>> }, tools: ApiTool[]) {
-  const binary = { type: 'string', format: 'binary' };
+  // Raw bytes, as OpenAPI 3.1 describes them: a string with the media type, no format.
+  const bytes = (type = 'application/octet-stream') => ({ type: 'string', contentMediaType: type });
+  const binary = bytes();
+  const jobStdout = (doc.paths?.['/jobs/{id}/stdout']?.get as { responses?: Record<string, { content?: Record<string, { schema?: unknown }> }> } | undefined)?.responses?.['200']?.content?.['application/octet-stream'];
+  if (jobStdout) jobStdout.schema = binary;
   for (const tool of tools) {
     const op = doc.paths?.[tool.path]?.post as {
       requestBody?: { content: Record<string, unknown> }; parameters?: unknown[]; responses?: Record<string, { content?: Record<string, unknown> }>;
@@ -585,7 +607,7 @@ function documentStreams(opts: ApiOptions, doc: { paths?: Record<string, Record<
     if (tool.schema.effects?.length) op['x-clyops-effects'] = tool.schema.effects;
     const content = (op.requestBody ??= { content: {} }).content;
     for (const type of tool.schema.stdin?.contentType ? tool.schema.stdin.contentType.split(',').map((t) => t.trim()) : ['application/octet-stream']) {
-      content[type] = { schema: { ...binary, description: `Standard input${tool.schema.stdin?.description ? `: ${tool.schema.stdin.description}` : ''}; the arguments come from the query string` } };
+      content[type] = { schema: { ...bytes(type), description: `Standard input${tool.schema.stdin?.description ? `: ${tool.schema.stdin.description}` : ''}; the arguments come from the query string` } };
     }
     content['multipart/form-data'] = {
       schema: {
@@ -595,16 +617,33 @@ function documentStreams(opts: ApiOptions, doc: { paths?: Record<string, Record<
       },
     };
     const properties = (toJsonSchema(publicSchema(tool.schema, closedOf(opts, tool))).properties ?? {}) as Record<string, Record<string, unknown>>;
+    // A json input's schema is in the JSON body, its `#` references relative to itself: point them
+    // at where it sits in this document. In the query string it is JSON text, checked by that schema.
+    const body = ((content['application/json'] as { schema?: { properties?: Record<string, Record<string, unknown>> } } | undefined)?.schema?.properties) ?? {};
+    const at = (name: string, many: boolean) => `#/paths/${token(tool.path)}/post/requestBody/content/application~1json/schema/properties/${token(name)}${many ? '/items' : ''}`;
+    const isJson = (s: Record<string, unknown> | undefined) => s?.contentMediaType === 'application/json';
+    for (const [name, schema] of Object.entries(properties)) {
+      const many = !isJson(schema) && isJson(schema.items as Record<string, unknown> | undefined);
+      if (!isJson(schema) && !many) continue;
+      const place = many ? (body[name]?.items as Record<string, unknown> | undefined) : body[name];
+      if (place) Object.assign(place, rebase(place, at(name, many)));
+    }
+    const textOf = (name: string, many: boolean) => ({ type: 'string', contentMediaType: 'application/json', contentSchema: { $ref: at(name, many) } });
     op.parameters = [
       ...(op.parameters ?? []),
-      ...Object.entries(properties).map(([name, schema]) => ({
-        in: 'query', name, required: false, schema, ...(schema.type === 'array' ? { style: 'form', explode: true } : {}),
-        description: `${schema.description ?? ''} (with a non-JSON body)`.trim(),
-      })),
+      ...Object.entries(properties).map(([name, raw]) => {
+        const many = !isJson(raw) && isJson(raw.items as Record<string, unknown> | undefined);
+        const schema = isJson(raw) ? { ...textOf(name, false), ...(raw.description ? { description: raw.description } : {}) }
+          : many ? { ...raw, items: textOf(name, true) } : raw;
+        return {
+          in: 'query', name, required: false, schema, ...(schema.type === 'array' ? { style: 'form', explode: true } : {}),
+          description: `${raw.description ?? ''} (with a non-JSON body)`.trim(),
+        };
+      }),
     ];
     const type = binaryStdout(tool);
     const ok = op.responses?.['200'];
-    if (type && ok) ok.content = { [type]: { schema: { ...binary, description: tool.schema.stdout?.description ?? '' } }, ...ok.content };
+    if (type && ok) ok.content = { [type]: { schema: { ...bytes(type), description: tool.schema.stdout?.description ?? '' } }, ...ok.content };
   }
   return doc;
 }
@@ -612,12 +651,8 @@ function documentStreams(opts: ApiOptions, doc: { paths?: Record<string, Record<
 /** The documented routes for one set of tools, on their own router and registry. */
 function buildRoutes(opts: ApiOptions, ctx: Ctx, tree: Group, tools: ApiTool[]) {
   const { queue } = ctx;
-  const { router, registry } = plus(express.Router(), {
-    openApiConfig: {
-      openapi: '3.0.0',
-      info: { title: tree.name, version: opts.version ?? '0.0.0', description: tree.description || `clyops tools in ${tree.dir}` },
-    },
-  });
+  const info = { title: tree.name, version: opts.version ?? '0.0.0', description: tree.description || `clyops tools in ${tree.dir}` };
+  const { router, registry } = plus(express.Router(), { openApiConfig: { openapi: '3.1.0', info } });
   if (opts.apiKey || Object.keys(opts.keys ?? {}).length) registry.registerSecurityScheme('apiKey', { type: 'http', scheme: 'bearer' });
   const jobView = (record: JobRecord, result?: ApiResult) => ({ ...record, ...(result ? { result } : {}) });
   const visible = (res: Response) => {
@@ -740,7 +775,7 @@ function buildRoutes(opts: ApiOptions, ctx: Ctx, tree: Group, tools: ApiTool[]) 
       tags: ['jobs'],
       params: JobParams,
       responses: {
-        200: { description: 'The output, with the tool\'s declared content type', content: { 'application/octet-stream': { schema: z.string().openapi({ format: 'binary' }) } } },
+        200: { description: 'The output, with the tool\'s declared content type', content: { 'application/octet-stream': { schema: z.string() } } },
         404: json(ErrorSchema, 'No such job, or no output (yet)'),
       },
     },
@@ -762,7 +797,7 @@ function buildRoutes(opts: ApiOptions, ctx: Ctx, tree: Group, tools: ApiTool[]) 
     },
   );
 
-  return { router, registry, tree, tools };
+  return { router, registry, info, tree, tools };
 }
 
 /** Errors as JSON: validation failures (400) with zod's issues, anything else 500. */

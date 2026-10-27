@@ -61,6 +61,22 @@ function jsonValue(schema: Js, at: At): z.ZodType {
   });
 }
 
+/**
+ * A json input's schema for the OpenAPI document, standing on its own: without the keywords that
+ * only document it, and with the `#` references that point into the whole input schema
+ * (`#/properties/shape/$defs/x`) pointing into itself (`#/$defs/x`). The document rebases them
+ * onto where it puts the schema (see documentStreams).
+ */
+function selfContained(schema: Js, pointer: string): unknown {
+  const prefix = `#${pointer}`;
+  const walk = (node: unknown): unknown => {
+    if (Array.isArray(node)) return node.map(walk);
+    if (!node || typeof node !== 'object') return node;
+    return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, k === '$ref' && typeof v === 'string' && (v === prefix || v.startsWith(`${prefix}/`)) ? `#${v.slice(prefix.length)}` : walk(v)]));
+  };
+  return walk(Object.fromEntries(Object.entries(schema).filter(([k]) => !DOCUMENTATION.has(k))));
+}
+
 /** Whether `value` matches one of the "given" shapes toJsonSchema uses for exclusive options. */
 function given(value: unknown, shape: { const?: unknown; type?: string; minItems?: number; not?: unknown } | undefined): boolean {
   if (value === undefined || value === null) return false;
@@ -132,5 +148,7 @@ export function toZod(schema: Js, at: At = { root: schema, pointer: '' }): z.Zod
   const meta: Record<string, unknown> = {};
   if (schema.description) meta.description = schema.description;
   if (schema.default !== undefined) meta.default = schema.default;
+  // OpenAPI 3.1 schemas are JSON Schema: a json input's schema goes in as it is.
+  if (schema.contentMediaType === 'application/json') Object.assign(meta, selfContained(schema, at.pointer));
   return Object.keys(meta).length ? out.openapi(meta) : out;
 }

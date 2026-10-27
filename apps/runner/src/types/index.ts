@@ -1,3 +1,5 @@
+import type { SchemaSettings } from '../lib/schemas';
+
 export interface ScriptInfo {
   name: string;
   path: string;
@@ -56,4 +58,6 @@ export interface FormValues {
 export interface AppConfig {
   scripts_dir?: string;
   templates_dir?: string;
+  /** How URL schemas are fetched (see lib/schemas.ts). */
+  schemas?: SchemaSettings;
 }

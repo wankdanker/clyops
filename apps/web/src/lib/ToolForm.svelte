@@ -1,7 +1,7 @@
 <script lang="ts">
   import { formFields, constraintIssues, withoutSecrets, isTextType, type Schema, type JsonSchema } from 'clyops-schema';
   import Field from './Field.svelte';
-  import { inputErrors, template, restoreTemplate, TEMPLATE_STORAGE, type SavedTemplate } from './form';
+  import { inputErrors, jsonSample, template, restoreTemplate, TEMPLATE_STORAGE, type SavedTemplate } from './form';
   let { schema, inputSchema, api, tool, busy, onrun }: {
     schema: Schema; inputSchema: JsonSchema; api: string; tool: string; busy: boolean;
     onrun: (values: Record<string, unknown>, async: boolean, stdin: string | File | undefined, files: Record<string, File>) => void;
@@ -42,7 +42,7 @@
   function update(key: string, value: unknown) { values = { ...values, [key]: value }; confirmation = false; }
   function toggle(key: string, on: boolean) {
     const field = fields.find(field => field.key === key)!;
-    if (on) update(key, field.many ? [] : field.schema.type === 'boolean' ? false : field.secret ? '' : field.schema.default ?? '');
+    if (on) update(key, field.many ? [] : field.json ? jsonSample(field) : field.schema.type === 'boolean' ? false : field.secret ? '' : field.schema.default ?? '');
     else { const { [key]: omitted, ...rest } = values; values = rest; const { [key]: file, ...remaining } = files; files = remaining; confirmation = false; }
   }
   function upload(key: string, file: File | undefined) {
@@ -62,7 +62,11 @@
       const checked = inputErrors(inputSchema, input as Record<string, unknown>);
       if (checked.length) throw new Error(checked.join('; '));
       // Secret values can only be entered into their dedicated password controls.
-      const sanitized = withoutSecrets(schema, input as Record<string, unknown>);
+      // A json field holds its text: an object, array or number given here becomes its JSON.
+      const asText = (key: string, value: unknown) => fields.find(field => field.key === key)?.json
+        ? (Array.isArray(value) && fields.find(field => field.key === key)?.many ? value.map(item => typeof item === 'string' ? item : JSON.stringify(item)) : typeof value === 'string' ? value : JSON.stringify(value, null, 2))
+        : value;
+      const sanitized = Object.fromEntries(Object.entries(withoutSecrets(schema, input as Record<string, unknown>)).map(([key, value]) => [key, asText(key, value)]));
       const secrets = Object.fromEntries(fields.filter(field => field.secret && enabled(field.key)).map(field => [field.key, values[field.key]]));
       values = { ...sanitized, ...secrets }; files = {}; confirmation = false; jsonError = '';
       jsonInput = JSON.stringify(sanitized, null, 2); mode = 'form';

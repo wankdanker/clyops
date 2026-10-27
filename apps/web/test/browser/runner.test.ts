@@ -50,6 +50,30 @@ test('typed controls, inherited defaults, oneOf/exclusive, templates, JSON and r
   expect(await page.locator('#api-key').inputValue()).toBe('');
 });
 
+test('a json:SCHEMA field shows its schema, starts from its example and is checked as you type', async ({ page }) => {
+  await connect(page); await choose(page,'shape');
+  const field=page.locator('[data-field=shape]');
+  await expect(field.locator('textarea')).toBeDisabled();
+  await field.getByText('Expected JSON').click();
+  await expect(field.locator('details pre')).toContainText('"minimum": 1');
+  await field.getByRole('checkbox').check();
+  await expect(field.locator('textarea')).toHaveValue('{\n  "w": 3\n}');
+  const run=page.getByRole('button',{name:'Run tool',exact:false});
+  await expect(run).toBeEnabled();
+  await field.locator('textarea').fill('{"w": 0}');
+  await expect(page.getByText('shape: /w must be >= 1')).toBeVisible(); await expect(run).toBeDisabled();
+  await field.locator('textarea').fill('{"w":');
+  await expect(page.getByText('shape: must be valid JSON')).toBeVisible(); await expect(run).toBeDisabled();
+  // The JSON editor takes the value itself; the field then holds its text.
+  await page.getByRole('button',{name:'Edit JSON',exact:false}).click();
+  await page.locator('#json-input').fill('{"shape": {"w": 7}}');
+  await page.getByRole('button',{name:'Apply JSON'}).click();
+  await expect(field.locator('textarea')).toHaveValue('{\n  "w": 7\n}');
+  await run.click();
+  await expect(page.locator('.result-status')).toContainText('Completed');
+  await expect(page.locator('.output').first()).toContainText('shape is {\n  "w": 7\n}');
+});
+
 test('destructive confirmation and stdin execution', async ({ page }) => {
   await connect(page); await choose(page,'erase');
   await expect(page.getByRole('button',{name:'Run tool',exact:false})).toBeDisabled();
