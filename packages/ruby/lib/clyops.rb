@@ -20,7 +20,7 @@ require_relative "clyops/completions"
 # See Cli for program configuration and Values for resolved runtime keys.
 module Clyops
   # Release version of this library.
-  VERSION = "0.10.0"
+  VERSION = "0.11.0"
 
   # -------------------------------------------------------------------------
   # Logging

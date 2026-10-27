@@ -5,6 +5,10 @@ section here.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-26
+
+Multi-step job functions with branches, and a JSON Schema for the clyops-jobs config file.
+
 ### clyops-jobs
 
 - Multi-step functions: `steps` on a function runs several tools in order with one context
