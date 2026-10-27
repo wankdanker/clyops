@@ -15,13 +15,14 @@
     "@monaco-editor/react": "^4.7.0",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
+    "ajv": "^8.20.0",
     "ansi-to-react": "^6.1.6",
     "clsx": "^2.0.0",
+    "clyops-schema": "0.11.0",
     "lucide-react": "^0.294.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "tailwind-merge": "^2.2.0",
-    "clyops-schema": "0.11.0"
+    "tailwind-merge": "^2.2.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",

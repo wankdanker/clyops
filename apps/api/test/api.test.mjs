@@ -160,6 +160,13 @@ test('OpenAPI document', async () => {
   assert.deepEqual(op.tags, ['media']);
   const body = op.requestBody.content['application/json'].schema;
   assert.deepEqual(body.properties.count, { type: 'integer', minimum: 1, maximum: 10, default: 3, description: 'Number of iterations' });
+  // A json:SCHEMA input carries its schema; a URL one (never fetched from example.com) names it.
+  // A json:SCHEMA input's schema is in x-clyops-json-schema (OpenAPI 3.0 schema objects are a JSON
+  // Schema subset); a URL one that isn't fetched (example.com never is) names the URL.
+  assert.deepEqual(body.properties.shape['x-clyops-json-schema'], JSON.parse(shapeSchema));
+  assert.deepEqual(body.properties.filter['x-clyops-json-schema'], { type: 'object' });
+  assert.deepEqual(body.properties.event['x-clyops-json-schema'], { $comment: 'JSON Schema: https://example.com/event.json' });
+  assert.equal(body.properties.payload['x-clyops-json-schema'], undefined);
   assert.deepEqual(body.required, ['input']);
   assert.ok(doc.paths['/jobs/{id}'].get);
 });
@@ -762,5 +769,26 @@ process.stdout.write(v.EVENT);
     } finally {
       off.close();
     }
+test('OpenAPI: a json input\'s schema stands on its own, its # references pointing into itself', async (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'clyops-api-refs-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const schema = { $defs: { w: { type: 'integer', minimum: 1 } }, type: 'object', properties: { w: { $ref: '#/$defs/w' } } };
+  jsTool(root, 'box', `const cli = new Cli({ name: 'box' });
+cli.opt('BOX', 'box', '', 'optional', 'Box', 'Options', ${JSON.stringify(`json:${JSON.stringify(schema)}`)});
+cli.optArray('ITEM', 'item', '', 'Items', 'Options', ${JSON.stringify(`json:${JSON.stringify(schema)}`)});
+const v = cli.run();
+process.stdout.write(String(v.BOX));
+`);
+  const api = await serve({ root, cwd: root });
+  try {
+    const doc = await (await fetch(`${api.at}/openapi.json`)).json();
+    const props = doc.paths['/tools/box'].post.requestBody.content['application/json'].schema.properties;
+    assert.deepEqual(props.box['x-clyops-json-schema'], schema);
+    assert.deepEqual(props.item.items['x-clyops-json-schema'], schema);
+    // Validation still follows the reference as rewritten into the input schema.
+    const res = await fetch(`${api.at}/tools/box`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ box: { w: 0 } }) });
+    assert.deepEqual((await res.json()).issues.map((i) => `${i.path.join('.')}: ${i.message}`), ['box: /w must be >= 1']);
+  } finally {
+    api.close();
   }
 });

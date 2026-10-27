@@ -946,7 +946,7 @@ file that already has the page's content untouched. Because it can write files,
 | NAME | the page name and the first sentence of `description` |
 | SYNOPSIS | a usage line per runnable command, as help writes it (section 7) |
 | DESCRIPTION | `description`, a paragraph per blank-line-separated block |
-| ARGUMENTS, OPTIONS, STREAMS, NOTES | for a program without commands: its arguments, its options except `help` (each with required, repeatable, secret, default, accepted values and variable), `stdin`, `stdout` and roles, then effects, relationships and required commands |
+| ARGUMENTS, OPTIONS, STREAMS, NOTES | for a program without commands: its arguments, its options except `help` (each with required, repeatable, secret, default, accepted values and variable, and a `json:SCHEMA` input's schema as indented JSON, unless it only references a URL), `stdin`, `stdout` and roles, then effects, relationships and required commands |
 | COMMANDS | for a program with commands: each runnable command with the same parts |
 | ENVIRONMENT | the precedence rule, each option's variable once, `CLYOPS_FDS` when there are roles, `CLYOPS_SILENT`, `CLYOPS_MAX_WIDTH`, `NO_COLOR` |
 | FILES | when `config` is set: the option and variable naming the file, its default, the line format and prefixes (section 4) |

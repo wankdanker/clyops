@@ -33,7 +33,7 @@ function manBlock(b: Block): string[] {
     case 'pre':
       return ['.PP', '.nf', '.RS 4', troff(b.text), '.RE', '.fi'];
     case 'dl':
-      return b.items.flatMap((i) => ['.TP', `\\fB${troff(i.term)}\\fR`, troff(i.text)]);
+      return b.items.flatMap((i) => ['.TP', `\\fB${troff(i.term)}\\fR`, troff(i.text), ...(i.schema ? ['.RS', '.PP', 'JSON Schema:', '.nf', troff(i.schema), '.fi', '.RE'] : [])]);
     case 'refs':
       return ['.PP', ...b.items.map((r, n) => `.BR ${arg(r.page)} ${arg(`(${r.section})${n < b.items.length - 1 ? ',' : ''}`)}`)];
   }
@@ -86,10 +86,10 @@ function code(text: string): string {
   return run > 1 ? `${fence} ${text} ${fence}` : `${fence}${text}${fence}`;
 }
 
-function fenced(text: string): string[] {
+function fenced(text: string, info = ''): string[] {
   const run = Math.max(2, ...(text.match(/`+/g) ?? []).map((m) => m.length)) + 1;
   const fence = '`'.repeat(run);
-  return [fence, text, fence];
+  return [fence + info, text, fence];
 }
 
 function markdownBlock(b: Block): string[] {
@@ -101,7 +101,7 @@ function markdownBlock(b: Block): string[] {
     case 'pre':
       return [...fenced(b.text), ''];
     case 'dl':
-      return [...b.items.map((i) => `- ${code(i.term)}: ${markdownText(i.text)}`), ''];
+      return [...b.items.flatMap((i) => [`- ${code(i.term)}: ${markdownText(i.text)}`, ...(i.schema ? ['', '  JSON Schema:', '', ...fenced(i.schema, 'json').join('\n').split('\n').map((l) => `  ${l}`), ''] : [])]), ''];
     case 'refs':
       return [b.items.map((r) => `[${markdownText(`${r.page}(${r.section})`)}](${encodeURI(r.page)}.md)`).join(', '), ''];
   }
@@ -142,7 +142,7 @@ function htmlBlock(b: Block): string {
     case 'pre':
       return `<pre><code>${htmlText(b.text)}</code></pre>`;
     case 'dl':
-      return `<dl>\n${b.items.map((i) => `<dt><code>${htmlText(i.term)}</code></dt>\n<dd>${htmlText(i.text)}</dd>`).join('\n')}\n</dl>`;
+      return `<dl>\n${b.items.map((i) => `<dt><code>${htmlText(i.term)}</code></dt>\n<dd>${htmlText(i.text)}${i.schema ? `\n<details><summary>JSON Schema</summary><pre><code>${htmlText(i.schema)}</code></pre></details>` : ''}</dd>`).join('\n')}\n</dl>`;
     case 'refs':
       return `<p>${b.items.map((r) => `<a href="${htmlText(encodeURI(r.page))}.html"><code>${htmlText(r.page)}</code>(${htmlText(r.section)})</a>`).join(', ')}</p>`;
   }

@@ -26,10 +26,13 @@ __export(index_exports, {
   fdsEnv: () => fdsEnv,
   formFields: () => formFields,
   formSchema: () => formSchema,
+  inputIssues: () => inputIssues,
   inputKey: () => inputKey,
   inputKeys: () => inputKeys,
   isBareFlag: () => isBareFlag,
   isTextType: () => isTextType,
+  jsonSample: () => jsonSample,
+  jsonSchemaView: () => jsonSchemaView,
   optionGiven: () => optionGiven,
   parseJsonInputs: () => parseJsonInputs,
   toJsonSchema: () => toJsonSchema,
@@ -214,10 +217,41 @@ function formFields(schema, naming = "input") {
       many: item.many,
       secret: item.secret,
       path: item.valueType === "path" || /^(path|file:|dir:)/.test(item.validation),
+      json: item.validation === "json" || item.validation.startsWith("json:"),
       validation: item.validation,
       schema: properties[key]
     };
   });
+}
+function inputIssues(inputSchema, input, validate) {
+  const issues = [];
+  const parsed = {};
+  const unparsed = /* @__PURE__ */ new Set();
+  for (const [key, value] of Object.entries(input)) {
+    const one = parseJsonInputs(inputSchema, { [key]: value });
+    if ("error" in one) {
+      issues.push(`${key}: must be valid JSON`);
+      unparsed.add(key);
+    } else parsed[key] = one.value[key];
+  }
+  if (validate(parsed)) return issues;
+  for (const error of validate.errors ?? []) {
+    const [key = "", ...rest] = error.instancePath.slice(1).split("/").map((part) => part.replace(/~1/g, "/").replace(/~0/g, "~"));
+    const missing = error.params.missingProperty;
+    if (missing && !key && unparsed.has(missing)) continue;
+    issues.push(`${key || missing || "Input"}: ${rest.length ? `/${rest.join("/")} ` : ""}${error.message ?? "is invalid"}`);
+  }
+  return issues;
+}
+function jsonSchemaView(field) {
+  if (!field.json) return void 0;
+  const { contentMediaType: _type, description: _description, default: _default, ...rest } = field.many ? field.schema.items ?? {} : field.schema;
+  return Object.keys(rest).length ? JSON.stringify(rest, null, 2) : void 0;
+}
+function jsonSample(field) {
+  const schema = field.many ? field.schema.items ?? {} : field.schema;
+  const sample = schema.default !== void 0 ? schema.default : Array.isArray(schema.examples) ? schema.examples[0] : void 0;
+  return sample === void 0 ? "" : JSON.stringify(sample, null, 2);
 }
 function optionGiven(option, value) {
   if (value === void 0 || value === null || value === false || Array.isArray(value) && !value.length) return false;
@@ -279,10 +313,13 @@ function fdsEnv(mapping) {
   fdsEnv,
   formFields,
   formSchema,
+  inputIssues,
   inputKey,
   inputKeys,
   isBareFlag,
   isTextType,
+  jsonSample,
+  jsonSchemaView,
   optionGiven,
   parseJsonInputs,
   toJsonSchema,

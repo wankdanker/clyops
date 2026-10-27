@@ -16,6 +16,19 @@ section here.
   leaves its input unchecked. The reserved example domains (RFC 2606) are never fetched.
   In clyops-tools: `loadTools`/`watchTools` take `schemas`, plus `fetchSchemaRefs`,
   `inlineSchemaRefs`, `clearSchemaCache` and `SchemaFetchError`.
+- The web and desktop runners check `json` and `json:SCHEMA` fields as you type, with ajv:
+  the text is parsed, as the API does, and checked against the field's schema, and
+  problems block a run while the field is enabled (#52). A JSON field is a text area with
+  an "Expected JSON" view of its schema, and starts from the schema's `default` or first
+  `examples` entry. clyops-schema's `inputIssues` does the parsing and messages with any
+  ajv-shaped validator, so the package keeps no dependencies; `jsonSchemaView`,
+  `jsonSample` and `FormField.json` go with it.
+- clyops-doc prints a `json:SCHEMA` input's schema under it in man pages, Markdown and HTML
+  (#52).
+- clyops-api's OpenAPI document gives a `json:SCHEMA` input's schema as
+  `x-clyops-json-schema`, with its `#` references pointing into itself (#52).
+- Fixed: the web runner rejected every `json:SCHEMA` field whose schema wasn't a string
+  schema, because it checked the field's text rather than its parsed value.
 
 ## [0.11.0] - 2026-10-26
 

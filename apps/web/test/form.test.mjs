@@ -7,7 +7,8 @@ async function module(file) {
   const compiled = await build({ entryPoints: [new URL('../src/lib/'+file, import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'node' });
   return import('data:text/javascript;base64,'+Buffer.from(compiled.outputFiles[0].text).toString('base64'));
 }
-const { controlValue, inputErrors, template, restoreTemplate, resultBlob, progressView } = await module('form.ts');
+const { controlAttributes, controlValue, inputErrors, jsonSample, jsonSchemaView, template, restoreTemplate, resultBlob, progressView } = await module('form.ts');
+const { formFields, toJsonSchema } = await module('../../../../packages/schema/src/index.ts');
 const { ApiClient, apiBase } = await module('client.ts');
 const { ansiSegments, ansiText } = await module('ansi.ts');
 
@@ -53,4 +54,35 @@ test('progress updates become a fraction and a label', () => {
   assert.deepEqual(progressView({ done: 1, total: 4, message: 'file 1' }), { fraction: 0.25, label: 'file 1' });
   assert.deepEqual(progressView({ pct: -5 }), { fraction: 0 });
   assert.deepEqual(progressView(null), {});
+});
+
+test('json fields are parsed before their schema checks them, each on its own', () => {
+  const cli = new Cli();
+  cli.opt('SHAPE', 'shape', '', 'optional', 'Shape', 'Options', 'json:{"type":"object","required":["w"],"properties":{"w":{"type":"integer"}},"examples":[{"w":3}]}');
+  cli.opt('PAYLOAD', 'payload', '', 'optional', 'Payload', 'Options', 'json');
+  cli.opt('COUNT', 'count', '', '1', 'Count', 'Options', 'json:{"type":"integer","minimum":1}');
+  cli.optArray('TAG', 'tag', '', 'Tags', 'Options', 'json:{"type":"string"}');
+  cli.opt('N', 'n', '', '1', 'N', 'Options', 'int:1-5');
+  const schema = JSON.parse(cli.jsonSchema());
+  const input = toJsonSchema(schema);
+  assert.deepEqual(inputErrors(input, { shape: '{"w": 2}', payload: '[1]', count: '3', tag: ['"a"'] }), []);
+  assert.deepEqual(inputErrors(input, { shape: '{"w": "x"}' }), ['shape: /w must be integer']);
+  assert.deepEqual(inputErrors(input, { shape: '{}' }), ["shape: must have required property 'w'"]);
+  assert.deepEqual(inputErrors(input, { count: '0' }), ['count: must be >= 1']);
+  assert.deepEqual(inputErrors(input, { tag: ['"a"', '2'] }), ['tag: /1 must be string']);
+  // Text that isn't JSON is reported, and doesn't hide another field's errors.
+  assert.deepEqual(inputErrors(input, { shape: '{', payload: 'nope', n: 9 }), ['shape: must be valid JSON', 'payload: must be valid JSON', 'n: must be <= 5']);
+
+  const fields = Object.fromEntries(formFields(schema).map((f) => [f.key, f]));
+  assert.deepEqual([fields.shape.json, fields.payload.json, fields.n.json], [true, true, false]);
+  assert.equal(jsonSchemaView(fields.shape), JSON.stringify({ type: 'object', required: ['w'], properties: { w: { type: 'integer' } }, examples: [{ w: 3 }] }, null, 2));
+  assert.equal(jsonSchemaView(fields.payload), undefined);
+  assert.equal(jsonSchemaView(fields.n), undefined);
+  // Its default, else its first example, is what an enabled field starts with.
+  assert.equal(jsonSample(fields.shape), JSON.stringify({ w: 3 }, null, 2));
+  assert.equal(jsonSample(fields.count), '1');
+  assert.equal(jsonSample(fields.payload), '');
+  // A json value is typed as text, even when its schema checks a number once parsed.
+  assert.equal(controlAttributes(fields.count).type, 'text');
+  assert.equal(controlAttributes(fields.count).min, undefined);
 });

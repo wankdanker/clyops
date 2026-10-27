@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Cli } from 'clyops';
-import { buildDoc, defaultDate, document, firstSentence, leaves, markdownText, pageName, pages, troff } from '../dist/index.js';
+import { buildDoc, defaultDate, document, firstSentence, leaves, markdownText, pageName, pages, schemaText, troff } from '../dist/index.js';
 
 const cli = fileURLToPath(new URL('../dist/cli.js', import.meta.url));
 const repo = fileURLToPath(new URL('../../..', import.meta.url));
@@ -248,3 +248,20 @@ test('--root: a page per tool and an index, found the way the dispatcher finds t
   }
 });
 
+
+test('a json:SCHEMA input shows its schema in every format; a URL one only names it', () => {
+  const option = (validation, schema) => ({ name: 'shape', shortName: '', variableName: 'SHAPE', description: 'Shape', default: '', group: 'Options', type: 'string', isFlag: false, isArray: false, required: false, validation, choices: [], schema, secret: false });
+  const shape = { $schema: 'https://json-schema.org/draft/2020-12/schema', type: 'object', properties: { w: { type: 'integer' } } };
+  assert.equal(schemaText(option('json:shape.json', shape)), JSON.stringify({ type: 'object', properties: { w: { type: 'integer' } } }, null, 2));
+  for (const [validation, schema] of [['json:https://x.org/s.json', { $ref: 'https://x.org/s.json' }], ['json', null], ['json:missing.json', null], ['string', { type: 'object' }]]) {
+    assert.equal(schemaText(option(validation, schema)), undefined, validation);
+  }
+  assert.equal(schemaText(option('json:{}', false)), 'false');
+
+  const program = { ...demo, commands: [], arguments: [], options: [option('json:shape.json', shape)] };
+  const man = document(program, 'man');
+  assert.match(man, /^JSON Schema:\n\.nf\n\{\n  "type": "object",/m);
+  if (hasGroff) assert.equal(groffWarnings(man), '');
+  assert.match(document(program, 'markdown'), /^ {2}JSON Schema:\n\n {2}```json\n {2}\{\n {4}"type": "object",/m);
+  assert.match(document(program, 'html'), /<details><summary>JSON Schema<\/summary><pre><code>\{\n {2}&quot;type&quot;: &quot;object&quot;,/);
+});

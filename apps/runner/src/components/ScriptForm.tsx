@@ -1,4 +1,4 @@
-import { valueSchema } from 'clyops-schema';
+import { jsonSample, jsonSchemaView, valueSchema } from 'clyops-schema';
 import { useState, useEffect, useMemo } from 'react';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { Play, Save, Loader2, X, RotateCcw, Search, Plus, Trash2, ChevronDown, ChevronUp, ChevronsDownUp, ChevronsUpDown, Copy, FileJson, Check, Terminal, AlertTriangle } from 'lucide-react';
@@ -9,6 +9,7 @@ import { Input } from './Input';
 import { Label } from './Label';
 import { buildCommandArgs, constraintIssues, expandCommands, formatCommandLine, initialFormValues, isTextType, parseCommandLine } from '../lib/utils';
 import { TemplateJsonEditor } from './TemplateJsonEditor';
+import { jsonFields, jsonIssues } from '../lib/json';
 
 /** Where a run's stdin comes from and its binary stdout goes (spec section 1.3). */
 export interface RunIo {
@@ -111,12 +112,17 @@ export function ScriptForm({ schema: program, onRun, onSaveTemplate, isRunning, 
     }
   }, [initialTemplateName]);
 
+  const json = jsonFields(schema);
+  const issues = useMemo(() => jsonIssues(schema, values), [schema, values]);
+  const blockingJson = Object.keys(issues).length > 0;
+
   const handleChange = (name: string, value: any) => {
     setValues((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (blockingJson) return;
     if (effects.includes('destructive') && !window.confirm(`${schema.script} is marked destructive: it deletes or overwrites things. Run it?`)) return;
     const args = [...words, ...buildCommandArgs(schema, values)];
     onRun(args, {
@@ -202,8 +208,42 @@ export function ScriptForm({ schema: program, onRun, onSaveTemplate, isRunning, 
     groupedOptions[opt.group].push(opt);
   });
 
+  // A json field's text, checked against its schema as you type.
+  const renderJson = (name: string, label: string, required: boolean, description: string) => {
+    const field = json[name];
+    const expected = jsonSchemaView(field);
+    const sample = jsonSample(field);
+    return (
+      <div>
+        <Label htmlFor={name}>
+          {label}
+          {required && <span className="text-destructive ml-1">*</span>}
+        </Label>
+        <textarea
+          id={name}
+          rows={4}
+          spellCheck={false}
+          value={(values[name] as string) ?? ''}
+          onChange={(e) => handleChange(name, e.target.value)}
+          placeholder={sample ? `e.g. ${sample}` : 'JSON value'}
+          required={required}
+          className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+        <p className="text-xs text-muted-foreground mt-1">{description}</p>
+        {(issues[name] ?? []).map((issue) => <p key={issue} className="text-xs text-destructive mt-1">{issue}</p>)}
+        {expected && (
+          <details className="mt-1 text-xs text-muted-foreground">
+            <summary className="cursor-pointer">Expected JSON</summary>
+            <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 font-mono">{expected}</pre>
+          </details>
+        )}
+      </div>
+    );
+  };
+
   const renderField = (opt: typeof schema.options[0]) => {
     const value = values[opt.name];
+    if (json[opt.name] && !opt.isArray) return renderJson(opt.name, opt.name, opt.required, opt.description);
     const fieldSchema = valueSchema(opt.validation, opt.choices);
     const bounds = { min: fieldSchema.minimum as number | undefined, max: fieldSchema.maximum as number | undefined,
       minLength: fieldSchema.minLength as number | undefined, maxLength: fieldSchema.maxLength as number | undefined };
@@ -292,6 +332,7 @@ export function ScriptForm({ schema: program, onRun, onSaveTemplate, isRunning, 
               Add {opt.name}
             </Button>
           </div>
+          {(issues[opt.name] ?? []).map((issue) => <p key={issue} className="text-xs text-destructive">{issue}</p>)}
         </div>
       );
     }
@@ -385,7 +426,7 @@ export function ScriptForm({ schema: program, onRun, onSaveTemplate, isRunning, 
           {/* Sticky Action Buttons Section */}
           <div className="sticky top-0 bg-card z-10 -mx-6 px-6 pt-0 pb-4 border-b space-y-3">
             <div className="flex items-center gap-2">
-              <Button type="submit" disabled={isRunning} className="flex-1">
+              <Button type="submit" disabled={isRunning || blockingJson} className="flex-1">
                 {isRunning ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -666,6 +707,8 @@ export function ScriptForm({ schema: program, onRun, onSaveTemplate, isRunning, 
                           default: '', group: 'Arguments', type: 'string', isFlag: false, isArray: true, required: false,
                           validation: arg.validation, choices: [] })}
                       </div>
+                    ) : json[arg.name] ? (
+                      <div key={arg.name}>{renderJson(arg.name, arg.name, arg.required, arg.description)}</div>
                     ) : (
                       <div key={arg.name}>
                         <Label htmlFor={arg.name}>
