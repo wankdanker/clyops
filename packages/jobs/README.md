@@ -27,6 +27,19 @@ and no `node_modules`. It includes clyops-tools. `require('clyops-jobs')` loads 
 }
 ```
 
+**Editor support.** The config has a JSON Schema, so editors complete and check it. Name it in
+the file, from the site or from the installed package:
+
+```json
+{ "$schema": "https://clyops.io/schemas/clyops-jobs.json", "functions": {} }
+```
+
+It's `config.schema.json` in the package (`clyops-jobs/config.schema.json`, e.g.
+`"./node_modules/clyops-jobs/config.schema.json"`). It catches typos in function and step
+fields (`x-` fields are free for your own notes), `script` and `steps` together, and bad step
+names; that a branch names a later step is checked when the function is resolved. Options
+blocks are any object, since their keys come from each tool's schema.
+
 - `functions.NAME.script` is the tool, relative to a script root.
 - `key` names the options block (default: the function name). Options are
   `deepMerge(defaults[key], config[key])`, keyed like the tool's options (`out_dir`, `out-dir`)

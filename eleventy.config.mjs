@@ -7,6 +7,7 @@ export default function (config) {
   config.addPassthroughCopy({ 'docs/assets': 'assets', 'docs/_native': 'reference' });
   // Our llms.txt index for AI agents is served from the site root (llmstxt.org).
   config.addPassthroughCopy({ 'docs/llms.txt': 'llms.txt' });
+  config.addPassthroughCopy({ 'packages/jobs/config.schema.json': 'schemas/clyops-jobs.json' });
   config.addPassthroughCopy({ 'docs/_generated/home-demo.json': 'assets/home-demo.json', 'docs/examples/home': 'demos' });
   config.addPassthroughCopy({ 'docs/_generated/playground-files.json': 'assets/playground-files.json' });
   config.addPassthroughCopy({ 'docs/_generated/linux-lab': 'assets/linux-lab' });
