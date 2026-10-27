@@ -15,14 +15,14 @@
 <div class="tsd-comment tsd-typography"><p>A configured function with resolved executable and merged defaults and overrides.</p>
 </div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">ResolvedFunction</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#config">config</a><span class="tsd-signature-symbol">:</span> <a href="../types/packages_jobs_src.Json.html" class="tsd-signature-type tsd-kind-type-alias">Json</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#definition">definition</a><span class="tsd-signature-symbol">:</span> <a href="packages_jobs_src.FunctionDefinition.html" class="tsd-signature-type tsd-kind-interface">FunctionDefinition</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#functionname">functionName</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#key">key</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#script">script</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#steps">steps</a><span class="tsd-signature-symbol">?:</span> <a href="packages_jobs_src.ResolvedStep.html" class="tsd-signature-type tsd-kind-interface">ResolvedStep</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div>
-<section class="tsd-panel tsd-hierarchy" data-refl="1026">
+<section class="tsd-panel tsd-hierarchy" data-refl="1086">
 <h4>Hierarchy (<a href="../hierarchy.html#packages/jobs/src.ResolvedFunction">View Summary</a>)</h4>
 <ul class="tsd-hierarchy">
 <li class="tsd-hierarchy-item"><span class="tsd-hierarchy-target">ResolvedFunction</span>
 <ul class="tsd-hierarchy">
 <li class="tsd-hierarchy-item"><a href="packages_jobs_src.ResolvedStep.html" class="tsd-signature-type tsd-kind-interface">ResolvedStep</a></li></ul></li></ul></section><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L78">packages/jobs/src/functions.ts:78</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L78">packages/jobs/src/functions.ts:78</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -46,42 +46,42 @@
 <div class="tsd-comment tsd-typography"><p><code>deepMerge(defaults[key], config[key])</code>.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L86">packages/jobs/src/functions.ts:86</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L86">packages/jobs/src/functions.ts:86</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="definition"><span>definition</span><a href="#definition" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">definition</span><span class="tsd-signature-symbol">:</span> <a href="packages_jobs_src.FunctionDefinition.html" class="tsd-signature-type tsd-kind-interface">FunctionDefinition</a></div>
 <div class="tsd-comment tsd-typography"><p>Original function binding, including positional, stream, artifact, and result templates.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L88">packages/jobs/src/functions.ts:88</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L88">packages/jobs/src/functions.ts:88</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="functionname"><span>function<wbr/>Name</span><a href="#functionname" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">functionName</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>Name of the configured function to invoke.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L80">packages/jobs/src/functions.ts:80</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L80">packages/jobs/src/functions.ts:80</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="key"><span>key</span><a href="#key" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">key</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>The config key holding its options (default: the function name).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L82">packages/jobs/src/functions.ts:82</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L82">packages/jobs/src/functions.ts:82</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="script"><span>script</span><a href="#script" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">script</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>The tool, resolved against the script root.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L84">packages/jobs/src/functions.ts:84</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L84">packages/jobs/src/functions.ts:84</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="steps"><code class="tsd-tag">Optional</code><span>steps</span><a href="#steps" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">steps</span><span class="tsd-signature-symbol">?:</span> <a href="packages_jobs_src.ResolvedStep.html" class="tsd-signature-type tsd-kind-interface">ResolvedStep</a><span class="tsd-signature-symbol">[]</span></div>
 <div class="tsd-comment tsd-typography"><p>A chain's steps, in order; its <code>script</code> is then the last step's and <code>config</code> is keyed by step name.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L90">packages/jobs/src/functions.ts:90</a></li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L90">packages/jobs/src/functions.ts:90</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">

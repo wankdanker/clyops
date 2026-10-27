@@ -15,7 +15,7 @@
 <div class="tsd-comment tsd-typography"><p>One tool in a function's <code>steps</code>: a function binding with a name, without artifacts or a result map.</p>
 </div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">StepDefinition</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#artifacts">artifacts</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#continue_on_exit">continue_on_exit</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#error">error</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#fail">fail</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#key">key</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#name">name</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#positionals">positionals</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#positionals_order">positionals_order</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">&quot;first&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;last&quot;</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#result">result</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#script">script</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#stdin">stdin</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#stdout">stdout</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#steps">steps</a><span class="tsd-signature-symbol">?:</span> <a href="" class="tsd-signature-type tsd-kind-interface">StepDefinition</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#strict_params">strict_params</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#succeed">succeed</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#timeout_ms">timeout_ms</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-signature-symbol">[</span><span class="tsd-kind-index-signature">key</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">]:</span> <span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div>
-<section class="tsd-panel tsd-hierarchy" data-refl="1007">
+<section class="tsd-panel tsd-hierarchy" data-refl="1067">
 <h4>Hierarchy (<a href="../hierarchy.html#packages/jobs/src.StepDefinition">View Summary</a>)</h4>
 <ul class="tsd-hierarchy">
 <li class="tsd-hierarchy-item"><a href="packages_jobs_src.FunctionDefinition.html" class="tsd-signature-type tsd-kind-interface">FunctionDefinition</a>
@@ -27,7 +27,7 @@
 <li class="tsd-index-signature">
 <div class="tsd-signature"><span class="tsd-signature-symbol">[</span><span class="tsd-kind-parameter">key</span>: <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">]:</span> <span class="tsd-signature-type">unknown</span></div></li></ul></section><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L60">packages/jobs/src/functions.ts:60</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L60">packages/jobs/src/functions.ts:60</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -62,28 +62,28 @@
 </div><aside class="tsd-sources">
 <p>Inherited from <a href="packages_jobs_src.FunctionDefinition.html">FunctionDefinition</a>.<a href="packages_jobs_src.FunctionDefinition.html#artifacts">artifacts</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L49">packages/jobs/src/functions.ts:49</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L49">packages/jobs/src/functions.ts:49</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="continue_on_exit"><code class="tsd-tag">Optional</code><span>continue_<wbr/>on_<wbr/>exit</span><a href="#continue_on_exit" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">continue_on_exit</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">[]</span></div>
 <div class="tsd-comment tsd-typography"><p>Exit codes besides 0 that count as success; the chain then reports the first of them.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L68">packages/jobs/src/functions.ts:68</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L68">packages/jobs/src/functions.ts:68</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="error"><code class="tsd-tag">Optional</code><span>error</span><a href="#error" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">error</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>The later step to run when this one can't start (a template, stdin or schema error), instead of throwing.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L74">packages/jobs/src/functions.ts:74</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L74">packages/jobs/src/functions.ts:74</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="fail"><code class="tsd-tag">Optional</code><span>fail</span><a href="#fail" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">fail</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>The later step to run when this one exits nonzero or times out, instead of ending the chain.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L72">packages/jobs/src/functions.ts:72</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L72">packages/jobs/src/functions.ts:72</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="key"><code class="tsd-tag">Optional</code><span>key</span><a href="#key" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">key</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div>
@@ -91,14 +91,14 @@
 </div><aside class="tsd-sources">
 <p>Overrides <a href="packages_jobs_src.FunctionDefinition.html">FunctionDefinition</a>.<a href="packages_jobs_src.FunctionDefinition.html#key">key</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L64">packages/jobs/src/functions.ts:64</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L64">packages/jobs/src/functions.ts:64</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="name"><span>name</span><a href="#name" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">name</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>Names the step in <code>${steps.NAME...}</code> templates and errors; letters, digits, <code>_</code> and <code>-</code>.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L62">packages/jobs/src/functions.ts:62</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L62">packages/jobs/src/functions.ts:62</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="positionals"><code class="tsd-tag">Optional</code><span>positionals</span><a href="#positionals" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">positionals</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">[]</span></div>
@@ -106,7 +106,7 @@
 </div><aside class="tsd-sources">
 <p>Inherited from <a href="packages_jobs_src.FunctionDefinition.html">FunctionDefinition</a>.<a href="packages_jobs_src.FunctionDefinition.html#positionals">positionals</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L41">packages/jobs/src/functions.ts:41</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L41">packages/jobs/src/functions.ts:41</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="positionals_order"><code class="tsd-tag">Optional</code><span>positionals_<wbr/>order</span><a href="#positionals_order" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">positionals_order</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">&quot;first&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;last&quot;</span></div>
@@ -114,7 +114,7 @@
 </div><aside class="tsd-sources">
 <p>Inherited from <a href="packages_jobs_src.FunctionDefinition.html">FunctionDefinition</a>.<a href="packages_jobs_src.FunctionDefinition.html#positionals_order">positionals_order</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L43">packages/jobs/src/functions.ts:43</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L43">packages/jobs/src/functions.ts:43</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="result"><code class="tsd-tag">Optional</code><span>result</span><a href="#result" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">result</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">unknown</span></div>
@@ -122,7 +122,7 @@
 </div><aside class="tsd-sources">
 <p>Inherited from <a href="packages_jobs_src.FunctionDefinition.html">FunctionDefinition</a>.<a href="packages_jobs_src.FunctionDefinition.html#result">result</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L51">packages/jobs/src/functions.ts:51</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L51">packages/jobs/src/functions.ts:51</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="script"><code class="tsd-tag">Optional</code><span>script</span><a href="#script" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">script</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div>
@@ -130,7 +130,7 @@
 </div><aside class="tsd-sources">
 <p>Inherited from <a href="packages_jobs_src.FunctionDefinition.html">FunctionDefinition</a>.<a href="packages_jobs_src.FunctionDefinition.html#script">script</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L39">packages/jobs/src/functions.ts:39</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L39">packages/jobs/src/functions.ts:39</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="stdin"><code class="tsd-tag">Optional</code><span>stdin</span><a href="#stdin" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">stdin</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div>
@@ -138,7 +138,7 @@
 </div><aside class="tsd-sources">
 <p>Inherited from <a href="packages_jobs_src.FunctionDefinition.html">FunctionDefinition</a>.<a href="packages_jobs_src.FunctionDefinition.html#stdin">stdin</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L45">packages/jobs/src/functions.ts:45</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L45">packages/jobs/src/functions.ts:45</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="stdout"><code class="tsd-tag">Optional</code><span>stdout</span><a href="#stdout" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">stdout</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div>
@@ -146,7 +146,7 @@
 </div><aside class="tsd-sources">
 <p>Inherited from <a href="packages_jobs_src.FunctionDefinition.html">FunctionDefinition</a>.<a href="packages_jobs_src.FunctionDefinition.html#stdout">stdout</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L47">packages/jobs/src/functions.ts:47</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L47">packages/jobs/src/functions.ts:47</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="steps"><code class="tsd-tag">Optional</code><span>steps</span><a href="#steps" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">steps</span><span class="tsd-signature-symbol">?:</span> <a href="" class="tsd-signature-type tsd-kind-interface">StepDefinition</a><span class="tsd-signature-symbol">[]</span></div>
@@ -154,7 +154,7 @@
 </div><aside class="tsd-sources">
 <p>Inherited from <a href="packages_jobs_src.FunctionDefinition.html">FunctionDefinition</a>.<a href="packages_jobs_src.FunctionDefinition.html#steps">steps</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L55">packages/jobs/src/functions.ts:55</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L55">packages/jobs/src/functions.ts:55</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="strict_params"><code class="tsd-tag">Optional</code><span>strict_<wbr/>params</span><a href="#strict_params" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">strict_params</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div>
@@ -162,21 +162,21 @@
 </div><aside class="tsd-sources">
 <p>Inherited from <a href="packages_jobs_src.FunctionDefinition.html">FunctionDefinition</a>.<a href="packages_jobs_src.FunctionDefinition.html#strict_params">strict_params</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L53">packages/jobs/src/functions.ts:53</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L53">packages/jobs/src/functions.ts:53</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="succeed"><code class="tsd-tag">Optional</code><span>succeed</span><a href="#succeed" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">succeed</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>The later step to run after this one succeeds instead of the next, or <code>$end</code> to end the chain there.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L70">packages/jobs/src/functions.ts:70</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L70">packages/jobs/src/functions.ts:70</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="timeout_ms"><code class="tsd-tag">Optional</code><span>timeout_<wbr/>ms</span><a href="#timeout_ms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">timeout_ms</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>This step's time limit; the whole chain also stays within the run's <code>timeoutMs</code>.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/c64d2a97503fcc479b0d327ea0381b8fff75acc6/packages/jobs/src/functions.ts#L66">packages/jobs/src/functions.ts:66</a></li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/packages/jobs/src/functions.ts#L66">packages/jobs/src/functions.ts:66</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
