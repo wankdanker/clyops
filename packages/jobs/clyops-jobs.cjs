@@ -749,6 +749,7 @@ async function runTool(fn, opts) {
     result: {},
     log: { onLine: opts.onLog }
   };
+  const stdin = stdinPath ? (0, import_node_fs4.createReadStream)(stdinPath, { fd: (0, import_node_fs4.openSync)(stdinPath, "r") }) : void 0;
   const started = start(file, argv, {
     cwd: opts.cwd,
     env: opts.env,
@@ -756,7 +757,7 @@ async function runTool(fn, opts) {
     killGraceMs: opts.killGraceMs,
     signal: opts.signal,
     onStderr: opts.onStderr,
-    stdin: stdinPath ? (0, import_node_fs4.createReadStream)(stdinPath) : void 0,
+    stdin,
     stdout: stdoutPath ? "stream" : "text",
     roles: declaredRoles({ schema }, roles)
   });

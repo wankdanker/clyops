@@ -25,6 +25,9 @@ Multi-step job functions with branches, and a JSON Schema for the clyops-jobs co
 - `functionParamNames(fn)` lists the `params` fields a function's templates use.
 - A JSON Schema for the config file, for editor completion and checks: `"$schema":
   "https://clyops.io/schemas/clyops-jobs.json"`, also shipped as `clyops-jobs/config.schema.json`.
+- Fixed: a missing or unreadable `stdin` file could go unreported when the tool exited
+  without reading its input; the file is now opened before the tool starts, so the run
+  always rejects.
 
 ## [0.10.0] - 2026-10-26
 
