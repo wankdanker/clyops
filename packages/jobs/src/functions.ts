@@ -241,8 +241,10 @@ export interface FunctionRun extends RunResult {
   progress?: Record<string, unknown>;
   /** Its `result` role parsed, else its collected stdout parsed, when either is JSON. */
   result?: unknown;
-  /** A chain's outputs by step name, for templates after it: `{ ...context, steps: run.steps }`. */
+  /** A chain's outputs by step name, for templates after it (see runContext). */
   steps?: Record<string, StepOutput>;
+  /** A chain's last step that ran or took its `error` branch, with its name: `previous` in templates after the run. */
+  previous?: StepOutput & { name: string };
   /** A chain's runs, one per step that ran, in order. */
   stepRuns?: Array<FunctionRun & { step: string }>;
   /** The step that stopped a chain: a nonzero exit (not in its `continue_on_exit`) or timeout with no `fail` branch, or a signal. */
@@ -363,12 +365,14 @@ async function runSteps(steps: ResolvedStep[], opts: RunFunctionOptions): Promis
     branch === END ? undefined : branch ? byName.get(branch) : fallthrough && i + 1 < steps.length ? i + 1 : undefined;
   let continued: number | undefined;
   let last: FunctionRun | undefined;
+  let previous: (StepOutput & { name: string }) | undefined;
   for (let i: number | undefined = 0; i !== undefined;) {
     const step = steps[i];
     const name = step.stepName;
     const limits = [step.definition.timeout_ms, deadline && Math.max(1, deadline - Date.now())].filter((ms): ms is number => Number(ms) > 0);
-    // A chain always renders: its steps reach each other through `steps` even without a caller context.
-    const context = { ...opts.context, steps: { ...outputs } };
+    // A chain always renders: its steps reach each other through `steps` (and the one before
+    // through `previous`) even without a caller context.
+    const context = { ...opts.context, steps: { ...outputs }, ...(previous ? { previous } : {}) };
     const onProgress = opts.onProgress && ((update: Record<string, unknown>) => opts.onProgress?.({ stage: name, ...update, step: name }));
     let ran: Awaited<ReturnType<typeof runTool>>;
     try {
@@ -377,6 +381,7 @@ async function runSteps(steps: ResolvedStep[], opts: RunFunctionOptions): Promis
       const message = `step ${name}: ${(error as Error).message}`;
       if (!step.definition.error) throw new Error(message, { cause: error });
       outputs[name] = { exit_code: null, stdout: '', error: message };
+      previous = { name, ...outputs[name] };
       i = byName.get(step.definition.error);
       continue;
     }
@@ -389,7 +394,8 @@ async function runSteps(steps: ResolvedStep[], opts: RunFunctionOptions): Promis
       ...(run.meta !== undefined ? { meta: run.meta } : {}),
       ...(run.progress ? { progress: run.progress } : {}),
     };
-    last = { ...run, steps: outputs, stepRuns, durationMs: stepRuns.reduce((ms, r) => ms + r.durationMs, 0) };
+    previous = { name, ...outputs[name] };
+    last = { ...run, steps: outputs, previous, stepRuns, durationMs: stepRuns.reduce((ms, r) => ms + r.durationMs, 0) };
     // A timed-out step failed, even when it exits 0 on SIGTERM.
     const ok = !run.timedOut && (run.exitCode === 0 || (run.exitCode !== null && (step.definition.continue_on_exit ?? []).includes(run.exitCode)));
     if (ok) {
@@ -405,6 +411,14 @@ async function runSteps(steps: ResolvedStep[], opts: RunFunctionOptions): Promis
   }
   if (!last) throw new Error('unreachable: a chain ends after a step that ran');
   return last;
+}
+
+/**
+ * The context to render a function's artifacts and result map with after a run:
+ * a chain's `steps` and `previous` (its last step) added to the run's context.
+ */
+export function runContext<T extends TemplateContext>(context: T, run: FunctionRun): T & Pick<FunctionRun, 'steps' | 'previous'> {
+  return { ...context, ...(run.steps ? { steps: run.steps } : {}), ...(run.previous ? { previous: run.previous } : {}) };
 }
 
 /** The result record every function shares, plus its rendered `result` map. */

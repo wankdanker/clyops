@@ -54,6 +54,7 @@ __export(index_exports, {
   resolveConfigPath: () => resolveConfigPath,
   resolveFunctionConfig: () => resolveFunctionConfig,
   resolveScriptPath: () => resolveScriptPath,
+  runContext: () => runContext,
   runScriptFunction: () => runScriptFunction,
   shellQuote: () => shellQuote,
   statFollowingSymlinks: () => statFollowingSymlinks,
@@ -785,11 +786,12 @@ async function runSteps(steps, opts) {
   const after = (i, branch, fallthrough) => branch === END ? void 0 : branch ? byName.get(branch) : fallthrough && i + 1 < steps.length ? i + 1 : void 0;
   let continued;
   let last;
+  let previous;
   for (let i = 0; i !== void 0; ) {
     const step = steps[i];
     const name = step.stepName;
     const limits = [step.definition.timeout_ms, deadline && Math.max(1, deadline - Date.now())].filter((ms) => Number(ms) > 0);
-    const context = { ...opts.context, steps: { ...outputs } };
+    const context = { ...opts.context, steps: { ...outputs }, ...previous ? { previous } : {} };
     const onProgress = opts.onProgress && ((update) => opts.onProgress?.({ stage: name, ...update, step: name }));
     let ran;
     try {
@@ -798,6 +800,7 @@ async function runSteps(steps, opts) {
       const message = `step ${name}: ${error.message}`;
       if (!step.definition.error) throw new Error(message, { cause: error });
       outputs[name] = { exit_code: null, stdout: "", error: message };
+      previous = { name, ...outputs[name] };
       i = byName.get(step.definition.error);
       continue;
     }
@@ -810,7 +813,8 @@ async function runSteps(steps, opts) {
       ...run.meta !== void 0 ? { meta: run.meta } : {},
       ...run.progress ? { progress: run.progress } : {}
     };
-    last = { ...run, steps: outputs, stepRuns, durationMs: stepRuns.reduce((ms, r) => ms + r.durationMs, 0) };
+    previous = { name, ...outputs[name] };
+    last = { ...run, steps: outputs, previous, stepRuns, durationMs: stepRuns.reduce((ms, r) => ms + r.durationMs, 0) };
     const ok = !run.timedOut && (run.exitCode === 0 || run.exitCode !== null && (step.definition.continue_on_exit ?? []).includes(run.exitCode));
     if (ok) {
       if (run.exitCode !== 0) continued ??= run.exitCode ?? void 0;
@@ -824,6 +828,9 @@ async function runSteps(steps, opts) {
   }
   if (!last) throw new Error("unreachable: a chain ends after a step that ran");
   return last;
+}
+function runContext(context, run) {
+  return { ...context, ...run.steps ? { steps: run.steps } : {}, ...run.previous ? { previous: run.previous } : {} };
 }
 function buildResultRecord(p) {
   return {
@@ -1093,6 +1100,7 @@ var JobQueue = class {
   resolveConfigPath,
   resolveFunctionConfig,
   resolveScriptPath,
+  runContext,
   runScriptFunction,
   shellQuote,
   statFollowingSymlinks,

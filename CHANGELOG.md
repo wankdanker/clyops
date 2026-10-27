@@ -14,6 +14,9 @@ section here.
   `timeout_ms` and `signal` bound and stop it (#46).
 - Branches in steps: `succeed`, `fail` and `error` on a step name a later step to go to
   (a fallback, a cleanup), and `succeed: "$end"` ends the chain (#46).
+- `${previous...}` in a step is the step that ran just before it, with its `name`, so a
+  handler several branches share knows which step led there; after the run it is the last
+  step, and `runContext(context, run)` adds it and `steps` for the result map.
 - A function run's `result` is the tool's `result` role, or its stdout, parsed as JSON.
 - `functionParamNames(fn)` lists the `params` fields a function's templates use.
 

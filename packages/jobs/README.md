@@ -82,6 +82,10 @@ tools that already exist (fetch some JSON, download what it names, process the f
   `result` role or else its collected stdout parsed as JSON; `meta`; `progress`. A
   `${steps...}` path that isn't there, such as a later step or a field the JSON lacks, is an
   error naming the step.
+- `previous` is the step that ran just before, on whichever path led here, with the same
+  fields plus its `name`: a handler several branches share reads `${previous.name}`,
+  `${previous.exit_code}`, `${previous.result.field}` or, after an `error` branch,
+  `${previous.error}`. The first step has none, so naming it there is an error.
 - After a step that succeeds the chain goes on to the next step, or ends after the last one.
   A step that exits nonzero, times out or is stopped ends the chain; the run is that step's,
   with `failedStep` naming it. A step that can't start (a template, stdin or schema error)
@@ -105,8 +109,9 @@ tools that already exist (fetch some JSON, download what it names, process the f
   ```
 - `timeoutMs` limits the whole chain and a step's `timeout_ms` that step; `signal` stops the
   running step. `onProgress` gets each step's updates with `step` and a default `stage`.
-- The run is the last step's, plus `steps` (the outputs by name) and `stepRuns`. Render
-  artifacts and the result with them: `{ ...context, steps: run.steps }`.
+- The run is the last step's, plus `steps` (the outputs by name), `previous` (the last step)
+  and `stepRuns`. Render artifacts and the result with them through `runContext(context,
+  run)`, so a result map can use `${previous...}` whichever branch the chain ended on.
 - `functionParamNames(fn)` lists the `params` fields a function's templates use, steps
   included, for describing its caller inputs.
 

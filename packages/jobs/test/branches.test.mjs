@@ -2,10 +2,10 @@
 // its options say: exit with a code, print a result, sleep or kill itself.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { resolveFunctionConfig, runScriptFunction } from '../dist/index.js';
+import { buildResultRecord, resolveFunctionConfig, runContext, runScriptFunction } from '../dist/index.js';
 
 const env = { PATH: process.env.PATH };
 const skip = process.platform === 'win32';
@@ -111,11 +111,14 @@ function randomChain(rand) {
   return steps;
 }
 
-// Each step prints the outputs it saw (`${steps}`), so the run shows what every template could reach.
-function toConfig(steps) {
-  return chain(steps.map(({ outcome, ...step }) => ({
+// Each step writes the outputs it saw (`${steps}`) and the step before it (`${previous}`, which the
+// first step has none of) to DIR/NAME.json, so the run shows what every template could reach. A
+// stdout file keeps the outputs small: a step's `stdout` is then the path, and it has no `result`.
+function toConfig(steps, dir) {
+  return chain(steps.map(({ outcome, ...step }, i) => ({
     ...step,
-    options: outcome.error ? { exit: '${steps.missing.x}' } : { exit: outcome.code, say: '{"saw": ${steps}}' },
+    stdout: `${dir}/${step.name}.json`,
+    options: outcome.error ? { exit: '${steps.missing.x}' } : { exit: outcome.code, say: `{"saw": \${steps}, "previous": ${i ? '${previous}' : 'null'}}` },
   })));
 }
 
@@ -131,10 +134,10 @@ test('random chains follow the branching rules', { skip, timeout: 120_000 }, asy
     const label = `seed ${seed} case ${n}: ${JSON.stringify(steps)}`;
     if (want.rejects) {
       shapes.rejects += 1;
-      await assert.rejects(runChain(root, toConfig(steps)), (e) => e.message.startsWith(want.rejects), label);
+      await assert.rejects(runChain(root, toConfig(steps, `case${n}`)), (e) => e.message.startsWith(want.rejects), label);
       continue;
     }
-    const run = await runChain(root, toConfig(steps));
+    const run = await runChain(root, toConfig(steps, `case${n}`));
     assert.deepEqual(names(run), want.ran, label);
     assert.equal(run.exitCode, want.exitCode, label);
     assert.equal(run.failedStep, want.failedStep, label);
@@ -142,8 +145,13 @@ test('random chains follow the branching rules', { skip, timeout: 120_000 }, asy
     // Every step saw exactly the steps before it on the path, nothing skipped or later.
     for (const [i, r] of run.stepRuns.entries()) {
       const before = want.seen.slice(0, want.seen.indexOf(r.step));
-      assert.deepEqual(Object.keys(run.steps[r.step].result.saw), before, `${label} step ${r.step} (${i})`);
+      const seen = JSON.parse(readFileSync(run.steps[r.step].stdout, 'utf8'));
+      assert.deepEqual(Object.keys(seen.saw), before, `${label} step ${r.step} (${i})`);
+      const previous = before.at(-1);
+      assert.deepEqual(seen.previous, previous ? { name: previous, ...run.steps[previous] } : null, `${label} previous of ${r.step}`);
     }
+    const final = want.seen.at(-1);
+    assert.deepEqual(run.previous, { name: final, ...run.steps[final] }, label);
     for (const name of want.seen) if (steps.find((s) => s.name === name).outcome.error) assert.equal(run.steps[name].exit_code, null, label);
     shapes[want.failedStep ? 'failed' : want.exitCode ? 'partial' : 'ok'] += 1;
     if (want.ran.length !== steps.length || want.seen.length !== want.ran.length) shapes.branched += 1;
@@ -270,4 +278,36 @@ test('progress, durations and the run belong to the right steps', { skip }, asyn
   assert.deepEqual([run.steps.a.result, run.steps.b.exit_code], [{ n: 1 }, 2]);
   assert.equal(run.durationMs, run.stepRuns[0].durationMs + run.stepRuns[1].durationMs);
   assert.deepEqual(run.command.slice(1), ['--exit', '2', '--say', '{"n": 2}']);
+});
+
+test('previous is the step before, whichever branch led here', { skip }, async () => {
+  const root = workspace();
+  // Two steps share one handler, which reports which of them failed and what it said.
+  const config = (failing) => chain([
+    { name: 'fetch', options: { say: '{"from": "fetch"}', exit: failing === 'fetch' ? 1 : 0 }, fail: 'report' },
+    { name: 'mirror', options: { say: '{"from": "mirror"}', exit: failing === 'mirror' ? 3 : 0 }, fail: 'report', succeed: '$end' },
+    { name: 'report', options: { say: '${previous.name} ${previous.exit_code} ${previous.result.from}' } },
+  ], { result: { reported: '${previous.stdout}', by: '${previous.name}' } });
+  for (const [failing, said] of [['fetch', 'fetch 1 fetch'], ['mirror', 'mirror 3 mirror']]) {
+    const fn = resolveFunctionConfig(root, config(failing), 'f');
+    const run = await runScriptFunction(fn, { configRoot: root, cwd: root, env, context: {} });
+    assert.equal(run.stdout, `${said}\n`, failing);
+    assert.deepEqual(run.previous, { name: 'report', ...run.steps.report });
+    const record = buildResultRecord({ jobId: 'j', fn, artifactKeys: [], context: runContext({}, run), now: 't' });
+    assert.deepEqual([record.reported, record.by], [said, 'report']);
+  }
+  const ok = await runChain(root, config(null));
+  assert.deepEqual([names(ok), ok.previous.name], [['fetch', 'mirror'], 'mirror']);
+
+  // After an error branch, previous is the step that couldn't start.
+  const errored = await runChain(root, chain([
+    { name: 'broken', options: { exit: '${steps.nope.x}' }, error: 'report' },
+    { name: 'report', options: { say: '${previous.name}: ${previous.error}' } },
+  ]));
+  assert.equal(errored.stdout, 'broken: step broken: unknown template value: steps.nope.x\n');
+
+  // The first step has no previous; naming it is an error.
+  await assert.rejects(runChain(root, chain([{ name: 'first', options: { say: '${previous.name}' } }])), (e) => e.message === 'step first: unknown template value: previous.name');
+  // runContext leaves a single-tool run's context alone.
+  assert.deepEqual(runContext({ job: 1 }, { exitCode: 0 }), { job: 1 });
 });
