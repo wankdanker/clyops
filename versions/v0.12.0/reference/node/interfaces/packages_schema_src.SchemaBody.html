@@ -1,0 +1,163 @@
+<!DOCTYPE html><html class="default" lang="en" data-base="../"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>SchemaBody | clyops Node API</title><meta name="description" content="Documentation for clyops Node API"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="../assets/style.css"/><link rel="stylesheet" href="../assets/highlight.css"/><script defer src="../assets/main.js"></script><script async src="../assets/icons.js" id="tsd-icons-script"></script><script async src="../assets/search.js" id="tsd-search-script"></script><script async src="../assets/navigation.js" id="tsd-nav-script"></script><script async src="../assets/hierarchy.js" id="tsd-hierarchy-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar">
+<div class="tsd-toolbar-contents container"><a href="../index.html" class="title">clyops Node API</a>
+<div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/>
+<ul role="listbox" id="tsd-search-results"></ul>
+<div id="tsd-search-status" aria-live="polite" aria-atomic="true">
+<div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-menu"></use></svg></a></div></header>
+<div class="container container-main">
+<div class="col-content">
+<div class="tsd-page-title">
+<ul class="tsd-breadcrumb" aria-label="Breadcrumb">
+<li><a href="../modules/packages_schema_src.html">packages/schema/src</a></li>
+<li><a href="" aria-current="page">SchemaBody</a></li></ul>
+<h1>Interface SchemaBody</h1></div>
+<section class="tsd-panel tsd-comment">
+<div class="tsd-comment tsd-typography"><p>The fields a program and each of its commands share. Fields added in 0.2 are optional.</p>
+</div></section>
+<div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">SchemaBody</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#arguments">arguments</a><span class="tsd-signature-symbol">:</span> <a href="packages_schema_src.SchemaArgument.html" class="tsd-signature-type tsd-kind-interface">SchemaArgument</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#commands">commands</a><span class="tsd-signature-symbol">?:</span> <a href="packages_schema_src.SchemaCommand.html" class="tsd-signature-type tsd-kind-interface">SchemaCommand</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#constraints">constraints</a><span class="tsd-signature-symbol">?:</span> <a href="packages_schema_src.SchemaConstraint.html" class="tsd-signature-type tsd-kind-interface">SchemaConstraint</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#description">description</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#effects">effects</a><span class="tsd-signature-symbol">?:</span> <a href="../types/packages_schema_src.Effect.html" class="tsd-signature-type tsd-kind-type-alias">Effect</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#epilog">epilog</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#options">options</a><span class="tsd-signature-symbol">:</span> <a href="packages_schema_src.SchemaOption.html" class="tsd-signature-type tsd-kind-interface">SchemaOption</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#requiredcommands">requiredCommands</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">{</span><br/>        <span class="tsd-kind-property">command</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>        <span class="tsd-kind-property">description</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>        <span class="tsd-kind-property">installHint</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#roles">roles</a><span class="tsd-signature-symbol">?:</span> <a href="packages_schema_src.SchemaRole.html" class="tsd-signature-type tsd-kind-interface">SchemaRole</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#stdin">stdin</a><span class="tsd-signature-symbol">?:</span> <a href="packages_schema_src.SchemaStream.html" class="tsd-signature-type tsd-kind-interface">SchemaStream</a><br/>    <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#stdout">stdout</a><span class="tsd-signature-symbol">?:</span> <a href="packages_schema_src.SchemaStream.html" class="tsd-signature-type tsd-kind-interface">SchemaStream</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div>
+<section class="tsd-panel tsd-hierarchy" data-refl="371">
+<h4>Hierarchy (<a href="../hierarchy.html#packages/schema/src.SchemaBody">View Summary</a>)</h4>
+<ul class="tsd-hierarchy">
+<li class="tsd-hierarchy-item"><span class="tsd-hierarchy-target">SchemaBody</span>
+<ul class="tsd-hierarchy">
+<li class="tsd-hierarchy-item"><a href="packages_schema_src.SchemaCommand.html" class="tsd-signature-type tsd-kind-interface">SchemaCommand</a></li>
+<li class="tsd-hierarchy-item"><a href="packages_schema_src.Schema.html" class="tsd-signature-type tsd-kind-interface">Schema</a></li></ul></li></ul></section><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/09e1a94c2355dd831381120594ba47bcd041589e/packages/schema/src/types.ts#L93">packages/schema/src/types.ts:93</a></li></ul></aside>
+<section class="tsd-panel-group tsd-index-group">
+<section class="tsd-panel tsd-index-panel">
+<details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
+<h5 class="tsd-index-heading uppercase">Index</h5></summary>
+<div class="tsd-accordion-details">
+<section class="tsd-index-section">
+<h3 class="tsd-index-heading tsd-anchor-link" id="properties">Properties<a href="#properties" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-index-list"><a href="#arguments" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>arguments</span></a>
+<a href="#commands" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>commands?</span></a>
+<a href="#constraints" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>constraints?</span></a>
+<a href="#description" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>description</span></a>
+<a href="#effects" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>effects?</span></a>
+<a href="#epilog" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>epilog</span></a>
+<a href="#options" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>options</span></a>
+<a href="#requiredcommands" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>required<wbr/>Commands</span></a>
+<a href="#roles" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>roles?</span></a>
+<a href="#stdin" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>stdin?</span></a>
+<a href="#stdout" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>stdout?</span></a>
+</div></section></div></details></section></section>
+<details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
+<h2 class="tsd-anchor-link" id="properties-1">Properties<a href="#properties-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
+<section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="arguments"><span>arguments</span><a href="#arguments" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">arguments</span><span class="tsd-signature-symbol">:</span> <a href="packages_schema_src.SchemaArgument.html" class="tsd-signature-type tsd-kind-interface">SchemaArgument</a><span class="tsd-signature-symbol">[]</span></div>
+<div class="tsd-comment tsd-typography"><p>Positional arguments in registration order.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/09e1a94c2355dd831381120594ba47bcd041589e/packages/schema/src/types.ts#L99">packages/schema/src/types.ts:99</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="commands"><code class="tsd-tag">Optional</code><span>commands</span><a href="#commands" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">commands</span><span class="tsd-signature-symbol">?:</span> <a href="packages_schema_src.SchemaCommand.html" class="tsd-signature-type tsd-kind-interface">SchemaCommand</a><span class="tsd-signature-symbol">[]</span></div>
+<div class="tsd-comment tsd-typography"><p>Nested commands with their own options, arguments, and metadata.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/09e1a94c2355dd831381120594ba47bcd041589e/packages/schema/src/types.ts#L122">packages/schema/src/types.ts:122</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="constraints"><code class="tsd-tag">Optional</code><span>constraints</span><a href="#constraints" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">constraints</span><span class="tsd-signature-symbol">?:</span> <a href="packages_schema_src.SchemaConstraint.html" class="tsd-signature-type tsd-kind-interface">SchemaConstraint</a><span class="tsd-signature-symbol">[]</span></div>
+<div class="tsd-comment tsd-typography"><p>Declared exclusive, requires, and oneOf option relationships.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/09e1a94c2355dd831381120594ba47bcd041589e/packages/schema/src/types.ts#L114">packages/schema/src/types.ts:114</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="description"><span>description</span><a href="#description" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">description</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+<div class="tsd-comment tsd-typography"><p>Human-readable description shown in help and documentation.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/09e1a94c2355dd831381120594ba47bcd041589e/packages/schema/src/types.ts#L95">packages/schema/src/types.ts:95</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="effects"><code class="tsd-tag">Optional</code><span>effects</span><a href="#effects" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">effects</span><span class="tsd-signature-symbol">?:</span> <a href="../types/packages_schema_src.Effect.html" class="tsd-signature-type tsd-kind-type-alias">Effect</a><span class="tsd-signature-symbol">[]</span></div>
+<div class="tsd-comment tsd-typography"><p>Declared read-only, idempotent, destructive, or network effects.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/09e1a94c2355dd831381120594ba47bcd041589e/packages/schema/src/types.ts#L112">packages/schema/src/types.ts:112</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="epilog"><span>epilog</span><a href="#epilog" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">epilog</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+<div class="tsd-comment tsd-typography"><p>Text shown after the help sections.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/09e1a94c2355dd831381120594ba47bcd041589e/packages/schema/src/types.ts#L97">packages/schema/src/types.ts:97</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="options"><span>options</span><a href="#options" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">options</span><span class="tsd-signature-symbol">:</span> <a href="packages_schema_src.SchemaOption.html" class="tsd-signature-type tsd-kind-interface">SchemaOption</a><span class="tsd-signature-symbol">[]</span></div>
+<div class="tsd-comment tsd-typography"><p>Options declared at this command level, in registration order.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/09e1a94c2355dd831381120594ba47bcd041589e/packages/schema/src/types.ts#L101">packages/schema/src/types.ts:101</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="requiredcommands"><span>required<wbr/>Commands</span><a href="#requiredcommands" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">requiredCommands</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">command</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">description</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">installHint</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">[]</span></div>
+<div class="tsd-comment tsd-typography"><p>External executables required by the tool, with descriptions and install hints.</p>
+</div>
+<div class="tsd-type-declaration">
+<h4>Type Declaration</h4>
+<ul class="tsd-parameters">
+<li class="tsd-parameter">
+<h5><span class="tsd-kind-property">command</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span></h5>
+<div class="tsd-comment tsd-typography"><p>Executable name searched for on PATH.</p>
+</div></li>
+<li class="tsd-parameter">
+<h5><span class="tsd-kind-property">description</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span></h5>
+<div class="tsd-comment tsd-typography"><p>Why the executable is needed.</p>
+</div></li>
+<li class="tsd-parameter">
+<h5><span class="tsd-kind-property">installHint</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span></h5>
+<div class="tsd-comment tsd-typography"><p>Installation instructions when the executable is absent.</p>
+</div></li></ul></div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/09e1a94c2355dd831381120594ba47bcd041589e/packages/schema/src/types.ts#L103">packages/schema/src/types.ts:103</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="roles"><code class="tsd-tag">Optional</code><span>roles</span><a href="#roles" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">roles</span><span class="tsd-signature-symbol">?:</span> <a href="packages_schema_src.SchemaRole.html" class="tsd-signature-type tsd-kind-interface">SchemaRole</a><span class="tsd-signature-symbol">[]</span></div>
+<div class="tsd-comment tsd-typography"><p>Declared roles at this level; absent before 0.5.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/09e1a94c2355dd831381120594ba47bcd041589e/packages/schema/src/types.ts#L120">packages/schema/src/types.ts:120</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="stdin"><code class="tsd-tag">Optional</code><span>stdin</span><a href="#stdin" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">stdin</span><span class="tsd-signature-symbol">?:</span> <a href="packages_schema_src.SchemaStream.html" class="tsd-signature-type tsd-kind-interface">SchemaStream</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></div>
+<div class="tsd-comment tsd-typography"><p>Declared input stream, or null/absent when none is declared.</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/09e1a94c2355dd831381120594ba47bcd041589e/packages/schema/src/types.ts#L116">packages/schema/src/types.ts:116</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="stdout"><code class="tsd-tag">Optional</code><span>stdout</span><a href="#stdout" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">stdout</span><span class="tsd-signature-symbol">?:</span> <a href="packages_schema_src.SchemaStream.html" class="tsd-signature-type tsd-kind-interface">SchemaStream</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></div>
+<div class="tsd-comment tsd-typography"><p>Declared output stream, or null/absent when undeclared (text output).</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/09e1a94c2355dd831381120594ba47bcd041589e/packages/schema/src/types.ts#L118">packages/schema/src/types.ts:118</a></li></ul></aside></section></section></details></div>
+<div class="col-sidebar">
+<div class="page-menu">
+<div class="tsd-navigation settings">
+<details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
+<h3>Settings</h3></summary>
+<div class="tsd-accordion-details">
+<div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span>
+<ul id="tsd-filter-options">
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li>
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li>
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-external" name="external"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>External</span></label></li></ul></div>
+<div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div>
+<details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
+<h3>On This Page</h3></summary>
+<div class="tsd-accordion-details">
+<details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Properties</summary>
+<div><a href="#arguments"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>arguments</span></a><a href="#commands"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>commands</span></a><a href="#constraints"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>constraints</span></a><a href="#description"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>description</span></a><a href="#effects"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>effects</span></a><a href="#epilog"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>epilog</span></a><a href="#options"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>options</span></a><a href="#requiredcommands"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>required<wbr/>Commands</span></a><a href="#roles"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>roles</span></a><a href="#stdin"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>stdin</span></a><a href="#stdout"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>stdout</span></a></div></details></div></details></div>
+<div class="site-menu">
+<nav class="tsd-navigation"><a href="../index.html">clyops Node API</a>
+<ul class="tsd-small-nested-navigation" id="tsd-nav-container">
+<li>Loading...</li></ul></nav></div></div></div><footer>
+<p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer>
+<div class="overlay"></div></body></html>
