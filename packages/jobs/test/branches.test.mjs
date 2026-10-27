@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { pbkdf2 } from 'node:crypto';
 import { join } from 'node:path';
 import { buildResultRecord, resolveFunctionConfig, runContext, runScriptFunction } from '../dist/index.js';
 
@@ -260,6 +261,24 @@ test('error branches cover every way a step can fail to start', { skip }, async 
   // A missing params field stays unset, not an error, unless strict.
   const unset = await runChain(root, chain([{ name: 'first', options: { exit: '${params.x}' }, error: 'tail' }, { name: 'tail' }]), { context: { params: {} } });
   assert.deepEqual([names(unset), unset.stepRuns[0].command.slice(1)], [['first', 'tail'], []]);
+});
+
+test('a missing stdin file fails the step even when the tool exits without reading it', { skip }, async () => {
+  // The tool exits at once; the error must not depend on which finishes first. Busy libuv
+  // threads delay any lazy open past the tool's exit, as a slow runner did on macOS.
+  const root = workspace();
+  const busy = () => Promise.all(Array.from({ length: 8 }, () => new Promise((done) => pbkdf2('x', 'y', 300_000, 32, 'sha256', done))));
+  const crowded = busy();
+  await assert.rejects(runScriptFunction(resolveFunctionConfig(root, { functions: { f: { script: 'scripts/outcome.sh', stdin: 'missing.txt' } } }, 'f'), { configRoot: root, cwd: root, env }), { code: 'ENOENT' }, 'with busy threads');
+  await crowded;
+  const config = chain([{ name: 'first', stdin: 'missing.txt', error: 'tail' }, { name: 'tail' }]);
+  for (let n = 0; n < 25; n += 1) {
+    const run = await runChain(root, config);
+    assert.deepEqual(names(run), ['tail'], `attempt ${n}`);
+    assert.match(run.steps.first.error, /ENOENT.*missing\.txt/);
+  }
+  const fn = resolveFunctionConfig(root, { functions: { f: { script: 'scripts/outcome.sh', stdin: 'missing.txt' } } }, 'f');
+  for (let n = 0; n < 25; n += 1) await assert.rejects(runScriptFunction(fn, { configRoot: root, cwd: root, env }), { code: 'ENOENT' }, `attempt ${n}`);
 });
 
 test('step templates render without a caller context', { skip }, async () => {

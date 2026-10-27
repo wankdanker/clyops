@@ -9,7 +9,7 @@
 // --help-json-schema (spec section 13), after `${dot.path}` / `{{dot.path}}`
 // templates are rendered against a context the trigger builds.
 import { declaredRoles, inputKeys, loadSchema, redactArgv, start, shellQuote, tail, toArgv, type RoleOption, type RunResult, type Schema } from 'clyops-tools';
-import { createReadStream, createWriteStream } from 'node:fs';
+import { createReadStream, createWriteStream, openSync } from 'node:fs';
 import { finished } from 'node:stream/promises';
 import { basename, dirname, isAbsolute, resolve } from 'node:path';
 import { isUnsetTemplate, renderConfigValue, renderResultMap, renderTemplateString, templateParamNames, type TemplateContext, type TemplateOptions } from './template.js';
@@ -334,9 +334,12 @@ async function runTool(fn: ResolvedFunction, opts: RunFunctionOptions): Promise<
     result: {},
     log: { onLine: opts.onLog },
   };
+  // Opened before the tool starts, so a missing or unreadable file always fails the run: a lazy
+  // stream reports it only after the tool may have exited without reading its input.
+  const stdin = stdinPath ? createReadStream(stdinPath, { fd: openSync(stdinPath, 'r') }) : undefined;
   const started = start(file, argv, {
     cwd: opts.cwd, env: opts.env, timeoutMs: opts.timeoutMs, killGraceMs: opts.killGraceMs, signal: opts.signal, onStderr: opts.onStderr,
-    stdin: stdinPath ? createReadStream(stdinPath) : undefined,
+    stdin,
     stdout: stdoutPath ? 'stream' : 'text',
     roles: declaredRoles({ schema }, roles),
   });

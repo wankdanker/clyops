@@ -2,6 +2,7 @@
 """Check release version edits against the shared pnpm lockfile, in scratch trees."""
 import importlib.util
 import json
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -50,7 +51,9 @@ class VersionTests(unittest.TestCase):
 
     def test_stale_lockfile_is_detected(self):
         lock = self.root / "pnpm-lock.yaml"
-        lock.write_text(lock.read_text().replace(f"specifier: {self.base_version}", "specifier: 0.99.0", 1))
+        # A clyops pin, not the first match: a third-party package can share the version (@xterm/addon-fit 0.11.0).
+        pin = re.search(version.PNPM_PIN, lock.read_text())
+        lock.write_text(lock.read_text()[:pin.start(1)] + "0.99.0" + lock.read_text()[pin.end(1):])
         self.assertEqual(len({v for _, v in version.current()}), 2)
         result = self.install_lockfile()
         self.assertNotEqual(result.returncode, 0)

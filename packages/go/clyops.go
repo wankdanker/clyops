@@ -27,7 +27,7 @@ import (
 )
 
 // Version is the clyops version this package implements.
-const Version = "0.10.0"
+const Version = "0.11.0"
 
 // ---------------------------------------------------------------------------
 // Logging
