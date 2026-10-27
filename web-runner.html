@@ -111,6 +111,13 @@ resolved by the tool from config, environment and defaults using the usual
 exclusive conflicts block submission. Requirements that may be satisfied by
 config/environment are advisory, and the tool validates effective values.
 Destructive tools require confirmation before execution.</p>
+<p>A <code>json</code> or <code>json:SCHEMA</code> field is a text area for its JSON. The text is parsed
+and checked against the input's schema as you type, as the API checks it, so
+<code>shape: /w must be integer</code> or <code>shape: must be valid JSON</code> blocks submission
+while the field is enabled. &quot;Expected JSON&quot; shows the schema, and an enabled
+field starts from the schema's <code>default</code>, else its first <code>examples</code> entry. The
+desktop runner does the same. A URL schema is checked when the API has fetched
+it (<code>--fetch-schemas</code>, on by default); the desktop runner fetches it itself.</p>
 <p>The JSON editor applies the same input schema as the API. It omits secrets;
 password values remain in their dedicated controls. Templates save only known,
 non-secret overrides in this browser, scoped by API and tool. Files and stdin are
@@ -145,7 +152,7 @@ the default uses the API/MCP input keys. <code>formSchema</code> adds clyops met
 changing request validation. The API and MCP retain their existing clyops-tools
 imports, which re-export the shared converter for compatibility. The desktop
 editor now uses it too, and numeric fields share the range conversion.</p>
-<p>Build/type/test commands and browser checks are in the <a href="https://github.com/wankdanker/clyops/blob/1a1f0ab27d3999009a6036e3a5393483f82a1ed4/apps/web/README.md">app README</a>.</p>
+<p>Build/type/test commands and browser checks are in the <a href="https://github.com/wankdanker/clyops/blob/f6a29759fd8d688f8ec16bb4763cc1bef6de9bc5/apps/web/README.md">app README</a>.</p>
 </main>
   </div>
   <footer>Guides are Markdown. API references come from the published source interfaces.</footer>
