@@ -54,7 +54,7 @@
         "steps": {
           "type": "array",
           "minItems": 1,
-          "description": "Tools run in order with one context; each step's outputs are `steps.NAME` (`exit_code`, `stdout`, `result`, `meta`, `progress`, `error`) in the templates after it.",
+          "description": "Tools run in order with one context; each step's outputs are `steps.NAME` (`exit_code`, `stdout`, `result`, `meta`, `progress`, `error`) in the templates after it, and the step that ran just before is `previous` (the same fields plus `name`).",
           "items": { "$ref": "#/$defs/step" }
         },
         "artifacts": { "$ref": "#/$defs/artifacts" },
