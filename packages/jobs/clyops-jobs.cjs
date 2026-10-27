@@ -32,6 +32,7 @@ __export(index_exports, {
   deepMerge: () => deepMerge,
   ensureDir: () => ensureDir,
   findFilesByArtifactPattern: () => findFilesByArtifactPattern,
+  functionParamNames: () => functionParamNames,
   functionTemplateOptions: () => functionTemplateOptions,
   globToRegex: () => globToRegex,
   isDirectoryPath: () => isDirectoryPath,
@@ -53,9 +54,11 @@ __export(index_exports, {
   resolveConfigPath: () => resolveConfigPath,
   resolveFunctionConfig: () => resolveFunctionConfig,
   resolveScriptPath: () => resolveScriptPath,
+  runContext: () => runContext,
   runScriptFunction: () => runScriptFunction,
   shellQuote: () => shellQuote,
   statFollowingSymlinks: () => statFollowingSymlinks,
+  templateParamNames: () => templateParamNames,
   timestampIso: () => timestampIso,
   transitionJobRecord: () => transitionJobRecord,
   truthy: () => truthy,
@@ -169,6 +172,16 @@ function isUnsetTemplate(value, context, opts) {
     if (current === MISSING || current === void 0 || current === null) return true;
   }
   return false;
+}
+function templateParamNames(value, names = /* @__PURE__ */ new Set()) {
+  if (typeof value === "string") {
+    for (const [, dollar, brace] of value.matchAll(TEMPLATE)) {
+      const [root, field] = String(dollar || brace).split(".").filter(Boolean);
+      if (OPTIONAL_ROOTS.includes(root ?? "") && field) names.add(field);
+    }
+  } else if (Array.isArray(value)) for (const item of value) templateParamNames(item, names);
+  else if (value && typeof value === "object") for (const item of Object.values(value)) templateParamNames(item, names);
+  return names;
 }
 function renderTemplateString(value, context, opts) {
   return String(value).replace(TEMPLATE, (_, dollar, brace) => lookupTemplateValue(context, dollar || brace, opts));
@@ -615,14 +628,50 @@ var LOGGER = {
 function configureLogging(opts) {
   Object.assign(LOGGER, Object.fromEntries(Object.entries(opts).filter(([, v]) => v)));
 }
+var STEP_NAME = /^[A-Za-z0-9_-]+$/;
+var END = "$end";
 function resolveFunctionConfig(scriptRoot, routeConfig, functionName) {
   const definition = objectValue(objectValue(routeConfig.functions)[functionName]);
   if (Object.keys(definition).length === 0) return null;
   const key = String(definition.key || functionName);
+  if (definition.steps === void 0) return resolveBinding(scriptRoot, routeConfig, functionName, key, definition, `function ${functionName}`);
+  if (definition.script) throw new Error(`function ${functionName} defines both script and steps`);
+  if (!Array.isArray(definition.steps) || definition.steps.length === 0) throw new Error(`function ${functionName} defines no steps`);
+  const steps = [];
+  for (const [i, item] of definition.steps.entries()) {
+    const step = { strict_params: definition.strict_params, ...objectValue(item) };
+    const name = String(step.name ?? "");
+    if (!STEP_NAME.test(name)) throw new Error(`function ${functionName} step ${i + 1} needs a name of letters, digits, _ or -`);
+    if (steps.some((s) => s.stepName === name)) throw new Error(`function ${functionName} has two steps named ${name}`);
+    const where = `function ${functionName} step ${name}`;
+    steps.push({ ...resolveBinding(scriptRoot, routeConfig, functionName, String(step.key || name), step, where), stepName: name, definition: step });
+  }
+  for (const [i, step] of steps.entries()) {
+    for (const outcome of ["succeed", "fail", "error"]) {
+      const target = step.definition[outcome];
+      if (target === void 0 || outcome === "succeed" && target === END) continue;
+      const at = steps.findIndex((s) => s.stepName === target);
+      if (at < 0) throw new Error(`function ${functionName} step ${step.stepName}: ${outcome} names no step ${String(target)}`);
+      if (at <= i) throw new Error(`function ${functionName} step ${step.stepName}: ${outcome} must name a later step, not ${String(target)}`);
+    }
+  }
+  const config = Object.fromEntries(steps.map((s) => [s.stepName, s.config]));
+  return { functionName, key, script: steps[steps.length - 1].script, config, definition, steps };
+}
+function resolveBinding(scriptRoot, routeConfig, functionName, key, definition, where) {
   const script = String(definition.script || "");
-  if (!script) throw new Error(`function ${functionName} does not define a script`);
+  if (!script) throw new Error(`${where} does not define a script`);
   const config = deepMerge(objectValue(objectValue(routeConfig.defaults)[key]), objectValue(routeConfig[key]));
   return { functionName, key, script: resolveScriptPath(scriptRoot, script), config, definition };
+}
+function functionParamNames(fn) {
+  const names = /* @__PURE__ */ new Set();
+  for (const part of fn.steps ?? [fn]) {
+    const { positionals, stdin, stdout } = part.definition;
+    templateParamNames([part.config, positionals, stdin, stdout], names);
+  }
+  templateParamNames([fn.definition.artifacts, fn.definition.result], names);
+  return [...names].sort();
 }
 function functionTemplateOptions(fn) {
   return { strict: fn.definition.strict_params === true };
@@ -641,6 +690,7 @@ function explicitPositionals(fn, context) {
   return fn.definition.positionals.filter((item) => !context || !isUnsetTemplate(item, context, templates)).map((item) => String(renderConfigValue(item, context, templates))).filter(Boolean);
 }
 async function buildFunctionCommand(fn, opts, schema) {
+  if (fn.steps) throw new Error(`function ${fn.functionName} runs steps; build each step's command`);
   schema ??= await loadSchema(fn.script);
   const context = opts.context;
   const templates = functionTemplateOptions(fn);
@@ -675,6 +725,9 @@ function streamPath(template, opts, base, templates) {
   return (0, import_node_path3.isAbsolute)(rendered) ? rendered : (0, import_node_path3.resolve)(base, rendered);
 }
 async function runScriptFunction(fn, opts) {
+  return fn.steps ? runSteps(fn.steps, opts) : (await runTool(fn, opts)).run;
+}
+async function runTool(fn, opts) {
   const schema = await loadSchema(fn.script);
   const [file, ...argv] = await buildFunctionCommand(fn, opts, schema);
   const command = [file, ...redactArgv(schema, argv)];
@@ -693,6 +746,7 @@ async function runScriptFunction(fn, opts) {
       }
     },
     meta: {},
+    result: {},
     log: { onLine: opts.onLog }
   };
   const started = start(file, argv, {
@@ -713,7 +767,70 @@ async function runScriptFunction(fn, opts) {
   }
   const [result] = await Promise.all([started.result, written]);
   const meta = parseRoleJson(result.roles?.meta);
-  return { ...result, command, stderrTail: tail(result.stderr), ...meta !== void 0 ? { meta } : {}, ...progress ? { progress } : {} };
+  const output = parseRoleJson(result.roles?.result) ?? (stdoutPath ? void 0 : parseRoleJson(result.stdout));
+  const run = {
+    ...result,
+    command,
+    stderrTail: tail(result.stderr),
+    ...meta !== void 0 ? { meta } : {},
+    ...progress ? { progress } : {},
+    ...output !== void 0 ? { result: output } : {}
+  };
+  return { run, stdoutPath };
+}
+async function runSteps(steps, opts) {
+  const deadline = opts.timeoutMs ? Date.now() + opts.timeoutMs : void 0;
+  const outputs = {};
+  const stepRuns = [];
+  const byName = new Map(steps.map((step, i) => [step.stepName, i]));
+  const after = (i, branch, fallthrough) => branch === END ? void 0 : branch ? byName.get(branch) : fallthrough && i + 1 < steps.length ? i + 1 : void 0;
+  let continued;
+  let last;
+  let previous;
+  for (let i = 0; i !== void 0; ) {
+    const step = steps[i];
+    const name = step.stepName;
+    const limits = [step.definition.timeout_ms, deadline && Math.max(1, deadline - Date.now())].filter((ms) => Number(ms) > 0);
+    const context = { ...opts.context, steps: { ...outputs }, ...previous ? { previous } : {} };
+    const onProgress = opts.onProgress && ((update) => opts.onProgress?.({ stage: name, ...update, step: name }));
+    let ran;
+    try {
+      ran = await runTool(step, { ...opts, context, onProgress, timeoutMs: limits.length ? Math.min(...limits) : void 0 });
+    } catch (error) {
+      const message = `step ${name}: ${error.message}`;
+      if (!step.definition.error) throw new Error(message, { cause: error });
+      outputs[name] = { exit_code: null, stdout: "", error: message };
+      previous = { name, ...outputs[name] };
+      i = byName.get(step.definition.error);
+      continue;
+    }
+    const { run, stdoutPath } = ran;
+    stepRuns.push({ ...run, step: name });
+    outputs[name] = {
+      exit_code: run.exitCode,
+      stdout: stdoutPath ?? run.stdout.replace(/\n+$/, ""),
+      ...run.result !== void 0 ? { result: run.result } : {},
+      ...run.meta !== void 0 ? { meta: run.meta } : {},
+      ...run.progress ? { progress: run.progress } : {}
+    };
+    previous = { name, ...outputs[name] };
+    last = { ...run, steps: outputs, previous, stepRuns, durationMs: stepRuns.reduce((ms, r) => ms + r.durationMs, 0) };
+    const ok = !run.timedOut && (run.exitCode === 0 || run.exitCode !== null && (step.definition.continue_on_exit ?? []).includes(run.exitCode));
+    if (ok) {
+      if (run.exitCode !== 0) continued ??= run.exitCode ?? void 0;
+      i = after(i, step.definition.succeed, true);
+      if (i === void 0) return { ...last, exitCode: run.exitCode || continued || 0 };
+      continue;
+    }
+    const stopped = opts.signal?.aborted || deadline !== void 0 && Date.now() >= deadline;
+    i = stopped ? void 0 : after(i, step.definition.fail, false);
+    if (i === void 0) return { ...last, failedStep: name };
+  }
+  if (!last) throw new Error("unreachable: a chain ends after a step that ran");
+  return last;
+}
+function runContext(context, run) {
+  return { ...context, ...run.steps ? { steps: run.steps } : {}, ...run.previous ? { previous: run.previous } : {} };
 }
 function buildResultRecord(p) {
   return {
@@ -961,6 +1078,7 @@ var JobQueue = class {
   deepMerge,
   ensureDir,
   findFilesByArtifactPattern,
+  functionParamNames,
   functionTemplateOptions,
   globToRegex,
   isDirectoryPath,
@@ -982,9 +1100,11 @@ var JobQueue = class {
   resolveConfigPath,
   resolveFunctionConfig,
   resolveScriptPath,
+  runContext,
   runScriptFunction,
   shellQuote,
   statFollowingSymlinks,
+  templateParamNames,
   timestampIso,
   transitionJobRecord,
   truthy,

@@ -58,6 +58,18 @@ export function isUnsetTemplate(value: unknown, context: TemplateContext, opts?:
   return false;
 }
 
+/** The `params` fields a value's templates name (the first part after `params.`), in strings, arrays and objects. */
+export function templateParamNames(value: unknown, names = new Set<string>()): Set<string> {
+  if (typeof value === 'string') {
+    for (const [, dollar, brace] of value.matchAll(TEMPLATE)) {
+      const [root, field] = String(dollar || brace).split('.').filter(Boolean);
+      if (OPTIONAL_ROOTS.includes(root ?? '') && field) names.add(field);
+    }
+  } else if (Array.isArray(value)) for (const item of value) templateParamNames(item, names);
+  else if (value && typeof value === 'object') for (const item of Object.values(value)) templateParamNames(item, names);
+  return names;
+}
+
 /** Replace dotted-path ${expression} and {{expression}} templates using the context. */
 export function renderTemplateString(value: string, context: TemplateContext, opts?: TemplateOptions): string {
   return String(value).replace(TEMPLATE, (_, dollar, brace) => lookupTemplateValue(context, dollar || brace, opts));

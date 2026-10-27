@@ -93,8 +93,10 @@ console.log(queue.get(job.record.job_id)?.record.status);
 
 `resolveFunctionConfig` resolves a configured script and merges defaults/overrides;
 `buildFunctionCommand` renders arguments; `runScriptFunction` executes it with
-optional stdin/stdout files. A function run wires the tool's `progress`, `meta` and
-`log` roles (`onProgress`, the run's `meta`), and queue tasks record progress with
+optional stdin/stdout files, or a function's `steps` in order, each step's outputs
+(`${steps.NAME.result.field}`, `${steps.NAME.stdout}`, and `${previous...}` for the step just before) feeding the templates after
+it, and `succeed`/`fail`/`error` branches to later steps. A function run wires the tool's `progress`, `meta`, `result` and
+`log` roles (`onProgress`, the run's `meta` and `result`), and queue tasks record progress with
 `progress(update)`. Templates use dotted paths in `${expression}` or
 `{{expression}}`. Boolean templates are validated after rendering. A missing
 `params` field leaves an option or positional that names it unset, even inside a
