@@ -1,6 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -251,4 +252,36 @@ test('stdio: inputs are open by default; --close-inputs closes them as the API d
   const confined = (await listed('--close-inputs', '--paths-within', root)).media_demo;
   assert.ok(confined.includes('input') && !confined.includes('exec'), confined.join(' '));
   assert.ok((await listed('--close-inputs', '--paths-within', root, '--allow-executable-inputs')).media_demo.includes('exec'));
+});
+
+test('a json:URL input is checked against the fetched schema; --fetch-schemas=false and --schema-hosts turn it off', { timeout: 60_000 }, async (t) => {
+  const doc = { type: 'object', required: ['at'], properties: { at: { $ref: 'defs.json#/definitions/time' } } };
+  const defs = { definitions: { time: { type: 'string', minLength: 4 } } };
+  const schemas = createServer((req, res) => res.writeHead(200).end(JSON.stringify(req.url === '/defs.json' ? defs : doc)));
+  await new Promise((done) => schemas.listen(0, '127.0.0.1', done));
+  t.after(() => { schemas.closeAllConnections(); schemas.close(); });
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'clyops-mcp-fetch-')));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const url = `http://127.0.0.1:${schemas.address().port}/event.json`;
+  writeFileSync(join(root, 'ev'), `#!/usr/bin/env node\n// clyops-tool\nconst { Cli } = require(${JSON.stringify(join(repo, 'packages/js/dist/cjs/index.js'))});
+const cli = new Cli({ name: 'ev' });
+cli.opt('EVENT', 'event', '', '', 'Event', 'Options', ${JSON.stringify(`json:${url}`)});
+process.stdout.write(cli.run().EVENT);
+`);
+  chmodSync(join(root, 'ev'), 0o755);
+  const call = async (args, event) => {
+    const client = new Client({ name: 'test', version: '1' });
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [cli, '--root', root, '--no-watch', ...args], env, stderr: 'pipe' }));
+    try {
+      const result = await client.callTool({ name: 'ev', arguments: { event } });
+      return result.isError ? result.content[0].text : result.structuredContent?.stdout ?? result.content[0].text;
+    } finally {
+      await client.close();
+    }
+  };
+  assert.match(await call([], { at: '26' }), /^Invalid arguments: .*must NOT have fewer than 4 characters/);
+  assert.doesNotMatch(await call([], { at: '2026' }), /Invalid arguments/);
+  for (const args of [['--fetch-schemas=false'], ['--schema-hosts', 'schemas.internal'], ['--schema-depth', '0']]) {
+    assert.doesNotMatch(await call(args, { at: 1 }), /Invalid arguments/, args.join(' '));
+  }
 });

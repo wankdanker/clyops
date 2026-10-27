@@ -20,6 +20,12 @@ cli.opt('CLYOPS_API_UI',           'ui',          '',  'true',      'Serve the s
 cli.opt('CLYOPS_API_WATCH',        'watch',       'w', 'true',      'Pick up added, changed and removed tools without a restart', 'Tools', 'bool');
 cli.opt('CLYOPS_API_PROBE_CONCURRENCY', 'probe-concurrency', '', '8', 'Tools asked for --help-json-schema at the same time when loading', 'Tools', 'int:1-');
 cli.opt('CLYOPS_API_PROBE_TIMEOUT', 'probe-timeout', '', '30',       'Seconds each tool has to answer --help-json-schema', 'Tools', 'int:1-');
+cli.opt('CLYOPS_API_FETCH_SCHEMAS',    'fetch-schemas',    '', 'true',    'Fetch the URL schemas json:SCHEMA inputs reference, so they are checked', 'Schemas', 'bool');
+cli.opt('CLYOPS_API_SCHEMA_DEPTH',     'schema-depth',     '', '3',       'Levels of references followed from an input\'s schema (0: fetch none)', 'Schemas', 'int:0-');
+cli.optArray('CLYOPS_API_SCHEMA_HOSTS', 'schema-hosts',    '',            'Fetch schemas only from this host (example.com, or *.example.com for its subdomains); default: any', 'Schemas');
+cli.opt('CLYOPS_API_SCHEMA_CACHE',     'schema-cache',     '', '3600',    'Seconds a fetched schema is reused before it is fetched again (0: every load)', 'Schemas', 'int:0-');
+cli.opt('CLYOPS_API_SCHEMA_TIMEOUT',   'schema-timeout',   '', '5',       'Seconds each schema fetch may take', 'Schemas', 'int:1-');
+cli.opt('CLYOPS_API_SCHEMA_MAX_BYTES', 'schema-max-bytes', '', '1048576', 'Largest schema document fetched, in bytes', 'Schemas', 'int:1-');
 cli.opt('CLYOPS_API_HOST',         'host',        'H', '127.0.0.1', 'Address to listen on', 'Server');
 cli.opt('CLYOPS_API_PORT',         'port',        'p', '8080',      'Port to listen on',                             'Server', 'port');
 cli.opt('CLYOPS_API_API_KEY',      'api-key',     'k', 'optional',  'Require this key (Authorization: Bearer KEY or X-API-Key); it may run every tool', 'Server', 'secret');
@@ -65,6 +71,11 @@ const { app, current, close } = await createApi({
   watch: args.CLYOPS_API_WATCH as boolean,
   probeConcurrency: args.CLYOPS_API_PROBE_CONCURRENCY as number,
   probeTimeoutMs: (args.CLYOPS_API_PROBE_TIMEOUT as number) * 1000,
+  schemas: {
+    fetch: args.CLYOPS_API_FETCH_SCHEMAS as boolean, depth: args.CLYOPS_API_SCHEMA_DEPTH as number, hosts: args.CLYOPS_API_SCHEMA_HOSTS as string[],
+    cacheTtlMs: (args.CLYOPS_API_SCHEMA_CACHE as number) * 1000, timeoutMs: (args.CLYOPS_API_SCHEMA_TIMEOUT as number) * 1000,
+    maxBytes: args.CLYOPS_API_SCHEMA_MAX_BYTES as number,
+  },
   onReload: ({ tools }) => info('reloaded: %d tool(s)', tools.length),
   version,
 });

@@ -4,6 +4,7 @@ import { commands, discover, type Command, type Group } from './discover.js';
 import { InputError, inputKeys, isPathValued, redactArgv, toArgv, type Input } from './argv.js';
 import { start, type RoleOption, type RunOptions, type RunResult, type Started } from './run.js';
 import { loadSchema, PROBE_TIMEOUT_MS, type Schema, type SchemaBody } from './schema.js';
+import { fetchSchemaRefs, type SchemaFetchOptions } from './fetch-schemas.js';
 
 /** A probed executable or leaf command, with its effective inherited schema. */
 export interface Tool extends Command {
@@ -175,6 +176,8 @@ export async function loadTools(
     concurrency?: number;
     /** How long each probe may take, in milliseconds (default `PROBE_TIMEOUT_MS`). */
     timeoutMs?: number;
+    /** How the URL schemas `json:SCHEMA` inputs reference are fetched (on by default); a failed fetch goes to `onError` and leaves the input unchecked. */
+    schemas?: SchemaFetchOptions;
   } = {},
 ): Promise<{ /** Discovered directory tree. */ tree: Group; /** Discovered, schema-loaded tools offered by the server. */ tools: Tool[] }> {
   const tree = discover(root, { name: opts.name });
@@ -182,7 +185,8 @@ export async function loadTools(
   // once times healthy ones out.
   const loaded = await mapLimit(commands(tree).filter((cmd) => cmd.kind === 'tool'), opts.concurrency ?? PROBE_CONCURRENCY, async (cmd) => {
     try {
-      return expandCommands(cmd, await loadSchema(cmd.file, { timeoutMs: opts.timeoutMs ?? PROBE_TIMEOUT_MS }));
+      const schema = await loadSchema(cmd.file, { timeoutMs: opts.timeoutMs ?? PROBE_TIMEOUT_MS });
+      return expandCommands(cmd, await fetchSchemaRefs(schema, opts.schemas, (err) => opts.onError?.(cmd, err)));
     } catch (err) {
       opts.onError?.(cmd, err as Error);
       return [];
@@ -219,11 +223,13 @@ export async function watchTools(
     concurrency?: number;
     /** How long each probe may take, in milliseconds (see `loadTools`). */
     timeoutMs?: number;
+    /** How URL schemas are fetched (see `loadTools`). */
+    schemas?: SchemaFetchOptions;
     onChange?: (loaded: { /** Discovered directory tree. */ tree: Group; /** Discovered, schema-loaded tools offered by the server. */ tools: Tool[] }) => void;
     onError?: (cmd: Command | null, err: Error) => void;
   } = {},
 ): Promise<ToolsWatcher> {
-  const load = () => loadTools(root, { name: opts.name, filter: opts.filter, onError: opts.onError, concurrency: opts.concurrency, timeoutMs: opts.timeoutMs });
+  const load = () => loadTools(root, { name: opts.name, filter: opts.filter, onError: opts.onError, concurrency: opts.concurrency, timeoutMs: opts.timeoutMs, schemas: opts.schemas });
   let loaded = await load();
   let timer: NodeJS.Timeout | undefined;
   // Reloads run one at a time; a change during one schedules another.

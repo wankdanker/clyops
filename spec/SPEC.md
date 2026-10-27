@@ -353,7 +353,7 @@ checks only the `json` grammar. `SCHEMA` is one of:
   must be valid JSON (an unknown rule otherwise);
 * a URL, when it starts with a scheme (`^[A-Za-z][A-Za-z0-9+.-]+:`, as in
   section 6): `json:https://example.com/event.json`. It becomes
-  `{"$ref": "URL"}` and is never fetched;
+  `{"$ref": "URL"}`; the program never fetches it (a server may, section 13);
 * otherwise a path to a JSON Schema file, relative to `root` (lexically, as in
   section 6) unless absolute. It is read only when `--help-json-schema` runs.
   A file that can't be read or isn't valid JSON gives the warning
@@ -808,7 +808,12 @@ with the section 5 regex, `json` → any JSON value (no `type`) with
 to point into the input's schema (`#/$defs/x` under the `payload` key becomes
 `#/properties/payload/$defs/x`, or `#/properties/payload/items/$defs/x` for an
 array), and any other `$ref` (a URL) becomes `"$comment": "JSON Schema: URL"`,
-since consumers don't fetch schemas. A
+so the input is documented but not checked. A server may first fetch the
+documents such references name, with a timeout and a size limit, and place
+each in the input schema's `$defs` keyed by its URL, rewriting the references
+(and those inside the fetched document, resolved against its URL) to point
+there; it never fetches while a probe runs, and a reference it doesn't fetch
+stays a `$comment`. A
 `null` schema is the same as `json`. A server validates a `json` input given
 as a string by parsing it first: input that isn't valid JSON is an error, and
 the parsed value must match the schema. Array options and

@@ -69,7 +69,7 @@ const token = (key: string) => key.replace(/~/g, '~0').replace(/\//g, '~1');
  * A tool's `json:SCHEMA` schema placed at `pointer` in the input's schema
  * (spec section 13): `$schema` and `$id` removed (two tools may share one
  * schema), `#` references pointed at its new place, and other references,
- * which consumers don't fetch, kept only as a `$comment`.
+ * not fetched by then (clyops-tools' loadTools fetches them into `$defs`), kept only as a `$comment`.
  */
 function embedSchema(schema: unknown, pointer: string): JsonSchema {
   if (schema === true || schema === null || schema === undefined) return {};

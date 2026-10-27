@@ -6,4 +6,5 @@ export * from './argv.js';
 export * from './run.js';
 export * from './json-schema.js';
 export * from './tools.js';
+export * from './fetch-schemas.js';
 export * from './serve.js';

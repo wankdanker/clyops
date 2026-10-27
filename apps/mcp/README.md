@@ -57,7 +57,13 @@ message and correct itself.
 clyops-mcp --root DIR [--name NAME] [--cwd DIR] [--timeout SECONDS] [--no-watch] [--probe-concurrency N] [--probe-timeout SECONDS]
            [--allow GLOB]... [--deny GLOB]... [--read-only] [--paths-within DIR]...
            [--close-inputs [--allow-executable-inputs]] [--max-output BYTES] [--audit FILE]
+           [--no-fetch-schemas] [--schema-depth N] [--schema-hosts HOST]... [--schema-cache SECONDS]
+           [--schema-timeout SECONDS] [--schema-max-bytes BYTES]
 ```
+
+URL schemas of `json:https://...` inputs are fetched when the tools load, as in
+[clyops-api](../api/README.md#options), so those inputs are checked; `--no-fetch-schemas`
+turns that off.
 
 The server watches the tools directory: when a tool is added, changed or removed it tells the
 agent (`notifications/tools/list_changed`), and clients that support it refresh their tool list

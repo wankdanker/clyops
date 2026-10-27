@@ -24,10 +24,13 @@ __export(index_exports, {
   InputError: () => InputError,
   PROBE_CONCURRENCY: () => PROBE_CONCURRENCY,
   PROBE_TIMEOUT_MS: () => PROBE_TIMEOUT_MS,
+  SCHEMA_FETCH_DEFAULTS: () => SCHEMA_FETCH_DEFAULTS,
+  SchemaFetchError: () => SchemaFetchError,
   allowed: () => allowed,
   auditLog: () => auditLog,
   checkWithin: () => checkWithin,
   classify: () => classify,
+  clearSchemaCache: () => clearSchemaCache,
   closedInputs: () => closedInputs,
   closedKeys: () => closedKeys,
   closedRequirement: () => closedRequirement,
@@ -36,10 +39,13 @@ __export(index_exports, {
   declaredRoles: () => declaredRoles,
   discover: () => discover,
   expandCommands: () => expandCommands,
+  fetchSchemaRefs: () => fetchSchemaRefs,
+  inlineSchemaRefs: () => inlineSchemaRefs,
   inputKey: () => inputKey,
   inputKeys: () => inputKeys,
   isBareFlag: () => isBareFlag,
   isPathValued: () => isPathValued,
+  isReservedSchemaHost: () => isReservedSchemaHost,
   isTextType: () => isTextType,
   loadSchema: () => loadSchema,
   loadTools: () => loadTools,
@@ -49,6 +55,7 @@ __export(index_exports, {
   redactArgv: () => redactArgv,
   run: () => run,
   runTool: () => runTool,
+  schemaHostAllowed: () => schemaHostAllowed,
   shellQuote: () => shellQuote,
   stamp: () => stamp,
   start: () => start,
@@ -826,6 +833,156 @@ function shellQuote(args) {
 
 // packages/tools/src/tools.ts
 var import_node_fs4 = require("node:fs");
+
+// packages/tools/src/fetch-schemas.ts
+var SCHEMA_FETCH_DEFAULTS = { depth: 3, cacheTtlMs: 36e5, timeoutMs: 5e3, maxBytes: 1048576 };
+var SchemaFetchError = class extends Error {
+  /** The schema's URL, without a fragment. */
+  url;
+  /** An error for the schema at `url`, saying why it couldn't be fetched. */
+  constructor(url, reason) {
+    super(`schema ${url}: ${reason}`);
+    this.name = "SchemaFetchError";
+    this.url = url;
+  }
+};
+function isReservedSchemaHost(url) {
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  return /(^|\.)example\.(com|net|org)$/.test(host) || /\.(example|invalid|test)$/.test(host) || ["example", "invalid", "test"].includes(host);
+}
+var FAILURE_TTL_MS = 6e4;
+var MAX_REDIRECTS = 5;
+var cache2 = /* @__PURE__ */ new Map();
+function clearSchemaCache() {
+  cache2.clear();
+}
+function schemaHostAllowed(url, hosts) {
+  if (!hosts?.length) return true;
+  const host = url.hostname.toLowerCase();
+  return hosts.some((entry) => {
+    const allowed2 = entry.trim().toLowerCase();
+    return allowed2.startsWith("*.") ? host.endsWith(allowed2.slice(1)) : host === allowed2;
+  });
+}
+async function download(url, opts) {
+  let target = new URL(url);
+  const signal = AbortSignal.timeout(opts.timeoutMs ?? SCHEMA_FETCH_DEFAULTS.timeoutMs);
+  for (let hops = 0; ; hops += 1) {
+    if (!schemaHostAllowed(target, opts.hosts)) throw new Error(`host ${target.hostname} is not in the allowed schema hosts`);
+    const res = await fetch(target, { redirect: "manual", signal, headers: { accept: "application/schema+json, application/json" } });
+    const location = res.headers.get("location");
+    if (res.status >= 300 && res.status < 400 && location) {
+      await res.body?.cancel();
+      if (hops >= MAX_REDIRECTS) throw new Error(`more than ${MAX_REDIRECTS} redirects`);
+      target = new URL(location, target);
+      continue;
+    }
+    if (!res.ok) {
+      await res.body?.cancel();
+      throw new Error(`HTTP ${res.status}`);
+    }
+    const max = opts.maxBytes ?? SCHEMA_FETCH_DEFAULTS.maxBytes;
+    const chunks = [];
+    let size = 0;
+    for await (const chunk of res.body ?? []) {
+      size += chunk.length;
+      if (size > max) throw new Error(`larger than ${max} bytes`);
+      chunks.push(chunk);
+    }
+    let doc;
+    try {
+      doc = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    } catch {
+      throw new Error("not JSON");
+    }
+    if (typeof doc !== "boolean" && (!doc || typeof doc !== "object" || Array.isArray(doc))) throw new Error("not a JSON Schema (an object or a boolean)");
+    return doc;
+  }
+}
+async function documentAt(url, opts, onError) {
+  const ttl = opts.cacheTtlMs ?? SCHEMA_FETCH_DEFAULTS.cacheTtlMs;
+  const hit = cache2.get(url);
+  if (hit && Date.now() - hit.at < (hit.error ? Math.min(ttl, FAILURE_TTL_MS) : ttl)) {
+    if (hit.error) throw hit.error;
+    return hit.doc;
+  }
+  try {
+    const doc = await download(url, opts);
+    if (ttl > 0) cache2.set(url, { at: Date.now(), doc });
+    return doc;
+  } catch (err) {
+    const error = new SchemaFetchError(url, err.name === "TimeoutError" ? "timed out" : err.message);
+    if (ttl > 0) cache2.set(url, { at: Date.now(), error });
+    onError(error);
+    throw error;
+  }
+}
+var token2 = (key) => key.replace(/~/g, "~0").replace(/\//g, "~1");
+async function inlineSchemaRefs(schema, opts = {}, onError = () => {
+}) {
+  const depth = opts.fetch === false ? 0 : opts.depth ?? SCHEMA_FETCH_DEFAULTS.depth;
+  if (depth <= 0 || !schema || typeof schema !== "object" || Array.isArray(schema)) return schema;
+  const defs = {};
+  const failed = /* @__PURE__ */ new Set();
+  const pointTo = async (ref, base, level) => {
+    if (ref.startsWith("#")) return base && (ref === "#" || ref.startsWith("#/")) ? `#/$defs/${encodeURIComponent(token2(base))}${ref.slice(1)}` : ref;
+    let url;
+    try {
+      url = new URL(ref, base);
+    } catch {
+      return ref;
+    }
+    const absolute = url.href;
+    if (url.protocol !== "http:" && url.protocol !== "https:" || isReservedSchemaHost(url)) return absolute;
+    const fragment = url.hash.slice(1);
+    url.hash = "";
+    const doc = url.href;
+    if (level >= depth || failed.has(doc) || fragment && !fragment.startsWith("/")) return absolute;
+    if (!(doc in defs)) {
+      defs[doc] = true;
+      try {
+        defs[doc] = await visit(stripIds(await documentAt(doc, opts, onError)), doc, level + 1);
+      } catch {
+        delete defs[doc];
+        failed.add(doc);
+        return absolute;
+      }
+    }
+    return `#/$defs/${encodeURIComponent(token2(doc))}${fragment}`;
+  };
+  const visit = async (node, base, level) => {
+    if (Array.isArray(node)) return Promise.all(node.map((item) => visit(item, base, level)));
+    if (!node || typeof node !== "object") return node;
+    const out = {};
+    for (const [key, value] of Object.entries(node)) {
+      out[key] = key === "$ref" && typeof value === "string" ? await pointTo(value, base, level) : await visit(value, base, level);
+    }
+    return out;
+  };
+  const root = await visit(schema, void 0, 0);
+  if (Object.keys(defs).length === 0) return root;
+  return { ...root, $defs: { ...root.$defs, ...defs } };
+}
+function stripIds(node) {
+  if (Array.isArray(node)) return node.map(stripIds);
+  if (!node || typeof node !== "object") return node;
+  return Object.fromEntries(Object.entries(node).filter(([k]) => k !== "$id" && k !== "$schema").map(([k, v]) => [k, stripIds(v)]));
+}
+async function fetchSchemaRefs(schema, opts = {}, onError = () => {
+}) {
+  const body = async (level) => {
+    const items = async (list) => Promise.all(list.map(async (item) => item.validation.startsWith("json:") && item.schema ? { ...item, schema: await inlineSchemaRefs(item.schema, opts, onError) } : item));
+    return {
+      ...level,
+      arguments: await items(level.arguments),
+      options: await items(level.options),
+      ...level.commands ? { commands: await Promise.all(level.commands.map((c) => body(c))) } : {}
+    };
+  };
+  return body(schema);
+}
+
+// packages/tools/src/tools.ts
 function closedInputs(schema, policy) {
   const closed = (validation, type) => validation === "file:executable" ? !policy.allowExecutables : isPathValued(validation, type) && !policy.confined;
   return [
@@ -913,7 +1070,8 @@ async function loadTools(root, opts = {}) {
   const tree = discover(root, { name: opts.name });
   const loaded = await mapLimit(commands(tree).filter((cmd) => cmd.kind === "tool"), opts.concurrency ?? PROBE_CONCURRENCY, async (cmd) => {
     try {
-      return expandCommands(cmd, await loadSchema(cmd.file, { timeoutMs: opts.timeoutMs ?? PROBE_TIMEOUT_MS }));
+      const schema = await loadSchema(cmd.file, { timeoutMs: opts.timeoutMs ?? PROBE_TIMEOUT_MS });
+      return expandCommands(cmd, await fetchSchemaRefs(schema, opts.schemas, (err) => opts.onError?.(cmd, err)));
     } catch (err) {
       opts.onError?.(cmd, err);
       return [];
@@ -924,7 +1082,7 @@ async function loadTools(root, opts = {}) {
   return { tree, tools };
 }
 async function watchTools(root, opts = {}) {
-  const load = () => loadTools(root, { name: opts.name, filter: opts.filter, onError: opts.onError, concurrency: opts.concurrency, timeoutMs: opts.timeoutMs });
+  const load = () => loadTools(root, { name: opts.name, filter: opts.filter, onError: opts.onError, concurrency: opts.concurrency, timeoutMs: opts.timeoutMs, schemas: opts.schemas });
   let loaded = await load();
   let timer;
   let running = Promise.resolve();
@@ -1001,10 +1159,13 @@ function auditLog(target) {
   InputError,
   PROBE_CONCURRENCY,
   PROBE_TIMEOUT_MS,
+  SCHEMA_FETCH_DEFAULTS,
+  SchemaFetchError,
   allowed,
   auditLog,
   checkWithin,
   classify,
+  clearSchemaCache,
   closedInputs,
   closedKeys,
   closedRequirement,
@@ -1013,10 +1174,13 @@ function auditLog(target) {
   declaredRoles,
   discover,
   expandCommands,
+  fetchSchemaRefs,
+  inlineSchemaRefs,
   inputKey,
   inputKeys,
   isBareFlag,
   isPathValued,
+  isReservedSchemaHost,
   isTextType,
   loadSchema,
   loadTools,
@@ -1026,6 +1190,7 @@ function auditLog(target) {
   redactArgv,
   run,
   runTool,
+  schemaHostAllowed,
   shellQuote,
   stamp,
   start,

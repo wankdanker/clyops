@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createApi } from '../dist/index.js';
+import { clearSchemaCache } from 'clyops-tools';
 
 const repo = fileURLToPath(new URL('../../..', import.meta.url));
 process.env.KEY = 'k'; // the demo's required --key, from its environment
@@ -234,7 +235,7 @@ test('watch: tools added and removed show up without a restart', { timeout: 60_0
 // ---------------------------------------------------------------------------
 // Commands, stdin/stdout, multipart, keys and the other security options.
 
-import { request } from 'node:http';
+import { createServer, request } from 'node:http';
 
 function jsTool(root, path, body) {
   writeFileSync(join(root, path), `#!/usr/bin/env node\n// clyops-tool\nconst { Cli } = require(${JSON.stringify(join(repo, 'packages/js/dist/cjs/index.js'))});\n${body}`);
@@ -719,4 +720,47 @@ test('inputs: file:executable and unconfined paths are set by the server, not ca
     confined.close();
   }
   rmSync(root, { recursive: true, force: true });
+});
+
+test('a json:URL input is checked against the fetched schema, references inside it too', async (t) => {
+  clearSchemaCache();
+  const docs = {
+    '/event.json': { type: 'object', required: ['at'], properties: { at: { $ref: 'defs.json#/definitions/time' }, kind: { $ref: '#/$defs/kind' } }, $defs: { kind: { enum: ['a', 'b'] } } },
+    '/defs.json': { definitions: { time: { type: 'string', minLength: 4 } } },
+  };
+  const schemas = createServer((req, res) => (docs[req.url] ? res.writeHead(200).end(JSON.stringify(docs[req.url])) : res.writeHead(404).end()));
+  await new Promise((done) => schemas.listen(0, '127.0.0.1', done));
+  t.after(() => { schemas.closeAllConnections(); schemas.close(); });
+  const url = `http://127.0.0.1:${schemas.address().port}/event.json`;
+  const root = mkdtempSync(join(tmpdir(), 'clyops-api-fetch-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  jsTool(root, 'ev', `const cli = new Cli({ name: 'ev' });
+cli.opt('EVENT', 'event', '', '', 'Event', 'Options', ${JSON.stringify(`json:${url}`)});
+const v = cli.run();
+process.stdout.write(v.EVENT);
+`);
+  const call = async (at, event) => {
+    const res = await fetch(`${at}/tools/ev`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ event }) });
+    const body = await res.json();
+    return res.status === 200 ? body.stdout : body.issues.map((i) => `${i.path.join('.')}: ${i.message}`);
+  };
+  const on = await serve({ root, cwd: root });
+  try {
+    assert.equal(await call(on.at, { at: '2026', kind: 'a' }), '{"at":"2026","kind":"a"}');
+    assert.deepEqual(await call(on.at, { at: '26' }), ['event: /at must NOT have fewer than 4 characters']);
+    assert.deepEqual(await call(on.at, { at: '2026', kind: 'c' }), ['event: /kind must be equal to one of the allowed values']);
+    assert.deepEqual(await call(on.at, { kind: 'a' }), ["event: must have required property 'at'"]);
+  } finally {
+    on.close();
+  }
+  // Off, or from a host not allowed, the input is served unchecked.
+  for (const schemaOpts of [{ fetch: false }, { hosts: ['schemas.internal'] }]) {
+    clearSchemaCache();
+    const off = await serve({ root, cwd: root, schemas: schemaOpts });
+    try {
+      assert.equal(await call(off.at, { at: 1 }), '{"at":1}', JSON.stringify(schemaOpts));
+    } finally {
+      off.close();
+    }
+  }
 });

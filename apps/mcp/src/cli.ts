@@ -2,7 +2,7 @@
 // clyops-mcp --root DIR: a stdio MCP server for a directory of clyops tools.
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Cli, warn } from 'clyops';
-import { auditLog, closedInputs, closedRequirement, loadTools, watchTools, type InputPolicy, type Tool } from 'clyops-tools';
+import { auditLog, closedInputs, closedRequirement, loadTools, SchemaFetchError, watchTools, type InputPolicy, type Tool } from 'clyops-tools';
 import { readFileSync } from 'node:fs';
 import { createMcpServer } from './server.js';
 
@@ -18,6 +18,12 @@ cli.opt('CLYOPS_MCP_TIMEOUT', 'timeout', 't', '0',        'Kill a tool after thi
 cli.opt('CLYOPS_MCP_WATCH',   'watch',   'w', 'true',     'Pick up added, changed and removed tools without a restart', 'Tools', 'bool');
 cli.opt('CLYOPS_MCP_PROBE_CONCURRENCY', 'probe-concurrency', '', '8', 'Tools asked for --help-json-schema at the same time when loading', 'Tools', 'int:1-');
 cli.opt('CLYOPS_MCP_PROBE_TIMEOUT', 'probe-timeout', '', '30', 'Seconds each tool has to answer --help-json-schema', 'Tools', 'int:1-');
+cli.opt('CLYOPS_MCP_FETCH_SCHEMAS',    'fetch-schemas',    '', 'true',    'Fetch the URL schemas json:SCHEMA inputs reference, so they are checked', 'Schemas', 'bool');
+cli.opt('CLYOPS_MCP_SCHEMA_DEPTH',     'schema-depth',     '', '3',       'Levels of references followed from an input\'s schema (0: fetch none)', 'Schemas', 'int:0-');
+cli.optArray('CLYOPS_MCP_SCHEMA_HOSTS', 'schema-hosts',    '',            'Fetch schemas only from this host (example.com, or *.example.com for its subdomains); default: any', 'Schemas');
+cli.opt('CLYOPS_MCP_SCHEMA_CACHE',     'schema-cache',     '', '3600',    'Seconds a fetched schema is reused before it is fetched again (0: every load)', 'Schemas', 'int:0-');
+cli.opt('CLYOPS_MCP_SCHEMA_TIMEOUT',   'schema-timeout',   '', '5',       'Seconds each schema fetch may take', 'Schemas', 'int:1-');
+cli.opt('CLYOPS_MCP_SCHEMA_MAX_BYTES', 'schema-max-bytes', '', '1048576', 'Largest schema document fetched, in bytes', 'Schemas', 'int:1-');
 cli.optArray('CLYOPS_MCP_ALLOW',        'allow',        'a',              'Serve only tools matching this glob over their words (media/*, media/**)', 'Security');
 cli.optArray('CLYOPS_MCP_DENY',         'deny',         'D',              'Leave out tools matching this glob', 'Security');
 cli.opt('CLYOPS_MCP_READ_ONLY',         'read-only',    '',  'flag',      'Serve only tools that declare the read-only effect', 'Security');
@@ -30,11 +36,18 @@ cli.opt('CLYOPS_MCP_POSITIONALS_ORDER', 'positionals-order', '', 'first', 'Posit
 const args = cli.run();
 
 // stdout is the MCP channel; clyops logs to stderr.
-const onError = (cmd: { words: string[] } | null, err: Error) => warn('%s%s', cmd ? `skipping ${cmd.words.join(' ')}: ` : '', err.message);
+const onError = (cmd: { words: string[] } | null, err: Error) => err instanceof SchemaFetchError && cmd
+  ? warn('%s: %s; serving it with that input unchecked', cmd.words.join(' '), err.message)
+  : warn('%s%s', cmd ? `skipping ${cmd.words.join(' ')}: ` : '', err.message);
 const filter = { allow: args.CLYOPS_MCP_ALLOW as string[], deny: args.CLYOPS_MCP_DENY as string[], readOnly: args.CLYOPS_MCP_READ_ONLY as boolean };
 const opts = {
   name: (args.CLYOPS_MCP_NAME as string | null) ?? undefined, filter, onError,
   concurrency: args.CLYOPS_MCP_PROBE_CONCURRENCY as number, timeoutMs: (args.CLYOPS_MCP_PROBE_TIMEOUT as number) * 1000,
+  schemas: {
+    fetch: args.CLYOPS_MCP_FETCH_SCHEMAS as boolean, depth: args.CLYOPS_MCP_SCHEMA_DEPTH as number, hosts: args.CLYOPS_MCP_SCHEMA_HOSTS as string[],
+    cacheTtlMs: (args.CLYOPS_MCP_SCHEMA_CACHE as number) * 1000, timeoutMs: (args.CLYOPS_MCP_SCHEMA_TIMEOUT as number) * 1000,
+    maxBytes: args.CLYOPS_MCP_SCHEMA_MAX_BYTES as number,
+  },
 };
 const within = args.CLYOPS_MCP_PATHS_WITHIN as string[];
 // Local over stdio, inputs are open unless asked otherwise (spec section 13).
