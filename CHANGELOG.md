@@ -5,6 +5,12 @@ section here.
 
 ## [Unreleased]
 
+### Changed
+
+- clyops-api runs on plus-express 4 (and zod-to-openapi 9). Generating its OpenAPI document no
+  longer grows memory on every call (GHSA-w686-3925-7pp4), and an error thrown while parsing
+  that isn't a Zod validation failure now answers 500 instead of 400.
+
 ## [0.12.0] - 2026-10-26
 
 URL schemas fetched and checked everywhere `json:SCHEMA` inputs are used, schemas shown and

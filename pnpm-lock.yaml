@@ -36,8 +36,8 @@ importers:
   apps/api:
     dependencies:
       '@asteasolutions/zod-to-openapi':
-        specifier: ^8.5.0
-        version: 8.5.0(zod@4.6.5)
+        specifier: ^9.1.0
+        version: 9.1.0(zod@4.6.7)
       ajv:
         specifier: ^8.20.0
         version: 8.20.0
@@ -60,12 +60,12 @@ importers:
         specifier: ^5.2.1
         version: 5.2.1
       plus-express:
-        specifier: ^2.1.1
-        version: 2.1.1(express@5.2.1)
+        specifier: ^4.0.0
+        version: 4.0.0(express@5.2.1)
     devDependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.32.1
-        version: 1.32.1(zod@4.6.5)
+        version: 1.32.1(zod@4.6.7)
       '@types/busboy':
         specifier: ^1.5.4
         version: 1.5.4
@@ -105,7 +105,7 @@ importers:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.32.1
-        version: 1.32.1(zod@4.6.5)
+        version: 1.32.1(zod@4.6.7)
       clyops:
         specifier: 0.12.0
         version: link:../../packages/js
@@ -313,8 +313,8 @@ packages:
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
     engines: {node: '>=10'}
 
-  '@asteasolutions/zod-to-openapi@8.5.0':
-    resolution: {integrity: sha512-SABbKiObg5dLRiTFnqiW1WWwGcg1BJfmHtT2asIBnBHg6Smy/Ms2KHc650+JI4Hw7lSkdiNebEGXpwoxfben8Q==}
+  '@asteasolutions/zod-to-openapi@9.1.0':
+    resolution: {integrity: sha512-pLMeRgRYS7/vZIgAAkOe2P6+XGTifR1MT9pqDoxZ11EmcJJ+DPmdPqLN8ZZF4U8R9KHCCQCS9c2wtuE8wSrfkw==}
     peerDependencies:
       zod: ^4.0.0
 
@@ -1986,8 +1986,8 @@ packages:
   please-upgrade-node@3.2.0:
     resolution: {integrity: sha512-gQR3WpIgNIKwBMVLkpMUeR3e1/E1y42bqDQZfql+kDeXd8COYfM8PQA4X6y7a8u9Ua9FHmsrrmirW2vHs45hWg==}
 
-  plus-express@2.1.1:
-    resolution: {integrity: sha512-rywdhhXwfFP3CBKBGg7zF50qFt7pUC7LRICsrUXBUQyogRzfwFGBaGnDRDanP5nq46mONq3osG9RY6TsjJBjZw==}
+  plus-express@4.0.0:
+    resolution: {integrity: sha512-sImf5fejcRy32RVuOPxTIs/rsGFMSCHQU2rtZnOOZ0cTBXcw5UTUF/Qs+sBU6jNnIMUmMV6/bWFrFN7iU8tEoQ==}
     peerDependencies:
       express: ^4.17.1 || ^5.0.0
 
@@ -2460,8 +2460,8 @@ packages:
     peerDependencies:
       zod: ^3.25.28 || ^4
 
-  zod@4.6.5:
-    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
 snapshots:
 
@@ -2564,10 +2564,10 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
-  '@asteasolutions/zod-to-openapi@8.5.0(zod@4.6.5)':
+  '@asteasolutions/zod-to-openapi@9.1.0(zod@4.6.7)':
     dependencies:
       openapi3-ts: 4.6.1
-      zod: 4.6.5
+      zod: 4.6.7
 
   '@babel/code-frame@7.28.6':
     dependencies:
@@ -2861,7 +2861,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@modelcontextprotocol/sdk@1.32.1(zod@4.6.5)':
+  '@modelcontextprotocol/sdk@1.32.1(zod@4.6.7)':
     dependencies:
       '@hono/node-server': 2.1.4(hono@4.13.13)
       ajv: 8.20.0
@@ -2878,8 +2878,8 @@ snapshots:
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
-      zod: 4.6.5
-      zod-to-json-schema: 3.25.2(zod@4.6.5)
+      zod: 4.6.7
+      zod-to-json-schema: 3.25.2(zod@4.6.7)
     transitivePeerDependencies:
       - supports-color
 
@@ -4020,13 +4020,12 @@ snapshots:
     dependencies:
       semver-compare: 1.0.0
 
-  plus-express@2.1.1(express@5.2.1):
+  plus-express@4.0.0(express@5.2.1):
     dependencies:
-      '@asteasolutions/zod-to-openapi': 8.5.0(zod@4.6.5)
+      '@asteasolutions/zod-to-openapi': 9.1.0(zod@4.6.7)
       express: 5.2.1
       extend: 3.0.2
-      tsx: 4.23.15
-      zod: 4.6.5
+      zod: 4.6.7
 
   postcss-import@15.1.0(postcss@8.5.6):
     dependencies:
@@ -4404,6 +4403,7 @@ snapshots:
       esbuild: 0.28.2
     optionalDependencies:
       fsevents: 2.3.3
+    optional: true
 
   type-is@2.1.0:
     dependencies:
@@ -4486,8 +4486,8 @@ snapshots:
 
   zimmerframe@1.1.5: {}
 
-  zod-to-json-schema@3.25.2(zod@4.6.5):
+  zod-to-json-schema@3.25.2(zod@4.6.7):
     dependencies:
-      zod: 4.6.5
+      zod: 4.6.7
 
-  zod@4.6.5: {}
+  zod@4.6.7: {}
