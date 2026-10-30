@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dispatcher and desktop runner · clyops</title>
+  <link rel="stylesheet" href="/versions/v0.12.1/assets/docs.css">
+  <script defer src="/versions/v0.12.1/assets/search.js"></script>
+</head>
+<body data-search-index="/versions/v0.12.1/search-index.json">
+  <a class="skip" href="#content">Skip to content</a>
+  <header><a href="/versions/v0.12.1/"><strong>clyops</strong></a><span>Documentation · 0.12.1</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <div class="shell">
+    <nav aria-label="Documentation">
+      <a href="/versions/v0.12.1/guide.html">Concepts and behavior</a>
+      <a href="/versions/v0.12.1/reference.html">API references</a>
+      <a href="/versions/v0.12.1/examples.html">Clone-and-run examples</a>
+      <a href="/versions/v0.12.1/linux-lab.html">Linux lab in your browser</a>
+      <a href="/versions/v0.12.1/completion.html">Bash, Zsh and Fish completion</a>
+      <h2>Languages</h2>
+      <a href="/versions/v0.12.1/languages/javascript.html">JavaScript / TypeScript</a><a href="/versions/v0.12.1/languages/python.html">Python</a><a href="/versions/v0.12.1/languages/rust.html">Rust</a><a href="/versions/v0.12.1/languages/go.html">Go</a><a href="/versions/v0.12.1/languages/java.html">Java</a><a href="/versions/v0.12.1/languages/ruby.html">Ruby</a><a href="/versions/v0.12.1/languages/c.html">C</a><a href="/versions/v0.12.1/languages/bash.html">Bash</a>
+      <h2>Tools and servers</h2>
+      <a href="/versions/v0.12.1/node-tools.html">Node tools, jobs, API and MCP</a>
+      <a href="/versions/v0.12.1/web-runner.html">Web runner and shared schema</a>
+      <a href="/versions/v0.12.1/applications.html">Dispatcher and desktop runner</a>
+      <a href="/versions/v0.12.1/maintaining.html">Maintaining the docs</a>
+      <a href="/versions/v0.12.1/versions.html">Release documentation</a>
+      <form action="/versions/v0.12.1/search.html" role="search"><label for="search">Search guides</label><input id="search" name="q" type="search"><button>Search</button></form>
+    </nav>
+    <main id="content"><h1 id="dispatcher-and-desktop-runner">Dispatcher and desktop runner</h1>
+<h2 id="dispatcher">Dispatcher</h2>
+<p><code>clyops-dispatch</code> turns a directory into nested subcommands. Download a binary
+from the <a href="https://github.com/wankdanker/clyops/releases">release</a>, then:</p>
+<pre><code class="language-sh">clyops-dispatch --root ./tools --name mytools --help
+clyops-dispatch --root ./tools --name mytools media convert --help
+</code></pre>
+<p>A <code>.clyops</code> file controls descriptions, directories, ignored entries and allowed
+or denied tools. Source detection requires a supported import/source statement
+or an explicit <code># clyops-tool</code> / <code>// clyops-tool</code> header marker for wrappers.
+Binary completion markers and nested dispatcher shebangs are also supported.
+Schemas are cached by file stamp; probes have a timeout.</p>
+<p>The <a href="https://github.com/wankdanker/clyops/blob/3136e26eec5897675fb1d94a3cf316342ea89694/apps/dispatch/README.md">dispatcher guide</a> covers definition files,
+aliases, completion, caching and filesystem behavior. This application exposes
+a command-line interface, rather than an installed library API.</p>
+<h2 id="desktop-runner">Desktop runner</h2>
+<p>The runner lists tools and generates forms from their schemas, including commands,
+secrets, constraints, effect badges and declared stdin/stdout. Unchecked flags
+explicitly override enabled config/environment values. Templates preserve false
+and zero values and omit secrets. Destructive tools require confirmation. A tool's
+<code>progress</code> role shows as a progress bar, its <code>meta</code> beside the output, and <code>log</code>
+and <code>result</code> lines in it.</p>
+<p>See the <a href="https://github.com/wankdanker/clyops/blob/3136e26eec5897675fb1d94a3cf316342ea89694/apps/runner/README.md">runner guide</a> for installation, usage, templates
+and frontend/native development. Its internal UI helpers are not a public package API.</p>
+<h2 id="documentation-clyops-doc">Documentation (clyops-doc)</h2>
+<p><code>clyops-doc</code> reads a tool's <code>--help-json-schema</code> and writes a man page, Markdown or HTML, so any
+clyops tool gets documentation without writing it twice:</p>
+<pre><code class="language-sh">mytool --help-json-schema | clyops-doc &gt; mytool.1
+mytool --help-json-schema | clyops-doc --format markdown --name &quot;mytool media to-pcm&quot; &gt; to-pcm.md
+</code></pre>
+<p>A program with commands gets a section per command with the options it inherits. To write files
+instead, give <code>--out-dir</code> (or <code>--prefix</code> to install man pages where <code>man</code> looks), and <code>--execute</code>
+to actually write them; without it, clyops-doc only lists the files:</p>
+<pre><code class="language-sh">mytool --help-json-schema | clyops-doc --split --out-dir man1 --execute    # mytool.1, mytool-db-migrate.1, ...
+clyops-doc --root ./tools --name mytools --prefix ~/.local --execute       # every tool, and an index page
+</code></pre>
+<p><code>--split</code> gives each command a page of its own, git-style, and <code>--root</code> documents a whole directory
+of tools the way the dispatcher finds them. The <a href="https://github.com/wankdanker/clyops/blob/3136e26eec5897675fb1d94a3cf316342ea89694/apps/doc/README.md">clyops-doc guide</a> covers
+the options and what goes in each section; <a href="https://github.com/wankdanker/clyops/blob/3136e26eec5897675fb1d94a3cf316342ea89694/spec/SPEC.md#15-documentation-clyops-doc">spec section 15</a>
+is the contract.</p>
+<h2 id="web-runner">Web runner</h2>
+<p>The static SvelteKit web runner is served by <code>clyops-api</code> at <code>/ui/</code>. It discovers
+tools through REST and uses the shared schema package for typed fields, ranges,
+relationship hints and secret handling. See the <a href="/versions/v0.12.1/web-runner.html">web runner guide</a>.</p>
+</main>
+  </div>
+  <footer>Guides are Markdown. API references come from the published source interfaces.</footer>
+</body>
+</html>
