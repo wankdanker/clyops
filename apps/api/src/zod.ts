@@ -33,6 +33,11 @@ function validator(at: At): ValidateFunction {
   return entry.ajv.getSchema(`${entry.id}#${at.pointer}`) as ValidateFunction;
 }
 
+/** Compile `schema` as json inputs are checked, throwing when it can't be (see checkableInputSchema). */
+export function compileJsonSchema(schema: object): void {
+  new Ajv({ strict: false, validateFormats: false, validateSchema: false }).compile(schema);
+}
+
 // Keywords that only document a json input; anything else is a schema to check.
 const DOCUMENTATION = new Set(['contentMediaType', 'description', 'default', 'writeOnly', 'format']);
 

@@ -828,3 +828,37 @@ process.stdout.write(String(v.BOX));
     api.close();
   }
 });
+
+test('a json input whose schema does not compile is served unchecked, with a warning', async (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'clyops-api-broken-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  jsTool(root, 'broken', `const cli = new Cli({ name: 'broken' });
+cli.opt('REF', 'ref', '', '', 'A reference to nothing', 'Options', 'json:{"$ref":"#/nope"}');
+cli.opt('KIND', 'kind', '', '', 'An unknown type', 'Options', 'json:{"type":"nonsense"}');
+cli.opt('COUNT', 'count', '', '', 'Count', 'Options', 'json:{"type":"integer"}');
+const v = cli.run();
+process.stdout.write([v.REF, v.KIND, v.COUNT].join(' '));
+`);
+  const warnings = [];
+  const onWarning = (w) => warnings.push(w.message);
+  process.on('warning', onWarning);
+  const s = await serve({ root, cwd: root });
+  t.after(() => { process.off('warning', onWarning); s.close(); });
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(warnings.filter((w) => w.startsWith('broken:')).map((w) => w.replace(/ \(.*\);/, ';')), [
+    "broken: ref: its JSON Schema doesn't compile; serving it with that input unchecked",
+    "broken: kind: its JSON Schema doesn't compile; serving it with that input unchecked",
+  ]);
+  const call = async (input) => {
+    const res = await fetch(`${s.at}/tools/broken`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) });
+    const body = await res.json();
+    return res.status === 200 ? body.stdout : `${res.status} ${body.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ')}`;
+  };
+  assert.equal(await call({ ref: { a: 1 }, kind: [1], count: 2 }), '{"a":1} [1] 2');
+  assert.equal(await call({ ref: '{', count: 'x' }), '400 ref: must be valid JSON, count: must be valid JSON');
+  assert.equal(await call({ count: 1.5 }), '400 count: must be integer');
+  const { input } = await (await fetch(`${s.at}/tools/broken`)).json();
+  assert.deepEqual(input.properties.ref, { contentMediaType: 'application/json', description: 'A reference to nothing' });
+  assert.deepEqual(input.properties.count, { type: 'integer', contentMediaType: 'application/json', description: 'Count' });
+  assertOpenApi31(await (await fetch(`${s.at}/openapi.json`)).json());
+});

@@ -29,6 +29,7 @@ __export(index_exports, {
   allowed: () => allowed,
   auditLog: () => auditLog,
   checkWithin: () => checkWithin,
+  checkableInputSchema: () => checkableInputSchema,
   classify: () => classify,
   clearSchemaCache: () => clearSchemaCache,
   closedInputs: () => closedInputs,
@@ -477,6 +478,24 @@ function parseJsonInputs(inputSchema, input) {
     }
   }
   return { value };
+}
+function checkableInputSchema(inputSchema, compile, onError = () => {
+}) {
+  const properties = inputSchema.properties ?? {};
+  let out;
+  for (const [key, prop] of Object.entries(properties)) {
+    const many = prop.type === "array" && prop.items?.contentMediaType === JSON_TYPE;
+    if (prop.contentMediaType !== JSON_TYPE && !many) continue;
+    try {
+      compile({ type: "object", properties: { [key]: prop } });
+    } catch (err) {
+      onError(key, err);
+      const unchecked = (schema) => Object.fromEntries(Object.entries(schema).filter(([k]) => ["contentMediaType", "description", "default", "writeOnly", "format"].includes(k)));
+      out ??= { ...properties };
+      out[key] = many ? { ...prop, items: unchecked(prop.items) } : unchecked(prop);
+    }
+  }
+  return out ? { ...inputSchema, properties: out } : inputSchema;
 }
 
 // packages/schema/src/schema-refs.ts
@@ -1179,6 +1198,7 @@ function auditLog(target) {
   allowed,
   auditLog,
   checkWithin,
+  checkableInputSchema,
   classify,
   clearSchemaCache,
   closedInputs,

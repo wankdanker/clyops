@@ -70,6 +70,9 @@ test('json fields are parsed before their schema checks them, each on its own', 
   assert.deepEqual(inputErrors(input, { shape: '{}' }), ["shape: must have required property 'w'"]);
   assert.deepEqual(inputErrors(input, { count: '0' }), ['count: must be >= 1']);
   assert.deepEqual(inputErrors(input, { tag: ['"a"', '2'] }), ['tag: /1 must be string']);
+  // A schema that doesn't compile leaves its field unchecked, as the API does, not every field broken.
+  const broken = new Cli(); broken.opt('REF', 'ref', '', 'optional', 'Ref', 'Options', 'json:{"$ref":"#/nope"}'); broken.opt('N', 'n', '', '1', 'N', 'Options', 'int:1-5');
+  assert.deepEqual(inputErrors(toJsonSchema(JSON.parse(broken.jsonSchema())), { ref: '{"any": 1}', n: 9 }), ['n: must be <= 5']);
   // Text that isn't JSON is reported, and doesn't hide another field's errors.
   assert.deepEqual(inputErrors(input, { shape: '{', payload: 'nope', n: 9 }), ['shape: must be valid JSON', 'payload: must be valid JSON', 'n: must be <= 5']);
 
