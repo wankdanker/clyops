@@ -8,7 +8,7 @@ shell completion. No dependencies, Java 17+. See the
 <dependency>
   <groupId>io.github.wankdanker</groupId>
   <artifactId>clyops</artifactId>
-  <version>0.12.0</version>
+  <version>0.12.1</version>
 </dependency>
 ```
 

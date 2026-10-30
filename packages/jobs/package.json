@@ -1,6 +1,6 @@
 {
   "name": "clyops-jobs",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "Run clyops tools as jobs: config-bound functions, templated invocation, artifacts, job records and a queue.",
   "license": "MIT",
   "repository": {
@@ -47,7 +47,7 @@
     "ajv": "^8.20.0"
   },
   "dependencies": {
-    "clyops-tools": "0.12.0"
+    "clyops-tools": "0.12.1"
   },
   "homepage": "https://clyops.io/node-tools.html"
 }

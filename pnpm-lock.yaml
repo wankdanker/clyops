@@ -45,16 +45,16 @@ importers:
         specifier: ^1.6.0
         version: 1.6.0
       clyops:
-        specifier: 0.12.0
+        specifier: 0.12.1
         version: link:../../packages/js
       clyops-jobs:
-        specifier: 0.12.0
+        specifier: 0.12.1
         version: link:../../packages/jobs
       clyops-mcp:
-        specifier: 0.12.0
+        specifier: 0.12.1
         version: link:../mcp
       clyops-tools:
-        specifier: 0.12.0
+        specifier: 0.12.1
         version: link:../../packages/tools
       express:
         specifier: ^5.2.1
@@ -76,7 +76,7 @@ importers:
         specifier: ^22.0.0
         version: 22.20.5
       clyops-web:
-        specifier: 0.12.0
+        specifier: 0.12.1
         version: link:../web
       typescript:
         specifier: ^5.6.0
@@ -85,13 +85,13 @@ importers:
   apps/doc:
     dependencies:
       clyops:
-        specifier: 0.12.0
+        specifier: 0.12.1
         version: link:../../packages/js
       clyops-schema:
-        specifier: 0.12.0
+        specifier: 0.12.1
         version: link:../../packages/schema
       clyops-tools:
-        specifier: 0.12.0
+        specifier: 0.12.1
         version: link:../../packages/tools
     devDependencies:
       '@types/node':
@@ -107,10 +107,10 @@ importers:
         specifier: ^1.32.1
         version: 1.32.1(zod@4.6.7)
       clyops:
-        specifier: 0.12.0
+        specifier: 0.12.1
         version: link:../../packages/js
       clyops-tools:
-        specifier: 0.12.0
+        specifier: 0.12.1
         version: link:../../packages/tools
     devDependencies:
       '@types/node':
@@ -144,7 +144,7 @@ importers:
         specifier: ^2.0.0
         version: 2.1.1
       clyops-schema:
-        specifier: 0.12.0
+        specifier: 0.12.1
         version: link:../../packages/schema
       lucide-react:
         specifier: ^0.294.0
@@ -196,7 +196,7 @@ importers:
         specifier: 2.3.5
         version: 2.3.5
       clyops-schema:
-        specifier: 0.12.0
+        specifier: 0.12.1
         version: link:../../packages/schema
     devDependencies:
       '@playwright/test':
@@ -230,7 +230,7 @@ importers:
   packages/jobs:
     dependencies:
       clyops-tools:
-        specifier: 0.12.0
+        specifier: 0.12.1
         version: link:../tools
     devDependencies:
       '@types/node':
@@ -261,7 +261,7 @@ importers:
   packages/tools:
     dependencies:
       clyops-schema:
-        specifier: 0.12.0
+        specifier: 0.12.1
         version: link:../schema
     devDependencies:
       '@types/node':

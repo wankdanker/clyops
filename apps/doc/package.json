@@ -1,6 +1,6 @@
 {
   "name": "clyops-doc",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "Documentation (man pages, Markdown, HTML) from any clyops tool's --help-json-schema.",
   "license": "MIT",
   "repository": {
@@ -42,9 +42,9 @@
     "prepublishOnly": "pnpm run build && pnpm test"
   },
   "dependencies": {
-    "clyops": "0.12.0",
-    "clyops-schema": "0.12.0",
-    "clyops-tools": "0.12.0"
+    "clyops": "0.12.1",
+    "clyops-schema": "0.12.1",
+    "clyops-tools": "0.12.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

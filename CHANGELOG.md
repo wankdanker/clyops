@@ -5,6 +5,10 @@ section here.
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-10-28
+
+clyops-api moves to plus-express 4.
+
 ### Changed
 
 - clyops-api runs on plus-express 4 (and zod-to-openapi 9). Generating its OpenAPI document no
