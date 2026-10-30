@@ -16,7 +16,7 @@
 </div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">SchemaFetchOptions</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#cachettlms">cacheTtlMs</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#depth">depth</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#download">download</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">url</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">opts</span><span class="tsd-signature-symbol">:</span> <a href="" class="tsd-signature-type tsd-kind-interface">SchemaFetchOptions</a><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#fetch">fetch</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#hosts">hosts</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#maxbytes">maxBytes</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#timeoutms">timeoutMs</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/3136e26eec5897675fb1d94a3cf316342ea89694/packages/schema/src/schema-refs.ts#L10">packages/schema/src/schema-refs.ts:10</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/59aa8d22f4f94054eeb6a53f5f9e205943acec8e/packages/schema/src/schema-refs.ts#L10">packages/schema/src/schema-refs.ts:10</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -41,14 +41,14 @@
 <div class="tsd-comment tsd-typography"><p>How long a fetched schema is reused, in milliseconds (default one hour; 0 refetches on every load).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/3136e26eec5897675fb1d94a3cf316342ea89694/packages/schema/src/schema-refs.ts#L18">packages/schema/src/schema-refs.ts:18</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/59aa8d22f4f94054eeb6a53f5f9e205943acec8e/packages/schema/src/schema-refs.ts#L18">packages/schema/src/schema-refs.ts:18</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="depth"><code class="tsd-tag">Optional</code><span>depth</span><a href="#depth" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">depth</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>How many levels of references to follow: 1 fetches the input's own, 2 also theirs (default 3; 0 fetches none).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/3136e26eec5897675fb1d94a3cf316342ea89694/packages/schema/src/schema-refs.ts#L14">packages/schema/src/schema-refs.ts:14</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/59aa8d22f4f94054eeb6a53f5f9e205943acec8e/packages/schema/src/schema-refs.ts#L14">packages/schema/src/schema-refs.ts:14</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="download"><code class="tsd-tag">Optional</code><span>download</span><a href="#download" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">download</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">url</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">opts</span><span class="tsd-signature-symbol">:</span> <a href="" class="tsd-signature-type tsd-kind-interface">SchemaFetchOptions</a><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">&gt;</span></div>
@@ -56,35 +56,35 @@
 <code>hosts</code> (redirects included), <code>timeoutMs</code> and <code>maxBytes</code>. Without it nothing is fetched.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/3136e26eec5897675fb1d94a3cf316342ea89694/packages/schema/src/schema-refs.ts#L27">packages/schema/src/schema-refs.ts:27</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/59aa8d22f4f94054eeb6a53f5f9e205943acec8e/packages/schema/src/schema-refs.ts#L27">packages/schema/src/schema-refs.ts:27</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="fetch"><code class="tsd-tag">Optional</code><span>fetch</span><a href="#fetch" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">fetch</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div>
 <div class="tsd-comment tsd-typography"><p>Fetch them at all (default true).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/3136e26eec5897675fb1d94a3cf316342ea89694/packages/schema/src/schema-refs.ts#L12">packages/schema/src/schema-refs.ts:12</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/59aa8d22f4f94054eeb6a53f5f9e205943acec8e/packages/schema/src/schema-refs.ts#L12">packages/schema/src/schema-refs.ts:12</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="hosts"><code class="tsd-tag">Optional</code><span>hosts</span><a href="#hosts" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">hosts</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span></div>
 <div class="tsd-comment tsd-typography"><p>Fetch only from these hosts (<code>example.com</code>, or <code>*.example.com</code> for its subdomains); unset or empty allows any.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/3136e26eec5897675fb1d94a3cf316342ea89694/packages/schema/src/schema-refs.ts#L16">packages/schema/src/schema-refs.ts:16</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/59aa8d22f4f94054eeb6a53f5f9e205943acec8e/packages/schema/src/schema-refs.ts#L16">packages/schema/src/schema-refs.ts:16</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="maxbytes"><code class="tsd-tag">Optional</code><span>max<wbr/>Bytes</span><a href="#maxbytes" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">maxBytes</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>The largest schema document fetched, in bytes (default 1 MiB).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/3136e26eec5897675fb1d94a3cf316342ea89694/packages/schema/src/schema-refs.ts#L22">packages/schema/src/schema-refs.ts:22</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/59aa8d22f4f94054eeb6a53f5f9e205943acec8e/packages/schema/src/schema-refs.ts#L22">packages/schema/src/schema-refs.ts:22</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="timeoutms"><code class="tsd-tag">Optional</code><span>timeout<wbr/>Ms</span><a href="#timeoutms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">timeoutMs</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>How long each fetch may take, in milliseconds (default 5000).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/3136e26eec5897675fb1d94a3cf316342ea89694/packages/schema/src/schema-refs.ts#L20">packages/schema/src/schema-refs.ts:20</a></li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/wankdanker/clyops/blob/59aa8d22f4f94054eeb6a53f5f9e205943acec8e/packages/schema/src/schema-refs.ts#L20">packages/schema/src/schema-refs.ts:20</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">

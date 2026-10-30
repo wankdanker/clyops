@@ -74,7 +74,7 @@ v := cli.Run()                                           // cli.CommandPath() ==
 </code></pre>
 <p>Commands share the program's options (accepted before or after the command words) and config file;
 each has its own help (<code>mytool db migrate --help</code>), schema and completion. See the
-<a href="https://github.com/wankdanker/clyops/blob/3136e26eec5897675fb1d94a3cf316342ea89694/spec/SPEC.md">spec</a> sections 1.3 to 1.7.</p>
+<a href="https://github.com/wankdanker/clyops/blob/59aa8d22f4f94054eeb6a53f5f9e205943acec8e/spec/SPEC.md">spec</a> sections 1.3 to 1.7.</p>
 <h2 id="parsing-and-errors">Parsing and errors</h2>
 <p>Use <code>Run</code> for a standalone program: it displays help/schema/completion and exits for those requests, or exits with status 1 on invalid input. Use the non-exiting <code>Parse</code> variant in libraries and tests; check its outcome before reading resolved values. Registration errors (duplicate names, unknown rules, or commands mixed with positionals) are programming errors, distinct from invalid user input. See the native reference for the language's result and error types.</p>
 <h2 id="more-recipes">More recipes</h2>

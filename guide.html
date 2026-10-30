@@ -146,11 +146,11 @@ field types in TypeScript, Python or Ruby.</p>
 <code>uuid</code>, <code>json</code>, <code>json:SCHEMA</code>, <code>date:YYYY-MM-DD</code>, <code>path</code>, <code>file:exists</code>, <code>file:readable</code>, <code>file:writable</code>,
 <code>file:executable</code>, <code>dir:exists</code> and <code>dir:writable</code>. Parameterized rules include <code>int:1-10</code>,
 <code>float:0-1</code>, <code>string:1-100</code>, <code>choice:red,green,blue</code> and <code>regex:PATTERN</code>.
-See <a href="https://github.com/wankdanker/clyops/blob/3136e26eec5897675fb1d94a3cf316342ea89694/spec/SPEC.md#5-validation-rules">spec section 5</a> for ranges and exact behavior.</p>
+See <a href="https://github.com/wankdanker/clyops/blob/59aa8d22f4f94054eeb6a53f5f9e205943acec8e/spec/SPEC.md#5-validation-rules">spec section 5</a> for ranges and exact behavior.</p>
 <p>Use <code>file:executable</code> for an option that names a program to run (<code>--ffmpeg</code>): a bare
 name must be on <code>PATH</code> and stays as given, and anything with a <code>/</code> must be an executable
 file. It also tells servers that run tools for remote callers not to take that option
-from them (<a href="https://github.com/wankdanker/clyops/blob/3136e26eec5897675fb1d94a3cf316342ea89694/spec/SPEC.md#13-json-input-toargv">spec section 13</a>), and shells complete
+from them (<a href="https://github.com/wankdanker/clyops/blob/59aa8d22f4f94054eeb6a53f5f9e205943acec8e/spec/SPEC.md#13-json-input-toargv">spec section 13</a>), and shells complete
 command names for it.</p>
 <p>Use <code>json</code> for an option that takes structured data (<code>--meta '{&quot;lang&quot;: &quot;en&quot;}'</code>): the
 value must be one JSON value, and stays the text as given for the program to parse.
@@ -165,8 +165,8 @@ and MCP server check input against it before the tool runs. They fetch a URL sch
 when they load the tools, and the schemas it references, three levels deep, so it is
 checked too. <code>--no-fetch-schemas</code>, <code>--schema-depth</code>, <code>--schema-hosts</code>,
 <code>--schema-cache</code>, <code>--schema-timeout</code> and <code>--schema-max-bytes</code> control that. A schema
-that can't be fetched leaves the input documented but unchecked, with a warning, and
-the reserved example domains (<code>example.com</code>, <code>.test</code>, ...) are never fetched.</p>
+that can't be fetched, or that doesn't compile, leaves the input unchecked, with a
+warning, and the reserved example domains (<code>example.com</code>, <code>.test</code>, ...) are never fetched.</p>
 <p>Standalone <code>validate</code> helpers return a typed value or the native validation
 error/result. Unknown registration rules and duplicate names are programming
 errors. Bad CLI values are parse errors. These are separate error paths.</p>
@@ -197,7 +197,7 @@ how <code>clyops-doc</code> writes a FILES section.</p>
 the config file containing the value; default/environment paths resolve against
 the CLI root. Paths are normalized after precedence. <code>-</code> denotes stdin where the
 application supports it. Path validation does not itself open/read files for the
-application. See <a href="https://github.com/wankdanker/clyops/blob/3136e26eec5897675fb1d94a3cf316342ea89694/spec/SPEC.md#6-paths">spec section 6</a>.</p>
+application. See <a href="https://github.com/wankdanker/clyops/blob/59aa8d22f4f94054eeb6a53f5f9e205943acec8e/spec/SPEC.md#6-paths">spec section 6</a>.</p>
 <h2 id="nested-commands-and-constraints">Nested commands and constraints</h2>
 <pre><code class="language-javascript">const db = cli.command('db', 'Database tasks');
 const migrate = db.command('migrate', 'Apply migrations');
