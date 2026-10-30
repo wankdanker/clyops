@@ -18,7 +18,7 @@
 if [[ -n "${_CLYOPS_LOADED:-}" ]]; then return 0; fi
 _CLYOPS_LOADED=1
 # shellcheck disable=SC2034  # public: read by callers
-CLYOPS_VERSION="0.12.1"
+CLYOPS_VERSION="0.12.2"
 
 if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 3) )); then
     echo "clyops.sh requires bash 4.3 or newer (found $BASH_VERSION)" >&2

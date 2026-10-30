@@ -5,7 +5,7 @@ Go 1.21+, standard library only.
 ## Install
 
 ```sh
-go get github.com/wankdanker/clyops/packages/go@v0.12.1
+go get github.com/wankdanker/clyops/packages/go@v0.12.2
 ```
 
 Pin the release the project uses. Compiled clyops binaries embed their
