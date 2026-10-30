@@ -5,6 +5,10 @@ section here.
 
 ## [Unreleased]
 
+## [0.12.2] - 2026-10-30
+
+A json:SCHEMA input whose schema doesn't compile no longer breaks its tool.
+
 ### Fixed
 
 - A `json:SCHEMA` input whose schema doesn't compile (a `#` reference to nothing, an unknown

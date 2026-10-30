@@ -13,14 +13,14 @@ dependencies = [
 
 [[package]]
 name = "clyops"
-version = "0.12.1"
+version = "0.12.2"
 dependencies = [
  "regex",
 ]
 
 [[package]]
 name = "clyops-dispatch"
-version = "0.12.1"
+version = "0.12.2"
 dependencies = [
  "clyops",
  "serde_json",

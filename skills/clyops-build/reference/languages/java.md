@@ -16,7 +16,7 @@ automatically** by the dispatcher, API or MCP server. Put an exact standalone
 #!/bin/sh
 # clyops-tool
 here=$(cd "$(dirname "$0")" && pwd)
-exec java -cp "$here/classes:$here/clyops-0.12.1.jar" Plan "$@"
+exec java -cp "$here/classes:$here/clyops-0.12.2.jar" Plan "$@"
 ```
 
 ## Registration
