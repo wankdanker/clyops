@@ -1,7 +1,7 @@
 // An HTTP API over a directory of clyops tools: one POST endpoint per tool,
 // validated and documented from its --help-json-schema.
 import {
-  allowed, closedInputs, closedKeys, closedRequirement, InputError, inputKeys, isTextType, loadTools, publicSchema, runTool, startTool, tail,
+  allowed, checkableInputSchema, closedInputs, closedKeys, closedRequirement, InputError, inputKeys, isTextType, loadTools, publicSchema, runTool, startTool, tail,
   SchemaFetchError, toJsonSchema, watchTools, type InputPolicy, type SchemaFetchOptions,
   type AuditEntry, type Command, type Group, type RunResult, type Tool, type ToolFilter, type ToolResult, type ToolRunOptions,
 } from 'clyops-tools';
@@ -18,7 +18,7 @@ import { Readable, Transform } from 'node:stream';
 import { finished, pipeline } from 'node:stream/promises';
 import { OpenApiGeneratorV31 } from '@asteasolutions/zod-to-openapi';
 import { plus, z } from 'plus-express';
-import { toZod } from './zod.js';
+import { compileJsonSchema, toZod } from './zod.js';
 
 /** A named API key and what it may run: globs over tool words (see clyops-tools' ToolFilter). */
 export interface ApiKey {
@@ -420,7 +420,7 @@ async function runBody(opts: ApiOptions, ctx: Ctx, tool: ApiTool, req: Request, 
     const closed = closedOf(opts, tool).filter((name) => !uploadedFor(tool, name, uploaded));
     const set = closedKeys(tool.schema, closed, input);
     if (set.length) return void res.status(400).json({ error: `${set.join(', ')}: set by the server, not by callers` });
-    const inputSchema = toJsonSchema(publicSchema(tool.schema, closed));
+    const inputSchema = checkableInputSchema(toJsonSchema(publicSchema(tool.schema, closed)), compileJsonSchema);
     const checked = toZod(inputSchema).safeParse(input);
     if (!checked.success) return void res.status(400).json({ error: 'Validation failed', issues: checked.error.issues });
     if (req.query.async === 'true' && stdin === req) {
@@ -679,7 +679,9 @@ function buildRoutes(opts: ApiOptions, ctx: Ctx, tree: Group, tools: ApiTool[]) 
   for (const tool of tools) {
     // Callers see the tool without the inputs closed to them (spec section 13).
     const schema = publicSchema(tool.schema, closedOf(opts, tool));
-    const inputSchema = toJsonSchema(schema);
+    // A json input whose schema doesn't compile is served unchecked rather than failing every call.
+    const inputSchema = checkableInputSchema(toJsonSchema(schema), compileJsonSchema, (key, err) => process.emitWarning(
+      `${tool.words.join(' ')}: ${key}: its JSON Schema doesn't compile (${err.message}); serving it with that input unchecked`));
     const tag = tool.words.length > 1 ? tool.words.slice(0, -1).join(' ') : 'tools';
     router.get(
       {

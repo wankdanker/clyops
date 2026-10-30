@@ -157,8 +157,8 @@ with a `contentMediaType`.
 seconds (default 3600) and checked like an inline one. `--schema-hosts` fetches only from the hosts
 given (`*.example.com` for subdomains; redirects are checked too), and `--schema-timeout` (5 s) and
 `--schema-max-bytes` (1 MiB) bound each fetch. A schema that can't be fetched is a warning: the tool
-is still served, with that input documented but unchecked. `--no-fetch-schemas` turns fetching
-off. The reserved example domains (`example.com`, `.test`, `.invalid`, ...) are never fetched.
+is still served, with that input documented but unchecked. So is one whose schema doesn't compile (a `#` reference
+to nothing, an unknown `type`). `--no-fetch-schemas` turns fetching off. The reserved example domains (`example.com`, `.test`, `.invalid`, ...) are never fetched.
 
 ## Security
 

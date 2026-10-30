@@ -9,7 +9,7 @@ import { Input } from './Input';
 import { Label } from './Label';
 import { buildCommandArgs, constraintIssues, expandCommands, formatCommandLine, initialFormValues, isTextType, parseCommandLine } from '../lib/utils';
 import { TemplateJsonEditor } from './TemplateJsonEditor';
-import { jsonFields, jsonIssues } from '../lib/json';
+import { jsonFields, jsonIssues, jsonUnchecked } from '../lib/json';
 
 /** Where a run's stdin comes from and its binary stdout goes (spec section 1.3). */
 export interface RunIo {
@@ -114,6 +114,7 @@ export function ScriptForm({ schema: program, onRun, onSaveTemplate, isRunning, 
 
   const json = jsonFields(schema);
   const issues = useMemo(() => jsonIssues(schema, values), [schema, values]);
+  const unchecked = jsonUnchecked(schema);
   const blockingJson = Object.keys(issues).length > 0;
 
   const handleChange = (name: string, value: any) => {
@@ -231,6 +232,7 @@ export function ScriptForm({ schema: program, onRun, onSaveTemplate, isRunning, 
         />
         <p className="text-xs text-muted-foreground mt-1">{description}</p>
         {(issues[name] ?? []).map((issue) => <p key={issue} className="text-xs text-destructive mt-1">{issue}</p>)}
+        {unchecked[name] && <p className="text-xs text-muted-foreground mt-1">Not checked: its JSON Schema doesn't compile ({unchecked[name]})</p>}
         {expected && (
           <details className="mt-1 text-xs text-muted-foreground">
             <summary className="cursor-pointer">Expected JSON</summary>

@@ -1,21 +1,23 @@
 // json and json:SCHEMA inputs (spec section 5): parsed and checked against their schema as you
 // type, with ajv, as clyops-api and clyops-mcp check them before a tool runs.
 import Ajv, { type ValidateFunction } from 'ajv';
-import { formFields, inputIssues, toJsonSchema, type FormField, type JsonSchema, type Schema } from 'clyops-schema';
+import { checkableInputSchema, formFields, inputIssues, toJsonSchema, type FormField, type JsonSchema, type Schema } from 'clyops-schema';
 import type { FormValues, ScriptSchema } from '../types';
 
 const ajv = new Ajv({ allErrors: true, strict: false });
 
-interface Compiled { input: JsonSchema; validate: ValidateFunction; fields: Record<string, FormField> }
+interface Compiled { input: JsonSchema; validate: ValidateFunction; fields: Record<string, FormField>; unchecked: Record<string, string> }
 // Each schema is compiled once; the form checks on every change.
 const compiled = new WeakMap<ScriptSchema, Compiled>();
 
 function compile(schema: ScriptSchema): Compiled {
   let entry = compiled.get(schema);
   if (!entry) {
-    const input = toJsonSchema(schema as unknown as Schema, 'declared');
+    // A json field whose schema doesn't compile is left unchecked, as clyops-api and clyops-mcp leave it.
+    const unchecked: Record<string, string> = {};
+    const input = checkableInputSchema(toJsonSchema(schema as unknown as Schema, 'declared'), (s) => new Ajv({ strict: false }).compile(s), (key, err) => { unchecked[key] = err.message; });
     const fields = Object.fromEntries(formFields(schema as unknown as Schema, 'declared').filter((field) => field.json).map((field) => [field.key, field]));
-    entry = { input, validate: ajv.compile(input), fields };
+    entry = { input, validate: ajv.compile(input), fields, unchecked };
     compiled.set(schema, entry);
   }
   return entry;
@@ -24,6 +26,11 @@ function compile(schema: ScriptSchema): Compiled {
 /** The json fields of a command level, by declared name. */
 export function jsonFields(schema: ScriptSchema): Record<string, FormField> {
   return compile(schema).fields;
+}
+
+/** Why each json field whose schema doesn't compile isn't checked, by declared name. */
+export function jsonUnchecked(schema: ScriptSchema): Record<string, string> {
+  return compile(schema).unchecked;
 }
 
 /**

@@ -23,6 +23,7 @@ var index_exports = {};
 __export(index_exports, {
   SCHEMA_FETCH_DEFAULTS: () => SCHEMA_FETCH_DEFAULTS,
   SchemaFetchError: () => SchemaFetchError,
+  checkableInputSchema: () => checkableInputSchema,
   clearSchemaCache: () => clearSchemaCache,
   constraintIssues: () => constraintIssues,
   effectiveRoles: () => effectiveRoles,
@@ -205,6 +206,24 @@ function parseJsonInputs(inputSchema, input) {
     }
   }
   return { value };
+}
+function checkableInputSchema(inputSchema, compile, onError = () => {
+}) {
+  const properties = inputSchema.properties ?? {};
+  let out;
+  for (const [key, prop] of Object.entries(properties)) {
+    const many = prop.type === "array" && prop.items?.contentMediaType === JSON_TYPE;
+    if (prop.contentMediaType !== JSON_TYPE && !many) continue;
+    try {
+      compile({ type: "object", properties: { [key]: prop } });
+    } catch (err) {
+      onError(key, err);
+      const unchecked = (schema) => Object.fromEntries(Object.entries(schema).filter(([k]) => ["contentMediaType", "description", "default", "writeOnly", "format"].includes(k)));
+      out ??= { ...properties };
+      out[key] = many ? { ...prop, items: unchecked(prop.items) } : unchecked(prop);
+    }
+  }
+  return out ? { ...inputSchema, properties: out } : inputSchema;
 }
 
 // packages/schema/src/forms.ts
@@ -441,6 +460,7 @@ async function fetchSchemaRefs(schema, opts = {}, onError = () => {
 0 && (module.exports = {
   SCHEMA_FETCH_DEFAULTS,
   SchemaFetchError,
+  checkableInputSchema,
   clearSchemaCache,
   constraintIssues,
   effectiveRoles,

@@ -181,3 +181,28 @@ export function parseJsonInputs(inputSchema: JsonSchema, input: Record<string, u
   }
   return { value };
 }
+
+/**
+ * `inputSchema` (from toJsonSchema) with each `json` input whose schema `compile` rejects (e.g.
+ * ajv's, for a `$ref` to nothing or an unknown `type`) left unchecked, as one that can't be fetched
+ * is: any JSON, keeping its description and default. Each one goes to `onError` with its key, so
+ * one broken schema doesn't fail every call to the tool.
+ */
+export function checkableInputSchema(inputSchema: JsonSchema, compile: (schema: JsonSchema) => unknown, onError: (key: string, err: Error) => void = () => {}): JsonSchema {
+  const properties = (inputSchema.properties ?? {}) as Record<string, JsonSchema>;
+  let out: Record<string, JsonSchema> | undefined;
+  for (const [key, prop] of Object.entries(properties)) {
+    const many = prop.type === 'array' && (prop.items as JsonSchema | undefined)?.contentMediaType === JSON_TYPE;
+    if (prop.contentMediaType !== JSON_TYPE && !many) continue;
+    try {
+      // Alone at its own key, so its `#/properties/<key>/...` references still resolve.
+      compile({ type: 'object', properties: { [key]: prop } });
+    } catch (err) {
+      onError(key, err as Error);
+      const unchecked = (schema: JsonSchema) => Object.fromEntries(Object.entries(schema).filter(([k]) => ['contentMediaType', 'description', 'default', 'writeOnly', 'format'].includes(k)));
+      out ??= { ...properties };
+      out[key] = many ? { ...prop, items: unchecked(prop.items as JsonSchema) } : unchecked(prop);
+    }
+  }
+  return out ? { ...inputSchema, properties: out } : inputSchema;
+}

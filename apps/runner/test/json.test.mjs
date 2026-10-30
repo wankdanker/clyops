@@ -5,7 +5,7 @@ import { Cli } from '../../../packages/js/dist/esm/index.js';
 
 // The real frontend module, bundled with ajv and clyops-schema.
 const compiled = await build({ entryPoints: [new URL('../src/lib/json.ts', import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'node' });
-const { jsonFields, jsonIssues } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString('base64')}`);
+const { jsonFields, jsonIssues, jsonUnchecked } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString('base64')}`);
 
 test('json fields are parsed and checked against their schema; empty ones are not given', () => {
   const cli = new Cli();
@@ -25,6 +25,17 @@ test('json fields are parsed and checked against their schema; empty ones are no
   });
   assert.deepEqual(jsonIssues(schema, { ...blank, shape: '{', doc: '{}' }), { shape: ['must be valid JSON'], doc: ['must be array'] });
   assert.deepEqual(jsonIssues(schema, { ...blank, shape: '{}' }), { shape: ["must have required property 'w'"] });
+});
+
+test('a json field whose schema does not compile is left unchecked, and says why', () => {
+  const cli = new Cli();
+  cli.opt('REF', 'ref', '', 'optional', 'Ref', 'Options', 'json:{"$ref":"#/nope"}');
+  cli.opt('COUNT', 'count', '', 'optional', 'Count', 'Options', 'json:{"type":"integer"}');
+  const schema = JSON.parse(cli.jsonSchema());
+  assert.deepEqual(Object.keys(jsonUnchecked(schema)), ['ref']);
+  assert.match(jsonUnchecked(schema).ref, /can't resolve reference/);
+  assert.deepEqual(jsonIssues(schema, { ref: '{"any": 1}', count: '2' }), {});
+  assert.deepEqual(jsonIssues(schema, { ref: '{', count: '"x"' }), { ref: ['must be valid JSON'], count: ['must be integer'] });
 });
 
 const schemas = await build({ entryPoints: [new URL('../src/lib/schemas.ts', import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'node' });

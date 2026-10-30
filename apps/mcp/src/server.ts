@@ -6,7 +6,7 @@ import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv
 import type { JsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/types.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
-  closedInputs, closedRequirement, InputError, isTextType, parseJsonInputs, publicSchema, runTool, tail, toJsonSchema,
+  checkableInputSchema, closedInputs, closedRequirement, InputError, isTextType, parseJsonInputs, publicSchema, runTool, tail, toJsonSchema,
   type AuditEntry, type InputPolicy, type JsonSchema, type Tool, type ToolResult,
 } from 'clyops-tools';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -118,7 +118,9 @@ function prepare(tool: Tool, closed: string[] = []) {
   if (!byClosed) prepared.set(tool, (byClosed = new Map()));
   let entry = byClosed.get(closed.join('\n'));
   if (!entry) {
-    const inputSchema = toJsonSchema(publicSchema(tool.schema, closed));
+    // A json input whose schema doesn't compile is served unchecked, not failing tools/list.
+    const inputSchema = checkableInputSchema(toJsonSchema(publicSchema(tool.schema, closed)), (schema) => validator.getValidator(schema as never), (key, err) => process.emitWarning(
+      `${tool.words.join(' ')}: ${key}: its JSON Schema doesn't compile (${err.message}); serving it with that input unchecked`));
     const stdin = tool.schema.stdin;
     const properties = inputSchema.properties as Record<string, JsonSchema>;
     if (stdin && !('stdin' in properties)) {

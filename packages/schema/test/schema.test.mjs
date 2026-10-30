@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { Cli } from '../../js/dist/esm/index.js';
-import { formFields, formSchema, toJsonSchema, constraintIssues, withoutSecrets, effectiveRoles, fdsEnv, parseJsonInputs } from '../dist/index.js';
+import { formFields, formSchema, toJsonSchema, constraintIssues, withoutSecrets, effectiveRoles, fdsEnv, parseJsonInputs, checkableInputSchema } from '../dist/index.js';
 
 function program() {
   const cli = new Cli({ name: 'forms' });
@@ -116,4 +116,28 @@ test('a json:SCHEMA input is its schema, with references pointed into the input 
   assert.deepEqual(parseJsonInputs(input, { any: '{"a": [1]}', event: { at: 'x' }, node: ['{}', { next: {} }], other: '{' }),
     { value: { any: { a: [1] }, event: { at: 'x' }, node: [{}, { next: {} }], other: '{' } });
   assert.deepEqual(parseJsonInputs(input, { node: ['{'] }), { error: 'node must be valid JSON' });
+});
+
+test('a json input whose schema does not compile is left unchecked, and reported', () => {
+  const cli = new Cli({ name: 'broken' });
+  cli.opt('BAD', 'bad', '', '', 'Bad type', '', 'json:{"type":"nonsense"}');
+  cli.optArray('REFS', 'refs', '', 'Refs to nothing', '', 'json:{"$ref":"#/nope"}');
+  cli.opt('GOOD', 'good', '', '{"w": 1}', 'Fine', '', 'json:{"type":"object"}');
+  cli.opt('NAME', 'name', '', '', 'Not json', '');
+  const input = toJsonSchema(JSON.parse(cli.jsonSchema()));
+  // Stands in for ajv: it rejects an unknown type and a reference to nothing.
+  const compile = (schema) => {
+    const text = JSON.stringify(schema);
+    if (text.includes('"nonsense"')) throw new Error('type must be JSONType or JSONType[]: nonsense');
+    if (text.includes('/nope"')) throw new Error("can't resolve reference");
+    return () => true;
+  };
+  const reported = [];
+  const out = checkableInputSchema(input, compile, (key, err) => reported.push(`${key}: ${err.message}`));
+  assert.deepEqual(reported, ['bad: type must be JSONType or JSONType[]: nonsense', "refs: can't resolve reference"]);
+  assert.deepEqual(out.properties.bad, { contentMediaType: 'application/json', description: 'Bad type' });
+  assert.deepEqual(out.properties.refs, { type: 'array', items: { contentMediaType: 'application/json' }, description: 'Refs to nothing' });
+  assert.deepEqual(out.properties.good, input.properties.good);
+  assert.deepEqual(out.properties.name, input.properties.name);
+  assert.equal(checkableInputSchema(out, compile), out);
 });

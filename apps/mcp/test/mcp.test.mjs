@@ -285,3 +285,35 @@ process.stdout.write(cli.run().EVENT);
     assert.doesNotMatch(await call(args, { at: 1 }), /Invalid arguments/, args.join(' '));
   }
 });
+
+test('a json input whose schema does not compile is served unchecked; the other tools and inputs still are', { timeout: 60_000 }, async (t) => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'clyops-mcp-broken-')));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(join(root, 'broken'), `#!/usr/bin/env node\n// clyops-tool\nconst { Cli } = require(${JSON.stringify(join(repo, 'packages/js/dist/cjs/index.js'))});
+const cli = new Cli({ name: 'broken' });
+cli.opt('BAD', 'bad', '', '', 'Bad', 'Options', 'json:{"$ref":"#/nope"}');
+cli.opt('COUNT', 'count', '', '', 'Count', 'Options', 'json:{"type":"integer"}');
+const v = cli.run();
+process.stdout.write(v.BAD + ' ' + v.COUNT);
+`);
+  chmodSync(join(root, 'broken'), 0o755);
+  const client = new Client({ name: 'test', version: '1' });
+  const transport = new StdioClientTransport({ command: process.execPath, args: [cli, '--root', root, '--no-watch'], env, stderr: 'pipe' });
+  let stderr = '';
+  transport.stderr.on('data', (chunk) => { stderr += chunk; });
+  await client.connect(transport);
+  try {
+    const { tools } = await client.listTools();
+    assert.deepEqual(tools.find((tool) => tool.name === 'broken').inputSchema.properties.bad, { contentMediaType: 'application/json', description: 'Bad' });
+    const call = async (args) => {
+      const result = await client.callTool({ name: 'broken', arguments: args });
+      return result.isError ? result.content[0].text : result.structuredContent?.stdout ?? result.content[0].text;
+    };
+    assert.equal(await call({ bad: { any: 1 }, count: 2 }), '{"any":1} 2');
+    assert.match(await call({ count: 'x' }), /^Invalid arguments: count must be valid JSON/);
+    assert.match(await call({ bad: '{' }), /^Invalid arguments: bad must be valid JSON/);
+  } finally {
+    await client.close();
+  }
+  assert.match(stderr, /broken: bad: its JSON Schema doesn't compile \(can't resolve reference .*\); serving it with that input unchecked/);
+});

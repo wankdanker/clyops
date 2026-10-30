@@ -813,7 +813,9 @@ documents such references name, with a timeout and a size limit, and place
 each in the input schema's `$defs` keyed by its URL, rewriting the references
 (and those inside the fetched document, resolved against its URL) to point
 there; it never fetches while a probe runs, and a reference it doesn't fetch
-stays a `$comment`. A
+stays a `$comment`. A schema the server's validator can't compile (a `#`
+reference to nothing, an unknown `type`) leaves that input unchecked, as an
+unfetched one is, with a warning, rather than failing the tool's calls. A
 `null` schema is the same as `json`. A server validates a `json` input given
 as a string by parsing it first: input that isn't valid JSON is an error, and
 the parsed value must match the schema. Array options and

@@ -5,6 +5,14 @@ section here.
 
 ## [Unreleased]
 
+### Fixed
+
+- A `json:SCHEMA` input whose schema doesn't compile (a `#` reference to nothing, an unknown
+  `type`) is served unchecked, with a warning, as one that can't be fetched is. clyops-api
+  answered 500 to every call that gave it, and clyops-mcp failed `tools/list` for every tool. The
+  web and desktop runners leave the field unchecked too, the desktop runner saying why.
+  `checkableInputSchema` (clyops-schema, re-exported by clyops-tools) does it.
+
 ## [0.12.1] - 2026-10-28
 
 clyops-api moves to plus-express 4.

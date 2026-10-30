@@ -87,8 +87,8 @@ and MCP server check input against it before the tool runs. They fetch a URL sch
 when they load the tools, and the schemas it references, three levels deep, so it is
 checked too. `--no-fetch-schemas`, `--schema-depth`, `--schema-hosts`,
 `--schema-cache`, `--schema-timeout` and `--schema-max-bytes` control that. A schema
-that can't be fetched leaves the input documented but unchecked, with a warning, and
-the reserved example domains (`example.com`, `.test`, ...) are never fetched.
+that can't be fetched, or that doesn't compile, leaves the input unchecked, with a
+warning, and the reserved example domains (`example.com`, `.test`, ...) are never fetched.
 
 Standalone `validate` helpers return a typed value or the native validation
 error/result. Unknown registration rules and duplicate names are programming

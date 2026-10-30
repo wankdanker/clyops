@@ -26,6 +26,8 @@ bounds, typed arrays, positional arguments and secret markers are preserved.
 `formSchema` attaches constraints, effects and I/O as `x-clyops` metadata.
 `inputKey`, `inputKeys` and `isBareFlag` retain the mapping used by clyops-tools.
 `isTextType` classifies declared streams.
+`checkableInputSchema(inputSchema, compile, onError)` leaves a `json` input unchecked when
+its schema doesn't compile with your validator (e.g. ajv's), reporting each one.
 
 Defaults are descriptions, not instructions to fill and submit every field.
 Required options, `requires`, and clyops `oneOf` can be satisfied by the tool's

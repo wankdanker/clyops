@@ -1,9 +1,9 @@
 import Ajv, { type ValidateFunction } from 'ajv';
-import { formFields, inputIssues, jsonSample, jsonSchemaView, withoutSecrets, type JsonSchema, type Schema, type ValueSpec, type FormField } from 'clyops-schema';
+import { checkableInputSchema, formFields, inputIssues, jsonSample, jsonSchemaView, withoutSecrets, type JsonSchema, type Schema, type ValueSpec, type FormField } from 'clyops-schema';
 
 const ajv = new Ajv({ allErrors: true, strict: false });
 // The form checks on every change; compile each tool's input schema once.
-const validators = new WeakMap<object, ValidateFunction>();
+const validators = new WeakMap<object, { input: JsonSchema; validate: ValidateFunction }>();
 
 /** Convert a scalar control's text without turning an empty numeric input into zero. */
 export function controlValue(value: string, schema: ValueSpec): unknown {
@@ -24,9 +24,13 @@ export function controlAttributes(field: FormField) {
 
 /** Validate only supplied inputs (see clyops-schema's inputIssues); the tool resolves inheritance and remaining requirements. */
 export function inputErrors(inputSchema: object, input: Record<string, unknown>): string[] {
-  let validate = validators.get(inputSchema);
-  if (!validate) validators.set(inputSchema, (validate = ajv.compile(inputSchema)));
-  return inputIssues(inputSchema as JsonSchema, input, validate);
+  let entry = validators.get(inputSchema);
+  if (!entry) {
+    // The API serves a json input whose schema doesn't compile unchecked; so does the form.
+    const checkable = checkableInputSchema(inputSchema as JsonSchema, (schema) => new Ajv({ strict: false }).compile(schema));
+    validators.set(inputSchema, (entry = { input: checkable, validate: ajv.compile(checkable) }));
+  }
+  return inputIssues(entry.input, input, entry.validate);
 }
 
 export { jsonSample, jsonSchemaView };
