@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>clyops · Small tools. Big reach.</title>
+  <meta name="description" content="Define a CLI in your language. Use the same tool from terminals, desktop forms, HTTP and AI agents.">
+  <meta name="theme-color" content="#0c1012">
+  <meta property="og:title" content="clyops · Small tools. Big reach.">
+  <meta property="og:description" content="Define a CLI in your language. Use the same tool from terminals, desktop forms, HTTP and AI agents.">
+  <meta property="og:type" content="website">
+  <link rel="stylesheet" href="/versions/v0.12.2/assets/home.css">
+  <script defer src="/versions/v0.12.2/assets/home.js"></script>
+  <script defer src="/versions/v0.12.2/assets/playground.js"></script>
+</head>
+<body data-demo-url="/versions/v0.12.2/assets/home-demo.json">
+  <a class="skip" href="#content">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="/versions/v0.12.2/" aria-label="clyops home"><span class="brand-mark" aria-hidden="true">[<b>c</b>]</span>clyops<span class="version">0.12.2</span></a>
+    <nav aria-label="Main navigation">
+      <a href="#how-it-works">How it works</a>
+      <a href="/versions/v0.12.2/guide.html">Docs</a>
+      <a class="github-link" href="https://github.com/wankdanker/clyops">GitHub <span aria-hidden="true">↗︎</span></a>
+    </nav>
+  </header>
+  <main id="content">
+    <section class="hero wrap" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> THE CLI IS JUST THE BEGINNING</p>
+        <h1 id="hero-title">Small tools.<br><span>Big reach.</span></h1>
+        <p class="hero-lead">Define your CLI once.<br>Use it from <strong>terminals, desktop forms,<br class="desktop-break"> HTTP, and AI agents.</strong></p>
+        <p class="hero-description">Your language. Your scripts. One consistent contract.<br>clyops makes the tools you write accessible wherever work happens.</p>
+        <div class="hero-actions"><a class="button primary" href="#playground">Try it in your browser <span aria-hidden="true">→</span></a><a class="text-link" href="/versions/v0.12.2/examples.html">Clone and run the examples <span aria-hidden="true">↗︎</span></a></div>
+        <div class="hero-meta"><span>OPEN SOURCE / MIT</span><span>9 LANGUAGE IMPLEMENTATIONS</span></div>
+      </div>
+      <div class="demo" id="terminal-demo" aria-label="Interactive terminal walkthrough">
+        <div class="demo-heading"><span class="eyebrow">FROM SCRIPT TO AGENT</span><span class="demo-badge">ILLUSTRATIVE PLAYBACK</span></div>
+        <div class="language-picker" role="group" aria-label="Demo language" hidden>
+          <button type="button" data-language="0" aria-pressed="true">Python</button><button type="button" data-language="1" aria-pressed="false">Bash</button><button type="button" data-language="2" aria-pressed="false">TypeScript</button><button type="button" data-language="3" aria-pressed="false">Rust</button>
+        </div>
+        <div class="terminal">
+          <div class="terminal-chrome"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="terminal-path">~/ops / scripts/plan.py</span><span class="terminal-symbol" aria-hidden="true">⌘</span></div>
+          <div class="terminal-screen" tabindex="0" aria-label="Terminal output; use arrow keys to scroll">
+            <div class="terminal-command"><span class="prompt" aria-hidden="true">❯</span><code id="demo-command">$EDITOR scripts/plan.py</code></div>
+            <pre id="demo-output">#!/usr/bin/env python3
+import json
+
+from clyops import Cli
+
+cli = Cli(name=&quot;plan&quot;)
+cli.set_description(&quot;Build a deployment plan. Change nothing.&quot;)
+cli.opt(&quot;SERVICE&quot;, &quot;service&quot;, &quot;s&quot;, &quot;api&quot;, &quot;Service&quot;, rule=&quot;choice:api,worker&quot;)
+cli.opt(&quot;ENV&quot;, &quot;env&quot;, &quot;e&quot;, &quot;staging&quot;, &quot;Environment&quot;, rule=&quot;choice:staging,production&quot;)
+cli.opt(&quot;REPLICAS&quot;, &quot;replicas&quot;, &quot;r&quot;, &quot;2&quot;, &quot;Replica count&quot;, rule=&quot;int:1-10&quot;)
+cli.set_effects(&quot;read-only&quot;)
+cli.set_stdout(&quot;Deployment plan&quot;, &quot;application/json&quot;)
+args = cli.run()
+print(json.dumps({&quot;service&quot;: args.SERVICE, &quot;env&quot;: args.ENV, &quot;replicas&quot;: args.REPLICAS}))</pre><span class="cursor" aria-hidden="true"></span>
+          </div>
+          <div class="terminal-status"><span><span class="status-dot" aria-hidden="true"></span> <span id="demo-stage">Write the tool</span></span><span id="demo-counter">01 / 06</span></div>
+        </div>
+        <div class="demo-controls" hidden>
+          <button id="demo-play" class="play-button" type="button" aria-label="Pause playback">Pause</button>
+          <div class="stage-picker" role="group" aria-label="Walkthrough step"><button type="button" data-stage="0" aria-label="Step 1: Write" aria-pressed="true"><span>Write</span></button><button type="button" data-stage="1" aria-label="Step 2: Help" aria-pressed="false"><span>Help</span></button><button type="button" data-stage="2" aria-label="Step 3: Run" aria-pressed="false"><span>Run</span></button><button type="button" data-stage="3" aria-label="Step 4: Schema" aria-pressed="false"><span>Schema</span></button><button type="button" data-stage="4" aria-label="Step 5: Agent" aria-pressed="false"><span>Agent</span></button><button type="button" data-stage="5" aria-label="Step 6: HTTP" aria-pressed="false"><span>HTTP</span></button></div>
+          <button id="demo-replay" class="replay-button" type="button" aria-label="Replay current language">↺</button>
+        </div>
+        <p id="demo-caption" class="demo-caption">Register options, validation and effects beside your code.</p>
+        <p class="demo-note">Real tool output. Agent dialogue illustrated. Schema and HTTP views abbreviated. <a href="/versions/v0.12.2/demo.html">Read or run the demo →</a></p>
+      </div>
+    </section>
+    <section class="language-strip" aria-label="Supported languages"><div class="wrap"><span class="eyebrow">SPEAK YOUR LANGUAGE</span><div><a href="/versions/v0.12.2/languages/javascript.html">JavaScript / TypeScript</a><a href="/versions/v0.12.2/languages/python.html">Python</a><a href="/versions/v0.12.2/languages/rust.html">Rust</a><a href="/versions/v0.12.2/languages/go.html">Go</a><a href="/versions/v0.12.2/languages/java.html">Java</a><a href="/versions/v0.12.2/languages/ruby.html">Ruby</a><a href="/versions/v0.12.2/languages/c.html">C</a><a href="/versions/v0.12.2/languages/bash.html">Bash</a></div></div></section>
+    <section class="contract-section wrap" id="how-it-works" aria-labelledby="contract-title">
+      <div class="section-intro"><p class="eyebrow">01 / ONE SOURCE OF TRUTH</p><h2 id="contract-title">The interface lives<br>beside your code.</h2><p>Register an option once. Its type, default, validation and description travel with the tool. Help text, generated forms and agent inputs all start with the same contract.</p></div>
+      <div class="contract-map" aria-label="Your script exports a schema used by the terminal, desktop, HTTP and MCP">
+        <div class="map-source"><span aria-hidden="true">&gt;_</span><div><strong>your tool</strong><small>Bash, Python, TypeScript, Rust…</small></div></div>
+        <div class="map-bridge"><span aria-hidden="true">↓</span><code>--help-json-schema</code><span aria-hidden="true">↓</span></div>
+        <div class="map-contract"><span class="eyebrow">THE CONTRACT</span><code>options · types · validation<br>effects · secrets · stdin / stdout</code></div>
+        <div class="map-bridge" aria-hidden="true">↓</div>
+        <div class="map-destinations"><a href="/versions/v0.12.2/guide.html">&gt;_ <span>Terminal</span></a><a href="/versions/v0.12.2/applications.html#desktop-runner">[▤] <span>Desktop</span></a><a href="/versions/v0.12.2/node-tools.html#http-api">{ } <span>HTTP</span></a><a href="/versions/v0.12.2/node-tools.html#mcp">✳ <span>Agents</span></a></div>
+      </div>
+    </section>
+    <section class="interfaces wrap" aria-labelledby="interfaces-title">
+      <div class="section-heading"><p class="eyebrow">02 / MEET YOUR TOOLS WHERE YOU WORK</p><h2 id="interfaces-title">A script can be more than a script.</h2></div>
+      <div class="interface-grid">
+        <article><span class="interface-number">01 — TERMINAL</span><h3>Stay in your flow.</h3><p>Parsing, validation, generated help and completion for Bash, Zsh and Fish. Turn a directory of tools into one command with the dispatcher.</p><code>$ ops plan --env staging</code><a href="/versions/v0.12.2/completion.html">Set up shell completion <span aria-hidden="true">↗︎</span></a></article>
+        <article><span class="interface-number">02 — DESKTOP</span><h3>Give scripts a face.</h3><p>The desktop runner builds forms from the schema, streams output and handles secrets, templates and declared effects.</p><div class="mini-form" aria-hidden="true"><span>Environment</span><span>staging <b>⌄</b></span></div><a href="/versions/v0.12.2/applications.html#desktop-runner">Meet the desktop runner <span aria-hidden="true">↗︎</span></a></article>
+        <article><span class="interface-number">03 — HTTP + WEB</span><h3>Make it an endpoint.</h3><p>Serve a tool directory with JSON input, OpenAPI and jobs. Open the web runner for typed forms and execution results.</p><code>POST /tools/plan · /ui/</code><a href="/versions/v0.12.2/web-runner.html">Explore the web runner <span aria-hidden="true">↗︎</span></a></article>
+        <article><span class="interface-number">04 — AGENTS</span><h3>Let agents call it.</h3><p>MCP exposes each tool with typed inputs and effect annotations. Validate arguments before the tool runs.</p><code>plan({ env: "staging" })</code><a href="/versions/v0.12.2/node-tools.html#mcp">Connect an MCP client <span aria-hidden="true">↗︎</span></a></article>
+      </div>
+    </section>
+    <section class="playground-section wrap" id="playground" aria-labelledby="playground-title" data-worker-url="/versions/v0.12.2/assets/playground-worker.js" data-files-url="/versions/v0.12.2/assets/playground-files.json">
+      <div class="section-heading"><p class="eyebrow">03 / YOUR TURN</p><h2 id="playground-title">Real scripts. Right here.</h2><p>Run the Python examples with real parsing, validation and generated help. Change a command. Press Enter. See what happens.</p></div>
+      <div class="playground-card">
+        <div class="playground-toolbar"><span>PYTHON / BROWSER WORKSPACE</span><div><button type="button" id="playground-start">Start Python playground</button><button type="button" id="playground-reset" disabled>Reset</button></div></div>
+        <pre id="playground-output" tabindex="0" aria-label="Playground terminal output">Try plan.py --help, report.py --format table, or a command of your own.
+Python loads when you press Start. No server connection needed.
+</pre>
+        <form class="playground-command-row"><span aria-hidden="true">❯</span><label class="sr-only" for="playground-command">Playground command</label><input id="playground-command" value="plan.py --help" placeholder="plan.py --env production --replicas 3" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="4000" disabled><button type="submit" disabled>Run ↵</button></form>
+        <div class="playground-suggestions" aria-label="Example commands"><button type="button" data-command="plan.py --help" disabled>Generated help</button><button type="button" data-command="plan.py --env production --replicas 3 --tag demo" disabled>Make a plan</button><button type="button" data-command="plan.py --replicas 99" disabled>Try validation</button><button type="button" data-command="report.py --format table" disabled>Read a CSV</button><button type="button" data-command="plan.py --help-json-schema" disabled>See the schema</button></div>
+        <details class="playground-stdin"><summary>stdin · for json-format.py</summary><label for="playground-stdin">Input document</label><textarea id="playground-stdin" maxlength="32000" spellcheck="false">{"service":"api","replicas":2}</textarea></details>
+        <p id="playground-status" role="status">Ready to start · the first load downloads the Python runtime</p>
+      </div>
+      <p class="playground-note">Python runs in this tab through <a href="https://pyodide.org/">Pyodide</a>, with an in-memory workspace. Try <code>help</code>, <code>ls</code>, or <code>cat examples/scripts/plan.py</code>. Tab completes options and choices; ↑/↓ recall commands. <a href="/versions/v0.12.2/linux-lab.html">Open the Linux lab for real Bash, FFmpeg and curl →</a></p>
+      <p class="playground-note"><a href="/versions/v0.12.2/examples.html">Get the whole scripts directory →</a> to run these tools with your own filesystem and network.</p>
+      <noscript><p>Enable JavaScript for the browser playground, or <a href="/versions/v0.12.2/examples.html">run the examples locally</a>.</p></noscript>
+    </section>
+    <section class="completion-section wrap" aria-labelledby="completion-title">
+      <div class="section-heading"><p class="eyebrow">04 / LESS TYPING, MORE DOING</p><h2 id="completion-title">Your shell already knows the options.</h2><p>Options, enum values, files and nested commands. Completion comes from the tool itself and follows your code.</p></div>
+      <div class="completion-grid"><article><h3>Bash</h3><pre>eval "$(plan.py --completion bash)"</pre></article><article><h3>Zsh</h3><pre>autoload -Uz compinit &amp;&amp; compinit
+eval "$(plan.py --completion zsh)"</pre></article><article><h3>Fish</h3><pre>plan.py --completion fish &gt; \
+  ~/.config/fish/completions/plan.py.fish</pre></article></div>
+      <p>Add the examples directory to your PATH, then enable your shell. <a href="/versions/v0.12.2/completion.html">Copy the full setup →</a></p>
+    </section>
+    <section class="start-section wrap" aria-labelledby="start-title">
+      <div><p class="eyebrow">05 / START SMALL</p><h2 id="start-title">Your next useful tool<br>starts here.</h2><p>Pick your language. Register a few options.<br>Let the same interface do more of the work.</p><a class="text-link" href="/versions/v0.12.2/reference.html">All guides and API references <span aria-hidden="true">→</span></a></div>
+      <div class="install-panel"><div><span id="install-language">PYTHON / INSTALL</span><button type="button" id="copy-install" hidden>Copy command</button></div><pre id="install-command">python -m pip install clyops</pre><a id="install-guide" href="/versions/v0.12.2/languages/python.html" data-base="/versions/v0.12.2/languages/">Read the Python guide →</a><span id="copy-status" role="status"></span></div>
+    </section>
+    <section class="project-notes wrap"><p><span class="status-dot" aria-hidden="true"></span> Shared specification. Shared conformance suite.</p><p>Every language is checked against the same behavior contract.</p><a href="https://github.com/wankdanker/clyops/tree/main/spec">Read the specification <span aria-hidden="true">↗︎</span></a></section>
+  </main>
+  <footer class="site-footer wrap"><a class="brand" href="/versions/v0.12.2/">[c] clyops</a><span>Small tools. Big reach.</span><div><a href="/versions/v0.12.2/guide.html">Documentation</a><a href="/versions/v0.12.2/versions.html">Versions</a><a href="https://github.com/wankdanker/clyops">GitHub ↗︎</a></div><span class="license">Open source · MIT</span></footer>
+</body>
+</html>
