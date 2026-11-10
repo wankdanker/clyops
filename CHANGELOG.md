@@ -5,6 +5,12 @@ section here.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-10
+
+Programs can list an input's values when they are asked for: shells offer them on Tab, and the
+HTTP API, MCP server and web runner list them a page at a time. Fish 4 completion of arguments
+after options is fixed.
+
 ### Added
 
 - `complete(name, fn)` (Bash: `clyops_complete name function`) lists an option's or argument's
