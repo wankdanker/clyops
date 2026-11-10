@@ -40,6 +40,9 @@ declare -A _CLYOPS_INDEX=()     # long -> registration index (names the per-opti
 
 _CLYOPS_ARGS=() _CLYOPS_ARG_DESC=() _CLYOPS_ARG_DEFAULT=() _CLYOPS_ARG_RULE=()
 _CLYOPS_VARIADIC=""             # index of the variadic argument, if any
+declare -A _CLYOPS_COMPLETER=() _CLYOPS_ARG_COMPLETER=()   # long / argument name -> completer function
+declare -A _CLYOPS_PAGED=() _CLYOPS_ARG_PAGED=()           # ... -> 1 when the completer pages itself
+_CLYOPS_VALS=() _CLYOPS_MORE=""                            # _clyops_list_values results
 
 _CLYOPS_CMDS=() _CLYOPS_CMD_DESC=() _CLYOPS_CMD_HINT=() _CLYOPS_CMD_OWNER=()
 declare -A _CLYOPS_SECRET=()    # long -> 1 for secret options
@@ -321,6 +324,31 @@ clyops_path_search() {
     [[ -v "_CLYOPS_KIND[$1]" ]] || _clyops_fatal "clyops_path_search: unknown option --$1"
     _CLYOPS_SEARCH[$1]="$2"
     [[ -n "${_CLYOPS_RULE[$1]}" ]] || _CLYOPS_RULE[$1]="path"
+}
+
+# Usage: clyops_complete <long|argument> <function> [paged]
+# The function lists the values of the value option or argument (spec section
+# 9.2), for shell completion and --complete-values. Its arguments are the words
+# typed after the commands; CLYOPS_COMPLETE_PREFIX, CLYOPS_COMPLETE_LIMIT (0: no
+# limit) and CLYOPS_COMPLETE_OFFSET are set, and it prints one value per line.
+# The library keeps the values starting with the prefix and pages them, unless
+# "paged" is given: then the function applies the prefix, offset and limit
+# itself (a database query can). A non-zero exit is a failure. It doesn't
+# validate. Registering a name again replaces it.
+clyops_complete() {
+    _clyops_record clyops_complete "$@" && return 0
+    local _c_paged=""
+    case "${3:-}" in "") ;; paged) _c_paged=1 ;; *) _clyops_fatal "clyops_complete: unknown mode '$3' (expected paged)" ;; esac
+    if [[ -v "_CLYOPS_KIND[$1]" && "${_CLYOPS_OWNER[$1]}" == "$_CLYOPS_SEL" ]]; then
+        [[ "${_CLYOPS_KIND[$1]}" == flag ]] && _clyops_fatal "Flag --$1 takes no value to complete"
+        _CLYOPS_COMPLETER[$1]="$2"; _CLYOPS_PAGED[$1]="$_c_paged"
+        return 0
+    fi
+    local _c_a
+    for _c_a in "${_CLYOPS_ARGS[@]}"; do
+        [[ "$_c_a" == "$1" ]] && { _CLYOPS_ARG_COMPLETER[$1]="$2"; _CLYOPS_ARG_PAGED[$1]="$_c_paged"; return 0; }
+    done
+    _clyops_fatal "Unknown option or argument '$1' for complete"
 }
 
 _clyops_known_rule() {
@@ -1055,6 +1083,17 @@ clyops_run() {
     for _c_arg in "$@"; do
         [[ "$_c_arg" == -- ]] && break
         if [[ "$_c_arg" == --help-json-schema ]]; then clyops_json_schema; exit 0; fi
+        if [[ "$_c_arg" == --complete-values ]]; then
+            local _c_rest=("$@")
+            while [[ "${_c_rest[0]}" != --complete-values ]]; do _c_rest=("${_c_rest[@]:1}"); done
+            local _c_slots=("${_c_rest[@]:1:4}") _c_words=("${_c_rest[@]:5}")
+            if (( ${#_c_slots[@]} < 4 )) || ! _clyops_values_slot "${_c_slots[2]}" || ! _clyops_values_slot "${_c_slots[3]}" || (( 10#${_c_slots[2]} < 1 )); then
+                die 1 "LIMIT and OFFSET must be integers (LIMIT >= 1)"
+            fi
+            while (( ${#_c_words[@]} )) && [[ "${_c_words[0]}" != -- ]]; do _c_words=("${_c_words[@]:1}"); done
+            clyops_complete_values "${_c_slots[0]}" "${_c_slots[1]}" "$(( 10#${_c_slots[2]} ))" "$(( 10#${_c_slots[3]} ))" "${_c_words[@]:1}" || die 1 "$_CLYOPS_ERROR"
+            exit 0
+        fi
         if [[ "$_c_arg" == --bash-completion ]]; then
             local _c_words=("$@")
             while (( ${#_c_words[@]} )) && [[ "${_c_words[0]}" != -- ]]; do _c_words=("${_c_words[@]:1}"); done
@@ -1408,7 +1447,8 @@ _clyops_schema_node() {
         printf '      "required": %s,\n      "isVariadic": %s,\n' "$required" "$variadic"
         _clyops_json_str "${_CLYOPS_ARG_DEFAULT[i]}"; printf '      "default": %s,\n' "$_r"
         _clyops_json_str "${_CLYOPS_ARG_RULE[i]}"; printf '      "validation": %s,\n' "$_r"
-        _clyops_rule_schema "${_CLYOPS_ARG_RULE[i]}" "${_CLYOPS_ARGS[i]}"; printf '      "schema": %s\n    }' "$_r"
+        _clyops_rule_schema "${_CLYOPS_ARG_RULE[i]}" "${_CLYOPS_ARGS[i]}"; printf '      "schema": %s,\n' "$_r"
+        printf '      "dynamic": %s\n    }' "$([[ -n "${_CLYOPS_ARG_COMPLETER[${_CLYOPS_ARGS[i]}]:-}" ]] && echo true || echo false)"
         sep=","
     done
     [[ -n "$sep" ]] && printf '\n  '
@@ -1443,7 +1483,8 @@ _clyops_schema_node() {
         fi
         _clyops_json_list "${choices[@]}"; printf '      "choices": %s,\n' "$_r"
         _clyops_rule_schema "$rule" "--$long"; printf '      "schema": %s,\n' "$_r"
-        printf '      "secret": %s\n    }' "$([[ -n "${_CLYOPS_SECRET[$long]:-}" ]] && echo true || echo false)"
+        printf '      "secret": %s,\n' "$([[ -n "${_CLYOPS_SECRET[$long]:-}" ]] && echo true || echo false)"
+        printf '      "dynamic": %s\n    }' "$([[ -n "${_CLYOPS_COMPLETER[$long]:-}" ]] && echo true || echo false)"
         sep=","
     done
     printf '\n  ],'
@@ -1516,19 +1557,92 @@ _clyops_completion_kind() { # rule search-dirs -> _r "kind<TAB>values"
     _r="$kind"$'\t'"${values:--}"
 }
 
+# Ask completer $1 (paged when $2 is set) for a page of values (spec section 9.2):
+# prefix $3, limit $4, offset $5; $6 set drops values the completion scripts
+# would split; the words follow. Sets _CLYOPS_VALS and _CLYOPS_MORE (1 or ""),
+# or fails when the completer does.
+_clyops_list_values() {
+    local fn="$1" paged="$2" prefix="$3" limit="$4" offset="$5" shell="$6" out line
+    shift 6
+    local rlimit=0 roffset=0
+    [[ -n "$paged" ]] && { rlimit=$(( limit + 1 )); roffset="$offset"; }
+    out=$(CLYOPS_COMPLETE_PREFIX="$prefix" CLYOPS_COMPLETE_LIMIT="$rlimit" CLYOPS_COMPLETE_OFFSET="$roffset" "$fn" "$@") || return 1
+    local -A seen=()
+    local -a vals=()
+    while IFS= read -r line; do
+        [[ -z "$line" || -n "${seen["$line"]+x}" ]] && continue
+        [[ -n "$shell" && "$line" == *[,$' \t\r']* ]] && continue
+        seen["$line"]=1
+        [[ -z "$paged" && "$line" != "$prefix"* ]] && continue
+        vals+=("$line")
+    done <<< "$out"
+    [[ -z "$paged" ]] && vals=("${vals[@]:offset}")
+    _CLYOPS_MORE=""
+    (( ${#vals[@]} > limit )) && _CLYOPS_MORE=1
+    _CLYOPS_VALS=("${vals[@]:0:limit}")
+}
+
+# Completer $1 (paged when $2 is set) as a completion record: _r "choice<TAB>values",
+# or fails when the completer does. The words follow.
+_clyops_completer_values() {
+    local fn="$1" paged="$2"
+    shift 2
+    _clyops_list_values "$fn" "$paged" "" 1000 0 1 "$@" || return 1
+    local IFS=,
+    _r="choice"$'\t'"${_CLYOPS_VALS[*]:--}"
+}
+
+# A --complete-values LIMIT or OFFSET (spec section 9.3): digits, from 0 to 1000000000.
+_clyops_values_slot() {
+    [[ "$1" =~ ^[0-9]+$ ]] || return 1
+    local n="${1#"${1%%[!0]*}"}"
+    (( ${#n} <= 10 )) && (( 10#${n:-0} <= 1000000000 ))
+}
+
+# Usage: clyops_complete_values <name> <prefix> <limit> <offset> [word...]
+# Print a page of the values of an option or argument as JSON (spec section 9.3):
+# {"values":[...],"more":false}. The words select the command. Fails with a
+# message in _CLYOPS_ERROR: No completer for 'NAME' / Completer for 'NAME' failed.
+clyops_complete_values() {
+    local name="$1" prefix="$2" limit="$3" offset="$4" fn="" paged="" i
+    shift 4
+    local words=("$@") skip=0
+    _clyops_ensure_help
+    if [[ -n "${_CLYOPS_CMD_KIDS[:]:-}" ]]; then
+        _clyops_walk "$@"
+        skip="$_r"
+        if [[ -n "${_CLYOPS_CMD_KIDS[:$_CLYOPS_SEL]:-}" ]] && (( skip < $# )) && [[ "${words[skip]}" != -* ]]; then
+            _CLYOPS_ERROR="No completer for '$name'"; return 1
+        fi
+        words=("${words[@]:skip}")
+    fi
+    if [[ -v "_CLYOPS_KIND[$name]" && -n "${_CLYOPS_COMPLETER[$name]:-}" ]]; then
+        fn="${_CLYOPS_COMPLETER[$name]}"; paged="${_CLYOPS_PAGED[$name]:-}"
+    else
+        for i in "${_CLYOPS_ARGS[@]}"; do
+            [[ "$i" == "$name" && -n "${_CLYOPS_ARG_COMPLETER[$name]:-}" ]] && { fn="${_CLYOPS_ARG_COMPLETER[$name]}"; paged="${_CLYOPS_ARG_PAGED[$name]:-}"; }
+        done
+    fi
+    [[ -n "$fn" ]] || { _CLYOPS_ERROR="No completer for '$name'"; return 1; }
+    _clyops_list_values "$fn" "$paged" "$prefix" "$limit" "$offset" "" "${words[@]}" || { _CLYOPS_ERROR="Completer for '$name' failed"; return 1; }
+    _clyops_json_list "${_CLYOPS_VALS[@]}"
+    printf '{"values":%s,"more":%s}\n' "$_r" "$([[ -n "$_CLYOPS_MORE" ]] && echo true || echo false)"
+}
+
 # Tab-separated completion records (spec section 9). The arguments are the
 # words typed after the program name; a program with commands follows them.
 clyops_completion_data() {
     _clyops_ensure_help
     _clyops_abspath "${_CLYOPS_ROOT:-.}" "$PWD"
     _CLYOPS_ROOT_ABS="$_r"
-    local long desc short i kid
+    local long desc short i kid words=("$@")
     echo "#clyops-completion 1"
     if [[ -n "${_CLYOPS_CMD_KIDS[:]:-}" ]]; then
         _clyops_walk "$@"
-        local skip="$_r" words=("$@")
+        local skip="$_r"
         [[ -n "${_CLYOPS_CMD_KIDS[:$_CLYOPS_SEL]:-}" ]] && (( skip < $# )) && [[ "${words[skip]}" != -* ]] && return 0
         printf 'skip\t%s\n' "$skip"
+        words=("${words[@]:skip}")
         for kid in ${_CLYOPS_CMD_KIDS[:$_CLYOPS_SEL]:-}; do
             desc="${_CLYOPS_CMD_ABOUT[:${_CLYOPS_SEL:+$_CLYOPS_SEL }$kid]}"; desc="${desc//$'\t'/ }"; desc="${desc//$'\n'/ }"
             printf 'cmd\t%s\t%s\n' "$kid" "$desc"
@@ -1540,15 +1654,19 @@ clyops_completion_data() {
         if [[ "${_CLYOPS_KIND[$long]}" == flag ]]; then
             printf 'opt\t--%s\t%s\tflag\tnone\t-\t%s\n' "$long" "${short:--}" "$desc"
         else
-            _clyops_search_dirs "$long"
-            _clyops_completion_kind "${_CLYOPS_RULE[$long]}" "$_r"
+            if [[ -z "${_CLYOPS_COMPLETER[$long]:-}" ]] || ! _clyops_completer_values "${_CLYOPS_COMPLETER[$long]}" "${_CLYOPS_PAGED[$long]:-}" "${words[@]}"; then
+                _clyops_search_dirs "$long"
+                _clyops_completion_kind "${_CLYOPS_RULE[$long]}" "$_r"
+            fi
             printf 'opt\t--%s\t%s\tvalue\t%s\t%s\n' "$long" "${short:--}" "$_r" "$desc"
         fi
         _clyops_is_bool_like "$long" && printf 'opt\t--no-%s\t-\tflag\tnone\t-\t%s\n' "$long" "$desc"
     done
     for (( i = 0; i < ${#_CLYOPS_ARGS[@]}; i++ )); do
         desc="${_CLYOPS_ARG_DESC[i]//$'\t'/ }"; desc="${desc//$'\n'/ }"
-        _clyops_completion_kind "${_CLYOPS_ARG_RULE[i]}" ""
+        if [[ -z "${_CLYOPS_ARG_COMPLETER[${_CLYOPS_ARGS[i]}]:-}" ]] || ! _clyops_completer_values "${_CLYOPS_ARG_COMPLETER[${_CLYOPS_ARGS[i]}]}" "${_CLYOPS_ARG_PAGED[${_CLYOPS_ARGS[i]}]:-}" "${words[@]}"; then
+            _clyops_completion_kind "${_CLYOPS_ARG_RULE[i]}" ""
+        fi
         printf 'arg\t%s\t%s\t%s\t%s\n' "${_CLYOPS_ARGS[i]}" "$([[ "$i" == "$_CLYOPS_VARIADIC" ]] && echo variadic || echo single)" "$_r" "$desc"
     done
 }
@@ -1571,5 +1689,5 @@ clyops_completion_script() {
 # BEGIN GENERATED COMPLETIONS (Generated by tools/sync-completions.py from spec/completions/. Do not edit.)
 _CLYOPS_COMPLETION_BASH=$'# bash completion for __CLYOPS_PROG__ (generated by clyops)\n# Enable with:  eval "$(__CLYOPS_PROG__ --completion bash)"\n_clyops___CLYOPS_FUNC__() {\n    local cur="${COMP_WORDS[COMP_CWORD]}" prev="" data rec name short type kind values rest i skip=0\n    local -A otype=() okind=() ovalues=()\n    local -a names=() cmds=() akind=() avalues=() aarity=()\n    (( COMP_CWORD > 0 )) && prev="${COMP_WORDS[COMP_CWORD-1]}"\n    # The words before the cursor let a dispatcher answer for the subcommand being typed.\n    data=$("${COMP_WORDS[0]}" --bash-completion -- "${COMP_WORDS[@]:1:COMP_CWORD-1}" 2>/dev/null) || return 0\n    [[ "$data" == "#clyops-completion 1"* ]] || return 0\n\n    while IFS=$\'\\t\' read -r rec name short type kind values rest; do\n        [[ "$values" == - ]] && values=""\n        case "$rec" in\n            skip) skip="$name" ;;\n            cmd) cmds+=("$name") ;;\n            opt)\n                for i in "$name" "$short"; do\n                    [[ -z "$i" || "$i" == - ]] && continue\n                    names+=("$i"); otype[$i]="$type"; okind[$i]="$kind"; ovalues[$i]="$values"\n                done ;;\n            arg)\n                # arg records: name, arity, kind, values, description\n                [[ "$kind" == - ]] && kind=""\n                aarity+=("$short"); akind+=("$type"); avalues+=("$kind") ;;\n        esac\n    done <<< "$data"\n    # Words up to and including a dispatched subcommand belong to the dispatcher.\n    local first=$(( 1 + skip ))\n    (( COMP_CWORD <= first )) && prev=""\n\n    # Option value: --opt=VALUE (bash splits on "=") or --opt VALUE.\n    local opt=""\n    if [[ "$cur" == --*=* ]]; then opt="${cur%%=*}"; cur="${cur#*=}"\n    elif [[ "$cur" == = && "${otype[$prev]}" == value ]]; then opt="$prev"; cur=""\n    elif [[ "$prev" == = ]] && (( COMP_CWORD > first + 1 )); then opt="${COMP_WORDS[COMP_CWORD-2]}"\n    elif [[ "$prev" == -* && "${otype[$prev]}" == value ]]; then opt="$prev"\n    fi\n    if [[ -n "$opt" ]]; then\n        _clyops_value___CLYOPS_FUNC__ "${okind[$opt]}" "${ovalues[$opt]}" "$cur"\n        return 0\n    fi\n\n    if [[ "$cur" == -* ]]; then\n        COMPREPLY=($(compgen -W "${names[*]}" -- "$cur"))\n        return 0\n    fi\n\n    # A dispatcher group: complete its subcommands.\n    if (( ${#cmds[@]} )); then\n        COMPREPLY=($(compgen -W "${cmds[*]}" -- "$cur"))\n        return 0\n    fi\n\n    # A dispatched program without completion data: fall back to file names.\n    if (( skip > 0 && ${#names[@]} == 0 && ${#akind[@]} == 0 )); then\n        compopt -o default 2>/dev/null\n        COMPREPLY=()\n        return 0\n    fi\n\n    # Positional: count earlier positionals, skipping options and their values.\n    local pos=0 endopts="" w\n    for (( i = first; i < COMP_CWORD; i++ )); do\n        w="${COMP_WORDS[i]}"\n        if [[ -z "$endopts" && "$w" == -- ]]; then endopts=1\n        elif [[ -z "$endopts" && "$w" == -?* ]]; then\n            [[ "$w" != *=* && "${otype[$w]}" == value ]] && (( i++ ))\n        elif [[ "$w" != = ]]; then (( pos++ ))\n        fi\n    done\n    local n=${#akind[@]}\n    (( n == 0 )) && return 0\n    if (( pos >= n )); then\n        [[ "${aarity[n-1]}" == variadic ]] || return 0\n        pos=$(( n - 1 ))\n    fi\n    _clyops_value___CLYOPS_FUNC__ "${akind[pos]}" "${avalues[pos]}" "$cur"\n}\n\n_clyops_value___CLYOPS_FUNC__() {\n    local kind="$1" values="$2" cur="$3" dir IFS=$\'\\n\'\n    case "$kind" in\n        choice) COMPREPLY=($(IFS=$\' \\t\\n\'; compgen -W "${values//,/ }" -- "$cur")) ;;\n        file|dir)\n            local flag=-f\n            [[ "$kind" == dir ]] && flag=-d\n            compopt -o filenames 2>/dev/null\n            COMPREPLY=($(compgen $flag -- "$cur"))\n            # Bare names also match entries in the option\'s search dirs.\n            if [[ -n "$values" && "$cur" != /* && "$cur" != ./* && "$cur" != ../* ]]; then\n                local -a dirs\n                IFS=: read -ra dirs <<< "$values"\n                for dir in "${dirs[@]}"; do\n                    [[ -d "$dir" ]] && COMPREPLY+=($(cd "$dir" && compgen $flag -- "$cur"))\n                done\n            fi ;;\n        command)\n            # A program on PATH, or a path once the word has a slash.\n            if [[ "$cur" == */* ]]; then\n                compopt -o filenames 2>/dev/null\n                COMPREPLY=($(compgen -f -- "$cur"))\n            else\n                COMPREPLY=($(compgen -c -- "$cur"))\n            fi ;;\n        host) COMPREPLY=($(compgen -A hostname -- "$cur")) ;;\n        none) COMPREPLY=() ;;\n        *) compopt -o default 2>/dev/null; COMPREPLY=() ;;\n    esac\n}\n\ncomplete -F _clyops___CLYOPS_FUNC__ __CLYOPS_PROG__\n'
 _CLYOPS_COMPLETION_ZSH=$'#compdef __CLYOPS_PROG__\n# zsh completion for __CLYOPS_PROG__ (generated by clyops)\n# Enable with:  eval "$(__CLYOPS_PROG__ --completion zsh)"\n#   or install:  __CLYOPS_PROG__ --completion zsh > "${fpath[1]}/___CLYOPS_PROG__"\n_clyops___CLYOPS_FUNC__() {\n    local data line esc action skip=0\n    local -a f specs cmds\n    # The words before the cursor let a dispatcher answer for the subcommand being typed.\n    data=$("${words[1]}" --bash-completion -- "${(@)words[2,CURRENT-1]}" 2>/dev/null) || return 1\n    [[ "$data" == "#clyops-completion 1"* ]] || return 1\n\n    for line in "${(@f)data}"; do\n        [[ "$line" == \\#* ]] && continue\n        f=("${(@ps:\\t:)line}")\n        if [[ "$f[1]" == skip ]]; then\n            skip=$f[2]\n        elif [[ "$f[1]" == cmd ]]; then\n            cmds+=("${f[2]//:/\\\\:}:$f[3]")\n        elif [[ "$f[1]" == opt ]]; then\n            esc="${${${${f[7]//\\\\/\\\\\\\\}//\\[/\\\\[}//\\]/\\\\]}//:/\\\\:}"\n            if [[ "$f[4]" == flag ]]; then\n                specs+=("$f[2][$esc]")\n                [[ "$f[3]" != - ]] && specs+=("$f[3][$esc]")\n                continue\n            fi\n            action="$(_clyops_action___CLYOPS_FUNC__ "$f[5]" "$f[6]")"\n            specs+=("$f[2]=[$esc]:value:$action")\n            [[ "$f[3]" != - ]] && specs+=("$f[3]+[$esc]:value:$action")\n        elif [[ "$f[1]" == arg ]]; then\n            esc="${${f[6]//\\\\/\\\\\\\\}//:/\\\\:}"\n            action="$(_clyops_action___CLYOPS_FUNC__ "$f[4]" "$f[5]")"\n            if [[ "$f[3]" == variadic ]]; then specs+=("*:$esc:$action"); else specs+=(":$esc:$action"); fi\n        fi\n    done\n    # Past a dispatched subcommand, complete its words as if they were the whole line.\n    if (( skip )); then\n        words=("${words[1]}" "${(@)words[2+skip,-1]}")\n        (( CURRENT -= skip ))\n    fi\n    # A dispatcher group: complete its subcommands.\n    if (( ${#cmds} )) && [[ "${words[CURRENT]}" != -* ]]; then\n        _describe -t commands command cmds\n        return\n    fi\n    # A dispatched program without completion data: fall back to file names.\n    if (( skip && ${#specs} == 0 )); then\n        _files\n        return\n    fi\n    _arguments -s -S : "${specs[@]}"\n}\n\n_clyops_action___CLYOPS_FUNC__() {\n    local kind="$1" values="$2"\n    [[ "$values" == - ]] && values=""\n    case "$kind" in\n        choice) print -r -- "(${values//,/ })" ;;\n        file) if [[ -n "$values" ]]; then print -r -- "{_files; _files -W \\"(${values//:/ })\\"}"; else print -r -- _files; fi ;;\n        dir) if [[ -n "$values" ]]; then print -r -- "{_files -/; _files -/ -W \\"(${values//:/ })\\"}"; else print -r -- "_files -/"; fi ;;\n        command) print -r -- \'{if [[ $PREFIX == */* ]]; then _files; else _command_names -e; fi}\' ;;\n        host) print -r -- _hosts ;;\n        none) print -r -- " " ;;\n        *) print -r -- _files ;;\n    esac\n}\n\nif [[ "${zsh_eval_context[-1]}" == loadautofunc ]]; then\n    _clyops___CLYOPS_FUNC__ "$@"\nelse\n    compdef _clyops___CLYOPS_FUNC__ __CLYOPS_PROG__\nfi\n'
-_CLYOPS_COMPLETION_FISH=$'# fish completion for __CLYOPS_PROG__ (generated by clyops)\n# Enable with:  __CLYOPS_PROG__ --completion fish | source\n#   or install:  __CLYOPS_PROG__ --completion fish > ~/.config/fish/completions/__CLYOPS_PROG__.fish\nfunction __clyops___CLYOPS_FUNC___value --argument-names kind values cur\n    switch $kind\n        case choice\n            string split , -- $values\n        case file\n            __fish_complete_path $cur\n            # Bare names also match entries in the option\'s search dirs.\n            if test -n "$values"; and not string match -qr -- \'^(/|\\./|\\.\\./)\' $cur\n                for dir in (string split : -- $values)\n                    for f in $dir/$cur*\n                        string replace -- "$dir/" \'\' $f\n                    end\n                end\n            end\n        case command\n            # A program on PATH, or a path once the word has a slash.\n            if string match -q -- \'*/*\' $cur\n                __fish_complete_path $cur\n            else\n                complete -C -- $cur\n            end\n        case dir\n            __fish_complete_directories $cur\n        case host\n            __fish_print_hostnames\n        case none\n        case \'*\'\n            __fish_complete_path $cur\n    end\nend\n\nfunction __clyops___CLYOPS_FUNC___complete\n    set -l tokens (commandline -opc)\n    set -l cur (commandline -ct)\n    # The words before the cursor let a dispatcher answer for the subcommand being typed.\n    set -l data (command $tokens[1] --bash-completion -- $tokens[2..-1] 2>/dev/null)\n    string match -q \'#clyops-completion 1\' -- $data[1]; or return\n\n    set -l skip 0\n    set -l cmds\n    set -l onames; set -l otypes; set -l okinds; set -l ovalues; set -l odescs\n    set -l akinds; set -l avalues; set -l aarity\n    for line in $data[2..-1]\n        set -l f (string split \\t -- $line)\n        switch $f[1]\n            case skip\n                set skip $f[2]\n            case cmd\n                set -a cmds "$f[2]"\\t"$f[3]"\n            case opt\n                # "-" marks an empty field.\n                set -l values $f[6]\n                test "$values" = -; and set values \'\'\n                for n in $f[2] $f[3]\n                    test "$n" = -; and continue\n                    set -a onames $n; set -a otypes $f[4]; set -a okinds $f[5]; set -a ovalues "$values"; set -a odescs "$f[7]"\n                end\n            case arg\n                set -l values $f[5]\n                test "$values" = -; and set values \'\'\n                set -a aarity $f[3]; set -a akinds $f[4]; set -a avalues "$values"\n        end\n    end\n    # Words up to and including a dispatched subcommand belong to the dispatcher.\n    set -l words $tokens[(math $skip + 2)..-1]\n\n    # --opt=VALUE\n    if string match -qr -- \'^--[^=]+=\' $cur\n        set -l opt (string replace -r \'=.*\' \'\' -- $cur)\n        set -l i (contains -i -- $opt $onames)\n        if test -n "$i"; and test "$otypes[$i]" = value\n            for v in (__clyops___CLYOPS_FUNC___value $okinds[$i] "$ovalues[$i]" (string replace -r \'^[^=]*=\' \'\' -- $cur))\n                echo "$opt=$v"\n            end\n        end\n        return\n    end\n    # --opt VALUE\n    if test (count $words) -gt 0\n        set -l i (contains -i -- $words[-1] $onames)\n        if test -n "$i"; and test "$otypes[$i]" = value\n            __clyops___CLYOPS_FUNC___value $okinds[$i] "$ovalues[$i]" $cur\n            return\n        end\n    end\n    if string match -q -- \'-*\' $cur\n        for i in (seq (count $onames))\n            echo $onames[$i]\\t$odescs[$i]\n        end\n        return\n    end\n    # A dispatcher group: complete its subcommands.\n    if test (count $cmds) -gt 0\n        printf \'%s\\n\' $cmds\n        return\n    end\n    # A dispatched program without completion data: fall back to file names.\n    if test $skip -gt 0; and test (count $onames) -eq 0; and test (count $akinds) -eq 0\n        __fish_complete_path $cur\n        return\n    end\n    # Positional: count earlier positionals, skipping options and their values.\n    set -l pos 0\n    set -l skipnext 0\n    set -l endopts 0\n    for w in $words\n        if test $skipnext -eq 1\n            set skipnext 0\n        else if test $endopts -eq 0; and test "$w" = --\n            set endopts 1\n        else if test $endopts -eq 0; and string match -q -- \'-?*\' $w\n            set -l i (contains -i -- $w $onames)\n            test -n "$i"; and test "$otypes[$i]" = value; and set skipnext 1\n        else\n            set pos (math $pos + 1)\n        end\n    end\n    set -l n (count $akinds)\n    test $n -eq 0; and return\n    if test $pos -ge $n\n        test "$aarity[$n]" = variadic; or return\n        set pos (math $n - 1)\n    end\n    set -l k (math $pos + 1)\n    __clyops___CLYOPS_FUNC___value $akinds[$k] "$avalues[$k]" $cur\nend\n\ncomplete -c __CLYOPS_PROG__ -f -a \'(__clyops___CLYOPS_FUNC___complete)\'\n'
+_CLYOPS_COMPLETION_FISH=$'# fish completion for __CLYOPS_PROG__ (generated by clyops)\n# Enable with:  __CLYOPS_PROG__ --completion fish | source\n#   or install:  __CLYOPS_PROG__ --completion fish > ~/.config/fish/completions/__CLYOPS_PROG__.fish\nfunction __clyops___CLYOPS_FUNC___value --argument-names kind values cur\n    switch $kind\n        case choice\n            string split , -- $values\n        case file\n            __fish_complete_path $cur\n            # Bare names also match entries in the option\'s search dirs.\n            if test -n "$values"; and not string match -qr -- \'^(/|\\./|\\.\\./)\' $cur\n                for dir in (string split : -- $values)\n                    for f in $dir/$cur*\n                        string replace -- "$dir/" \'\' $f\n                    end\n                end\n            end\n        case command\n            # A program on PATH, or a path once the word has a slash.\n            if string match -q -- \'*/*\' $cur\n                __fish_complete_path $cur\n            else\n                complete -C -- $cur\n            end\n        case dir\n            __fish_complete_directories $cur\n        case host\n            __fish_print_hostnames\n        case none\n        case \'*\'\n            __fish_complete_path $cur\n    end\nend\n\nfunction __clyops___CLYOPS_FUNC___complete\n    set -l tokens (commandline -opc)\n    set -l cur (commandline -ct)\n    # The words before the cursor let a dispatcher answer for the subcommand being typed.\n    set -l data (command $tokens[1] --bash-completion -- $tokens[2..-1] 2>/dev/null)\n    string match -q \'#clyops-completion 1\' -- $data[1]; or return\n\n    set -l skip 0\n    set -l cmds\n    set -l onames; set -l otypes; set -l okinds; set -l ovalues; set -l odescs\n    set -l akinds; set -l avalues; set -l aarity\n    for line in $data[2..-1]\n        set -l f (string split \\t -- $line)\n        switch $f[1]\n            case skip\n                set skip $f[2]\n            case cmd\n                set -a cmds "$f[2]"\\t"$f[3]"\n            case opt\n                # "-" marks an empty field.\n                set -l values $f[6]\n                test "$values" = -; and set values \'\'\n                for n in $f[2] $f[3]\n                    test "$n" = -; and continue\n                    set -a onames $n; set -a otypes $f[4]; set -a okinds $f[5]; set -a ovalues "$values"; set -a odescs "$f[7]"\n                end\n            case arg\n                set -l values $f[5]\n                test "$values" = -; and set values \'\'\n                set -a aarity $f[3]; set -a akinds $f[4]; set -a avalues "$values"\n        end\n    end\n    # Words up to and including a dispatched subcommand belong to the dispatcher.\n    set -l words $tokens[(math $skip + 2)..-1]\n\n    # --opt=VALUE\n    if string match -qr -- \'^--[^=]+=\' $cur\n        set -l opt (string replace -r \'=.*\' \'\' -- $cur)\n        set -l i (contains -i -- $opt $onames)\n        if test -n "$i"; and test "$otypes[$i]" = value\n            for v in (__clyops___CLYOPS_FUNC___value $okinds[$i] "$ovalues[$i]" (string replace -r \'^[^=]*=\' \'\' -- $cur))\n                echo "$opt=$v"\n            end\n        end\n        return\n    end\n    # --opt VALUE\n    if test (count $words) -gt 0\n        set -l i (contains -i -- $words[-1] $onames)\n        if test -n "$i"; and test "$otypes[$i]" = value\n            __clyops___CLYOPS_FUNC___value $okinds[$i] "$ovalues[$i]" $cur\n            return\n        end\n    end\n    if string match -q -- \'-*\' $cur\n        for i in (seq (count $onames))\n            echo $onames[$i]\\t$odescs[$i]\n        end\n        return\n    end\n    # A dispatcher group: complete its subcommands.\n    if test (count $cmds) -gt 0\n        printf \'%s\\n\' $cmds\n        return\n    end\n    # A dispatched program without completion data: fall back to file names.\n    if test $skip -gt 0; and test (count $onames) -eq 0; and test (count $akinds) -eq 0\n        __fish_complete_path $cur\n        return\n    end\n    # Positional: count earlier positionals, skipping options and their values.\n    set -l pos 0\n    set -l skipnext 0\n    set -l endopts 0\n    for w in $words\n        if test $skipnext -eq 1\n            set skipnext 0\n        else if test $endopts -eq 0; and test "$w" = --\n            set endopts 1\n        else if test $endopts -eq 0; and string match -qr -- \'^-.\' $w\n            set -l i (contains -i -- $w $onames)\n            test -n "$i"; and test "$otypes[$i]" = value; and set skipnext 1\n        else\n            set pos (math $pos + 1)\n        end\n    end\n    set -l n (count $akinds)\n    test $n -eq 0; and return\n    if test $pos -ge $n\n        test "$aarity[$n]" = variadic; or return\n        set pos (math $n - 1)\n    end\n    set -l k (math $pos + 1)\n    __clyops___CLYOPS_FUNC___value $akinds[$k] "$avalues[$k]" $cur\nend\n\ncomplete -c __CLYOPS_PROG__ -f -a \'(__clyops___CLYOPS_FUNC___complete)\'\n'
 # END GENERATED COMPLETIONS

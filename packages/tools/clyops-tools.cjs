@@ -26,6 +26,8 @@ __export(index_exports, {
   PROBE_TIMEOUT_MS: () => PROBE_TIMEOUT_MS,
   SCHEMA_FETCH_DEFAULTS: () => SCHEMA_FETCH_DEFAULTS,
   SchemaFetchError: () => SchemaFetchError,
+  VALUES_TIMEOUT_MS: () => VALUES_TIMEOUT_MS,
+  ValuesError: () => ValuesError,
   allowed: () => allowed,
   auditLog: () => auditLog,
   checkWithin: () => checkWithin,
@@ -37,6 +39,7 @@ __export(index_exports, {
   closedRequirement: () => closedRequirement,
   commandName: () => commandName,
   commands: () => commands,
+  completeValues: () => completeValues,
   declaredRoles: () => declaredRoles,
   discover: () => discover,
   downloadSchema: () => downloadSchema,
@@ -1159,6 +1162,52 @@ function startTool(tool, input, opts = {}) {
   const command = [tool.file, ...redactArgv(tool.schema, full)];
   return { ...started, command, result: started.result.then((r) => ({ ...r, command })) };
 }
+var VALUES_TIMEOUT_MS = 1e4;
+var ValuesError = class extends Error {
+  /** HTTP status used by adapters to report a failing tool. */
+  status = 502;
+};
+async function completeValues(tool, key, input = {}, opts = {}) {
+  const { schema } = tool;
+  const item = [...schema.options.filter((o) => o.name !== "help"), ...schema.arguments].find((i) => inputKeys(i).includes(key));
+  if (!item || !item.dynamic) throw new InputError(`${key} has no values to list`);
+  if (opts.closed?.includes(item.name)) throw new InputError(`${key}: set by the server, not by callers`);
+  const limit = opts.limit ?? 100;
+  const offset = opts.offset ?? 0;
+  if (!Number.isInteger(limit) || limit < 1) throw new InputError("limit must be an integer of at least 1");
+  if (!Number.isInteger(offset) || offset < 0) throw new InputError("offset must be a non-negative integer");
+  const own = new Set(inputKeys(item));
+  const others = Object.fromEntries(Object.entries(input).filter(([k]) => !own.has(k)));
+  const argvOptions = { within: opts.within, cwd: opts.cwd, secretEnv: opts.secretsInEnv !== false, positionals: opts.positionalsOrder, controlled: opts.closed };
+  let built;
+  try {
+    built = toArgv(schema, others, argvOptions);
+  } catch (err) {
+    if (err instanceof InputError) throw err;
+    const argKeys = new Set(schema.arguments.flatMap((a) => inputKeys(a)));
+    built = toArgv(schema, Object.fromEntries(Object.entries(others).filter(([k]) => !argKeys.has(k))), argvOptions);
+  }
+  const words = [...tool.subcommand ?? [], ...built.argv];
+  const env = Object.keys(built.env).length ? { ...opts.env ?? process.env, ...built.env } : opts.env;
+  const result = await start(tool.file, ["--complete-values", item.name, opts.prefix ?? "", String(limit), String(offset), "--", ...words], {
+    cwd: opts.cwd,
+    env,
+    signal: opts.signal,
+    timeoutMs: opts.timeoutMs ?? VALUES_TIMEOUT_MS
+  }).result;
+  const said = result.stderr.trim().split("\n").pop()?.replace(/^\S+ \S+ \[[^\]]*\] /, "") ?? "";
+  if (result.timedOut) throw new ValuesError(`${tool.words.join(" ")} took too long to list values`);
+  if (result.exitCode !== 0) throw new ValuesError(said || `${tool.words.join(" ")} failed to list values`);
+  let page;
+  try {
+    page = JSON.parse(result.stdout);
+  } catch {
+    page = void 0;
+  }
+  const ok = (p) => typeof p === "object" && p !== null && Array.isArray(p.values) && p.values.every((v) => typeof v === "string") && typeof p.more === "boolean";
+  if (!ok(page)) throw new ValuesError(`${tool.words.join(" ")} answered --complete-values with something other than a page of values`);
+  return { values: page.values, more: page.more };
+}
 function declaredRoles(tool, requested) {
   const declared = new Map((tool.schema.roles ?? []).map((r) => [r.name, r.direction]));
   return Object.fromEntries(Object.entries(requested).filter(([name, role]) => declared.get(name) === (role.input === void 0 ? "out" : "in")));
@@ -1195,6 +1244,8 @@ function auditLog(target) {
   PROBE_TIMEOUT_MS,
   SCHEMA_FETCH_DEFAULTS,
   SchemaFetchError,
+  VALUES_TIMEOUT_MS,
+  ValuesError,
   allowed,
   auditLog,
   checkWithin,
@@ -1206,6 +1257,7 @@ function auditLog(target) {
   closedRequirement,
   commandName,
   commands,
+  completeValues,
   declaredRoles,
   discover,
   downloadSchema,

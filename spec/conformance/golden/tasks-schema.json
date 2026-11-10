@@ -19,7 +19,8 @@
       "validation": "",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "help",
@@ -35,7 +36,8 @@
       "validation": "",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     }
   ],
   "config": null,
@@ -74,7 +76,8 @@
           "validation": "",
           "choices": [],
           "schema": null,
-          "secret": false
+          "secret": false,
+          "dynamic": true
         }
       ],
       "requiredCommands": [],
@@ -96,7 +99,8 @@
               "isVariadic": false,
               "default": "latest",
               "validation": "",
-              "schema": null
+              "schema": null,
+              "dynamic": true
             }
           ],
           "options": [
@@ -114,7 +118,8 @@
               "validation": "",
               "choices": [],
               "schema": null,
-              "secret": false
+              "secret": false,
+              "dynamic": false
             }
           ],
           "requiredCommands": [],
@@ -165,7 +170,8 @@
           "isVariadic": false,
           "default": "",
           "validation": "",
-          "schema": null
+          "schema": null,
+          "dynamic": false
         }
       ],
       "options": [
@@ -183,7 +189,8 @@
           "validation": "url",
           "choices": [],
           "schema": null,
-          "secret": false
+          "secret": false,
+          "dynamic": false
         },
         {
           "name": "email",
@@ -199,7 +206,8 @@
           "validation": "email",
           "choices": [],
           "schema": null,
-          "secret": false
+          "secret": false,
+          "dynamic": false
         }
       ],
       "requiredCommands": [],

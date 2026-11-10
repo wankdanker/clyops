@@ -2,8 +2,10 @@
   import { formFields, constraintIssues, withoutSecrets, isTextType, type Schema, type JsonSchema } from 'clyops-schema';
   import Field from './Field.svelte';
   import { inputErrors, jsonSample, template, restoreTemplate, TEMPLATE_STORAGE, type SavedTemplate } from './form';
-  let { schema, inputSchema, api, tool, busy, onrun }: {
+  let { schema, inputSchema, api, tool, busy, onrun, listValues }: {
     schema: Schema; inputSchema: JsonSchema; api: string; tool: string; busy: boolean;
+    /** Lists a dynamic input's values (spec section 13), given the text typed and the other inputs. */
+    listValues?: (key: string, prefix: string, input: Record<string, unknown>) => Promise<{ values: string[]; more: boolean }>;
     onrun: (values: Record<string, unknown>, async: boolean, stdin: string | File | undefined, files: Record<string, File>) => void;
   } = $props();
   const fields = $derived(formFields(schema));
@@ -105,7 +107,7 @@
     <button type="button" class="secondary" onclick={applyJson} disabled={busy}>Apply JSON</button>
   {:else}
     {#each groups as group}
-      <fieldset class="field-group"><legend>{group || 'Options'}</legend>{#each fields.filter(field => field.group === group) as field (field.key)}<Field {field} value={values[field.key]} enabled={enabled(field.key)} locked={busy} onchange={value => update(field.key, value)} ontoggle={on => toggle(field.key, on)} onfile={file => upload(field.key, file)}/>{/each}</fieldset>
+      <fieldset class="field-group"><legend>{group || 'Options'}</legend>{#each fields.filter(field => field.group === group) as field (field.key)}<Field {field} value={values[field.key]} enabled={enabled(field.key)} locked={busy} onchange={value => update(field.key, value)} ontoggle={on => toggle(field.key, on)} onfile={file => upload(field.key, file)} suggest={field.dynamic && listValues ? (prefix: string) => listValues(field.key, prefix, Object.fromEntries(Object.entries(values).filter(([key]) => key !== field.key && !Object.hasOwn(files, key)))) : undefined}/>{/each}</fieldset>
     {/each}
   {/if}
   {#if schema.stdin}

@@ -2,6 +2,10 @@ import type { Schema, JsonSchema } from 'clyops-schema';
 
 export interface ToolSummary { name: string; words: string[]; path: string; description: string; }
 export interface ToolDescription { schema: Schema; input: JsonSchema; }
+/** What to list for `POST /values/...`: an input key, the other inputs, and the page wanted. */
+export interface ValuesRequest { name: string; input?: Record<string, unknown>; prefix?: string; limit?: number; offset?: number; }
+/** A page of values; `more` when the limit left some out. */
+export interface ValuesPage { values: string[]; more: boolean; }
 export interface RunResult {
   ok: boolean; exitCode: number | null; stdout: string; stderr: string;
   timedOut: boolean; signal: string | null; durationMs: number;
@@ -29,7 +33,7 @@ export class ApiClient {
   constructor(base: string, private key = '') { this.base = apiBase(base); }
   private url(path: string): string {
     const [pathname, query, extra] = path.split('?');
-    if (!/^\/(tools(?:\/|$)|jobs(?:\/|$)|openapi\.json$)/.test(pathname) || pathname.includes('#') || extra !== undefined || (query !== undefined && query !== 'async=true') || pathname.split('/').some(part => ['.', '..'].includes(decodeURIComponent(part)))) throw new Error('Invalid API endpoint.');
+    if (!/^\/(tools(?:\/|$)|values\/|jobs(?:\/|$)|openapi\.json$)/.test(pathname) || pathname.includes('#') || extra !== undefined || (query !== undefined && query !== 'async=true') || pathname.split('/').some(part => ['.', '..'].includes(decodeURIComponent(part)))) throw new Error('Invalid API endpoint.');
     const url = new URL(this.base + path);
     if (url.origin !== new URL(this.base).origin || !url.pathname.startsWith(new URL(this.base).pathname.replace(/\/$/, '') + '/')) throw new Error('Endpoint must stay within the configured API.');
     return url.href;
@@ -65,6 +69,10 @@ export class ApiClient {
       body = form;
     } else { body = JSON.stringify(input); headers['Content-Type'] = 'application/json'; }
     return this.json(path + (async ? '?async=true' : ''), { method: 'POST', headers, body });
+  }
+  /** A page of a dynamic input's values (spec section 13): `path` is the tool's `/tools/...` path. */
+  values(path: string, request: ValuesRequest): Promise<ValuesPage> {
+    return this.json(path.replace(/^\/tools\//, '/values/'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request) });
   }
   async download(path: string): Promise<Blob> { return (await this.response(path, { headers: { Accept: 'application/octet-stream' } })).blob(); }
 }

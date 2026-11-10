@@ -48,6 +48,8 @@ export interface FormField {
   json: boolean;
   /** Original rule for explanations and server-only checks. */
   validation: string;
+  /** Whether the tool can list values for it on demand (spec section 9.3). */
+  dynamic: boolean;
   /** Converted JSON Schema of the submitted field. */
   schema: ValueSpec;
 }
@@ -65,7 +67,7 @@ export function formFields(schema: Schema, naming: 'input' | 'declared' = 'input
       positional: item.positional, required: item.required, many: item.many, secret: item.secret,
       path: item.valueType === 'path' || /^(path|file:|dir:)/.test(item.validation),
       json: item.validation === 'json' || item.validation.startsWith('json:'),
-      validation: item.validation, schema: properties[key],
+      validation: item.validation, dynamic: item.dynamic === true, schema: properties[key],
     };
   });
 }

@@ -34,7 +34,15 @@ cli.argVariadic(NAME, description, rule);
 ```
 
 Metadata: `setDescription`, `setEpilog`, `setConfig(option, prefixes)`,
-`setPathSearch(long, dirs)`, `requireCommand(cmd, description, hint)`,
+`setPathSearch(long, dirs)`,
+`complete(name, req -> List.of(...))` (completion values, §9.2; a
+`Completer` gets a `CompleteRequest(words, prefix, limit, offset)` and may throw, which keeps the
+rule's completion; the library filters by prefix and pages),
+`complete(name, true, fn)` (paged: `fn` applies prefix, offset and `limit` (one more than wanted)
+itself, e.g. in SQL), `completeValues(name, prefix, limit, offset, words)` (§9.3: a
+`ValuesPage(values, more)`; throws `No completer for 'NAME'` or `Completer for 'NAME' failed`;
+`--complete-values NAME PREFIX LIMIT OFFSET -- WORDS...` prints it as JSON),
+`requireCommand(cmd, description, hint)`,
 `setEffects(effects...)`, `setStdin(description, contentType)`,
 `setStdout(description, contentType)`, `exclusive(longs...)`,
 `requires(longs...)`, `oneOf(longs...)`, `command(name, description)`.

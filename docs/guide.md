@@ -217,6 +217,29 @@ the library. The schema format discriminator is `clyops: 1`. Completion follows
 commands and their inherited options. `valuesJson` is a separate resolved-values
 document, with secrets masked.
 
+### Completion values from your program
+
+`complete(name, fn)` (Bash: `clyops_complete NAME FUNCTION`) lists an option's or
+argument's values when they are asked for, for values only the program can find
+at that moment: instances registered in a directory, branches, running
+containers, the distinct values of a database column. Shells offer them on Tab,
+and the HTTP API, MCP server and web runner ([applications](applications.md)) list them on
+demand, through `prog --complete-values NAME PREFIX LIMIT OFFSET -- WORDS...`, which
+prints `{"values": [...], "more": false}`.
+
+The function gets a request: the words typed so far (after any command words),
+the prefix being typed, a limit and an offset. By default it may return every
+value, and the library keeps those starting with the prefix and pages them.
+Registered as *paged*, it applies the prefix, offset and limit itself, so a
+database query fetches only one page. Shells ask for at most 1000 values, and
+drop values containing commas or whitespace, which on-demand lists keep.
+
+It runs only for completion, never for a normal run, help or the schema, so keep
+it quick and read-only. If it fails, the shell completes as the rule would. It
+doesn't validate: the option's rule still decides what is accepted, so check the
+value after `run` if only listed values are allowed. The schema marks such
+inputs `"dynamic": true`. Registering a name again replaces its completer.
+
 ## Logging and helper functions
 
 `info`, `warn`, `error` and `success` write timestamped messages to stderr. `die`

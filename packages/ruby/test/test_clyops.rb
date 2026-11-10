@@ -203,4 +203,89 @@ class ClyopsTest < Minitest::Test
     assert_includes cli.usage, "\nOutput [plan]: Migration plan\n"
     refute_includes cli.usage, "[progress]"
   end
+
+  def test_complete_registration_errors
+    cli = make
+    err = assert_raises(Clyops::DefinitionError) { cli.complete("nope") { [] } }
+    assert_equal "Unknown option or argument 'nope' for complete", err.message
+    err = assert_raises(Clyops::DefinitionError) { cli.complete("fast", ->(_request) { [] }) }
+    assert_equal "Flag --fast takes no value to complete", err.message
+    assert_same cli, cli.complete("file") { [] }.complete("tag", ->(_request) { [] })
+  end
+
+  def test_complete_values_sanitized_with_fallback
+    calls = []
+    cli = make
+    cli.complete("count") do |request|
+      calls << request
+      ["a", "", "b c", "d,e", "f\tg", "a", "h"]
+    end
+    cli.complete("tag") { [] }
+    cli.complete("file") { raise "no" }
+    assert_equal "ok", cli.parse(["x", "-n", "4"]).status
+    schema = JSON.parse(cli.json_schema)
+    assert_empty calls
+    assert_equal [true, false, true, false], schema["options"].map { |o| o["dynamic"] }
+    assert_same true, schema["arguments"][0]["dynamic"]
+    data = cli.completion_data(%w[x y])
+    assert_includes data, "opt\t--count\t-n\tvalue\tchoice\ta,h\tCount\n"
+    assert_includes data, "opt\t--tag\t-t\tvalue\tchoice\t-\tTags\n"
+    assert_includes data, "arg\tfile\tsingle\tfile\t-\tFile\n"
+    assert_equal [Clyops::CompleteRequest.new(words: %w[x y], prefix: "", limit: 0, offset: 0)], calls
+  end
+
+  def test_complete_gets_words_after_commands
+    cli = Clyops::Cli.new(name: "m", env: {})
+    cli.opt "HOST", "host", "", "optional", "Host"
+    cli.complete("host") { |request| ["top"] + request.words }
+    migrate = cli.command("db", "Database").command("migrate", "Migrate")
+    migrate.arg "name", "Name", "all"
+    migrate.complete("name") { |request| request.words.map { |w| "w:#{w}" } }
+    data = cli.completion_data(%w[db migrate --host x])
+    assert_includes data, "skip\t2\n"
+    assert_includes data, "opt\t--host\t-\tvalue\tchoice\ttop,--host,x\tHost\n"
+    assert_includes data, "arg\tname\tsingle\tchoice\tw:--host,w:x\tName\n"
+  end
+
+  def page(values, more) = Clyops::ValuesPage.new(values: values, more: more)
+
+  def test_complete_values_pages_unless_paged
+    all = ["alpha", "beta", "albert", "has space", "a,b", "alpha", ""]
+    cli = make.complete("count") { all }
+    assert_equal page(["alpha", "beta", "albert", "has space", "a,b"], false), cli.complete_values("count", "", 10, 0)
+    assert_equal page(["alpha"], true), cli.complete_values("count", "al", 1, 0)
+    assert_equal page(["albert"], false), cli.complete_values("count", "al", 1, 1)
+    seen = []
+    paged = make.complete("count", paged: true) do |request|
+      seen << request
+      %w[x y z].take(request.limit)
+    end
+    assert_equal page(%w[x y], true), paged.complete_values("count", "q", 2, 40, ["-f"])
+    assert_equal [Clyops::CompleteRequest.new(words: ["-f"], prefix: "q", limit: 3, offset: 40)], seen
+    # Registering again replaces the completer and its mode.
+    paged.complete("count") { ["only"] }
+    assert_equal page(["only"], false), paged.complete_values("count", "", 5, 0)
+    assert_equal '{"values":["only"],"more":false}', paged.complete_values("count", "", 5, 0).to_json
+    err = assert_raises(ArgumentError) { make.complete_values("count", "", 5, 0) }
+    assert_equal "No completer for 'count'", err.message
+    err = assert_raises(ArgumentError) { make.complete("count") { raise "x" }.complete_values("count", "", 5, 0) }
+    assert_equal "Completer for 'count' failed", err.message
+    # Shell completion keeps at most 1000 values.
+    many = make.complete("count") { (0...1500).map { |i| "v#{i}" } }
+    line = many.completion_data.split("\n").find { |l| l.start_with?("opt\t--count") }
+    assert_equal 1000, line.split("\t")[5].split(",").length
+  end
+
+  def test_complete_values_follows_commands
+    cli = Clyops::Cli.new(name: "t", env: {})
+    db = cli.command("db", "Database")
+    db.opt("URL", "url", "", "optional", "URL").complete("url") { ["pg:main"] }
+    db.command("migrate", "Migrate").arg("target", "Target").complete("target", &:words)
+    assert_equal page(["pg:main"], false), cli.complete_values("url", "", 5, 0, %w[db migrate])
+    assert_equal page(%w[-n x], false), cli.complete_values("target", "", 5, 0, %w[db migrate -n x])
+    err = assert_raises(ArgumentError) { cli.complete_values("target", "", 5, 0, ["db"]) }
+    assert_equal "No completer for 'target'", err.message
+    err = assert_raises(ArgumentError) { cli.complete_values("url", "", 5, 0, []) }
+    assert_equal "No completer for 'url'", err.message
+  end
 end

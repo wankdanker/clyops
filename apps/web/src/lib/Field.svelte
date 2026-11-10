@@ -1,8 +1,10 @@
 <script lang="ts">
   import type { FormField } from 'clyops-schema';
-  import { controlValue, controlAttributes, jsonSample, jsonSchemaView } from './form';
-  let { field, value, enabled, onchange, ontoggle, onfile, locked = false }: {
+  import { controlValue, controlAttributes, jsonSample, jsonSchemaView, valueSuggester, VALUES_SHOWN } from './form';
+  let { field, value, enabled, onchange, ontoggle, onfile, locked = false, suggest }: {
     field: FormField; value: unknown; enabled: boolean; locked?: boolean;
+    /** Lists this dynamic input's values matching what is typed (spec section 13). */
+    suggest?: (prefix: string) => Promise<{ values: string[]; more: boolean }>;
     onchange: (value: unknown) => void; ontoggle: (enabled: boolean) => void;
     onfile: (file: File | undefined) => void;
   } = $props();
@@ -12,6 +14,11 @@
   const identifier = $derived('field-' + field.key);
   const expected = $derived(jsonSchemaView(field));
   const sample = $derived(jsonSample(field));
+  // A dynamic input suggests the tool's values for what is typed, in a datalist.
+  let suggestions = $state<string[]>([]);
+  let moreSuggestions = $state(false);
+  const listId = $derived(suggest ? identifier + '-values' : undefined);
+  const lookup = $derived(suggest ? valueSuggester(suggest, (values, more) => { suggestions = values; moreSuggestions = more; }) : undefined);
   function changeItem(index: number, text: string) { onchange(items.map((item, i) => i === index ? (field.json ? text : controlValue(text, scalar)) : item)); }
 </script>
 
@@ -30,7 +37,7 @@
           {:else if scalar.type === 'boolean'}
             <select id={index === 0 ? identifier : identifier + '-' + index} aria-label={field.name + ' item ' + (index + 1)} disabled={!enabled || locked} value={String(item)} onchange={event => changeItem(index, event.currentTarget.value)}><option value="true">true</option><option value="false">false</option></select>
           {:else}
-            <input id={index === 0 ? identifier : identifier + '-' + index} aria-label={field.name + ' item ' + (index + 1)} {...attributes} disabled={!enabled || locked} value={String(item)} oninput={event => changeItem(index, event.currentTarget.value)} autocomplete={field.secret ? 'off' : undefined}>
+            <input id={index === 0 ? identifier : identifier + '-' + index} aria-label={field.name + ' item ' + (index + 1)} {...attributes} disabled={!enabled || locked} value={String(item)} list={listId} onfocus={event => lookup?.(event.currentTarget.value, true)} oninput={event => { changeItem(index, event.currentTarget.value); lookup?.(event.currentTarget.value); }} autocomplete={field.secret ? 'off' : undefined}>
           {/if}
           <button type="button" class="quiet danger" disabled={!enabled || locked} aria-label={'Remove ' + field.name + ' item ' + (index + 1)} onclick={() => onchange(items.filter((_, i) => i !== index))}>×</button>
         </div>
@@ -44,8 +51,9 @@
   {:else if scalar.type === 'boolean'}
     <select id={identifier} disabled={locked} value={!enabled ? 'inherit' : String(value)} onchange={event => { if (event.currentTarget.value === 'inherit') ontoggle(false); else { ontoggle(true); onchange(event.currentTarget.value === 'true'); } }}><option value="inherit">Inherit from tool</option><option value="true">On / true</option><option value="false">Off / false</option></select>
   {:else}
-    <input id={identifier} {...attributes} disabled={!enabled || locked} value={enabled ? String(value ?? '') : ''} placeholder={field.secret ? 'Not saved in templates' : field.schema.default !== undefined ? 'Declared default: ' + String(field.schema.default) : 'Inherit from tool'} oninput={event => onchange(controlValue(event.currentTarget.value, scalar))} autocomplete={field.secret ? 'off' : undefined}>
+    <input id={identifier} {...attributes} disabled={!enabled || locked} value={enabled ? String(value ?? '') : ''} placeholder={field.secret ? 'Not saved in templates' : field.schema.default !== undefined ? 'Declared default: ' + String(field.schema.default) : 'Inherit from tool'} list={listId} onfocus={event => lookup?.(event.currentTarget.value, true)} oninput={event => { onchange(controlValue(event.currentTarget.value, scalar)); lookup?.(event.currentTarget.value); }} autocomplete={field.secret ? 'off' : undefined}>
   {/if}
+  {#if listId}<datalist id={listId}>{#each suggestions as suggestion}<option value={suggestion}></option>{/each}</datalist>{#if moreSuggestions}<p class="field-hint">Showing the first {VALUES_SHOWN} values; keep typing to narrow them.</p>{/if}{/if}
   {#if scalar.minimum !== undefined || scalar.maximum !== undefined}<p class="field-hint">{scalar.type === 'integer' ? 'Integer' : 'Number'} · {scalar.minimum ?? 'unbounded'} to {scalar.maximum ?? 'unbounded'}</p>{/if}
   {#if scalar.minLength !== undefined || scalar.maxLength !== undefined}<p class="field-hint">Length: {scalar.minLength ?? 0} to {scalar.maxLength ?? 'unbounded'} characters</p>{/if}
   {#if field.json}<p class="field-hint">JSON{expected ? ', checked against its schema as you type' : ''}.</p>{#if expected}<details class="json-schema"><summary>Expected JSON</summary><pre>{expected}</pre></details>{/if}{/if}

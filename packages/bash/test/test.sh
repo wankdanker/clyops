@@ -138,5 +138,58 @@ check "roles: commands inherit, help lists their own" "2||2|Output [plan]: Migra
     clyops_run "$@"; clyops_fd_open plan
     clyops_usage | grep "\[plan\]"; clyops_usage | grep -c "\[progress\]" || true' db migrate; } | paste -sd'|' -)"
 
+check "complete: dynamic values, sanitized, from the words typed" "opt	--count	-	value	choice	a,b,w:-x	Count|arg	FILE	single	file	-	File" "$(run '
+    list() { printf "%s\n" a "b c" "" "x,y" a b; for w in "$@"; do echo "w:$w"; done; }
+    broken() { echo partial; return 3; }
+    clyops_arg FILE "File" "" path
+    clyops_opt COUNT count "" 1 "Count" Options int
+    clyops_complete count list
+    clyops_complete FILE broken
+    clyops_completion_data -x | grep -E "^(opt	--count|arg)"' | paste -sd'|' -)"
+
+check "complete: commands pass the words after them, schema marks dynamic" "arg	target	single	choice	w:-n	Target|true|false|false" "$({ run '
+    t() { for w in "$@"; do echo "w:$w"; done; }
+    clyops_command db "Database"
+    clyops_arg target "Target"
+    clyops_opt NAME name "" optional "Name"
+    clyops_complete target t
+    clyops_run "$@"' --bash-completion -- db -n | grep ^arg
+    run 'clyops_arg target "Target"; clyops_opt NAME name "" optional "Name"; clyops_complete target t; clyops_run --help-json-schema' | grep '"dynamic"' | sed 's/.*: //'; } | paste -sd'|' -)"
+
+check "complete: the completer doesn't run when parsing" "x" "$(run '
+    t() { echo RAN >&2; }
+    clyops_opt NAME name "" optional "Name"
+    clyops_complete name t
+    clyops_run --name x; echo "$NAME"')"
+
+check "complete: unknown names and flags are programming errors" "Unknown option or argument 'nope' for complete|Flag --fast takes no value to complete" "$({
+    run 'clyops_complete nope f' | sed 's/.*\] //'
+    run 'clyops_opt FAST fast f flag F; clyops_complete fast f' | sed 's/.*\] //'; } | paste -sd'|' -)"
+
+check "complete: --complete-values pages for the completer, keeping spaces" '{"values":["alpha","a b"],"more":true}|{"values":["albert"],"more":false}' "$({ run '
+    list() { printf "%s\n" alpha beta "a b" albert alpha; }
+    clyops_opt NAME name "" optional "Name"
+    clyops_complete name list
+    clyops_run --complete-values name a 2 0'
+    run 'list() { printf "%s\n" alpha beta "a b" albert; }; clyops_opt NAME name "" optional "Name"; clyops_complete name list; clyops_run --complete-values name al 5 1'; } | paste -sd'|' -)"
+
+check "complete: a paged completer gets the request" '{"values":["x:q:3:4:-n"],"more":false}' "$(run '
+    list() { echo "x:$CLYOPS_COMPLETE_PREFIX:$CLYOPS_COMPLETE_LIMIT:$CLYOPS_COMPLETE_OFFSET:$*"; }
+    clyops_opt NAME name "" optional "Name"
+    clyops_complete name list paged
+    clyops_run --complete-values name q 2 4 -- -n')"
+
+check "complete: registering again replaces the completer" '{"values":["two"],"more":false}' "$(run '
+    a() { echo one; }; b() { echo two; }
+    clyops_opt NAME name "" optional "Name"
+    clyops_complete name a paged
+    clyops_complete name b
+    clyops_run --complete-values name "" 5 0')"
+
+check "complete: --complete-values errors" "No completer for 'nope'|Completer for 'name' failed|LIMIT and OFFSET must be integers (LIMIT >= 1)" "$({
+    run 'clyops_opt NAME name "" optional "Name"; clyops_run --complete-values nope "" 5 0' | sed 's/.*\] //'
+    run 'f() { return 1; }; clyops_opt NAME name "" optional "Name"; clyops_complete name f; clyops_run --complete-values name "" 5 0' | sed 's/.*\] //'
+    run 'clyops_opt NAME name "" optional "Name"; clyops_run --complete-values name "" 0 0' | sed 's/.*\] //'; } | paste -sd'|' -)"
+
 if (( failures )); then echo "$failures failed"; exit 1; fi
 echo "all passed"

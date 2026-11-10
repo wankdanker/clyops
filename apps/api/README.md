@@ -109,7 +109,8 @@ after the first byte for it to arrive.
 
 Open `/ui/` for the packaged static SvelteKit runner. It builds typed forms from
 these same schemas and supports templates, stdin/uploads, jobs, cancellation and
-output downloads. The static shell is public so it can ask for an API key; tool
+output downloads. Inputs whose values a tool lists on demand suggest them as you
+type (`POST /values/...`). The static shell is public so it can ask for an API key; tool
 and job endpoints retain their existing authentication and scopes. `--no-ui`
 disables it; library callers can pass `ui: false` to `createApi`.
 See the [web runner guide](https://clyops.io/web-runner.html).
@@ -128,10 +129,29 @@ successfully listening.
 | `GET /tools` | The tools: name, words, path, description |
 | `GET /tools/<words>` | A tool's clyops schema and the JSON Schema of its input |
 | `POST /tools/<words>[?async=true]` | Run it |
+| `POST /values/<words>` | List a dynamic input's values: `{"name", "input", "prefix", "limit", "offset"}` → `{"values": [...], "more": false}` (below) |
 | `GET /jobs`, `GET /jobs/<id>`, `DELETE /jobs/<id>` | Async jobs |
 | `GET /jobs/<id>/events` | A job's changes and progress, as server-sent events |
 | `GET /jobs/<id>/stdout` | A finished job's binary output |
 | `POST /mcp` | The same tools over MCP (streamable HTTP, stateless) for agents; see [clyops-mcp](../mcp). `--no-mcp` turns it off. |
+
+### Listing values
+
+An input marked `"dynamic": true` in a tool's schema has values the tool lists on
+demand (spec sections 9.2 and 13), such as existing records. `POST /values/<words>`
+runs the tool with `--complete-values` and answers a page:
+
+```sh
+curl -s localhost:8080/values/db/query -H 'content-type: application/json' \
+  -d '{"name": "customer", "prefix": "ac", "limit": 20, "input": {"region": "eu"}}'
+# {"values":["acme","acorn"],"more":false}
+```
+
+`input` holds the other inputs given so far, which the tool may narrow its values by.
+`limit` defaults to 100 (at most 1000); ask again with a larger `offset` while `more`
+is true. The endpoint exists only for tools with a dynamic input; a key that may not
+run the tool gets 403, an input that isn't dynamic (or is closed) 400, and a tool
+that fails or times out (10 seconds) 502.
 
 ## Options
 

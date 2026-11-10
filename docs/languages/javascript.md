@@ -74,6 +74,34 @@ const args = cli.run();                                      // args.command: ['
 each has its own help (`mytool db migrate --help`), schema and completion. See the
 [spec](../../spec/SPEC.md) sections 1.3 to 1.7.
 
+## Completion values from your program
+
+`complete(name, fn)` lists an option's or argument's values for values only the
+program can find, such as the instances registered in a directory. Shells offer
+them on Tab, and the API, MCP server and web runner list them on demand
+(`--complete-values`). The function gets a request, `{ words, prefix, limit, offset }`,
+where `words` are the words typed after the command words:
+
+```js
+const fs = require('node:fs');
+cli.opt('INSTANCE', 'instance', 'i', '', 'Instance to target');
+cli.complete('instance', () => fs.readdirSync('/var/lib/myapp/instances').filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)));
+```
+
+By default the function may return everything: the library keeps the values that
+start with `prefix` and pages them. For thousands of values, register it
+`{ paged: true }` and apply the prefix, offset and limit yourself:
+
+```js
+cli.complete('customer', ({ prefix, limit, offset }) => db.prepare('SELECT DISTINCT name FROM customers WHERE name LIKE ? ORDER BY name LIMIT ? OFFSET ?').all(prefix + '%', limit || -1, offset).map((r) => r.name), { paged: true });
+```
+
+The function runs only when values are asked for, on every Tab, so keep it quick
+and read-only. Throwing keeps the rule's shell completion. It doesn't validate:
+check the value after `run` if only listed values are allowed.
+`cli.completeValues(name, prefix, limit, offset, words)` returns a page,
+`{ values, more }`. See the [spec](../../spec/SPEC.md) sections 9.2 and 9.3.
+
 ## Parsing and errors
 
 Use `run` for a standalone program: it displays help/schema/completion and exits for those requests, or exits with status 1 on invalid input. Use the non-exiting `parse` variant in libraries and tests; check its outcome before reading resolved values. Registration errors (duplicate names, unknown rules, or commands mixed with positionals) are programming errors, distinct from invalid user input. See the native reference for the language's result and error types.

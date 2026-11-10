@@ -290,6 +290,77 @@ export function startTool(tool: Tool, input: Input, opts: ToolRunOptions = {}): 
   return { ...started, command, result: started.result.then((r) => ({ ...r, command })) };
 }
 
+/** How long `completeValues` lets a tool answer (spec section 13), unless told otherwise. */
+export const VALUES_TIMEOUT_MS = 10_000;
+
+/** Options for `completeValues`: what to list, and how to run the tool as for `runTool`. */
+export interface CompleteValuesOptions extends Pick<ToolRunOptions, 'cwd' | 'env' | 'timeoutMs' | 'signal' | 'within' | 'positionalsOrder' | 'secretsInEnv' | 'closed'> {
+  /** The text being completed (default: empty). */
+  prefix?: string;
+  /** The most values to return, at least 1 (default: 100). */
+  limit?: number;
+  /** How many matching values to skip (default: 0). */
+  offset?: number;
+}
+
+/** A page of an input's values (spec section 9.3). */
+export interface ValuesPage {
+  /** The values, at most the limit asked for. */
+  values: string[];
+  /** Whether values beyond the limit were left out. */
+  more: boolean;
+}
+
+/** A tool that couldn't list values: it failed, timed out or answered something else (HTTP status 502). */
+export class ValuesError extends Error {
+  /** HTTP status used by adapters to report a failing tool. */
+  status = 502;
+}
+
+/**
+ * List the values of a dynamic input (spec sections 9.3 and 13): `key` is its
+ * input key, `input` the other inputs given so far. Inputs that can't be
+ * placed on a command line yet (an argument after a missing one) and closed
+ * inputs are left out. Throws an InputError when the input isn't dynamic, is
+ * closed or the limit is out of range, and a ValuesError when the tool fails.
+ */
+export async function completeValues(tool: Tool, key: string, input: Input = {}, opts: CompleteValuesOptions = {}): Promise<ValuesPage> {
+  const { schema } = tool;
+  const item = [...schema.options.filter((o) => o.name !== 'help'), ...schema.arguments].find((i) => inputKeys(i).includes(key));
+  if (!item || !item.dynamic) throw new InputError(`${key} has no values to list`);
+  if (opts.closed?.includes(item.name)) throw new InputError(`${key}: set by the server, not by callers`);
+  const limit = opts.limit ?? 100;
+  const offset = opts.offset ?? 0;
+  if (!Number.isInteger(limit) || limit < 1) throw new InputError('limit must be an integer of at least 1');
+  if (!Number.isInteger(offset) || offset < 0) throw new InputError('offset must be a non-negative integer');
+  const own = new Set(inputKeys(item));
+  const others = Object.fromEntries(Object.entries(input).filter(([k]) => !own.has(k)));
+  const argvOptions = { within: opts.within, cwd: opts.cwd, secretEnv: opts.secretsInEnv !== false, positionals: opts.positionalsOrder, controlled: opts.closed };
+  let built;
+  try {
+    built = toArgv(schema, others, argvOptions);
+  } catch (err) {
+    if (err instanceof InputError) throw err;
+    // An argument given after a missing one: list without the arguments.
+    const argKeys = new Set(schema.arguments.flatMap((a) => inputKeys(a)));
+    built = toArgv(schema, Object.fromEntries(Object.entries(others).filter(([k]) => !argKeys.has(k))), argvOptions);
+  }
+  const words = [...(tool.subcommand ?? []), ...built.argv];
+  const env = Object.keys(built.env).length ? { ...(opts.env ?? process.env), ...built.env } : opts.env;
+  const result = await start(tool.file, ['--complete-values', item.name, opts.prefix ?? '', String(limit), String(offset), '--', ...words], {
+    cwd: opts.cwd, env, signal: opts.signal, timeoutMs: opts.timeoutMs ?? VALUES_TIMEOUT_MS,
+  }).result;
+  const said = result.stderr.trim().split('\n').pop()?.replace(/^\S+ \S+ \[[^\]]*\] /, '') ?? '';
+  if (result.timedOut) throw new ValuesError(`${tool.words.join(' ')} took too long to list values`);
+  if (result.exitCode !== 0) throw new ValuesError(said || `${tool.words.join(' ')} failed to list values`);
+  let page: unknown;
+  try { page = JSON.parse(result.stdout); } catch { page = undefined; }
+  const ok = (p: unknown): p is ValuesPage => typeof p === 'object' && p !== null && Array.isArray((p as ValuesPage).values) &&
+    (p as ValuesPage).values.every((v) => typeof v === 'string') && typeof (p as ValuesPage).more === 'boolean';
+  if (!ok(page)) throw new ValuesError(`${tool.words.join(' ')} answered --complete-values with something other than a page of values`);
+  return { values: page.values, more: page.more };
+}
+
 /**
  * The requested roles a tool declares in that direction (an input role needs `input`); the rest are
  * dropped, so a runner can ask every tool for `progress` and only wire it where it exists.

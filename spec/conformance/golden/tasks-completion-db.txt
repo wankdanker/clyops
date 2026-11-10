@@ -2,7 +2,7 @@
 skip	1
 cmd	migrate	Apply migrations
 cmd	status	Show migration status
-opt	--url	-u	value	default	-	Database URL
+opt	--url	-u	value	choice	sqlite:app.db,pg:main	Database URL
 opt	--verbose	-v	flag	none	-	Verbose output
 opt	--no-verbose	-	flag	none	-	Verbose output
 opt	--help	-h	flag	none	-	Show this help message and exit

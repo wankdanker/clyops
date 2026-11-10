@@ -21,6 +21,49 @@ export type Validation =
   | `int:${string}` | `float:${string}` | `string:${string}` | `choice:${string}` | `regex:${string}` | `json:${string}`
   | 'secret' | `secret:${string}`;
 
+/** What a completer is asked for (spec section 9.2). */
+export interface CompleteRequest {
+  /** The words typed after the program's command words. */
+  words: string[];
+  /** The text being completed; empty for shell completion. */
+  prefix: string;
+  /** The most values wanted; 0 means no limit. */
+  limit: number;
+  /** How many matching values to skip. */
+  offset: number;
+}
+
+/**
+ * Lists the values of an option or argument (spec section 9.2). Throwing
+ * keeps the rule's shell completion and makes `--complete-values` fail.
+ */
+export type Completer = (request: CompleteRequest) => string[];
+
+/** How a completer is registered (spec section 9.2). */
+export interface CompleteOptions {
+  /** The completer applies the request's prefix, offset and limit itself; otherwise the library does. */
+  paged?: boolean;
+}
+
+/** A page of values (spec section 9.3). */
+export interface ValuesPage {
+  /** The values, at most the limit asked for. */
+  values: string[];
+  /** Whether values beyond the limit were left out. */
+  more: boolean;
+}
+
+interface CompleterDef {
+  fn: Completer;
+  paged: boolean;
+}
+
+/** The largest LIMIT and OFFSET `--complete-values` takes (spec section 9.3). */
+const MAX_VALUES_SLOT = 1_000_000_000;
+
+/** The completion records' request limit (spec section 9.2). */
+const SHELL_COMPLETION_LIMIT = 1000;
+
 /** What running a program does (spec section 1.3). */
 export type Effect = 'read-only' | 'idempotent' | 'destructive' | 'network';
 const EFFECTS = ['read-only', 'idempotent', 'destructive', 'network'];
@@ -96,6 +139,7 @@ interface OptionDef {
   validation: string;
   searchDirs: string[];
   secret: boolean;
+  completer?: CompleterDef;
 }
 
 interface ArgDef {
@@ -104,6 +148,7 @@ interface ArgDef {
   defaultValue: string;
   validation: string;
   variadic: boolean;
+  completer?: CompleterDef;
 }
 
 interface RequiredCommand {
@@ -513,6 +558,31 @@ function completionKind(rule: string, searchDirs: string[]): [string, string] {
   return ['default', ''];
 }
 
+/**
+ * Ask a completer for a page of values (spec section 9.2): the library pages
+ * unless the completer was registered as paged. `shell` also drops values the
+ * completion scripts would split. Throws when the completer fails.
+ */
+function listValues(c: CompleterDef, words: string[], prefix: string, limit: number, offset: number, shell: boolean): ValuesPage {
+  const list: unknown = c.fn(c.paged ? { words: [...words], prefix, limit: limit + 1, offset } : { words: [...words], prefix, limit: 0, offset: 0 });
+  if (!Array.isArray(list)) throw new Error('A completer must return a list of strings');
+  const seen = new Set<string>();
+  for (const v of list) if (typeof v === 'string' && v !== '' && !(shell && /[, \t\r\n]/.test(v))) seen.add(v);
+  let values = [...seen];
+  if (!c.paged) values = values.filter((v) => v.startsWith(prefix)).slice(offset);
+  return { values: values.slice(0, limit), more: values.length > limit };
+}
+
+/** The kind and values of a completion record, asking the completer first (spec section 9.2). */
+function completionRecord(rule: string, searchDirs: string[], completer: CompleterDef | undefined, words: string[]): [string, string] {
+  if (completer) {
+    try {
+      return ['choice', listValues(completer, words, '', SHELL_COMPLETION_LIMIT, 0, true).values.join(',')];
+    } catch { /* keep the rule's completion */ }
+  }
+  return completionKind(rule, searchDirs);
+}
+
 function isBoolLike(opt: OptionDef): boolean {
   return opt.kind === 'flag' || ['bool', 'choice:true,false', 'choice:false,true'].includes(opt.validation);
 }
@@ -748,6 +818,58 @@ export class Cli {
   requireCommand(command: string, description: string, installHint = ''): this {
     this.commands.push({ command, description, installHint });
     return this;
+  }
+
+  /**
+   * List the values of the value option or argument `name` of this level
+   * (spec section 9.2), for shell completion and `--complete-values`. The
+   * function gets a request (the words typed after the commands, a prefix, a
+   * limit and an offset) and returns strings. The library keeps the values
+   * starting with the prefix and pages them, unless `paged` is set: then the
+   * function applies the prefix, offset and limit itself, as a database query
+   * can. It doesn't validate anything. Registering a name again replaces it.
+   */
+  complete(name: string, fn: Completer, options: CompleteOptions = {}): this {
+    const target = this.byLong.get(name) ?? this.args.find((a) => a.name === name);
+    if (!target) throw new Error(`Unknown option or argument '${name}' for complete`);
+    if ('kind' in target && target.kind === 'flag') throw new Error(`Flag --${name} takes no value to complete`);
+    target.completer = { fn, paged: options.paged === true };
+    return this;
+  }
+
+  /**
+   * A page of the values of `name` (spec section 9.3): an option of the chain
+   * selected by `words` (nearest first) or an argument of that command. Throws
+   * `No completer for 'NAME'` or `Completer for 'NAME' failed`.
+   */
+  completeValues(name: string, prefix: string, limit: number, offset: number, words: string[] = []): ValuesPage {
+    const selected = this.followWords(words);
+    let completer: CompleterDef | undefined;
+    if (selected) {
+      for (let n: Cli | undefined = selected.node; n && !completer; n = n.parent) completer = n.byLong.get(name)?.completer;
+      completer ??= selected.node.args.find((a) => a.name === name)?.completer;
+    }
+    if (!completer) throw new Error(`No completer for '${name}'`);
+    try {
+      return listValues(completer, words.slice(selected?.skip ?? 0), prefix, limit, offset, false);
+    } catch {
+      throw new Error(`Completer for '${name}' failed`);
+    }
+  }
+
+  /** The command `words` select and how many words name it, or undefined when they stop at a command group (spec section 9). */
+  private followWords(words: string[]): { node: Cli; skip: number } | undefined {
+    let node: Cli = this;
+    let skip = 0;
+    if (this.children.length === 0) return { node, skip };
+    for (const w of words) {
+      const child = node.children.find((c) => c.word === w);
+      if (!child) break;
+      node = child;
+      skip++;
+    }
+    if (node.children.length > 0 && skip < words.length && !words[skip].startsWith('-')) return undefined;
+    return { node, skip };
   }
 
   /** Fallback dirs (relative to root) for bare relative values of a path option. */
@@ -1124,6 +1246,24 @@ export class Cli {
     const end = argv.indexOf('--');
     const head = end >= 0 ? argv.slice(0, end) : argv;
     if (head.includes('--help-json-schema')) { this.ensureHelp(); process.stdout.write(this.jsonSchema() + '\n'); process.exit(0); }
+    const valuesAt = head.indexOf('--complete-values');
+    if (valuesAt >= 0) {
+      this.ensureHelp();
+      const [name, prefix, limitText, offsetText] = argv.slice(valuesAt + 1, valuesAt + 5);
+      const after = argv.indexOf('--', valuesAt + 5);
+      if (offsetText === undefined || !/^[0-9]+$/.test(limitText) || !/^[0-9]+$/.test(offsetText) || Number(limitText) < 1
+        || Number(limitText) > MAX_VALUES_SLOT || Number(offsetText) > MAX_VALUES_SLOT) {
+        die(1, 'LIMIT and OFFSET must be integers (LIMIT >= 1)');
+      }
+      let page: ValuesPage;
+      try {
+        page = this.completeValues(name, prefix, Number(limitText), Number(offsetText), after >= 0 ? argv.slice(after + 1) : []);
+      } catch (err) {
+        die(1, '%s', (err as Error).message);
+      }
+      process.stdout.write(JSON.stringify(page) + '\n');
+      process.exit(0);
+    }
     if (head.includes('--bash-completion')) {
       this.ensureHelp();
       process.stdout.write(this.completionData(end >= 0 ? argv.slice(end + 1) : []));
@@ -1303,14 +1443,14 @@ export class Cli {
       arguments: this.args.map((a) => ({
         name: a.name, description: a.description, required: !a.variadic && !a.defaultValue,
         isVariadic: a.variadic, default: a.defaultValue, validation: a.validation,
-        schema: ruleSchema(a.validation, this.root, a.name),
+        schema: ruleSchema(a.validation, this.root, a.name), dynamic: a.completer !== undefined,
       })),
       options: this.options.map((o) => ({
         name: o.long, shortName: o.short, variableName: o.varName, description: o.description,
         default: o.kind === 'flag' ? 'false' : o.defaultValue, group: o.group, type: type(o),
         isFlag: o.kind === 'flag', isArray: o.kind === 'array', required: o.required, validation: o.validation,
         choices: o.validation.startsWith('choice:') ? o.validation.slice(7).split(',') : [],
-        schema: ruleSchema(o.validation, this.root, `--${o.long}`), secret: o.secret,
+        schema: ruleSchema(o.validation, this.root, `--${o.long}`), secret: o.secret, dynamic: o.completer !== undefined,
       })),
       ...(this.parent ? {} : { config: this.configOption ? { option: this.configOption, prefixes: this.configPrefixes } : null }),
       requiredCommands: this.commands.map((c) => ({ command: c.command, description: c.description, installHint: c.installHint })),
@@ -1340,17 +1480,12 @@ export class Cli {
   completionData(words: string[] = []): string {
     const clean = (s: string) => s.replace(/[\t\n]/g, ' ');
     const lines = ['#clyops-completion 1'];
-    let node: Cli = this;
+    const selected = this.followWords(words);
+    if (!selected) return lines.join('\n') + '\n';
+    const { node, skip } = selected;
     if (this.children.length > 0) {
-      let skip = 0;
-      for (const w of words) {
-        const child = node.children.find((c) => c.word === w);
-        if (!child) break;
-        node = child;
-        skip++;
-      }
-      if (node.children.length > 0 && skip < words.length && !words[skip].startsWith('-')) return lines.join('\n') + '\n';
       lines.push(`skip\t${skip}`);
+      words = words.slice(skip);
       for (const c of node.children) lines.push(`cmd\t${c.word}\t${clean(c.description)}`);
     }
     const options: OptionDef[] = [];
@@ -1361,12 +1496,12 @@ export class Cli {
         lines.push(`opt\t--${o.long}\t${o.short ? '-' + o.short : '-'}\tflag\tnone\t-\t${clean(o.description)}`, noLine);
         continue;
       }
-      const [kind, values] = completionKind(o.validation, o.searchDirs);
+      const [kind, values] = completionRecord(o.validation, o.searchDirs, o.completer, words);
       lines.push(`opt\t--${o.long}\t${o.short ? '-' + o.short : '-'}\tvalue\t${kind}\t${values || '-'}\t${clean(o.description)}`);
       if (isBoolLike(o)) lines.push(noLine);
     }
     for (const a of node.args) {
-      const [kind, values] = completionKind(a.validation, []);
+      const [kind, values] = completionRecord(a.validation, [], a.completer, words);
       lines.push(`arg\t${a.name}\t${a.variadic ? 'variadic' : 'single'}\t${kind}\t${values || '-'}\t${clean(a.description)}`);
     }
     return lines.join('\n') + '\n';

@@ -76,6 +76,67 @@ Commands share the program's options (accepted before or after the command words
 each has its own help (`mytool db migrate --help`), schema and completion. See the
 [spec](../../spec/SPEC.md) sections 1.3 to 1.7.
 
+## Completion values from your program
+
+`complete(name, fn)` lists the values of a value option, array option or
+positional argument of that level, for values only the program can find, such
+as the instances registered in a directory. They are offered when the user
+presses Tab, and tooling (the HTTP API, MCP server and web runner) reads them
+with `--complete-values`:
+
+```java
+cli.opt("INSTANCE", "instance", "i", "", "Instance to target");
+cli.complete("instance", req -> {
+    try (var files = Files.list(Path.of("/var/lib/myapp/instances"))) {
+        return files.map(f -> f.getFileName().toString()).filter(n -> n.endsWith(".json"))
+            .map(n -> n.substring(0, n.length() - 5)).toList();
+    }
+});
+```
+
+The function (`Completer`: `List<String> complete(CompleteRequest request)
+throws Exception`) gets a `CompleteRequest(words, prefix, limit, offset)`:
+`words` are the words typed after the command words, for completers that depend
+on another option, and `prefix` is the text being completed. It runs only for
+`--bash-completion` and `--complete-values`, so keep it quick (each Tab also
+starts a JVM) and don't print to stdout. Throwing, or returning `null`, keeps
+the rule's completion. The library drops empty values, `null`s and duplicates,
+keeps the values starting with `prefix`, then skips `offset` and keeps `limit`,
+so the function may return every value. It doesn't validate: check the value
+after `run` if only listed values are allowed. Completing an unknown name or a
+flag throws `IllegalArgumentException`; registering a name again replaces its
+completer.
+
+When the values come from a database, register with `complete(name, true, fn)`
+and apply the request yourself. The function is then asked for one more value
+than wanted (`limit` is never 0 here), so the library can tell whether more
+remain:
+
+```java
+cli.complete("customer", true, req -> {
+    try (var st = db.prepareStatement(
+            "SELECT name FROM customers WHERE name LIKE ? ESCAPE '\\' ORDER BY name LIMIT ? OFFSET ?")) {
+        st.setString(1, req.prefix().replace("%", "\\%").replace("_", "\\_") + "%");
+        st.setInt(2, req.limit());
+        st.setInt(3, req.offset());
+        var names = new ArrayList<String>();
+        try (var rows = st.executeQuery()) {
+            while (rows.next()) names.add(rows.getString(1));
+        }
+        return names;
+    }
+});
+```
+
+`prog --complete-values NAME PREFIX LIMIT OFFSET -- WORDS...` prints one page
+as JSON, `{"values":[...],"more":false}`, and exits; values with spaces or
+commas are kept there, while shell completion drops them and asks for at most
+1000. In code, `completeValues(name, prefix, limit, offset, words)` returns a
+`ValuesPage(values, more)`, or throws `IllegalArgumentException`
+(`No completer for 'NAME'`) or `IllegalStateException`
+(`Completer for 'NAME' failed`). See the [spec](../../spec/SPEC.md) sections
+9.2 and 9.3.
+
 ## Parsing and errors
 
 Use `run` for a standalone program: it displays help/schema/completion and exits for those requests, or exits with status 1 on invalid input. Use the non-exiting `parse` variant in libraries and tests; check its outcome before reading resolved values. Registration errors (duplicate names, unknown rules, or commands mixed with positionals) are programming errors, distinct from invalid user input. See the native reference for the language's result and error types.

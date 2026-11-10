@@ -1,4 +1,4 @@
-use clyops::{describe_rule, resolve_path, validate, wrap_text, Cli, Parsed, Value};
+use clyops::{describe_rule, resolve_path, validate, wrap_text, Cli, CompleteRequest, Parsed, Value, ValuesPage};
 
 fn make() -> Cli {
     let mut cli = Cli::new();
@@ -244,4 +244,135 @@ fn role_scope_and_help() {
     let usage = cli.usage();
     assert!(usage.contains("\nOutput [plan]: Migration plan\n"), "{usage}");
     assert!(!usage.contains("[progress]"));
+}
+
+#[test]
+#[should_panic(expected = "Unknown option or argument 'nope' for complete")]
+fn complete_unknown_name_panics() {
+    make().complete("nope", |_| Ok(Vec::new()));
+}
+
+#[test]
+#[should_panic(expected = "Flag --fast takes no value to complete")]
+fn complete_flag_panics() {
+    make().complete("fast", |_| Ok(Vec::new()));
+}
+
+fn record<'a>(data: &'a str, prefix: &str) -> &'a str {
+    data.lines().find(|l| l.starts_with(prefix)).unwrap_or_else(|| panic!("no record {prefix} in {data}"))
+}
+
+#[test]
+fn completers_fill_completion_records() {
+    let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counter = calls.clone();
+    let mut cli = make();
+    cli.complete("count", move |request| {
+        counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        assert_eq!((request.prefix.as_str(), request.limit, request.offset), ("", 0, 0));
+        let mut list: Vec<String> = ["b", "", "a,b", "a b", "x\ty", "b", "c"].iter().map(|s| s.to_string()).collect();
+        list.extend(request.words.iter().map(|w| format!("w:{w}")));
+        Ok(list)
+    });
+    cli.complete("file", |_| Ok(Vec::new()));
+    cli.complete("tag", |_| Err("no tags".into()));
+    assert_eq!(cli.parse(&["x", "-n", "3"]), Parsed::Ok);
+    let _ = (cli.usage(), cli.json_schema());
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0, "only completion runs a completer");
+    let data = cli.completion_data_for(&["x", "y"]);
+    assert_eq!(record(&data, "opt\t--count"), "opt\t--count\t-n\tvalue\tchoice\tb,c,w:x,w:y\tCount");
+    assert_eq!(record(&data, "arg\tfile"), "arg\tfile\tsingle\tchoice\t-\tFile");
+    assert_eq!(record(&data, "opt\t--tag"), "opt\t--tag\t-t\tvalue\tdefault\t-\tTags");
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+
+#[test]
+fn panicking_completer_keeps_the_rule() {
+    let mut cli = make();
+    cli.complete("file", |_| panic!("boom"));
+    let data = cli.completion_data();
+    assert_eq!(record(&data, "arg\tfile"), "arg\tfile\tsingle\tfile\t-\tFile");
+}
+
+#[test]
+fn completers_get_the_words_after_the_commands() {
+    let mut cli = Cli::new();
+    cli.name("m").env(Vec::new());
+    cli.opt("CONFIG", "config", "c", "optional", "Config");
+    cli.complete("config", |request| Ok(vec![format!("top-{}", request.words.join("+"))]));
+    let migrate = cli.command("db", "Database").command("migrate", "Migrate");
+    migrate.arg("name", "Name", "all", "");
+    migrate.complete("name", |request| Ok(request.words.clone()));
+    let data = cli.completion_data_for(&["db", "migrate", "a", "b"]);
+    assert_eq!(record(&data, "skip"), "skip\t2");
+    assert_eq!(record(&data, "opt\t--config"), "opt\t--config\t-c\tvalue\tchoice\ttop-a+b\tConfig");
+    assert_eq!(record(&data, "arg\tname"), "arg\tname\tsingle\tchoice\ta,b\tName");
+}
+
+#[test]
+fn schema_marks_dynamic_values() {
+    let mut cli = make();
+    cli.complete("count", |_| Ok(Vec::new()));
+    let compact: String = cli.json_schema().split_whitespace().collect();
+    assert!(compact.contains(r#""name":"file","description":"File","required":true,"isVariadic":false,"default":"","validation":"path","schema":null,"dynamic":false"#), "{compact}");
+    assert!(compact.contains(r#""secret":false,"dynamic":true"#), "{compact}");
+    assert!(compact.contains(r#""name":"tag","#) && compact.matches(r#""dynamic":true"#).count() == 1, "{compact}");
+}
+
+fn page(values: &[&str], more: bool) -> ValuesPage {
+    ValuesPage { values: values.iter().map(|v| v.to_string()).collect(), more }
+}
+
+#[test]
+fn complete_values_pages_for_the_completer_unless_it_is_paged() {
+    let mut cli = make();
+    cli.complete("count", |_| {
+        Ok(["alpha", "beta", "albert", "has space", "a,b", "alpha", ""].iter().map(|v| v.to_string()).collect())
+    });
+    assert_eq!(cli.complete_values("count", "", 10, 0, &[]), Ok(page(&["alpha", "beta", "albert", "has space", "a,b"], false)));
+    assert_eq!(cli.complete_values("count", "al", 1, 0, &[]), Ok(page(&["alpha"], true)));
+    assert_eq!(cli.complete_values("count", "al", 1, 1, &[]), Ok(page(&["albert"], false)));
+
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let log = seen.clone();
+    let mut paged = make();
+    paged.complete_paged("count", move |request| {
+        log.lock().unwrap().push(request.clone());
+        Ok(["x", "y", "z"].iter().take(request.limit).map(|v| v.to_string()).collect())
+    });
+    assert_eq!(paged.complete_values("count", "q", 2, 40, &["-f"]), Ok(page(&["x", "y"], true)));
+    let want = CompleteRequest { words: vec!["-f".into()], prefix: "q".into(), limit: 3, offset: 40 };
+    assert_eq!(*seen.lock().unwrap(), vec![want]);
+    // Registering again replaces the completer and its mode.
+    paged.complete("count", |_| Ok(vec!["only".into()]));
+    assert_eq!(paged.complete_values("count", "", 5, 0, &[]), Ok(page(&["only"], false)));
+
+    assert_eq!(make().complete_values("count", "", 5, 0, &[]), Err("No completer for 'count'".to_string()));
+    let mut failing = make();
+    failing.complete("count", |_| Err("x".into()));
+    assert_eq!(failing.complete_values("count", "", 5, 0, &[]), Err("Completer for 'count' failed".to_string()));
+    failing.complete("count", |_| panic!("boom"));
+    assert_eq!(failing.complete_values("count", "", 5, 0, &[]), Err("Completer for 'count' failed".to_string()));
+
+    // Shell completion keeps at most 1000 values.
+    let mut many = make();
+    many.complete("count", |_| Ok((0..1500).map(|i| format!("v{i}")).collect()));
+    let data = many.completion_data();
+    assert_eq!(record(&data, "opt\t--count").split('\t').nth(5).unwrap().split(',').count(), 1000);
+}
+
+#[test]
+fn complete_values_follows_commands() {
+    let mut cli = Cli::new();
+    cli.name("t").env(Vec::new());
+    let db = cli.command("db", "Database");
+    db.opt("URL", "url", "", "optional", "URL");
+    db.complete("url", |_| Ok(vec!["pg:main".into()]));
+    let migrate = db.command("migrate", "Migrate");
+    migrate.arg("target", "Target", "", "");
+    migrate.complete("target", |request| Ok(request.words.clone()));
+    assert_eq!(cli.complete_values("url", "", 5, 0, &["db", "migrate"]), Ok(page(&["pg:main"], false)));
+    assert_eq!(cli.complete_values("target", "", 5, 0, &["db", "migrate", "-n", "x"]), Ok(page(&["-n", "x"], false)));
+    assert_eq!(cli.complete_values("target", "", 5, 0, &["db"]), Err("No completer for 'target'".to_string()));
+    assert_eq!(cli.complete_values("url", "", 5, 0, &[]), Err("No completer for 'url'".to_string()));
 }

@@ -193,4 +193,103 @@ class CliTest {
         unmapped.emit("progress", "nothing happens");
     }
 
+
+    @Test
+    void completeRegistrationErrors() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> make().complete("nope", w -> List.of()));
+        assertEquals("Unknown option or argument 'nope' for complete", e.getMessage());
+        e = assertThrows(IllegalArgumentException.class, () -> make().complete("fast", w -> List.of()));
+        assertEquals("Flag --fast takes no value to complete", e.getMessage());
+    }
+
+    @Test
+    void completersListValuesOnlyForCompletion() {
+        int[] calls = {0};
+        List<CompleteRequest> seen = new java.util.ArrayList<>();
+        Cli cli = make();
+        cli.complete("count", req -> {
+            calls[0]++;
+            seen.add(req);
+            List<String> out = new java.util.ArrayList<>(List.of("first"));
+            out.addAll(req.words());
+            out.addAll(java.util.Arrays.asList("", "a,b", "a b", "tab\there", "cr\rx", null, "first"));
+            return out;
+        });
+        cli.complete("tag", w -> {
+            calls[0]++;
+            throw new Exception("unavailable");
+        });
+        cli.complete("file", w -> {
+            calls[0]++;
+            return List.of();
+        });
+        assertEquals("ok", cli.parse("a.txt", "--count", "4").status());
+        cli.usage();
+        String schema = cli.jsonSchema();
+        assertEquals(0, calls[0]);
+        assertTrue(schema.contains("\"schema\": null,\n      \"dynamic\": true\n"), schema);
+        assertTrue(schema.contains("\"secret\": false,\n      \"dynamic\": true\n"), schema);
+        assertTrue(schema.contains("\"secret\": false,\n      \"dynamic\": false\n"), schema);
+        String data = cli.completionData(List.of("x", "-v"));
+        assertEquals(3, calls[0]);
+        assertTrue(data.contains("opt\t--count\t-n\tvalue\tchoice\tfirst,x,-v\t"), data);
+        assertEquals(List.of(new CompleteRequest(List.of("x", "-v"), "", 0, 0)), seen);
+        assertTrue(data.contains("opt\t--tag\t-t\tvalue\tdefault\t-\t"), data);
+        assertTrue(data.contains("arg\tfile\tsingle\tchoice\t-\tFile\n"), data);
+    }
+
+    @Test
+    void completersGetTheWordsAfterTheCommands() {
+        Cli cli = new Cli("m").opt("URL", "url", "", "optional", "URL");
+        cli.complete("url", req -> java.util.stream.Stream.concat(java.util.stream.Stream.of("top"), req.words().stream()).toList());
+        Cli db = cli.command("db", "Database").arg("name", "Name", "main");
+        db.complete("name", req -> java.util.stream.Stream.concat(java.util.stream.Stream.of("n"), req.words().stream()).toList());
+        String data = cli.completionData(List.of("db", "y"));
+        assertTrue(data.contains("skip\t1\n"), data);
+        assertTrue(data.contains("opt\t--url\t-\tvalue\tchoice\ttop,y\t"), data);
+        assertTrue(data.contains("arg\tname\tsingle\tchoice\tn,y\t"), data);
+    }
+
+    @Test
+    void completeValuesPagesForTheCompleterUnlessItIsPaged() {
+        List<String> all = java.util.Arrays.asList("alpha", "beta", "albert", "has space", "a,b", "alpha", "", null);
+        Cli cli = make().complete("count", req -> all);
+        assertEquals(new ValuesPage(List.of("alpha", "beta", "albert", "has space", "a,b"), false), cli.completeValues("count", "", 10, 0, List.of()));
+        assertEquals(new ValuesPage(List.of("alpha"), true), cli.completeValues("count", "al", 1, 0, List.of()));
+        assertEquals(new ValuesPage(List.of("albert"), false), cli.completeValues("count", "al", 1, 1, List.of()));
+        List<CompleteRequest> seen = new java.util.ArrayList<>();
+        Cli paged = make().complete("count", true, req -> {
+            seen.add(req);
+            return List.of("x", "y", "z").subList(0, Math.min(3, req.limit()));
+        });
+        assertEquals(new ValuesPage(List.of("x", "y"), true), paged.completeValues("count", "q", 2, 40, List.of("-f")));
+        assertEquals(List.of(new CompleteRequest(List.of("-f"), "q", 3, 40)), seen);
+        // Registering again replaces the completer and its mode.
+        paged.complete("count", req -> List.of("only"));
+        assertEquals(new ValuesPage(List.of("only"), false), paged.completeValues("count", "", 5, 0, List.of()));
+        RuntimeException e = assertThrows(IllegalArgumentException.class, () -> make().completeValues("count", "", 5, 0, List.of()));
+        assertEquals("No completer for 'count'", e.getMessage());
+        e = assertThrows(IllegalStateException.class, () -> make().complete("count", req -> {
+            throw new Exception("x");
+        }).completeValues("count", "", 5, 0, List.of()));
+        assertEquals("Completer for 'count' failed", e.getMessage());
+        // Shell completion keeps at most 1000 values.
+        Cli many = make().complete("count", req -> java.util.stream.IntStream.range(0, 1500).mapToObj(i -> "v" + i).toList());
+        String line = many.completionData().lines().filter(l -> l.startsWith("opt\t--count")).findFirst().orElseThrow();
+        assertEquals(1000, line.split("\t")[5].split(",").length);
+    }
+
+    @Test
+    void completeValuesFollowsCommands() {
+        Cli cli = new Cli("t").setEnv(Map.of());
+        Cli db = cli.command("db", "Database").opt("URL", "url", "", "optional", "URL");
+        db.complete("url", req -> List.of("pg:main"));
+        db.command("migrate", "Migrate").arg("target", "Target", "").complete("target", CompleteRequest::words);
+        assertEquals(new ValuesPage(List.of("pg:main"), false), cli.completeValues("url", "", 5, 0, List.of("db", "migrate")));
+        assertEquals(new ValuesPage(List.of("-n", "x"), false), cli.completeValues("target", "", 5, 0, List.of("db", "migrate", "-n", "x")));
+        RuntimeException e = assertThrows(IllegalArgumentException.class, () -> cli.completeValues("target", "", 5, 0, List.of("db")));
+        assertEquals("No completer for 'target'", e.getMessage());
+        e = assertThrows(IllegalArgumentException.class, () -> cli.completeValues("url", "", 5, 0, List.of()));
+        assertEquals("No completer for 'url'", e.getMessage());
+    }
 }

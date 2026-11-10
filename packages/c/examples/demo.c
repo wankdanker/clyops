@@ -1,8 +1,65 @@
 /* The conformance demo CLI (spec/conformance/README.md) in C. */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "clyops.h"
+
+/* Completers (spec section 9.2): the DEMO_HOSTS entries, then words-N. They fail when DEMO_HOSTS is unset. */
+static int demo_hosts(int nwords, void (*each)(const char* value, void* ctx), void* ctx) {
+    fputs("completer ran\n", stderr);
+    const char* env = getenv("DEMO_HOSTS");
+    if (!env) return 1;
+    for (const char* p = env;; ) {
+        const char* end = strchr(p, ';');
+        size_t n = end ? (size_t)(end - p) : strlen(p);
+        char* entry = malloc(n + 1);
+        if (!entry) return 1;
+        memcpy(entry, p, n);
+        entry[n] = 0;
+        each(entry, ctx);
+        free(entry);
+        if (!end) break;
+        p = end + 1;
+    }
+    if (nwords > 0) {
+        char label[32];
+        snprintf(label, sizeof label, "words-%d", nwords);
+        each(label, ctx);
+    }
+    return 0;
+}
+
+static void add_value(const char* value, void* ctx) { clyops_values_add(ctx, value); }
+
+/* Library-paged: the library keeps the values starting with the prefix and pages them. */
+static int hosts(const clyops_complete_request_t* req, clyops_values_t* out, void* userdata) {
+    (void)userdata;
+    return demo_hosts(req->nwords, add_value, out);
+}
+
+typedef struct {
+    const clyops_complete_request_t* req;
+    clyops_values_t* out;
+    int matched;
+    int taken;
+} page_t;
+
+static void add_page_value(const char* value, void* ctx) {
+    page_t* page = ctx;
+    if (strncmp(value, page->req->prefix, strlen(page->req->prefix)) != 0) return;
+    if (page->matched++ < page->req->offset) return;
+    if (page->req->limit > 0 && page->taken >= page->req->limit) return;
+    page->taken++;
+    clyops_values_add(page->out, value);
+}
+
+/* Paged: applies the request's prefix, offset and limit itself. */
+static int paged_hosts(const clyops_complete_request_t* req, clyops_values_t* out, void* userdata) {
+    (void)userdata;
+    page_t page = {req, out, 0, 0};
+    return demo_hosts(req->nwords, add_page_value, &page);
+}
 
 int main(int argc, char** argv) {
     clyops_t* cli = clyops_new("demo");
@@ -55,6 +112,8 @@ int main(int argc, char** argv) {
 
     clyops_config(cli, "config", "demo:,shared:");
     clyops_path_search(cli, "config", "conf");
+    clyops_complete(cli, "host", hosts, NULL);
+    clyops_complete_paged(cli, "rest", paged_hosts, NULL);
     clyops_exclusive(cli, "endpoint", "addr");
     clyops_requires(cli, "dest", "src");
 

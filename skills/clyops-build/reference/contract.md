@@ -96,6 +96,34 @@ selected words are available as `command` (e.g. `["db", "migrate"]`). Config is
 the program's. Each command has its own help, schema and completion. Each leaf
 command becomes its own tool in the API and MCP server (`tasks_db_migrate`).
 
+## Dynamic completion values (§9.2, §9.3)
+
+`complete(NAME, FN)` registers a function that lists the values of the value
+option or argument `NAME` of that level (unknown name: `Unknown option or
+argument 'NAME' for complete`; a flag: `Flag --NAME takes no value to
+complete`; registering again replaces it). It gets a request: `words` (typed
+after the command words), `prefix`, `limit` (0: none) and `offset`; it returns
+strings. Bash: `clyops_complete NAME FUNCTION [paged]`; the function gets the
+words as arguments, `CLYOPS_COMPLETE_PREFIX`/`_LIMIT`/`_OFFSET` in its
+environment, and prints one value per line.
+
+By default the library keeps the values starting with the prefix and pages
+them. Registered *paged* (JS `{ paged: true }`, Python `paged=True`, Ruby
+`paged: true`, Rust `complete_paged`, Go `CompletePaged`, Java
+`complete(name, true, fn)`, C `clyops_complete_paged`, Bash `paged`), the
+function applies prefix, offset and limit itself (for a database query); it is
+asked for one more than the limit so the library can report `more`.
+
+It runs only for `--bash-completion` (prefix empty, at most 1000 values, values
+with a comma or whitespace dropped; a failure keeps the rule's completion) and
+for `prog --complete-values NAME PREFIX LIMIT OFFSET [-- WORDS...]`, which prints
+`{"values":[...],"more":false}` (exit 1: `LIMIT and OFFSET must be integers
+(LIMIT >= 1)`, `No completer for 'NAME'`, `Completer for 'NAME' failed`). These
+are the one exception to "no work before `run`", so it must be quick and change
+nothing. It never validates. The schema has `"dynamic": true`; the HTTP API
+(`POST /values/<tool words>`), MCP server (`list_values`) and web runner list
+such values on demand.
+
 ## Parsing (§2)
 
 `--` ends options. `--name=value`, `--name value`, `-n value`, `-nvalue`,

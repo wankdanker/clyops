@@ -246,6 +246,7 @@ function formFields(schema, naming = "input") {
       path: item.valueType === "path" || /^(path|file:|dir:)/.test(item.validation),
       json: item.validation === "json" || item.validation.startsWith("json:"),
       validation: item.validation,
+      dynamic: item.dynamic === true,
       schema: properties[key]
     };
   });

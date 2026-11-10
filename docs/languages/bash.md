@@ -58,6 +58,36 @@ A command's registrations are recorded and made when the command is selected, so
 each has its own help (`mytool db migrate --help`), schema and completion. See the
 [spec](../../spec/SPEC.md) sections 1.3 to 1.7.
 
+## Completion values from your program
+
+`clyops_complete NAME FUNCTION` lists an option's or argument's values for values
+only the program can find, such as the instances registered in a directory.
+Shells offer them on Tab, and the API, MCP server and web runner list them on
+demand (`--complete-values`). The function prints one value per line. Its
+arguments are the words typed after the command words, and
+`CLYOPS_COMPLETE_PREFIX`, `CLYOPS_COMPLETE_LIMIT` (0: no limit) and
+`CLYOPS_COMPLETE_OFFSET` are set:
+
+```bash
+list_instances() { local f; for f in /var/lib/myapp/instances/*.json; do [[ -e "$f" ]] && basename "$f" .json; done; }
+clyops_opt      INSTANCE instance i "" "Instance to target"
+clyops_complete instance list_instances
+```
+
+By default the function may print everything: the library keeps the values that
+start with the prefix and pages them. For thousands of values, add `paged` and
+apply the prefix, offset and limit yourself:
+
+```bash
+customers() { sqlite3 app.db "SELECT DISTINCT name FROM customers WHERE name LIKE '${CLYOPS_COMPLETE_PREFIX//\'/\'\'}%' ORDER BY name LIMIT $CLYOPS_COMPLETE_LIMIT OFFSET $CLYOPS_COMPLETE_OFFSET"; }
+clyops_complete customer customers paged
+```
+
+The function runs only when values are asked for, on every Tab, so keep it quick
+and read-only. A non-zero exit keeps the rule's shell completion. It doesn't
+validate: check the value after `clyops_run` if only listed values are allowed.
+See the [spec](../../spec/SPEC.md) sections 9.2 and 9.3.
+
 ## Parsing and errors
 
 Use `clyops_run` for a standalone program: it displays help/schema/completion and exits for those requests, or exits with status 1 on invalid input. Use the non-exiting `clyops_parse` variant in libraries and tests; check its outcome before reading resolved values. Registration errors (duplicate names, unknown rules, or commands mixed with positionals) are programming errors, distinct from invalid user input. See the native reference for the language's result and error types.

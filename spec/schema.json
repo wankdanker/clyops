@@ -76,6 +76,10 @@
               "boolean",
               "null"
             ]
+          },
+          "dynamic": {
+            "type": "boolean",
+            "description": "A completer lists values at completion time (spec section 9.2); any value the rule accepts is still valid. Absent in older output: false."
           }
         }
       }
@@ -166,6 +170,10 @@
               "boolean",
               "null"
             ]
+          },
+          "dynamic": {
+            "type": "boolean",
+            "description": "A completer lists values at completion time (spec section 9.2); any value the rule accepts is still valid. Absent in older output: false."
           }
         }
       }
@@ -430,6 +438,10 @@
                   "boolean",
                   "null"
                 ]
+              },
+              "dynamic": {
+                "type": "boolean",
+                "description": "A completer lists values at completion time (spec section 9.2); any value the rule accepts is still valid. Absent in older output: false."
               }
             }
           }
@@ -520,6 +532,10 @@
                   "boolean",
                   "null"
                 ]
+              },
+              "dynamic": {
+                "type": "boolean",
+                "description": "A completer lists values at completion time (spec section 9.2); any value the rule accepts is still valid. Absent in older output: false."
               }
             }
           }

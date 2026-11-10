@@ -14,6 +14,8 @@ export interface SchemaArgument {
   validation: string;
   /** JSON Schema of a `json:SCHEMA` rule (spec section 8); null or absent otherwise. */
   schema?: unknown;
+  /** The program lists values at completion time (spec section 9.2); absent in older schemas. */
+  dynamic?: boolean;
 }
 
 /** An option as declared by a tool schema. */
@@ -46,6 +48,8 @@ export interface SchemaOption {
   secret?: boolean;
   /** JSON Schema of a `json:SCHEMA` rule (spec section 8); null or absent otherwise. */
   schema?: unknown;
+  /** The program lists values at completion time (spec section 9.2); absent in older schemas. */
+  dynamic?: boolean;
 }
 
 /** What running a tool does (spec section 1.3). */

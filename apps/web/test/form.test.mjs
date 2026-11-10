@@ -7,7 +7,7 @@ async function module(file) {
   const compiled = await build({ entryPoints: [new URL('../src/lib/'+file, import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'node' });
   return import('data:text/javascript;base64,'+Buffer.from(compiled.outputFiles[0].text).toString('base64'));
 }
-const { controlAttributes, controlValue, inputErrors, jsonSample, jsonSchemaView, template, restoreTemplate, resultBlob, progressView } = await module('form.ts');
+const { valueSuggester, controlAttributes, controlValue, inputErrors, jsonSample, jsonSchemaView, template, restoreTemplate, resultBlob, progressView } = await module('form.ts');
 const { formFields, toJsonSchema } = await module('../../../../packages/schema/src/index.ts');
 const { ApiClient, apiBase } = await module('client.ts');
 const { ansiSegments, ansiText } = await module('ansi.ts');
@@ -88,4 +88,32 @@ test('json fields are parsed before their schema checks them, each on its own', 
   // A json value is typed as text, even when its schema checks a number once parsed.
   assert.equal(controlAttributes(fields.count).type, 'text');
   assert.equal(controlAttributes(fields.count).min, undefined);
+});
+
+test('dynamic inputs: formFields marks them, the client asks /values, the suggester keeps the latest answer', async () => {
+  const cli = new Cli({ name: 't', env: {} }).opt('HOST', 'host', '', 'optional', 'Host').complete('host', () => []);
+  const fields = formFields(JSON.parse(cli.jsonSchema()));
+  assert.equal(fields.find((f) => f.key === 'host').dynamic, true);
+  assert.equal(fields.find((f) => f.key === 'help'), undefined);
+
+  const calls = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => { calls.push([url, init.method, init.body]); return new Response('{"values":["a"],"more":false}', { status: 200 }); };
+  try {
+    const client = new ApiClient('http://api.test', '');
+    assert.deepEqual(await client.values('/tools/media/demo', { name: 'host', prefix: 'a', limit: 5 }), { values: ['a'], more: false });
+    assert.deepEqual(calls, [['http://api.test/values/media/demo', 'POST', '{"name":"host","prefix":"a","limit":5}']]);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+
+  const seen = [];
+  const pending = [];
+  const suggest = valueSuggester((prefix) => new Promise((resolve) => pending.push(() => resolve({ values: [prefix], more: prefix === 'b' }))), (values, more) => seen.push([values, more]), 1);
+  suggest('a', true);
+  suggest('b', true);
+  pending[1]();
+  pending[0]();
+  await new Promise((r) => setTimeout(r, 5));
+  assert.deepEqual(seen, [[['b'], true]]);
 });

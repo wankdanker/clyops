@@ -1,5 +1,7 @@
 // The conformance commands demo (spec/conformance/README.md) in Java.
 import io.github.wankdanker.clyops.Cli;
+import java.util.List;
+import java.util.stream.Stream;
 
 public class Tasks {
     public static void main(String[] argv) {
@@ -11,9 +13,11 @@ public class Tasks {
 
         Cli db = cli.command("db", "Database tasks");
         db.opt("DB_URL", "url", "u", "sqlite:app.db", "Database URL", "Database");
+        db.complete("url", req -> List.of("sqlite:app.db", "pg:main"));
         Cli migrate = db.command("migrate", "Apply migrations");
         migrate.arg("target", "Target version", "latest");
         migrate.opt("DRY_RUN", "dry-run", "n", "flag", "Show what would run");
+        migrate.complete("target", req -> Stream.concat(Stream.of("v1", "v2"), req.words().stream().map(w -> "w:" + w)).toList());
         migrate.setEffects("destructive");
         migrate.role("plan", "out", "Migration plan", "text/plain");
         db.command("status", "Show migration status").setEffects("read-only");

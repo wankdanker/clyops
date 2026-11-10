@@ -14,6 +14,7 @@ package clyops
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -633,6 +634,98 @@ func completionKind(rule string, searchDirs []string) (kind, values string) {
 	return "default", ""
 }
 
+// CompleteRequest is what a completer is asked for (spec section 9.2).
+type CompleteRequest struct {
+	// Words are the words typed after the program's command words.
+	Words []string
+	// Prefix is the text being completed; empty for shell completion.
+	Prefix string
+	// Limit is the most values wanted; 0 means no limit.
+	Limit int
+	// Offset is how many matching values to skip.
+	Offset int
+}
+
+// Completer lists the values of an option or argument (spec section 9.2).
+// Returning an error (or panicking) keeps the rule's shell completion and
+// makes --complete-values fail.
+type Completer func(CompleteRequest) ([]string, error)
+
+// ValuesPage is a page of values (spec section 9.3).
+type ValuesPage struct {
+	// Values are the values, at most the limit asked for.
+	Values []string `json:"values"`
+	// More is whether values beyond the limit were left out.
+	More bool `json:"more"`
+}
+
+// completerDef is a registered completer and whether it pages itself.
+type completerDef struct {
+	fn    Completer
+	paged bool
+}
+
+// shellCompletionLimit is the completion records' request limit (spec section 9.2).
+const shellCompletionLimit = 1000
+
+// listValues asks a completer for a page of values (spec section 9.2): the
+// library pages unless the completer was registered as paged. shell also drops
+// values the completion scripts would split. ok is false when the completer
+// returns an error or panics.
+func listValues(c *completerDef, words []string, prefix string, limit, offset int, shell bool) (page ValuesPage, ok bool) {
+	req := CompleteRequest{Words: append([]string{}, words...), Prefix: prefix}
+	if c.paged {
+		req.Limit, req.Offset = limit+1, offset
+	}
+	list, ok := callCompleter(c.fn, req)
+	if !ok {
+		return ValuesPage{}, false
+	}
+	seen := map[string]bool{}
+	values := []string{}
+	for _, v := range list {
+		if v != "" && !(shell && strings.ContainsAny(v, ", \t\r\n")) && !seen[v] {
+			seen[v] = true
+			values = append(values, v)
+		}
+	}
+	if !c.paged {
+		matching := []string{}
+		for _, v := range values {
+			if strings.HasPrefix(v, prefix) {
+				matching = append(matching, v)
+			}
+		}
+		values = matching[min(offset, len(matching)):]
+	}
+	if len(values) > limit {
+		return ValuesPage{Values: values[:limit], More: true}, true
+	}
+	return ValuesPage{Values: values}, true
+}
+
+// completionRecord is the kind and values of a completion record, asking the
+// completer first (spec section 9.2).
+func completionRecord(rule string, searchDirs []string, completer *completerDef, words []string) (kind, values string) {
+	if completer != nil {
+		if page, ok := listValues(completer, words, "", shellCompletionLimit, 0, true); ok {
+			return "choice", strings.Join(page.Values, ",")
+		}
+	}
+	return completionKind(rule, searchDirs)
+}
+
+// callCompleter runs a completer; ok is false when it returns an error or panics.
+func callCompleter(completer Completer, req CompleteRequest) (list []string, ok bool) {
+	defer func() {
+		if recover() != nil {
+			list, ok = nil, false
+		}
+	}()
+	list, err := completer(req)
+	return list, err == nil
+}
+
 // ---------------------------------------------------------------------------
 // Cli
 // ---------------------------------------------------------------------------
@@ -643,6 +736,7 @@ type option struct {
 	description, group, rule         string
 	searchDirs                       []string
 	secret                           bool
+	completer                        *completerDef
 }
 
 func (o *option) label() string {
@@ -663,6 +757,7 @@ func (o *option) boolLike() bool {
 type argument struct {
 	name, description, def, rule string
 	variadic                     bool
+	completer                    *completerDef
 }
 
 type command struct{ name, description, hint string }
@@ -1091,6 +1186,94 @@ func (c *Cli) SetPathSearch(long, dirs string) *Cli {
 	return c
 }
 
+// Complete lists the values of the value option, array option or positional
+// argument name of this level (options are looked up first; spec section 9.2),
+// for shell completion and --complete-values. fn gets a CompleteRequest (the
+// words typed after the commands, a prefix, a limit and an offset) and returns
+// strings; the library keeps the values starting with the prefix and pages
+// them. It doesn't validate anything. Registering a name again replaces its
+// completer. Panics on an unknown name or a flag.
+func (c *Cli) Complete(name string, fn Completer) *Cli {
+	return c.setCompleter(name, &completerDef{fn: fn})
+}
+
+// CompletePaged is Complete for a completer that applies the request's prefix,
+// offset and limit itself, as a database query can (spec section 9.2). It is
+// asked for one more value than wanted, so the library can tell whether more
+// remain; the library only truncates.
+func (c *Cli) CompletePaged(name string, fn Completer) *Cli {
+	return c.setCompleter(name, &completerDef{fn: fn, paged: true})
+}
+
+func (c *Cli) setCompleter(name string, def *completerDef) *Cli {
+	if opt := c.byLong[name]; opt != nil {
+		if opt.kind == "flag" {
+			panic("clyops: flag --" + name + " takes no value to complete")
+		}
+		opt.completer = def
+		return c
+	}
+	for _, a := range c.args {
+		if a.name == name {
+			a.completer = def
+			return c
+		}
+	}
+	panic("clyops: unknown option or argument '" + name + "' for complete")
+}
+
+// CompleteValues is a page of the values of name (spec section 9.3): an
+// option of the chain the command words in words select (the nearest level
+// first) or an argument of that command. Errors are "No completer for 'NAME'"
+// and "Completer for 'NAME' failed".
+func (c *Cli) CompleteValues(name, prefix string, limit, offset int, words []string) (ValuesPage, error) {
+	node, skip, ok := c.followWords(words)
+	var def *completerDef
+	if ok {
+		for n := node; n != nil && def == nil; n = n.parent {
+			if opt := n.byLong[name]; opt != nil {
+				def = opt.completer
+			}
+		}
+		for _, a := range node.args {
+			if def == nil && a.name == name {
+				def = a.completer
+			}
+		}
+	}
+	if def == nil {
+		return ValuesPage{}, errors.New("No completer for '" + name + "'")
+	}
+	page, ok := listValues(def, words[skip:], prefix, limit, offset, false)
+	if !ok {
+		return ValuesPage{}, errors.New("Completer for '" + name + "' failed")
+	}
+	return page, nil
+}
+
+// followWords is the command words selects and how many words name it; ok is
+// false when they stop at a command group (spec section 9).
+func (c *Cli) followWords(words []string) (node *Cli, skip int, ok bool) {
+	node = c
+	if len(c.children) == 0 {
+		return node, 0, true
+	}
+walk:
+	for _, w := range words {
+		for _, k := range node.children {
+			if k.word == w {
+				node, skip = k, skip+1
+				continue walk
+			}
+		}
+		break
+	}
+	if len(node.children) > 0 && skip < len(words) && !strings.HasPrefix(words[skip], "-") {
+		return nil, 0, false
+	}
+	return node, skip, true
+}
+
 // Opt registers an option. def is a value, "flag", "optional", or "" (required).
 // groupAndRule is an optional group (default "Options") and validation rule.
 func (c *Cli) Opt(variable, long, short, def, description string, groupAndRule ...string) *Cli {
@@ -1102,23 +1285,23 @@ func (c *Cli) Opt(variable, long, short, def, description string, groupAndRule .
 	if def == "flag" || def == "optional" {
 		value = ""
 	}
-	return c.add(&option{variable, long, short, kind, value, def == "", description, group, rule, nil, false})
+	return c.add(&option{variable, long, short, kind, value, def == "", description, group, rule, nil, false, nil})
 }
 
 // OptArray registers a repeatable option whose values accumulate into a list.
 func (c *Cli) OptArray(variable, long, short, description string, groupAndRule ...string) *Cli {
 	group, rule := groupRule(groupAndRule)
-	return c.add(&option{variable, long, short, "array", "", false, description, group, rule, nil, false})
+	return c.add(&option{variable, long, short, "array", "", false, description, group, rule, nil, false, nil})
 }
 
 // Arg registers a positional argument. An empty def makes it required.
 func (c *Cli) Arg(name, description, def string, rule ...string) *Cli {
-	return c.addArg(&argument{name, description, def, first(rule), false})
+	return c.addArg(&argument{name, description, def, first(rule), false, nil})
 }
 
 // ArgVariadic registers a final positional argument that collects the remaining tokens.
 func (c *Cli) ArgVariadic(name, description string, rule ...string) *Cli {
-	return c.addArg(&argument{name, description, "", first(rule), true})
+	return c.addArg(&argument{name, description, "", first(rule), true, nil})
 }
 
 func groupRule(extra []string) (group, rule string) {
@@ -1182,7 +1365,7 @@ func (c *Cli) ensureHelp() {
 		if c.byShort["h"] != nil {
 			short = ""
 		}
-		c.add(&option{"HELP", "help", short, "flag", "", false, "Show this help message and exit", "Global", "", nil, false})
+		c.add(&option{"HELP", "help", short, "flag", "", false, "Show this help message and exit", "Global", "", nil, false, nil})
 	}
 }
 
@@ -1651,9 +1834,43 @@ func (c *Cli) resolve() {
 	}
 }
 
+// runCompleteValues answers --complete-values NAME PREFIX LIMIT OFFSET [-- WORDS...]
+// (spec section 9.3) with one line of JSON, and exits.
+func (c *Cli) runCompleteValues(rest []string) {
+	number := func(s string) int {
+		if s == "" || strings.Trim(s, "0123456789") != "" {
+			return -1
+		}
+		n, err := strconv.Atoi(s)
+		if err != nil || n > 1000000000 {
+			return -1
+		}
+		return n
+	}
+	if len(rest) < 4 || number(rest[2]) < 1 || number(rest[3]) < 0 {
+		Die(1, "LIMIT and OFFSET must be integers (LIMIT >= 1)")
+	}
+	words := []string{}
+	if i := slices.Index(rest[4:], "--"); i >= 0 {
+		words = rest[4+i+1:]
+	}
+	page, err := c.CompleteValues(rest[0], rest[1], number(rest[2]), number(rest[3]), words)
+	if err != nil {
+		Die(1, "%s", err.Error())
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(page); err != nil {
+		panic(err)
+	}
+	fmt.Print(buf.String())
+	os.Exit(0)
+}
+
 // Run parses os.Args like a CLI: it handles --help, --help-json-schema,
-// --completion and --bash-completion, prints errors and exits on failure,
-// and returns the values.
+// --completion, --bash-completion and --complete-values, prints errors and
+// exits on failure, and returns the values.
 func (c *Cli) Run() Values { return c.RunArgs(os.Args[1:]) }
 
 // RunArgs is Run with an explicit argv (without the program name).
@@ -1669,11 +1886,16 @@ func (c *Cli) RunArgs(argv []string) Values {
 	if len(head) < len(argv) {
 		words = argv[len(head)+1:]
 	}
+	if slices.Contains(head, "--help-json-schema") {
+		fmt.Println(c.JSONSchema())
+		os.Exit(0)
+	}
+	if at := slices.Index(head, "--complete-values"); at >= 0 {
+		c.ensureHelp()
+		c.runCompleteValues(argv[at+1:])
+	}
 	for i, a := range head {
 		switch a {
-		case "--help-json-schema":
-			fmt.Println(c.JSONSchema())
-			os.Exit(0)
 		case "--bash-completion":
 			fmt.Print(c.CompletionData(words...))
 			os.Exit(0)
@@ -2003,6 +2225,7 @@ type schemaArgument struct {
 	Default     string          `json:"default"`
 	Validation  string          `json:"validation"`
 	Schema      json.RawMessage `json:"schema"`
+	Dynamic     bool            `json:"dynamic"`
 }
 
 type schemaOption struct {
@@ -2020,6 +2243,7 @@ type schemaOption struct {
 	Choices      []string        `json:"choices"`
 	Schema       json.RawMessage `json:"schema"`
 	Secret       bool            `json:"secret"`
+	Dynamic      bool            `json:"dynamic"`
 }
 
 type schemaCommand struct {
@@ -2078,7 +2302,7 @@ func (c *Cli) schemaBody() schemaBody {
 		Constraints: append([]constraint{}, c.constraints...), Stdin: c.stdin, Stdout: c.stdout, Roles: append([]roleDecl{}, c.roles...), Commands: []schemaNode{}}
 	for _, a := range c.args {
 		s.Arguments = append(s.Arguments, schemaArgument{a.name, a.description, !a.variadic && a.def == "", a.variadic, a.def, a.rule,
-			ruleSchema(a.rule, c.root(), a.name)})
+			ruleSchema(a.rule, c.root(), a.name), a.completer != nil})
 	}
 	for _, o := range c.options {
 		def, typ, choices := o.def, "string", []string{}
@@ -2102,7 +2326,7 @@ func (c *Cli) schemaBody() schemaBody {
 			choices = strings.Split(r[7:], ",")
 		}
 		s.Options = append(s.Options, schemaOption{o.long, o.short, o.variable, o.description, def, o.group, typ,
-			o.kind == "flag", o.kind == "array", o.required, r, choices, ruleSchema(r, c.root(), "--"+o.long), o.secret})
+			o.kind == "flag", o.kind == "array", o.required, r, choices, ruleSchema(r, c.root(), "--"+o.long), o.secret, o.completer != nil})
 	}
 	for _, cmd := range c.commands {
 		s.RequiredCommands = append(s.RequiredCommands, schemaCommand{cmd.name, cmd.description, cmd.hint})
@@ -2138,23 +2362,13 @@ func (c *Cli) CompletionData(words ...string) string {
 		return s
 	}
 	lines := []string{"#clyops-completion 1"}
-	node := c
+	node, skip, ok := c.followWords(words)
+	if !ok {
+		return lines[0] + "\n"
+	}
 	if len(c.children) > 0 {
-		skip := 0
-	walk:
-		for _, w := range words {
-			for _, k := range node.children {
-				if k.word == w {
-					node, skip = k, skip+1
-					continue walk
-				}
-			}
-			break
-		}
-		if len(node.children) > 0 && skip < len(words) && !strings.HasPrefix(words[skip], "-") {
-			return lines[0] + "\n"
-		}
 		lines = append(lines, "skip\t"+strconv.Itoa(skip))
+		words = words[skip:]
 		for _, k := range node.children {
 			lines = append(lines, "cmd\t"+k.word+"\t"+clean(k.description))
 		}
@@ -2171,7 +2385,7 @@ func (c *Cli) CompletionData(words ...string) string {
 		if o.kind == "flag" {
 			lines = append(lines, "opt\t--"+o.long+"\t"+short+"\tflag\tnone\t-\t"+clean(o.description))
 		} else {
-			kind, values := completionKind(o.rule, o.searchDirs)
+			kind, values := completionRecord(o.rule, o.searchDirs, o.completer, words)
 			lines = append(lines, "opt\t--"+o.long+"\t"+short+"\tvalue\t"+kind+"\t"+orDash(values)+"\t"+clean(o.description))
 		}
 		if o.boolLike() {
@@ -2179,7 +2393,7 @@ func (c *Cli) CompletionData(words ...string) string {
 		}
 	}
 	for _, a := range node.args {
-		kind, values := completionKind(a.rule, nil)
+		kind, values := completionRecord(a.rule, nil, a.completer, words)
 		arity := "single"
 		if a.variadic {
 			arity = "variadic"

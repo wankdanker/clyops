@@ -132,6 +132,477 @@
     }
   },
   {
+    "name": "dynamic: a completer's values replace the rule's kind",
+    "args": [
+      "--bash-completion",
+      "--",
+      "-v",
+      "--host"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;has space;;a,b;alpha;tab\there;beta"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "@completion-dynamic.txt",
+      "stderr": [
+        "completer ran"
+      ]
+    }
+  },
+  {
+    "name": "dynamic: an empty list offers nothing",
+    "args": [
+      "--bash-completion"
+    ],
+    "env": {
+      "DEMO_HOSTS": ""
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "@completion-dynamic-empty.txt"
+    }
+  },
+  {
+    "name": "dynamic: a failing completer keeps the rule's kind",
+    "args": [
+      "--bash-completion"
+    ],
+    "env": {
+      "DEMO_HOSTS": null
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "@completion.txt"
+    }
+  },
+  {
+    "name": "dynamic: the completer doesn't run when parsing",
+    "args": [
+      "in.txt",
+      "--host",
+      "alpha"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "HOST": "alpha"
+      },
+      "stderrNot": [
+        "completer ran"
+      ]
+    }
+  },
+  {
+    "name": "dynamic: the completer doesn't validate",
+    "args": [
+      "in.txt",
+      "--host",
+      "gamma"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "HOST": "gamma"
+      }
+    }
+  },
+  {
+    "name": "dynamic: the completer doesn't run for help",
+    "args": [
+      "--help"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "@help.txt",
+      "stderrNot": [
+        "completer ran"
+      ]
+    }
+  },
+  {
+    "name": "dynamic: the completer doesn't run for the schema",
+    "args": [
+      "--help-json-schema"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha"
+    },
+    "files": {
+      "shape.json": "{\n  \"type\": \"object\",\n  \"properties\": { \"w\": { \"type\": \"integer\" } }\n}\n"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "@schema.json",
+      "stderrNot": [
+        "completer ran"
+      ]
+    }
+  },
+  {
+    "name": "values: the library pages a completer, keeping spaces and commas",
+    "args": [
+      "--complete-values",
+      "host",
+      "",
+      "10",
+      "0"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;beta;albert;has space;a,b;alpha;;q\"x;tab\there"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "{\"values\":[\"alpha\",\"beta\",\"albert\",\"has space\",\"a,b\",\"q\\\"x\",\"tab\\there\"],\"more\":false}\n"
+    }
+  },
+  {
+    "name": "values: the library keeps values starting with the prefix",
+    "args": [
+      "--complete-values",
+      "host",
+      "al",
+      "1",
+      "0"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;beta;albert;has space;a,b;alpha;;q\"x;tab\there"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "{\"values\":[\"alpha\"],\"more\":true}\n"
+    }
+  },
+  {
+    "name": "values: the library skips the offset",
+    "args": [
+      "--complete-values",
+      "host",
+      "al",
+      "1",
+      "1"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;beta;albert;has space;a,b;alpha;;q\"x;tab\there"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "{\"values\":[\"albert\"],\"more\":false}\n"
+    }
+  },
+  {
+    "name": "values: an offset past the end gives nothing",
+    "args": [
+      "--complete-values",
+      "host",
+      "",
+      "5",
+      "50"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;beta;albert;has space;a,b;alpha;;q\"x;tab\there"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "{\"values\":[],\"more\":false}\n"
+    }
+  },
+  {
+    "name": "values: a paged completer gets the prefix, offset and one more than the limit",
+    "args": [
+      "--complete-values",
+      "rest",
+      "al",
+      "1",
+      "0",
+      "--",
+      "x"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;albert;beta"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "{\"values\":[\"alpha\"],\"more\":true}\n"
+    }
+  },
+  {
+    "name": "values: a paged completer pages itself",
+    "args": [
+      "--complete-values",
+      "rest",
+      "al",
+      "1",
+      "1",
+      "--",
+      "x"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;albert;beta"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "{\"values\":[\"albert\"],\"more\":false}\n"
+    }
+  },
+  {
+    "name": "values: a completer gets the words",
+    "args": [
+      "--complete-values",
+      "rest",
+      "",
+      "10",
+      "0",
+      "--",
+      "in.txt",
+      "slow"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "{\"values\":[\"alpha\",\"words-2\"],\"more\":false}\n"
+    }
+  },
+  {
+    "name": "values: a failing completer is an error",
+    "args": [
+      "--complete-values",
+      "host",
+      "",
+      "10",
+      "0"
+    ],
+    "env": {
+      "DEMO_HOSTS": null
+    },
+    "expect": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": [
+        "Completer for 'host' failed"
+      ]
+    }
+  },
+  {
+    "name": "values: an input without a completer is an error",
+    "args": [
+      "--complete-values",
+      "port",
+      "",
+      "10",
+      "0"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha"
+    },
+    "expect": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": [
+        "No completer for 'port'"
+      ]
+    }
+  },
+  {
+    "name": "values: an unknown name is an error",
+    "args": [
+      "--complete-values",
+      "bogus",
+      "",
+      "10",
+      "0"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha"
+    },
+    "expect": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": [
+        "No completer for 'bogus'"
+      ]
+    }
+  },
+  {
+    "name": "values: the limit must be at least 1",
+    "args": [
+      "--complete-values",
+      "host",
+      "",
+      "0",
+      "0"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha"
+    },
+    "expect": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": [
+        "LIMIT and OFFSET must be integers (LIMIT >= 1)"
+      ]
+    }
+  },
+  {
+    "name": "values: the offset must be an integer",
+    "args": [
+      "--complete-values",
+      "host",
+      "",
+      "5",
+      "x"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha"
+    },
+    "expect": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": [
+        "LIMIT and OFFSET must be integers (LIMIT >= 1)"
+      ]
+    }
+  },
+  {
+    "name": "values: every slot is required",
+    "args": [
+      "--complete-values",
+      "host"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha"
+    },
+    "expect": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": [
+        "LIMIT and OFFSET must be integers (LIMIT >= 1)"
+      ]
+    }
+  },
+  {
+    "name": "values: the limit may be 1000000000",
+    "args": [
+      "--complete-values",
+      "host",
+      "",
+      "1000000000",
+      "0"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;beta"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "{\"values\":[\"alpha\",\"beta\"],\"more\":false}\n"
+    }
+  },
+  {
+    "name": "values: a paged completer may be asked for 1000000000",
+    "args": [
+      "--complete-values",
+      "rest",
+      "",
+      "1000000000",
+      "1000000000"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;beta"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "{\"values\":[],\"more\":false}\n"
+    }
+  },
+  {
+    "name": "values: the limit may not exceed 1000000000",
+    "args": [
+      "--complete-values",
+      "host",
+      "",
+      "1000000001",
+      "0"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;beta"
+    },
+    "expect": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": [
+        "LIMIT and OFFSET must be integers (LIMIT >= 1)"
+      ]
+    }
+  },
+  {
+    "name": "values: an offset past 2^64 is an error",
+    "args": [
+      "--complete-values",
+      "host",
+      "",
+      "5",
+      "99999999999999999999"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;beta"
+    },
+    "expect": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": [
+        "LIMIT and OFFSET must be integers (LIMIT >= 1)"
+      ]
+    }
+  },
+  {
+    "name": "values: leading zeros are allowed",
+    "args": [
+      "--complete-values",
+      "host",
+      "",
+      "0000000000001",
+      "0"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;beta"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "{\"values\":[\"alpha\"],\"more\":true}\n"
+    }
+  },
+  {
+    "name": "values: after -- it is an argument",
+    "args": [
+      "in.txt",
+      "fast",
+      "--",
+      "--complete-values"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "rest": [
+          "--complete-values"
+        ]
+      }
+    }
+  },
+  {
     "name": "bash completion script",
     "args": [
       "--completion",
@@ -2826,6 +3297,97 @@
     "expect": {
       "exit": 0,
       "stdout": "#clyops-completion 1\n"
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: a completer gets the words after the commands",
+    "args": [
+      "--bash-completion",
+      "--",
+      "db",
+      "migrate",
+      "-n",
+      "x"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@tasks-completion-migrate-words.txt"
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: values of an option of a parent command",
+    "args": [
+      "--complete-values",
+      "url",
+      "",
+      "10",
+      "0",
+      "--",
+      "db",
+      "migrate"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "{\"values\":[\"sqlite:app.db\",\"pg:main\"],\"more\":false}\n"
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: values with the words after the commands",
+    "args": [
+      "--complete-values",
+      "target",
+      "",
+      "10",
+      "0",
+      "--",
+      "db",
+      "migrate",
+      "-n"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "{\"values\":[\"v1\",\"v2\",\"w:-n\"],\"more\":false}\n"
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: values need the command's words",
+    "args": [
+      "--complete-values",
+      "target",
+      "",
+      "10",
+      "0",
+      "--",
+      "db"
+    ],
+    "expect": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": [
+        "No completer for 'target'"
+      ]
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: values at the top level",
+    "args": [
+      "--complete-values",
+      "url",
+      "",
+      "10",
+      "0"
+    ],
+    "expect": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": [
+        "No completer for 'url'"
+      ]
     }
   },
   {

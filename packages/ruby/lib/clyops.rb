@@ -529,13 +529,74 @@ module Clyops
     rule.empty? ? ["default", ""] : ["none", ""]
   end
 
+  # What a completer is asked for (spec section 9.2): the words typed after the
+  # program's command words, the text being completed (empty for shell
+  # completion), the most values wanted (0 means no limit) and how many
+  # matching values to skip.
+  CompleteRequest = Struct.new(:words, :prefix, :limit, :offset, keyword_init: true)
+
+  # A page of values (spec section 9.3): the values, at most the limit asked
+  # for, and whether values beyond the limit were left out.
+  ValuesPage = Struct.new(:values, :more, keyword_init: true) do
+    # The page as compact JSON, as --complete-values prints it.
+    # @return [String] {"values":[...],"more":false}
+    def to_json(*args) = { "values" => values, "more" => more }.to_json(*args)
+  end
+
+  # @private
+  CompleterDef = Struct.new(:fn, :paged)
+
+  # @private
+  SHELL_COMPLETION_LIMIT = 1000
+
+  # Ask a completer for a page of values (spec section 9.2): the library pages
+  # unless the completer was registered as paged. `shell` also drops values the
+  # completion scripts would split. Raises when the completer fails.
+  # @param completer [CompleterDef] The registered completer and its mode.
+  # @param words [Array<String>] Words typed after the program's commands.
+  # @param prefix [String] The text being completed.
+  # @param limit [Integer] The most values wanted.
+  # @param offset [Integer] How many matching values to skip.
+  # @param shell [Boolean] Whether the values are for a completion record.
+  # @return [Clyops::ValuesPage] the page.
+  def list_values(completer, words, prefix, limit, offset, shell)
+    request = if completer.paged
+                CompleteRequest.new(words: words.dup, prefix: prefix, limit: limit + 1, offset: offset)
+              else
+                CompleteRequest.new(words: words.dup, prefix: prefix, limit: 0, offset: 0)
+              end
+    list = completer.fn.call(request)
+    raise TypeError, "a completer returns a list of strings" unless list.is_a?(Array)
+
+    values = list.select { |v| v.is_a?(String) && !v.empty? && !(shell && v.match?(/[, \t\r\n]/)) }.uniq
+    values = values.select { |v| v.start_with?(prefix) }.drop(offset) unless completer.paged
+    ValuesPage.new(values: values.take(limit), more: values.length > limit)
+  end
+
+  # Return the kind and values of a completion record, asking the completer first (spec section 9.2).
+  # @param rule [String] Validation rule.
+  # @param search_dirs [Array<String>] The search dirs value.
+  # @param completer [CompleterDef, nil] The registered completer, if any.
+  # @param words [Array<String>] Words typed after the program's commands.
+  # @return [Array<String>] the documented result.
+  def completion_record(rule, search_dirs, completer, words)
+    if completer
+      begin
+        return ["choice", list_values(completer, words, "", SHELL_COMPLETION_LIMIT, 0, true).values.join(",")]
+      rescue StandardError, ScriptError
+        # keep the rule's completion
+      end
+    end
+    completion_kind(rule, search_dirs)
+  end
+
   # -------------------------------------------------------------------------
   # Cli
   # -------------------------------------------------------------------------
 
   # @private
   Option = Struct.new(:var, :long, :short, :kind, :default, :required, :description, :group, :rule, :search_dirs,
-                      :secret) do
+                      :secret, :completer) do
     def label
       head = short.empty? ? "    --#{long}" : "-#{short}, --#{long}"
       kind == "flag" ? head : "#{head}=<value>"
@@ -547,7 +608,7 @@ module Clyops
   end
 
   # @private
-  Arg = Struct.new(:name, :description, :default, :rule, :variadic)
+  Arg = Struct.new(:name, :description, :default, :rule, :variadic, :completer)
 
   # status is "ok", "help" or "error".
   ParseResult = Struct.new(:status, :error, :show_usage, :detail) do
@@ -795,6 +856,60 @@ module Clyops
       self
     end
 
+    # List the values of the value option or argument `name` of this level (spec section 9.2),
+    # for shell completion and --complete-values. The completer gets a CompleteRequest (the words
+    # typed after the commands, a prefix, a limit and an offset) and returns strings. The library
+    # keeps the values starting with the prefix and pages them, unless `paged` is set: then the
+    # completer applies the prefix, offset and limit itself, as a database query can. It doesn't
+    # validate anything. Registering a name again replaces it.
+    # @param name [String] Long option name without --, or positional argument name.
+    # @param callable [#call, nil] The completer, when no block is given.
+    # @param paged [Boolean] Whether the completer applies the prefix, offset and limit itself.
+    # @yieldparam request [Clyops::CompleteRequest] What is asked for.
+    # @yieldreturn [Array<String>] Values to offer.
+    # @return [Clyops::Cli] this CLI or the new child command.
+    def complete(name, callable = nil, paged: false, &block)
+      fn = callable || block
+      raise ArgumentError, "complete needs a callable or a block" unless fn.respond_to?(:call)
+
+      target = @by_long[name] || @args.find { |a| a.name == name }
+      raise DefinitionError, "Unknown option or argument '#{name}' for complete" unless target
+      raise DefinitionError, "Flag --#{name} takes no value to complete" if target.is_a?(Option) && target.kind == "flag"
+
+      target.completer = CompleterDef.new(fn, paged ? true : false)
+      self
+    end
+
+    # A page of the values of `name` (spec section 9.3): an option of the chain selected by
+    # `words` (nearest first) or an argument of that command. Raises ArgumentError with
+    # `No completer for 'NAME'` or `Completer for 'NAME' failed`.
+    # @param name [String] Long option name without --, or positional argument name.
+    # @param prefix [String] The text being completed.
+    # @param limit [Integer] The most values wanted (at least 1).
+    # @param offset [Integer] How many matching values to skip.
+    # @param words [Array<String>] Words typed after the program name.
+    # @return [Clyops::ValuesPage] the values and whether more remain.
+    def complete_values(name, prefix, limit, offset, words = [])
+      words = words.to_a
+      node, skip = follow_words(words)
+      completer = nil
+      if node
+        n = node
+        while n && completer.nil?
+          completer = n.by_long[name]&.completer
+          n = n.parent
+        end
+        completer ||= node.args.find { |a| a.name == name }&.completer
+      end
+      raise ArgumentError, "No completer for '#{name}'" unless completer
+
+      begin
+        Clyops.list_values(completer, words.drop(skip), prefix, limit, offset, false)
+      rescue StandardError, ScriptError
+        raise ArgumentError, "Completer for '#{name}' failed"
+      end
+    end
+
     # Register an option. `default` is a value, "flag", "optional", or "" (required).
     # @param var [String] Variable and environment key.
     # @param long [String] Long option name without --.
@@ -890,8 +1005,9 @@ module Clyops
       ParseResult.new("ok")
     end
 
-    # Parse like a CLI: handles --help, --help-json-schema, --completion and
-    # --bash-completion, prints errors and exits on failure. Returns the values.
+    # Parse like a CLI: handles --help, --help-json-schema, --completion,
+    # --bash-completion and --complete-values, prints errors and exits on failure.
+    # Returns the values.
     # @param argv [Array<String>] Arguments excluding the executable name.
     # @return [Clyops::Values] the documented result.
     def run(argv = ARGV)
@@ -899,6 +1015,24 @@ module Clyops
       head = argv.include?("--") ? argv[0...argv.index("--")] : argv
       if head.include?("--help-json-schema")
         $stdout.write("#{json_schema}\n")
+        exit(0)
+      end
+      if (at = head.index("--complete-values"))
+        ensure_help
+        name, prefix, limit, offset = argv[(at + 1)..(at + 4)]
+        unless offset && limit.match?(/\A[0-9]+\z/) && offset.match?(/\A[0-9]+\z/) && limit.to_i >= 1 &&
+               limit.to_i <= 1_000_000_000 && offset.to_i <= 1_000_000_000
+          Clyops.die(1, "LIMIT and OFFSET must be integers (LIMIT >= 1)")
+        end
+        rest = argv.drop(at + 5)
+        words = rest.include?("--") ? rest[(rest.index("--") + 1)..] : []
+        page = begin
+          complete_values(name, prefix, limit.to_i, offset.to_i, words)
+        rescue ArgumentError => e
+          Clyops.die(1, e.message)
+        end
+        utf8 = page.values.map { |v| v.dup.force_encoding(Encoding::UTF_8).scrub }
+        $stdout.write("#{JSON.generate({ 'values' => utf8, 'more' => page.more })}\n")
         exit(0)
       end
       if head.include?("--bash-completion")
@@ -1088,19 +1222,12 @@ module Clyops
       ensure_help
       clean = ->(s) { s.tr("\t\n", "  ") }
       lines = ["#clyops-completion 1"]
-      node = self
+      node, skip = follow_words(words)
+      return "#{lines[0]}\n" unless node
+
       unless @children.empty?
-        skip = 0
-        words.each do |w|
-          child = node.children.find { |c| c.word == w }
-          break unless child
-
-          node = child
-          skip += 1
-        end
-        return "#{lines[0]}\n" if !node.children.empty? && skip < words.length && !words[skip].start_with?("-")
-
         lines << "skip\t#{skip}"
+        words = words.drop(skip)
         node.children.each { |c| lines << "cmd\t#{c.word}\t#{clean.(c.description)}" }
       end
       options = []
@@ -1114,13 +1241,13 @@ module Clyops
         if o.kind == "flag"
           lines << "opt\t--#{o.long}\t#{short}\tflag\tnone\t-\t#{clean.(o.description)}"
         else
-          kind, values = Clyops.completion_kind(o.rule, o.search_dirs)
+          kind, values = Clyops.completion_record(o.rule, o.search_dirs, o.completer, words)
           lines << "opt\t--#{o.long}\t#{short}\tvalue\t#{kind}\t#{values.empty? ? '-' : values}\t#{clean.(o.description)}"
         end
         lines << "opt\t--no-#{o.long}\t-\tflag\tnone\t-\t#{clean.(o.description)}" if o.bool_like?
       end
       node.args.each do |a|
-        kind, values = Clyops.completion_kind(a.rule, [])
+        kind, values = Clyops.completion_record(a.rule, [], a.completer, words)
         lines << "arg\t#{a.name}\t#{a.variadic ? 'variadic' : 'single'}\t#{kind}\t#{values.empty? ? '-' : values}\t#{clean.(a.description)}"
       end
       "#{lines.join("\n")}\n"
@@ -1169,14 +1296,15 @@ module Clyops
         "arguments" => @args.map do |a|
           { "name" => a.name, "description" => a.description, "required" => !a.variadic && a.default.empty?,
             "isVariadic" => a.variadic, "default" => a.default, "validation" => a.rule,
-            "schema" => Clyops.rule_schema(a.rule, @root, a.name) }
+            "schema" => Clyops.rule_schema(a.rule, @root, a.name), "dynamic" => !a.completer.nil? }
         end,
         "options" => @options.map do |o|
           { "name" => o.long, "shortName" => o.short, "variableName" => o.var, "description" => o.description,
             "default" => o.kind == "flag" ? "false" : o.default, "group" => o.group, "type" => type_of.(o),
             "isFlag" => o.kind == "flag", "isArray" => o.kind == "array", "required" => o.required,
             "validation" => o.rule, "choices" => o.rule.start_with?("choice:") ? o.rule[7..].split(",", -1) : [],
-            "schema" => Clyops.rule_schema(o.rule, @root, "--#{o.long}"), "secret" => o.secret }
+            "schema" => Clyops.rule_schema(o.rule, @root, "--#{o.long}"), "secret" => o.secret,
+            "dynamic" => !o.completer.nil? }
         end,
         **(@parent ? {} : { "config" => @config_option.empty? ? nil : { "option" => @config_option, "prefixes" => @config_prefixes.dup } }),
         "requiredCommands" => @commands.map { |c, d, h| { "command" => c, "description" => d, "installHint" => h } },
@@ -1190,6 +1318,25 @@ module Clyops
     end
 
     private
+
+    # The command `words` select and how many words name it, or nil when they
+    # stop at a command group (spec section 9).
+    def follow_words(words)
+      node = self
+      skip = 0
+      return [node, skip] if @children.empty?
+
+      words.each do |w|
+        child = node.children.find { |c| c.word == w }
+        break unless child
+
+        node = child
+        skip += 1
+      end
+      return nil if !node.children.empty? && skip < words.length && !words[skip].start_with?("-")
+
+      [node, skip]
+    end
 
     # The selected command, its parent, ... up to this one.
     def chain

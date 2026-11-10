@@ -111,7 +111,7 @@ function __clyops___CLYOPS_FUNC___complete
             set skipnext 0
         else if test $endopts -eq 0; and test "$w" = --
             set endopts 1
-        else if test $endopts -eq 0; and string match -q -- '-?*' $w
+        else if test $endopts -eq 0; and string match -qr -- '^-.' $w
             set -l i (contains -i -- $w $onames)
             test -n "$i"; and test "$otypes[$i]" = value; and set skipnext 1
         else

@@ -2,6 +2,30 @@
 # The conformance demo CLI (spec/conformance/README.md) in Bash.
 source "$(dirname "${BASH_SOURCE[0]}")/../clyops.sh"
 
+# Completers (spec section 9.2): the DEMO_HOSTS entries, then words-N. They fail when DEMO_HOSTS is unset.
+# Library-paged: the library keeps the values starting with the prefix and pages them.
+demo_hosts() {
+    echo "completer ran" >&2
+    [[ -v DEMO_HOSTS ]] || return 1
+    local -a hosts=()
+    IFS=';' read -ra hosts <<< "$DEMO_HOSTS"
+    (( ${#hosts[@]} )) && printf '%s\n' "${hosts[@]}"
+    (( $# > 0 )) && echo "words-$#"
+    return 0
+}
+# Paged: applies CLYOPS_COMPLETE_PREFIX, _OFFSET and _LIMIT itself.
+demo_paged_hosts() {
+    local out h skip="$CLYOPS_COMPLETE_OFFSET" n=0
+    out=$(demo_hosts "$@") || return 1
+    while IFS= read -r h; do
+        [[ "$h" == "$CLYOPS_COMPLETE_PREFIX"* ]] || continue
+        (( skip > 0 )) && { skip=$(( skip - 1 )); continue; }
+        (( CLYOPS_COMPLETE_LIMIT > 0 && n >= CLYOPS_COMPLETE_LIMIT )) && break
+        printf '%s\n' "$h"; n=$(( n + 1 ))
+    done <<< "$out"
+    return 0
+}
+
 clyops_name demo
 clyops_root "${DEMO_ROOT:-$PWD}"
 clyops_description "Demo program for the clyops conformance suite. It registers one of every kind of option and argument so that each implementation can be checked against the same help text, schema and resolved values."
@@ -52,6 +76,8 @@ clyops_opt_array INCLUDE  include  I           "Include directory"     Files    
 
 clyops_config      config "demo:,shared:"
 clyops_path_search config conf
+clyops_complete host demo_hosts
+clyops_complete rest demo_paged_hosts paged
 clyops_exclusive   endpoint addr
 clyops_requires    dest src
 

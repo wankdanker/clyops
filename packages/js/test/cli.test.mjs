@@ -248,3 +248,65 @@ test('file:executable: a program on PATH or an executable file, and its secret f
   }
 });
 
+
+test('complete lists dynamic values for completion only (spec section 9.2)', () => {
+  let calls = 0;
+  const seen = [];
+  const cli = make().complete('count', (req) => { calls++; seen.push(req); return ['a', 'b c', '', 'x,y', 'a', 'b']; })
+    .complete('file', () => { throw new Error('registry unavailable'); });
+  const data = cli.completionData(['-f']);
+  assert.match(data, /^opt\t--count\t-n\tvalue\tchoice\ta,b\tCount$/m);
+  assert.match(data, /^arg\tfile\tsingle\tfile\t-\tFile$/m);
+  assert.deepEqual(seen, [{ words: ['-f'], prefix: '', limit: 0, offset: 0 }]);
+  assert.equal(cli.parse(['a.txt', '-n', '5']).status, 'ok');
+  JSON.parse(cli.jsonSchema());
+  assert.equal(calls, 1);
+  const schema = JSON.parse(cli.jsonSchema());
+  assert.equal(schema.options.find((o) => o.name === 'count').dynamic, true);
+  assert.equal(schema.options.find((o) => o.name === 'tag').dynamic, false);
+  assert.equal(schema.arguments[0].dynamic, true);
+  assert.match(make().complete('tag', () => []).completionData(), /^opt\t--tag\t-t\tvalue\tchoice\t-\tTags$/m);
+});
+
+test('complete gets the words after the commands', () => {
+  const cli = new Cli({ name: 't', env: {} });
+  const db = cli.command('db', 'Database');
+  db.arg('target', 'Target').complete('target', ({ words }) => words.map((w) => `w:${w}`));
+  assert.match(cli.completionData(['db', '-x', 'y']), /^arg\ttarget\tsingle\tchoice\tw:-x,w:y\tTarget$/m);
+});
+
+test('complete rejects unknown names and flags', () => {
+  assert.throws(() => make().complete('bogus', () => []), /Unknown option or argument 'bogus' for complete/);
+  assert.throws(() => make().complete('fast', () => []), /Flag --fast takes no value to complete/);
+});
+
+test('completeValues pages for the completer unless it is paged (spec section 9.3)', () => {
+  const all = ['alpha', 'beta', 'albert', 'has space', 'a,b', 'alpha', ''];
+  const cli = make().complete('count', () => all);
+  assert.deepEqual(cli.completeValues('count', '', 10, 0), { values: ['alpha', 'beta', 'albert', 'has space', 'a,b'], more: false });
+  assert.deepEqual(cli.completeValues('count', 'al', 1, 0), { values: ['alpha'], more: true });
+  assert.deepEqual(cli.completeValues('count', 'al', 1, 1), { values: ['albert'], more: false });
+  const seen = [];
+  const paged = make().complete('count', (req) => { seen.push(req); return ['x', 'y', 'z'].slice(0, req.limit); }, { paged: true });
+  assert.deepEqual(paged.completeValues('count', 'q', 2, 40, ['-f']), { values: ['x', 'y'], more: true });
+  assert.deepEqual(seen, [{ words: ['-f'], prefix: 'q', limit: 3, offset: 40 }]);
+  // Registering again replaces the completer and its mode.
+  paged.complete('count', () => ['only']);
+  assert.deepEqual(paged.completeValues('count', '', 5, 0), { values: ['only'], more: false });
+  assert.throws(() => make().completeValues('count', '', 5, 0), /No completer for 'count'/);
+  assert.throws(() => make().complete('count', () => { throw new Error('x'); }).completeValues('count', '', 5, 0), /Completer for 'count' failed/);
+  // Shell completion keeps at most 1000 values.
+  const many = make().complete('count', () => Array.from({ length: 1500 }, (_, i) => `v${i}`));
+  assert.equal(many.completionData().split('\n').find((l) => l.startsWith('opt\t--count')).split('\t')[5].split(',').length, 1000);
+});
+
+test('completeValues follows commands', () => {
+  const cli = new Cli({ name: 't', env: {} });
+  const db = cli.command('db', 'Database');
+  db.opt('URL', 'url', '', 'optional', 'URL').complete('url', () => ['pg:main']);
+  db.command('migrate', 'Migrate').arg('target', 'Target').complete('target', ({ words }) => words);
+  assert.deepEqual(cli.completeValues('url', '', 5, 0, ['db', 'migrate']), { values: ['pg:main'], more: false });
+  assert.deepEqual(cli.completeValues('target', '', 5, 0, ['db', 'migrate', '-n', 'x']), { values: ['-n', 'x'], more: false });
+  assert.throws(() => cli.completeValues('target', '', 5, 0, ['db']), /No completer for 'target'/);
+  assert.throws(() => cli.completeValues('url', '', 5, 0, []), /No completer for 'url'/);
+});

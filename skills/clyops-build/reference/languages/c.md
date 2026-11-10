@@ -34,6 +34,15 @@ clyops_arg_variadic(cli, NAME, .description = "...", .rule = "...");
 
 Metadata: `clyops_root`, `clyops_description`, `clyops_epilog`,
 `clyops_config(cli, option, prefixes)`, `clyops_path_search(cli, long, dirs)`,
+`clyops_complete(cli, name, fn, userdata)` (completion values, §9.2; `fn` is a
+`clyops_completer_t`, `int fn(const clyops_complete_request_t* req, clyops_values_t* out, void* userdata)`
+with `req->words`, `nwords`, `prefix`, `limit`, `offset`; adds with `clyops_values_add(out, value)`
+and returns 0; non-zero keeps the rule's completion; the library filters by prefix and pages),
+`clyops_complete_paged(cli, name, fn, userdata)` (the same, but `fn` applies prefix, offset and
+`limit` (one more than wanted) itself, e.g. in SQL),
+`clyops_complete_values(cli, name, prefix, limit, offset, nwords, words, &page)` (§9.3: fills a
+`clyops_values_page_t` {`values`, `count`, `more`}, freed with `clyops_values_page_free`; -1 with
+`clyops_error` set otherwise; `--complete-values NAME PREFIX LIMIT OFFSET -- WORDS...` prints it as JSON),
 `clyops_require_command(cli, cmd, description, hint)`,
 `clyops_effects(cli, ...)`, `clyops_stdin(cli, description, type)`,
 `clyops_stdout(cli, description, type)`, `clyops_exclusive(cli, ...)`,

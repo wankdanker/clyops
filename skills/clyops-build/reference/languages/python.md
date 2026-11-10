@@ -25,7 +25,13 @@ cli.arg_variadic(NAME, description, rule="")
 
 `group` and `rule` can be positional or keyword arguments. Metadata:
 `set_description`, `set_epilog`, `set_config(option, prefixes)`,
-`set_path_search(long, dirs)`, `require_command(cmd, description, hint)`,
+`set_path_search(long, dirs)`,
+`complete(name, lambda request: [...], paged=False)` (completion values, §9.2;
+`request` has `words`, `prefix`, `limit`, `offset`; `paged=True` means the
+function applies prefix, offset and limit itself, e.g. in SQL),
+`complete_values(name, prefix, limit, offset, words=())` (a `ValuesPage` of
+`values` and `more`, as `--complete-values` prints, §9.3),
+`require_command(cmd, description, hint)`,
 `set_effects(*effects)`, `set_stdin(description, content_type)`,
 `set_stdout(description, content_type)`, `exclusive(*longs)`,
 `requires(*longs)`, `one_of(*longs)`, `command(name, description)`.
