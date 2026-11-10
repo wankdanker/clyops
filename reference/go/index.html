@@ -43,6 +43,21 @@ then call Run (or Parse).
 </section><section id="Cli.Command"><h2>Cli.Command</h2><pre><code>func (c *Cli) Command(name, description string) *Cli</code></pre><p>Command registers a command (spec section 1.7) and returns it, to register
 its options and arguments on.
 </section><section id="Cli.CommandPath"><h2>Cli.CommandPath</h2><pre><code>func (c *Cli) CommandPath() []string</code></pre><p>CommandPath is the command words selected by the last parse, e.g. [&quot;db&quot;, &quot;migrate&quot;].
+</section><section id="Cli.Complete"><h2>Cli.Complete</h2><pre><code>func (c *Cli) Complete(name string, fn Completer) *Cli</code></pre><p>Complete lists the values of the value option, array option or positional
+argument name of this level (options are looked up first; spec section 9.2),
+for shell completion and --complete-values. fn gets a CompleteRequest (the
+words typed after the commands, a prefix, a limit and an offset) and returns
+strings; the library keeps the values starting with the prefix and pages
+them. It doesn&apos;t validate anything. Registering a name again replaces its
+completer. Panics on an unknown name or a flag.
+</section><section id="Cli.CompletePaged"><h2>Cli.CompletePaged</h2><pre><code>func (c *Cli) CompletePaged(name string, fn Completer) *Cli</code></pre><p>CompletePaged is Complete for a completer that applies the request&apos;s prefix,
+offset and limit itself, as a database query can (spec section 9.2). It is
+asked for one more value than wanted, so the library can tell whether more
+remain; the library only truncates.
+</section><section id="Cli.CompleteValues"><h2>Cli.CompleteValues</h2><pre><code>func (c *Cli) CompleteValues(name, prefix string, limit, offset int, words []string) (ValuesPage, error)</code></pre><p>CompleteValues is a page of the values of name (spec section 9.3): an
+option of the chain the command words in words select (the nearest level
+first) or an argument of that command. Errors are &quot;No completer for &apos;NAME&apos;&quot;
+and &quot;Completer for &apos;NAME&apos; failed&quot;.
 </section><section id="Cli.CompletionData"><h2>Cli.CompletionData</h2><pre><code>func (c *Cli) CompletionData(words ...string) string</code></pre><p>CompletionData is the tab-separated completion records (spec section 9).
 words are the words typed after the program name; a program with commands
 follows them.
@@ -72,8 +87,8 @@ groupAndRule is an optional group (default &quot;Options&quot;) and validation r
 descriptor its runner chooses. name is meta, progress, log, result or another agreed name; schema is
 a JSON Schema for each document or line: JSON text as a string, any other value marshalled, or nil.
 </section><section id="Cli.Run"><h2>Cli.Run</h2><pre><code>func (c *Cli) Run() Values</code></pre><p>Run parses os.Args like a CLI: it handles --help, --help-json-schema,
---completion and --bash-completion, prints errors and exits on failure,
-and returns the values.
+--completion, --bash-completion and --complete-values, prints errors and
+exits on failure, and returns the values.
 </section><section id="Cli.RunArgs"><h2>Cli.RunArgs</h2><pre><code>func (c *Cli) RunArgs(argv []string) Values</code></pre><p>RunArgs is Run with an explicit argv (without the program name).
 </section><section id="Cli.SetConfig"><h2>Cli.SetConfig</h2><pre><code>func (c *Cli) SetConfig(option, prefixes string) *Cli</code></pre><p>SetConfig names the option holding a config file path; prefixes is comma-separated.
 </section><section id="Cli.SetDescription"><h2>Cli.SetDescription</h2><pre><code>func (c *Cli) SetDescription(text string) *Cli</code></pre><p>SetDescription sets the text shown under the usage line.
@@ -86,6 +101,19 @@ for bare relative values of a path option.
 </section><section id="Cli.Source"><h2>Cli.Source</h2><pre><code>func (c *Cli) Source(long string) string</code></pre><p>Source is where an option&apos;s value came from: cli, config, env, default or unset.
 </section><section id="Cli.Usage"><h2>Cli.Usage</h2><pre><code>func (c *Cli) Usage() string</code></pre><p>Usage is the help text (spec section 7), for the selected command.
 </section><section id="Cli.ValuesJSON"><h2>Cli.ValuesJSON</h2><pre><code>func (c *Cli) ValuesJSON() string</code></pre><p>ValuesJSON is the resolved values as JSON (spec section 10), in registration order.
+</section><section id="CompleteRequest"><h2>CompleteRequest</h2><pre><code>type CompleteRequest struct {
+	// Words are the words typed after the program&#39;s command words.
+	Words []string
+	// Prefix is the text being completed; empty for shell completion.
+	Prefix string
+	// Limit is the most values wanted; 0 means no limit.
+	Limit int
+	// Offset is how many matching values to skip.
+	Offset int
+}</code></pre><p>CompleteRequest is what a completer is asked for (spec section 9.2).
+</section><section id="Completer"><h2>Completer</h2><pre><code>type Completer func(CompleteRequest) ([]string, error)</code></pre><p>Completer lists the values of an option or argument (spec section 9.2).
+Returning an error (or panicking) keeps the rule&apos;s shell completion and
+makes --complete-values fail.
 </section><section id="ParseResult"><h2>ParseResult</h2><pre><code>type ParseResult struct {
 	Status    string
 	Error     string
@@ -103,4 +131,10 @@ Types follow spec section 10: bool for flags, int, float64, string, a
 </section><section id="Values.List"><h2>Values.List</h2><pre><code>func (v Values) List(name string) []any</code></pre><p>List is an array option&apos;s or variadic argument&apos;s values.
 </section><section id="Values.String"><h2>Values.String</h2><pre><code>func (v Values) String(name string) string</code></pre><p>String is the value as a string (&quot;&quot; when unset).
 </section><section id="Values.Strings"><h2>Values.Strings</h2><pre><code>func (v Values) Strings(name string) []string</code></pre><p>Strings is an array option&apos;s or variadic argument&apos;s values as strings.
+</section><section id="ValuesPage"><h2>ValuesPage</h2><pre><code>type ValuesPage struct {
+	// Values are the values, at most the limit asked for.
+	Values []string `json:&#34;values&#34;`
+	// More is whether values beyond the limit were left out.
+	More bool `json:&#34;more&#34;`
+}</code></pre><p>ValuesPage is a page of values (spec section 9.3).
 </section></main></html>

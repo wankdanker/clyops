@@ -146,11 +146,11 @@ field types in TypeScript, Python or Ruby.</p>
 <code>uuid</code>, <code>json</code>, <code>json:SCHEMA</code>, <code>date:YYYY-MM-DD</code>, <code>path</code>, <code>file:exists</code>, <code>file:readable</code>, <code>file:writable</code>,
 <code>file:executable</code>, <code>dir:exists</code> and <code>dir:writable</code>. Parameterized rules include <code>int:1-10</code>,
 <code>float:0-1</code>, <code>string:1-100</code>, <code>choice:red,green,blue</code> and <code>regex:PATTERN</code>.
-See <a href="https://github.com/wankdanker/clyops/blob/a2b251eef232f20f1ac1feaa7213d11d4c0cd4d3/spec/SPEC.md#5-validation-rules">spec section 5</a> for ranges and exact behavior.</p>
+See <a href="https://github.com/wankdanker/clyops/blob/21f55521d6bdaa35daf57fac97db3c4af50c0446/spec/SPEC.md#5-validation-rules">spec section 5</a> for ranges and exact behavior.</p>
 <p>Use <code>file:executable</code> for an option that names a program to run (<code>--ffmpeg</code>): a bare
 name must be on <code>PATH</code> and stays as given, and anything with a <code>/</code> must be an executable
 file. It also tells servers that run tools for remote callers not to take that option
-from them (<a href="https://github.com/wankdanker/clyops/blob/a2b251eef232f20f1ac1feaa7213d11d4c0cd4d3/spec/SPEC.md#13-json-input-toargv">spec section 13</a>), and shells complete
+from them (<a href="https://github.com/wankdanker/clyops/blob/21f55521d6bdaa35daf57fac97db3c4af50c0446/spec/SPEC.md#13-json-input-toargv">spec section 13</a>), and shells complete
 command names for it.</p>
 <p>Use <code>json</code> for an option that takes structured data (<code>--meta '{&quot;lang&quot;: &quot;en&quot;}'</code>): the
 value must be one JSON value, and stays the text as given for the program to parse.
@@ -197,7 +197,7 @@ how <code>clyops-doc</code> writes a FILES section.</p>
 the config file containing the value; default/environment paths resolve against
 the CLI root. Paths are normalized after precedence. <code>-</code> denotes stdin where the
 application supports it. Path validation does not itself open/read files for the
-application. See <a href="https://github.com/wankdanker/clyops/blob/a2b251eef232f20f1ac1feaa7213d11d4c0cd4d3/spec/SPEC.md#6-paths">spec section 6</a>.</p>
+application. See <a href="https://github.com/wankdanker/clyops/blob/21f55521d6bdaa35daf57fac97db3c4af50c0446/spec/SPEC.md#6-paths">spec section 6</a>.</p>
 <h2 id="nested-commands-and-constraints">Nested commands and constraints</h2>
 <pre><code class="language-javascript">const db = cli.command('db', 'Database tasks');
 const migrate = db.command('migrate', 'Apply migrations');
@@ -261,6 +261,25 @@ and completing a whole directory with the dispatcher.</p>
 the library. The schema format discriminator is <code>clyops: 1</code>. Completion follows
 commands and their inherited options. <code>valuesJson</code> is a separate resolved-values
 document, with secrets masked.</p>
+<h3 id="completion-values-from-your-program">Completion values from your program</h3>
+<p><code>complete(name, fn)</code> (Bash: <code>clyops_complete NAME FUNCTION</code>) lists an option's or
+argument's values when they are asked for, for values only the program can find
+at that moment: instances registered in a directory, branches, running
+containers, the distinct values of a database column. Shells offer them on Tab,
+and the HTTP API, MCP server and web runner (<a href="/applications.html">applications</a>) list them on
+demand, through <code>prog --complete-values NAME PREFIX LIMIT OFFSET -- WORDS...</code>, which
+prints <code>{&quot;values&quot;: [...], &quot;more&quot;: false}</code>.</p>
+<p>The function gets a request: the words typed so far (after any command words),
+the prefix being typed, a limit and an offset. By default it may return every
+value, and the library keeps those starting with the prefix and pages them.
+Registered as <em>paged</em>, it applies the prefix, offset and limit itself, so a
+database query fetches only one page. Shells ask for at most 1000 values, and
+drop values containing commas or whitespace, which on-demand lists keep.</p>
+<p>It runs only for completion, never for a normal run, help or the schema, so keep
+it quick and read-only. If it fails, the shell completes as the rule would. It
+doesn't validate: the option's rule still decides what is accepted, so check the
+value after <code>run</code> if only listed values are allowed. The schema marks such
+inputs <code>&quot;dynamic&quot;: true</code>. Registering a name again replaces its completer.</p>
 <h2 id="logging-and-helper-functions">Logging and helper functions</h2>
 <p><code>info</code>, <code>warn</code>, <code>error</code> and <code>success</code> write timestamped messages to stderr. <code>die</code>
 logs and exits with the supplied code. <code>CLYOPS_SILENT=true</code> or the native silent

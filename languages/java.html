@@ -82,7 +82,58 @@ a program that starts others removes it from <code>ProcessBuilder.environment()<
 sets it to <code>forwardFds(...)</code>.</p>
 <p>Commands share the program's options (accepted before or after the command words) and config file;
 each has its own help (<code>mytool db migrate --help</code>), schema and completion. See the
-<a href="https://github.com/wankdanker/clyops/blob/a2b251eef232f20f1ac1feaa7213d11d4c0cd4d3/spec/SPEC.md">spec</a> sections 1.3 to 1.7.</p>
+<a href="https://github.com/wankdanker/clyops/blob/21f55521d6bdaa35daf57fac97db3c4af50c0446/spec/SPEC.md">spec</a> sections 1.3 to 1.7.</p>
+<h2 id="completion-values-from-your-program">Completion values from your program</h2>
+<p><code>complete(name, fn)</code> lists the values of a value option, array option or
+positional argument of that level, for values only the program can find, such
+as the instances registered in a directory. They are offered when the user
+presses Tab, and tooling (the HTTP API, MCP server and web runner) reads them
+with <code>--complete-values</code>:</p>
+<pre><code class="language-java">cli.opt(&quot;INSTANCE&quot;, &quot;instance&quot;, &quot;i&quot;, &quot;&quot;, &quot;Instance to target&quot;);
+cli.complete(&quot;instance&quot;, req -&gt; {
+    try (var files = Files.list(Path.of(&quot;/var/lib/myapp/instances&quot;))) {
+        return files.map(f -&gt; f.getFileName().toString()).filter(n -&gt; n.endsWith(&quot;.json&quot;))
+            .map(n -&gt; n.substring(0, n.length() - 5)).toList();
+    }
+});
+</code></pre>
+<p>The function (<code>Completer</code>: <code>List&lt;String&gt; complete(CompleteRequest request) throws Exception</code>) gets a <code>CompleteRequest(words, prefix, limit, offset)</code>:
+<code>words</code> are the words typed after the command words, for completers that depend
+on another option, and <code>prefix</code> is the text being completed. It runs only for
+<code>--bash-completion</code> and <code>--complete-values</code>, so keep it quick (each Tab also
+starts a JVM) and don't print to stdout. Throwing, or returning <code>null</code>, keeps
+the rule's completion. The library drops empty values, <code>null</code>s and duplicates,
+keeps the values starting with <code>prefix</code>, then skips <code>offset</code> and keeps <code>limit</code>,
+so the function may return every value. It doesn't validate: check the value
+after <code>run</code> if only listed values are allowed. Completing an unknown name or a
+flag throws <code>IllegalArgumentException</code>; registering a name again replaces its
+completer.</p>
+<p>When the values come from a database, register with <code>complete(name, true, fn)</code>
+and apply the request yourself. The function is then asked for one more value
+than wanted (<code>limit</code> is never 0 here), so the library can tell whether more
+remain:</p>
+<pre><code class="language-java">cli.complete(&quot;customer&quot;, true, req -&gt; {
+    try (var st = db.prepareStatement(
+            &quot;SELECT name FROM customers WHERE name LIKE ? ESCAPE '\\' ORDER BY name LIMIT ? OFFSET ?&quot;)) {
+        st.setString(1, req.prefix().replace(&quot;%&quot;, &quot;\\%&quot;).replace(&quot;_&quot;, &quot;\\_&quot;) + &quot;%&quot;);
+        st.setInt(2, req.limit());
+        st.setInt(3, req.offset());
+        var names = new ArrayList&lt;String&gt;();
+        try (var rows = st.executeQuery()) {
+            while (rows.next()) names.add(rows.getString(1));
+        }
+        return names;
+    }
+});
+</code></pre>
+<p><code>prog --complete-values NAME PREFIX LIMIT OFFSET -- WORDS...</code> prints one page
+as JSON, <code>{&quot;values&quot;:[...],&quot;more&quot;:false}</code>, and exits; values with spaces or
+commas are kept there, while shell completion drops them and asks for at most
+1000. In code, <code>completeValues(name, prefix, limit, offset, words)</code> returns a
+<code>ValuesPage(values, more)</code>, or throws <code>IllegalArgumentException</code>
+(<code>No completer for 'NAME'</code>) or <code>IllegalStateException</code>
+(<code>Completer for 'NAME' failed</code>). See the <a href="https://github.com/wankdanker/clyops/blob/21f55521d6bdaa35daf57fac97db3c4af50c0446/spec/SPEC.md">spec</a> sections
+9.2 and 9.3.</p>
 <h2 id="parsing-and-errors">Parsing and errors</h2>
 <p>Use <code>run</code> for a standalone program: it displays help/schema/completion and exits for those requests, or exits with status 1 on invalid input. Use the non-exiting <code>parse</code> variant in libraries and tests; check its outcome before reading resolved values. Registration errors (duplicate names, unknown rules, or commands mixed with positionals) are programming errors, distinct from invalid user input. See the native reference for the language's result and error types.</p>
 <h2 id="more-recipes">More recipes</h2>

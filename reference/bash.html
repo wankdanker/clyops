@@ -84,6 +84,16 @@ Prints the CLYOPS_FDS value passing these roles on to a program this one starts 
 <p>Usage: clyops_require_command <command> <description> [install-hint]</p>
 <h2 id="clyops_path_search"><code>clyops_path_search</code></h2>
 <p>Usage: clyops_path_search <long> &lt;dir[:dir...]&gt;   (dirs relative to the root)</p>
+<h2 id="clyops_complete"><code>clyops_complete</code></h2>
+<p>Usage: clyops_complete &lt;long|argument&gt; <function> [paged]
+The function lists the values of the value option or argument (spec section
+9.2), for shell completion and --complete-values. Its arguments are the words
+typed after the commands; CLYOPS_COMPLETE_PREFIX, CLYOPS_COMPLETE_LIMIT (0: no
+limit) and CLYOPS_COMPLETE_OFFSET are set, and it prints one value per line.
+The library keeps the values starting with the prefix and pages them, unless
+&quot;paged&quot; is given: then the function applies the prefix, offset and limit
+itself (a database query can). A non-zero exit is a failure. It doesn't
+validate. Registering a name again replaces it.</p>
 <h2 id="clyops_opt"><code>clyops_opt</code></h2>
 <p>Usage: clyops_opt <VAR> <long> <short> &lt;default|flag|optional|&quot;&quot;&gt; <description> [group] [rule]</p>
 <h2 id="clyops_opt_array"><code>clyops_opt_array</code></h2>
@@ -110,6 +120,11 @@ prints errors and exits on failure, otherwise assigns the variables.</p>
 <p>Help text (spec section 7), for the selected command.</p>
 <h2 id="clyops_json_schema"><code>clyops_json_schema</code></h2>
 <p>JSON description of the CLI (spec section 8).</p>
+<h2 id="clyops_complete_values"><code>clyops_complete_values</code></h2>
+<p>Usage: clyops_complete_values <name> <prefix> <limit> <offset> [word...]
+Print a page of the values of an option or argument as JSON (spec section 9.3):
+{&quot;values&quot;:[...],&quot;more&quot;:false}. The words select the command. Fails with a
+message in _CLYOPS_ERROR: No completer for 'NAME' / Completer for 'NAME' failed.</p>
 <h2 id="clyops_completion_data"><code>clyops_completion_data</code></h2>
 <p>Tab-separated completion records (spec section 9). The arguments are the
 words typed after the program name; a program with commands follows them.</p>

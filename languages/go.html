@@ -74,7 +74,57 @@ v := cli.Run()                                           // cli.CommandPath() ==
 </code></pre>
 <p>Commands share the program's options (accepted before or after the command words) and config file;
 each has its own help (<code>mytool db migrate --help</code>), schema and completion. See the
-<a href="https://github.com/wankdanker/clyops/blob/a2b251eef232f20f1ac1feaa7213d11d4c0cd4d3/spec/SPEC.md">spec</a> sections 1.3 to 1.7.</p>
+<a href="https://github.com/wankdanker/clyops/blob/21f55521d6bdaa35daf57fac97db3c4af50c0446/spec/SPEC.md">spec</a> sections 1.3 to 1.7.</p>
+<h2 id="completion-values-from-your-program">Completion values from your program</h2>
+<p><code>Complete(name, fn)</code> lists the values of an option or argument, read when the
+user presses Tab and by tooling (<code>--complete-values</code>), for values only the
+program can find, such as the instances registered in a directory:</p>
+<pre><code class="language-go">cli.Opt(&quot;INSTANCE&quot;, &quot;instance&quot;, &quot;i&quot;, &quot;&quot;, &quot;Instance to target&quot;)
+cli.Complete(&quot;instance&quot;, func(clyops.CompleteRequest) ([]string, error) {
+	files, err := filepath.Glob(&quot;/var/lib/myapp/instances/*.json&quot;)
+	for i, f := range files {
+		files[i] = strings.TrimSuffix(filepath.Base(f), &quot;.json&quot;)
+	}
+	return files, err
+})
+</code></pre>
+<p>The function (<code>clyops.Completer</code>) runs only for <code>--bash-completion</code> and
+<code>--complete-values</code>, so keep it quick. The <code>clyops.CompleteRequest</code> carries
+<code>Words</code> (the words typed after the command words, for completers that depend on
+another option), <code>Prefix</code>, <code>Limit</code> and <code>Offset</code>. The library keeps the values
+that start with <code>Prefix</code> and pages them, so a completer can ignore those and
+return every value. Returning an error, or panicking, keeps the rule's
+completion. It doesn't validate: check the value after <code>Run</code> if only listed
+values are allowed.</p>
+<p>For a long list, register with <code>CompletePaged</code> and apply the prefix, offset and
+limit yourself, for example in a query. <code>Limit</code> is one more than the page (so
+the library can tell whether more remain) and <code>0</code> means no limit; the library
+only truncates:</p>
+<pre><code class="language-go">cli.CompletePaged(&quot;customer&quot;, func(req clyops.CompleteRequest) ([]string, error) {
+	limit := int64(req.Limit)
+	if limit == 0 {
+		limit = -1 // SQLite: no limit
+	}
+	rows, err := db.Query(&quot;SELECT name FROM customers WHERE name LIKE ? || '%' ORDER BY name LIMIT ? OFFSET ?&quot;,
+		req.Prefix, limit, req.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&amp;name); err != nil {
+			return nil, err
+		}
+		names = append(names, name)
+	}
+	return names, rows.Err()
+})
+</code></pre>
+<p><code>cli.CompleteValues(name, prefix, limit, offset, words)</code> returns a
+<code>clyops.ValuesPage{Values, More}</code>, and <code>mytool --complete-values NAME PREFIX LIMIT OFFSET -- WORDS...</code> prints it as JSON for the HTTP API, MCP server and web
+runner. See the <a href="https://github.com/wankdanker/clyops/blob/21f55521d6bdaa35daf57fac97db3c4af50c0446/spec/SPEC.md">spec</a> sections 9.2 and 9.3.</p>
 <h2 id="parsing-and-errors">Parsing and errors</h2>
 <p>Use <code>Run</code> for a standalone program: it displays help/schema/completion and exits for those requests, or exits with status 1 on invalid input. Use the non-exiting <code>Parse</code> variant in libraries and tests; check its outcome before reading resolved values. Registration errors (duplicate names, unknown rules, or commands mixed with positionals) are programming errors, distinct from invalid user input. See the native reference for the language's result and error types.</p>
 <h2 id="more-recipes">More recipes</h2>

@@ -297,7 +297,7 @@
 <a href=#297 id=297 data-nosnippet>297</a>            set skipnext 0
 <a href=#298 id=298 data-nosnippet>298</a>        else if test $endopts -eq 0; and test "$w" = --
 <a href=#299 id=299 data-nosnippet>299</a>            set endopts 1
-<a href=#300 id=300 data-nosnippet>300</a>        else if test $endopts -eq 0; and string match -q -- '-?*' $w
+<a href=#300 id=300 data-nosnippet>300</a>        else if test $endopts -eq 0; and string match -qr -- '^-.' $w
 <a href=#301 id=301 data-nosnippet>301</a>            set -l i (contains -i -- $w $onames)
 <a href=#302 id=302 data-nosnippet>302</a>            test -n "$i"; and test "$otypes[$i]" = value; and set skipnext 1
 <a href=#303 id=303 data-nosnippet>303</a>        else

@@ -102,7 +102,7 @@
     
   
     
-      <strong class="classes">Classes:</strong> <span class='object_link'><a href="Clyops/Cli.html" title="Clyops::Cli (class)">Cli</a></span>, <span class='object_link'><a href="Clyops/DefinitionError.html" title="Clyops::DefinitionError (class)">DefinitionError</a></span>, <span class='object_link'><a href="Clyops/ParseResult.html" title="Clyops::ParseResult (class)">ParseResult</a></span>, <span class='object_link'><a href="Clyops/ValidationError.html" title="Clyops::ValidationError (class)">ValidationError</a></span>, <span class='object_link'><a href="Clyops/Values.html" title="Clyops::Values (class)">Values</a></span>
+      <strong class="classes">Classes:</strong> <span class='object_link'><a href="Clyops/Cli.html" title="Clyops::Cli (class)">Cli</a></span>, <span class='object_link'><a href="Clyops/CompleteRequest.html" title="Clyops::CompleteRequest (class)">CompleteRequest</a></span>, <span class='object_link'><a href="Clyops/DefinitionError.html" title="Clyops::DefinitionError (class)">DefinitionError</a></span>, <span class='object_link'><a href="Clyops/ParseResult.html" title="Clyops::ParseResult (class)">ParseResult</a></span>, <span class='object_link'><a href="Clyops/ValidationError.html" title="Clyops::ValidationError (class)">ValidationError</a></span>, <span class='object_link'><a href="Clyops/Values.html" title="Clyops::Values (class)">Values</a></span>, <span class='object_link'><a href="Clyops/ValuesPage.html" title="Clyops::ValuesPage (class)">ValuesPage</a></span>
     
   
 </p>
@@ -459,7 +459,7 @@ function __clyops___CLYOPS_FUNC___complete
             set skipnext 0
         else if test $endopts -eq 0; and test &quot;$w&quot; = --
             set endopts 1
-        else if test $endopts -eq 0; and string match -q -- &#39;-?*&#39; $w
+        else if test $endopts -eq 0; and string match -qr -- &#39;^-.&#39; $w
             set -l i (contains -i -- $w $onames)
             test -n &quot;$i&quot;; and test &quot;$otypes[$i]&quot; = value; and set skipnext 1
         else
@@ -626,6 +626,30 @@ complete -c __CLYOPS_PROG__ -f -a &#39;(__clyops___CLYOPS_FUNC___complete)&#39;
   
     <span class="summary_desc"><div class='inline'>
 <p>Return completion kind and values for the validation rule.</p>
+</div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#completion_record-class_method" title="completion_record (class method)">.<strong>completion_record</strong>(rule, search_dirs, completer, words)  &#x21d2; Array&lt;String&gt; </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'>
+<p>Return the kind and values of a completion record, asking the completer first (spec section 9.2).</p>
 </div></span>
   
 </li>
@@ -842,6 +866,30 @@ complete -c __CLYOPS_PROG__ -f -a &#39;(__clyops___CLYOPS_FUNC___complete)&#39;
   
     <span class="summary_desc"><div class='inline'>
 <p>Whether the validation rule is supported.</p>
+</div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#list_values-class_method" title="list_values (class method)">.<strong>list_values</strong>(completer, words, prefix, limit, offset, shell)  &#x21d2; Clyops::ValuesPage </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'>
+<p>Ask a completer for a page of values (spec section 9.2): the library pages unless the completer was registered as paged.</p>
 </div></span>
   
 </li>
@@ -1468,6 +1516,147 @@ complete -c __CLYOPS_PROG__ -f -a &#39;(__clyops___CLYOPS_FUNC___complete)&#39;
   <span class='kw'>return</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>host</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span> <span class='kw'>if</span> <span class='qwords_beg'>%w[</span><span class='tstring_content'>hostname</span><span class='words_sep'> </span><span class='tstring_content'>ip</span><span class='tstring_end'>]</span></span><span class='period'>.</span><span class='id identifier rubyid_include?'>include?</span><span class='lparen'>(</span><span class='id identifier rubyid_rule'>rule</span><span class='rparen'>)</span>
 
   <span class='id identifier rubyid_rule'>rule</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span> <span class='op'>?</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>default</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span> <span class='op'>:</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>none</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="completion_record-class_method">
+  
+    .<strong>completion_record</strong>(rule, search_dirs, completer, words)  &#x21d2; <tt>Array&lt;String&gt;</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    
+<p>Return the kind and values of a completion record, asking the completer first (spec section 9.2).</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>rule</span>
+      
+      
+        <span class='type'>(<tt>String</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>Validation rule.</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>search_dirs</span>
+      
+      
+        <span class='type'>(<tt>Array&lt;String&gt;</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>The search dirs value.</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>completer</span>
+      
+      
+        <span class='type'>(<tt><span class='object_link'>CompleterDef</span></tt>, <tt>nil</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>The registered completer, if any.</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>words</span>
+      
+      
+        <span class='type'>(<tt>Array&lt;String&gt;</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>Words typed after the program’s commands.</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Array&lt;String&gt;</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>the documented result.</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+582
+583
+584
+585
+586
+587
+588
+589
+590
+591</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 582</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_completion_record'>completion_record</span><span class='lparen'>(</span><span class='id identifier rubyid_rule'>rule</span><span class='comma'>,</span> <span class='id identifier rubyid_search_dirs'>search_dirs</span><span class='comma'>,</span> <span class='id identifier rubyid_completer'>completer</span><span class='comma'>,</span> <span class='id identifier rubyid_words'>words</span><span class='rparen'>)</span>
+  <span class='kw'>if</span> <span class='id identifier rubyid_completer'>completer</span>
+    <span class='kw'>begin</span>
+      <span class='kw'>return</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>choice</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_list_values'>list_values</span><span class='lparen'>(</span><span class='id identifier rubyid_completer'>completer</span><span class='comma'>,</span> <span class='id identifier rubyid_words'>words</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='const'>SHELL_COMPLETION_LIMIT</span><span class='comma'>,</span> <span class='int'>0</span><span class='comma'>,</span> <span class='kw'>true</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_values'>values</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>,</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='rbracket'>]</span>
+    <span class='kw'>rescue</span> <span class='const'>StandardError</span><span class='comma'>,</span> <span class='const'>ScriptError</span>
+      <span class='comment'># keep the rule&#39;s completion
+</span>    <span class='kw'>end</span>
+  <span class='kw'>end</span>
+  <span class='id identifier rubyid_completion_kind'>completion_kind</span><span class='lparen'>(</span><span class='id identifier rubyid_rule'>rule</span><span class='comma'>,</span> <span class='id identifier rubyid_search_dirs'>search_dirs</span><span class='rparen'>)</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -2307,6 +2496,198 @@ complete -c __CLYOPS_PROG__ -f -a &#39;(__clyops___CLYOPS_FUNC___complete)&#39;
   <span class='kw'>return</span> <span class='op'>!</span><span class='id identifier rubyid_rule'>rule</span><span class='period'>.</span><span class='id identifier rubyid_start_with?'>start_with?</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>json:{</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='op'>||</span> <span class='id identifier rubyid_json?'>json?</span><span class='lparen'>(</span><span class='id identifier rubyid_rule'>rule</span><span class='lbracket'>[</span><span class='int'>5</span><span class='op'>..</span><span class='rbracket'>]</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='id identifier rubyid_rule'>rule</span><span class='period'>.</span><span class='id identifier rubyid_start_with?'>start_with?</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>json:</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_rule'>rule</span><span class='period'>.</span><span class='id identifier rubyid_length'>length</span> <span class='op'>&gt;</span> <span class='int'>5</span>
 
   <span class='kw'>false</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="list_values-class_method">
+  
+    .<strong>list_values</strong>(completer, words, prefix, limit, offset, shell)  &#x21d2; <tt><span class='object_link'><a href="Clyops/ValuesPage.html" title="Clyops::ValuesPage (class)">Clyops::ValuesPage</a></span></tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    
+<p>Ask a completer for a page of values (spec section 9.2): the library pages unless the completer was registered as paged. ‘shell` also drops values the completion scripts would split. Raises when the completer fails.</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>completer</span>
+      
+      
+        <span class='type'>(<tt><span class='object_link'>CompleterDef</span></tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>The registered completer and its mode.</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>words</span>
+      
+      
+        <span class='type'>(<tt>Array&lt;String&gt;</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>Words typed after the program’s commands.</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>prefix</span>
+      
+      
+        <span class='type'>(<tt>String</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>The text being completed.</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>limit</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>The most values wanted.</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>offset</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>How many matching values to skip.</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>shell</span>
+      
+      
+        <span class='type'>(<tt>Boolean</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>Whether the values are for a completion record.</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="Clyops/ValuesPage.html" title="Clyops::ValuesPage (class)">Clyops::ValuesPage</a></span></tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>the page.</p>
+</div>
+      
+    </li>
+  
+</ul>
+<p class="tag_title">Raises:</p>
+<ul class="raise">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>TypeError</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+562
+563
+564
+565
+566
+567
+568
+569
+570
+571
+572
+573
+574</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 562</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_list_values'>list_values</span><span class='lparen'>(</span><span class='id identifier rubyid_completer'>completer</span><span class='comma'>,</span> <span class='id identifier rubyid_words'>words</span><span class='comma'>,</span> <span class='id identifier rubyid_prefix'>prefix</span><span class='comma'>,</span> <span class='id identifier rubyid_limit'>limit</span><span class='comma'>,</span> <span class='id identifier rubyid_offset'>offset</span><span class='comma'>,</span> <span class='id identifier rubyid_shell'>shell</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_request'>request</span> <span class='op'>=</span> <span class='kw'>if</span> <span class='id identifier rubyid_completer'>completer</span><span class='period'>.</span><span class='id identifier rubyid_paged'>paged</span>
+              <span class='const'><span class='object_link'><a href="Clyops/CompleteRequest.html" title="Clyops::CompleteRequest (class)">CompleteRequest</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='label'>words:</span> <span class='id identifier rubyid_words'>words</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span><span class='comma'>,</span> <span class='label'>prefix:</span> <span class='id identifier rubyid_prefix'>prefix</span><span class='comma'>,</span> <span class='label'>limit:</span> <span class='id identifier rubyid_limit'>limit</span> <span class='op'>+</span> <span class='int'>1</span><span class='comma'>,</span> <span class='label'>offset:</span> <span class='id identifier rubyid_offset'>offset</span><span class='rparen'>)</span>
+            <span class='kw'>else</span>
+              <span class='const'><span class='object_link'><a href="Clyops/CompleteRequest.html" title="Clyops::CompleteRequest (class)">CompleteRequest</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='label'>words:</span> <span class='id identifier rubyid_words'>words</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span><span class='comma'>,</span> <span class='label'>prefix:</span> <span class='id identifier rubyid_prefix'>prefix</span><span class='comma'>,</span> <span class='label'>limit:</span> <span class='int'>0</span><span class='comma'>,</span> <span class='label'>offset:</span> <span class='int'>0</span><span class='rparen'>)</span>
+            <span class='kw'>end</span>
+  <span class='id identifier rubyid_list'>list</span> <span class='op'>=</span> <span class='id identifier rubyid_completer'>completer</span><span class='period'>.</span><span class='id identifier rubyid_fn'>fn</span><span class='period'>.</span><span class='id identifier rubyid_call'>call</span><span class='lparen'>(</span><span class='id identifier rubyid_request'>request</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_raise'>raise</span> <span class='const'>TypeError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>a completer returns a list of strings</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>unless</span> <span class='id identifier rubyid_list'>list</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>Array</span><span class='rparen'>)</span>
+
+  <span class='id identifier rubyid_values'>values</span> <span class='op'>=</span> <span class='id identifier rubyid_list'>list</span><span class='period'>.</span><span class='id identifier rubyid_select'>select</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_v'>v</span><span class='op'>|</span> <span class='id identifier rubyid_v'>v</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>String</span><span class='rparen'>)</span> <span class='op'>&amp;&amp;</span> <span class='op'>!</span><span class='id identifier rubyid_v'>v</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span> <span class='op'>&amp;&amp;</span> <span class='op'>!</span><span class='lparen'>(</span><span class='id identifier rubyid_shell'>shell</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_v'>v</span><span class='period'>.</span><span class='id identifier rubyid_match?'>match?</span><span class='lparen'>(</span><span class='tstring'><span class='regexp_beg'>/</span><span class='tstring_content'>[, \t\r\n]</span><span class='regexp_end'>/</span></span><span class='rparen'>)</span><span class='rparen'>)</span> <span class='rbrace'>}</span><span class='period'>.</span><span class='id identifier rubyid_uniq'>uniq</span>
+  <span class='id identifier rubyid_values'>values</span> <span class='op'>=</span> <span class='id identifier rubyid_values'>values</span><span class='period'>.</span><span class='id identifier rubyid_select'>select</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_v'>v</span><span class='op'>|</span> <span class='id identifier rubyid_v'>v</span><span class='period'>.</span><span class='id identifier rubyid_start_with?'>start_with?</span><span class='lparen'>(</span><span class='id identifier rubyid_prefix'>prefix</span><span class='rparen'>)</span> <span class='rbrace'>}</span><span class='period'>.</span><span class='id identifier rubyid_drop'>drop</span><span class='lparen'>(</span><span class='id identifier rubyid_offset'>offset</span><span class='rparen'>)</span> <span class='kw'>unless</span> <span class='id identifier rubyid_completer'>completer</span><span class='period'>.</span><span class='id identifier rubyid_paged'>paged</span>
+  <span class='const'><span class='object_link'><a href="Clyops/ValuesPage.html" title="Clyops::ValuesPage (class)">ValuesPage</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='label'>values:</span> <span class='id identifier rubyid_values'>values</span><span class='period'>.</span><span class='id identifier rubyid_take'>take</span><span class='lparen'>(</span><span class='id identifier rubyid_limit'>limit</span><span class='rparen'>)</span><span class='comma'>,</span> <span class='label'>more:</span> <span class='id identifier rubyid_values'>values</span><span class='period'>.</span><span class='id identifier rubyid_length'>length</span> <span class='op'>&gt;</span> <span class='id identifier rubyid_limit'>limit</span><span class='rparen'>)</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -3419,7 +3800,7 @@ complete -c __CLYOPS_PROG__ -f -a &#39;(__clyops___CLYOPS_FUNC___complete)&#39;
 </div>
 
       <div id="footer">
-  Generated on Fri Oct 30 14:59:11 2026 by
+  Generated on Tue Nov 10 22:54:09 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.38 (ruby-3.3.13).
 </div>

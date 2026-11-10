@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['rule_0',['rule',['../structclyops__meta__t.html#a8a3c75665e15e5ba6f7a63ce33777ed4',1,'clyops_meta_t']]]
+  ['limit_0',['limit',['../structclyops__complete__request__t.html#a5b3ce6c2489290c4b3203b3a2c969b40',1,'clyops_complete_request_t']]]
 ];

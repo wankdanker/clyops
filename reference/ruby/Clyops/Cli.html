@@ -372,6 +372,54 @@
         <li class="public ">
   <span class="summary_signature">
     
+      <a href="#complete-instance_method" title="#complete (instance method)">#<strong>complete</strong>(name, callable = nil, paged: false) {|request| ... } &#x21d2; Clyops::Cli </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'>
+<p>List the values of the value option or argument ‘name` of this level (spec section 9.2), for shell completion and –complete-values.</p>
+</div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#complete_values-instance_method" title="#complete_values (instance method)">#<strong>complete_values</strong>(name, prefix, limit, offset, words = [])  &#x21d2; Clyops::ValuesPage </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'>
+<p>A page of the values of ‘name` (spec section 9.3): an option of the chain selected by `words` (nearest first) or an argument of that command.</p>
+</div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
       <a href="#completion_data-instance_method" title="#completion_data (instance method)">#<strong>completion_data</strong>(words = [])  &#x21d2; String </a>
     
 
@@ -797,7 +845,7 @@
 
   
     <span class="summary_desc"><div class='inline'>
-<p>Parse like a CLI: handles –help, –help-json-schema, –completion and –bash-completion, prints errors and exits on failure.</p>
+<p>Parse like a CLI: handles –help, –help-json-schema, –completion, –bash-completion and –complete-values, prints errors and exits on failure.</p>
 </div></span>
   
 </li>
@@ -1175,40 +1223,40 @@
       <pre class="lines">
 
 
-606
-607
-608
-609
-610
-611
-612
-613
-614
-615
-616
-617
-618
-619
-620
-621
-622
-623
-624
-625
-626
-627
-628
-629
-630
-631
-632
-633
-634
-635
-636</pre>
+667
+668
+669
+670
+671
+672
+673
+674
+675
+676
+677
+678
+679
+680
+681
+682
+683
+684
+685
+686
+687
+688
+689
+690
+691
+692
+693
+694
+695
+696
+697</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 606</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 667</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='label'>name:</span> <span class='kw'>nil</span><span class='comma'>,</span> <span class='label'>root:</span> <span class='kw'>nil</span><span class='comma'>,</span> <span class='label'>cwd:</span> <span class='kw'>nil</span><span class='comma'>,</span> <span class='label'>env:</span> <span class='kw'>nil</span><span class='rparen'>)</span>
   <span class='ivar'>@name</span> <span class='op'>=</span> <span class='id identifier rubyid_name'>name</span> <span class='op'>||</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_basename'>basename</span><span class='lparen'>(</span><span class='gvar'>$PROGRAM_NAME</span> <span class='op'>||</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>cli</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -1292,12 +1340,12 @@
       <pre class="lines">
 
 
-592
-593
-594</pre>
+653
+654
+655</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 592</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 653</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_cwd'>cwd</span>
   <span class='ivar'>@cwd</span>
@@ -1348,12 +1396,12 @@
       <pre class="lines">
 
 
-598
-599
-600</pre>
+659
+660
+661</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 598</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 659</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_env'>env</span>
   <span class='ivar'>@env</span>
@@ -1404,12 +1452,12 @@
       <pre class="lines">
 
 
-586
-587
-588</pre>
+647
+648
+649</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 586</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 647</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_name'>name</span>
   <span class='ivar'>@name</span>
@@ -1460,12 +1508,12 @@
       <pre class="lines">
 
 
-595
-596
-597</pre>
+656
+657
+658</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 595</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 656</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_root'><span class='object_link'><a href="../top-level-namespace.html" title="Top Level Namespace (root)">root</a></span></span>
   <span class='ivar'>@root</span>
@@ -1516,12 +1564,12 @@
       <pre class="lines">
 
 
-589
-590
-591</pre>
+650
+651
+652</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 589</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 650</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_values'>values</span>
   <span class='ivar'>@values</span>
@@ -1656,12 +1704,12 @@
       <pre class="lines">
 
 
-831
-832
-833</pre>
+946
+947
+948</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 831</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 946</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_arg'>arg</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='comma'>,</span> <span class='id identifier rubyid_description'>description</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_default'>default</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_rule'>rule</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='id identifier rubyid_add_arg'>add_arg</span><span class='lparen'>(</span><span class='const'>Arg</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='comma'>,</span> <span class='id identifier rubyid_description'>description</span><span class='comma'>,</span> <span class='id identifier rubyid_default'>default</span><span class='comma'>,</span> <span class='id identifier rubyid_rule'>rule</span><span class='comma'>,</span> <span class='kw'>false</span><span class='rparen'>)</span><span class='rparen'>)</span>
@@ -1771,12 +1819,12 @@
       <pre class="lines">
 
 
-840
-841
-842</pre>
+955
+956
+957</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 840</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 955</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_arg_variadic'>arg_variadic</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='comma'>,</span> <span class='id identifier rubyid_description'>description</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_rule'>rule</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='id identifier rubyid_add_arg'>add_arg</span><span class='lparen'>(</span><span class='const'>Arg</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='comma'>,</span> <span class='id identifier rubyid_description'>description</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_rule'>rule</span><span class='comma'>,</span> <span class='kw'>true</span><span class='rparen'>)</span><span class='rparen'>)</span>
@@ -1881,18 +1929,18 @@
       <pre class="lines">
 
 
-744
-745
-746
-747
-748
-749
-750
-751
-752</pre>
+805
+806
+807
+808
+809
+810
+811
+812
+813</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 744</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 805</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_command'>command</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='comma'>,</span> <span class='id identifier rubyid_description'>description</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='id identifier rubyid_raise'>raise</span> <span class='const'><span class='object_link'><a href="DefinitionError.html" title="Clyops::DefinitionError (class)">DefinitionError</a></span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Cannot mix commands and positional arguments</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>unless</span> <span class='ivar'>@args</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
@@ -1952,18 +2000,18 @@
       <pre class="lines">
 
 
-756
-757
-758
-759
-760
-761
-762
-763
-764</pre>
+817
+818
+819
+820
+821
+822
+823
+824
+825</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 756</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 817</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_command_path'>command_path</span>
   <span class='id identifier rubyid_words'>words</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
@@ -1973,6 +2021,380 @@
     <span class='id identifier rubyid_node'>node</span> <span class='op'>=</span> <span class='id identifier rubyid_node'>node</span><span class='period'>.</span><span class='id identifier rubyid_parent'>parent</span>
   <span class='kw'>end</span>
   <span class='id identifier rubyid_words'>words</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="complete-instance_method">
+  
+    #<strong>complete</strong>(name, callable = nil, paged: false) {|request| ... } &#x21d2; <tt><span class='object_link'><a href="" title="Clyops::Cli (class)">Clyops::Cli</a></span></tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    
+<p>List the values of the value option or argument ‘name` of this level (spec section 9.2), for shell completion and –complete-values. The completer gets a CompleteRequest (the words typed after the commands, a prefix, a limit and an offset) and returns strings. The library keeps the values starting with the prefix and pages them, unless `paged` is set: then the completer applies the prefix, offset and limit itself, as a database query can. It doesn’t validate anything. Registering a name again replaces it.</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>name</span>
+      
+      
+        <span class='type'>(<tt>String</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>Long option name without –, or positional argument name.</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>callable</span>
+      
+      
+        <span class='type'>(<tt>#call</tt>, <tt>nil</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>nil</tt>)</em>
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>The completer, when no block is given.</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>paged</span>
+      
+      
+        <span class='type'>(<tt>Boolean</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>false</tt>)</em>
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>Whether the completer applies the prefix, offset and limit itself.</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Yield Parameters:</p>
+<ul class="yieldparam">
+  
+    <li>
+      
+        <span class='name'>request</span>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="CompleteRequest.html" title="Clyops::CompleteRequest (class)">Clyops::CompleteRequest</a></span></tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>What is asked for.</p>
+</div>
+      
+    </li>
+  
+</ul>
+<p class="tag_title">Yield Returns:</p>
+<ul class="yieldreturn">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Array&lt;String&gt;</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>Values to offer.</p>
+</div>
+      
+    </li>
+  
+</ul>
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="" title="Clyops::Cli (class)">Clyops::Cli</a></span></tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>this CLI or the new child command.</p>
+</div>
+      
+    </li>
+  
+</ul>
+<p class="tag_title">Raises:</p>
+<ul class="raise">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>ArgumentError</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+871
+872
+873
+874
+875
+876
+877
+878
+879
+880
+881</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 871</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_complete'>complete</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='comma'>,</span> <span class='id identifier rubyid_callable'>callable</span> <span class='op'>=</span> <span class='kw'>nil</span><span class='comma'>,</span> <span class='label'>paged:</span> <span class='kw'>false</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_fn'>fn</span> <span class='op'>=</span> <span class='id identifier rubyid_callable'>callable</span> <span class='op'>||</span> <span class='id identifier rubyid_block'>block</span>
+  <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>complete needs a callable or a block</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>unless</span> <span class='id identifier rubyid_fn'>fn</span><span class='period'>.</span><span class='id identifier rubyid_respond_to?'>respond_to?</span><span class='lparen'>(</span><span class='symbol'>:call</span><span class='rparen'>)</span>
+
+  <span class='id identifier rubyid_target'>target</span> <span class='op'>=</span> <span class='ivar'>@by_long</span><span class='lbracket'>[</span><span class='id identifier rubyid_name'>name</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='ivar'>@args</span><span class='period'>.</span><span class='id identifier rubyid_find'>find</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_a'>a</span><span class='op'>|</span> <span class='id identifier rubyid_a'>a</span><span class='period'>.</span><span class='id identifier rubyid_name'>name</span> <span class='op'>==</span> <span class='id identifier rubyid_name'>name</span> <span class='rbrace'>}</span>
+  <span class='id identifier rubyid_raise'>raise</span> <span class='const'><span class='object_link'><a href="DefinitionError.html" title="Clyops::DefinitionError (class)">DefinitionError</a></span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Unknown option or argument &#39;</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_name'>name</span><span class='embexpr_end'>}</span><span class='tstring_content'>&#39; for complete</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>unless</span> <span class='id identifier rubyid_target'>target</span>
+  <span class='id identifier rubyid_raise'>raise</span> <span class='const'><span class='object_link'><a href="DefinitionError.html" title="Clyops::DefinitionError (class)">DefinitionError</a></span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Flag --</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_name'>name</span><span class='embexpr_end'>}</span><span class='tstring_content'> takes no value to complete</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>if</span> <span class='id identifier rubyid_target'>target</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>Option</span><span class='rparen'>)</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_target'>target</span><span class='period'>.</span><span class='id identifier rubyid_kind'>kind</span> <span class='op'>==</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>flag</span><span class='tstring_end'>&quot;</span></span>
+
+  <span class='id identifier rubyid_target'>target</span><span class='period'>.</span><span class='id identifier rubyid_completer'>completer</span> <span class='op'>=</span> <span class='const'>CompleterDef</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='id identifier rubyid_fn'>fn</span><span class='comma'>,</span> <span class='id identifier rubyid_paged'>paged</span> <span class='op'>?</span> <span class='kw'>true</span> <span class='op'>:</span> <span class='kw'>false</span><span class='rparen'>)</span>
+  <span class='kw'>self</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="complete_values-instance_method">
+  
+    #<strong>complete_values</strong>(name, prefix, limit, offset, words = [])  &#x21d2; <tt><span class='object_link'><a href="ValuesPage.html" title="Clyops::ValuesPage (class)">Clyops::ValuesPage</a></span></tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    
+<p>A page of the values of ‘name` (spec section 9.3): an option of the chain selected by `words` (nearest first) or an argument of that command. Raises ArgumentError with `No completer for ’NAME’‘ or `Completer for ’NAME’ failed`.</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>name</span>
+      
+      
+        <span class='type'>(<tt>String</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>Long option name without –, or positional argument name.</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>prefix</span>
+      
+      
+        <span class='type'>(<tt>String</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>The text being completed.</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>limit</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>The most values wanted (at least 1).</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>offset</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>How many matching values to skip.</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>words</span>
+      
+      
+        <span class='type'>(<tt>Array&lt;String&gt;</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>[]</tt>)</em>
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>Words typed after the program name.</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="ValuesPage.html" title="Clyops::ValuesPage (class)">Clyops::ValuesPage</a></span></tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'>
+<p>the values and whether more remain.</p>
+</div>
+      
+    </li>
+  
+</ul>
+<p class="tag_title">Raises:</p>
+<ul class="raise">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>ArgumentError</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+892
+893
+894
+895
+896
+897
+898
+899
+900
+901
+902
+903
+904
+905
+906
+907
+908
+909
+910
+911</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 892</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_complete_values'>complete_values</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='comma'>,</span> <span class='id identifier rubyid_prefix'>prefix</span><span class='comma'>,</span> <span class='id identifier rubyid_limit'>limit</span><span class='comma'>,</span> <span class='id identifier rubyid_offset'>offset</span><span class='comma'>,</span> <span class='id identifier rubyid_words'>words</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_words'>words</span> <span class='op'>=</span> <span class='id identifier rubyid_words'>words</span><span class='period'>.</span><span class='id identifier rubyid_to_a'>to_a</span>
+  <span class='id identifier rubyid_node'>node</span><span class='comma'>,</span> <span class='id identifier rubyid_skip'>skip</span> <span class='op'>=</span> <span class='id identifier rubyid_follow_words'>follow_words</span><span class='lparen'>(</span><span class='id identifier rubyid_words'>words</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_completer'>completer</span> <span class='op'>=</span> <span class='kw'>nil</span>
+  <span class='kw'>if</span> <span class='id identifier rubyid_node'>node</span>
+    <span class='id identifier rubyid_n'>n</span> <span class='op'>=</span> <span class='id identifier rubyid_node'>node</span>
+    <span class='kw'>while</span> <span class='id identifier rubyid_n'>n</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_completer'>completer</span><span class='period'>.</span><span class='id identifier rubyid_nil?'>nil?</span>
+      <span class='id identifier rubyid_completer'>completer</span> <span class='op'>=</span> <span class='id identifier rubyid_n'>n</span><span class='period'>.</span><span class='id identifier rubyid_by_long'>by_long</span><span class='lbracket'>[</span><span class='id identifier rubyid_name'>name</span><span class='rbracket'>]</span><span class='op'>&amp;.</span><span class='id identifier rubyid_completer'>completer</span>
+      <span class='id identifier rubyid_n'>n</span> <span class='op'>=</span> <span class='id identifier rubyid_n'>n</span><span class='period'>.</span><span class='id identifier rubyid_parent'>parent</span>
+    <span class='kw'>end</span>
+    <span class='id identifier rubyid_completer'>completer</span> <span class='op'>||=</span> <span class='id identifier rubyid_node'>node</span><span class='period'>.</span><span class='id identifier rubyid_args'>args</span><span class='period'>.</span><span class='id identifier rubyid_find'>find</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_a'>a</span><span class='op'>|</span> <span class='id identifier rubyid_a'>a</span><span class='period'>.</span><span class='id identifier rubyid_name'>name</span> <span class='op'>==</span> <span class='id identifier rubyid_name'>name</span> <span class='rbrace'>}</span><span class='op'>&amp;.</span><span class='id identifier rubyid_completer'>completer</span>
+  <span class='kw'>end</span>
+  <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>No completer for &#39;</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_name'>name</span><span class='embexpr_end'>}</span><span class='tstring_content'>&#39;</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>unless</span> <span class='id identifier rubyid_completer'>completer</span>
+
+  <span class='kw'>begin</span>
+    <span class='const'><span class='object_link'><a href="../Clyops.html" title="Clyops (module)">Clyops</a></span></span><span class='period'>.</span><span class='id identifier rubyid_list_values'><span class='object_link'><a href="../Clyops.html#list_values-class_method" title="Clyops.list_values (method)">list_values</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_completer'>completer</span><span class='comma'>,</span> <span class='id identifier rubyid_words'>words</span><span class='period'>.</span><span class='id identifier rubyid_drop'>drop</span><span class='lparen'>(</span><span class='id identifier rubyid_skip'>skip</span><span class='rparen'>)</span><span class='comma'>,</span> <span class='id identifier rubyid_prefix'>prefix</span><span class='comma'>,</span> <span class='id identifier rubyid_limit'>limit</span><span class='comma'>,</span> <span class='id identifier rubyid_offset'>offset</span><span class='comma'>,</span> <span class='kw'>false</span><span class='rparen'>)</span>
+  <span class='kw'>rescue</span> <span class='const'>StandardError</span><span class='comma'>,</span> <span class='const'>ScriptError</span>
+    <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Completer for &#39;</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_name'>name</span><span class='embexpr_end'>}</span><span class='tstring_content'>&#39; failed</span><span class='tstring_end'>&quot;</span></span>
+  <span class='kw'>end</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -2045,68 +2467,54 @@
       <pre class="lines">
 
 
-1087
-1088
-1089
-1090
-1091
-1092
-1093
-1094
-1095
-1096
-1097
-1098
-1099
-1100
-1101
-1102
-1103
-1104
-1105
-1106
-1107
-1108
-1109
-1110
-1111
-1112
-1113
-1114
-1115
-1116
-1117
-1118
-1119
-1120
-1121
-1122
-1123
-1124
-1125
-1126
-1127</pre>
+1221
+1222
+1223
+1224
+1225
+1226
+1227
+1228
+1229
+1230
+1231
+1232
+1233
+1234
+1235
+1236
+1237
+1238
+1239
+1240
+1241
+1242
+1243
+1244
+1245
+1246
+1247
+1248
+1249
+1250
+1251
+1252
+1253
+1254</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 1087</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 1221</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_completion_data'>completion_data</span><span class='lparen'>(</span><span class='id identifier rubyid_words'>words</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_ensure_help'>ensure_help</span>
   <span class='id identifier rubyid_clean'>clean</span> <span class='op'>=</span> <span class='tlambda'>-&gt;</span><span class='lparen'>(</span><span class='id identifier rubyid_s'>s</span><span class='rparen'>)</span> <span class='tlambeg'>{</span> <span class='id identifier rubyid_s'>s</span><span class='period'>.</span><span class='id identifier rubyid_tr'>tr</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>\t\n</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>  </span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='rbrace'>}</span>
   <span class='id identifier rubyid_lines'>lines</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>#clyops-completion 1</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
-  <span class='id identifier rubyid_node'>node</span> <span class='op'>=</span> <span class='kw'>self</span>
+  <span class='id identifier rubyid_node'>node</span><span class='comma'>,</span> <span class='id identifier rubyid_skip'>skip</span> <span class='op'>=</span> <span class='id identifier rubyid_follow_words'>follow_words</span><span class='lparen'>(</span><span class='id identifier rubyid_words'>words</span><span class='rparen'>)</span>
+  <span class='kw'>return</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_lines'>lines</span><span class='lbracket'>[</span><span class='int'>0</span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_content'>\n</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>unless</span> <span class='id identifier rubyid_node'>node</span>
+
   <span class='kw'>unless</span> <span class='ivar'>@children</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
-    <span class='id identifier rubyid_skip'>skip</span> <span class='op'>=</span> <span class='int'>0</span>
-    <span class='id identifier rubyid_words'>words</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_w'>w</span><span class='op'>|</span>
-      <span class='id identifier rubyid_child'>child</span> <span class='op'>=</span> <span class='id identifier rubyid_node'>node</span><span class='period'>.</span><span class='id identifier rubyid_children'>children</span><span class='period'>.</span><span class='id identifier rubyid_find'>find</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_c'>c</span><span class='op'>|</span> <span class='id identifier rubyid_c'>c</span><span class='period'>.</span><span class='id identifier rubyid_word'>word</span> <span class='op'>==</span> <span class='id identifier rubyid_w'>w</span> <span class='rbrace'>}</span>
-      <span class='kw'>break</span> <span class='kw'>unless</span> <span class='id identifier rubyid_child'>child</span>
-
-      <span class='id identifier rubyid_node'>node</span> <span class='op'>=</span> <span class='id identifier rubyid_child'>child</span>
-      <span class='id identifier rubyid_skip'>skip</span> <span class='op'>+=</span> <span class='int'>1</span>
-    <span class='kw'>end</span>
-    <span class='kw'>return</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_lines'>lines</span><span class='lbracket'>[</span><span class='int'>0</span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_content'>\n</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>if</span> <span class='op'>!</span><span class='id identifier rubyid_node'>node</span><span class='period'>.</span><span class='id identifier rubyid_children'>children</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_skip'>skip</span> <span class='op'>&lt;</span> <span class='id identifier rubyid_words'>words</span><span class='period'>.</span><span class='id identifier rubyid_length'>length</span> <span class='op'>&amp;&amp;</span> <span class='op'>!</span><span class='id identifier rubyid_words'>words</span><span class='lbracket'>[</span><span class='id identifier rubyid_skip'>skip</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_start_with?'>start_with?</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>-</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
-
     <span class='id identifier rubyid_lines'>lines</span> <span class='op'>&lt;&lt;</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>skip\t</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_skip'>skip</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+    <span class='id identifier rubyid_words'>words</span> <span class='op'>=</span> <span class='id identifier rubyid_words'>words</span><span class='period'>.</span><span class='id identifier rubyid_drop'>drop</span><span class='lparen'>(</span><span class='id identifier rubyid_skip'>skip</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_node'>node</span><span class='period'>.</span><span class='id identifier rubyid_children'>children</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_c'>c</span><span class='op'>|</span> <span class='id identifier rubyid_lines'>lines</span> <span class='op'>&lt;&lt;</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>cmd\t</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_c'>c</span><span class='period'>.</span><span class='id identifier rubyid_word'>word</span><span class='embexpr_end'>}</span><span class='tstring_content'>\t</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_clean'>clean</span><span class='period'>.</span><span class='lparen'>(</span><span class='id identifier rubyid_c'>c</span><span class='period'>.</span><span class='id identifier rubyid_description'>description</span><span class='rparen'>)</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span> <span class='rbrace'>}</span>
   <span class='kw'>end</span>
   <span class='id identifier rubyid_options'>options</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
@@ -2120,13 +2528,13 @@
     <span class='kw'>if</span> <span class='id identifier rubyid_o'>o</span><span class='period'>.</span><span class='id identifier rubyid_kind'>kind</span> <span class='op'>==</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>flag</span><span class='tstring_end'>&quot;</span></span>
       <span class='id identifier rubyid_lines'>lines</span> <span class='op'>&lt;&lt;</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>opt\t--</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_o'>o</span><span class='period'>.</span><span class='id identifier rubyid_long'>long</span><span class='embexpr_end'>}</span><span class='tstring_content'>\t</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_short'>short</span><span class='embexpr_end'>}</span><span class='tstring_content'>\tflag\tnone\t-\t</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_clean'>clean</span><span class='period'>.</span><span class='lparen'>(</span><span class='id identifier rubyid_o'>o</span><span class='period'>.</span><span class='id identifier rubyid_description'>description</span><span class='rparen'>)</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
     <span class='kw'>else</span>
-      <span class='id identifier rubyid_kind'>kind</span><span class='comma'>,</span> <span class='id identifier rubyid_values'>values</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="../Clyops.html" title="Clyops (module)">Clyops</a></span></span><span class='period'>.</span><span class='id identifier rubyid_completion_kind'><span class='object_link'><a href="../Clyops.html#completion_kind-class_method" title="Clyops.completion_kind (method)">completion_kind</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_o'>o</span><span class='period'>.</span><span class='id identifier rubyid_rule'>rule</span><span class='comma'>,</span> <span class='id identifier rubyid_o'>o</span><span class='period'>.</span><span class='id identifier rubyid_search_dirs'>search_dirs</span><span class='rparen'>)</span>
+      <span class='id identifier rubyid_kind'>kind</span><span class='comma'>,</span> <span class='id identifier rubyid_values'>values</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="../Clyops.html" title="Clyops (module)">Clyops</a></span></span><span class='period'>.</span><span class='id identifier rubyid_completion_record'><span class='object_link'><a href="../Clyops.html#completion_record-class_method" title="Clyops.completion_record (method)">completion_record</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_o'>o</span><span class='period'>.</span><span class='id identifier rubyid_rule'>rule</span><span class='comma'>,</span> <span class='id identifier rubyid_o'>o</span><span class='period'>.</span><span class='id identifier rubyid_search_dirs'>search_dirs</span><span class='comma'>,</span> <span class='id identifier rubyid_o'>o</span><span class='period'>.</span><span class='id identifier rubyid_completer'>completer</span><span class='comma'>,</span> <span class='id identifier rubyid_words'>words</span><span class='rparen'>)</span>
       <span class='id identifier rubyid_lines'>lines</span> <span class='op'>&lt;&lt;</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>opt\t--</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_o'>o</span><span class='period'>.</span><span class='id identifier rubyid_long'>long</span><span class='embexpr_end'>}</span><span class='tstring_content'>\t</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_short'>short</span><span class='embexpr_end'>}</span><span class='tstring_content'>\tvalue\t</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_kind'>kind</span><span class='embexpr_end'>}</span><span class='tstring_content'>\t</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_values'>values</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span> <span class='op'>?</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>-</span><span class='tstring_end'>&#39;</span></span> <span class='op'>:</span> <span class='id identifier rubyid_values'>values</span><span class='embexpr_end'>}</span><span class='tstring_content'>\t</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_clean'>clean</span><span class='period'>.</span><span class='lparen'>(</span><span class='id identifier rubyid_o'>o</span><span class='period'>.</span><span class='id identifier rubyid_description'>description</span><span class='rparen'>)</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
     <span class='kw'>end</span>
     <span class='id identifier rubyid_lines'>lines</span> <span class='op'>&lt;&lt;</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>opt\t--no-</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_o'>o</span><span class='period'>.</span><span class='id identifier rubyid_long'>long</span><span class='embexpr_end'>}</span><span class='tstring_content'>\t-\tflag\tnone\t-\t</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_clean'>clean</span><span class='period'>.</span><span class='lparen'>(</span><span class='id identifier rubyid_o'>o</span><span class='period'>.</span><span class='id identifier rubyid_description'>description</span><span class='rparen'>)</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>if</span> <span class='id identifier rubyid_o'>o</span><span class='period'>.</span><span class='id identifier rubyid_bool_like?'>bool_like?</span>
   <span class='kw'>end</span>
   <span class='id identifier rubyid_node'>node</span><span class='period'>.</span><span class='id identifier rubyid_args'>args</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_a'>a</span><span class='op'>|</span>
-    <span class='id identifier rubyid_kind'>kind</span><span class='comma'>,</span> <span class='id identifier rubyid_values'>values</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="../Clyops.html" title="Clyops (module)">Clyops</a></span></span><span class='period'>.</span><span class='id identifier rubyid_completion_kind'><span class='object_link'><a href="../Clyops.html#completion_kind-class_method" title="Clyops.completion_kind (method)">completion_kind</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_a'>a</span><span class='period'>.</span><span class='id identifier rubyid_rule'>rule</span><span class='comma'>,</span> <span class='lbracket'>[</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_kind'>kind</span><span class='comma'>,</span> <span class='id identifier rubyid_values'>values</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="../Clyops.html" title="Clyops (module)">Clyops</a></span></span><span class='period'>.</span><span class='id identifier rubyid_completion_record'><span class='object_link'><a href="../Clyops.html#completion_record-class_method" title="Clyops.completion_record (method)">completion_record</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_a'>a</span><span class='period'>.</span><span class='id identifier rubyid_rule'>rule</span><span class='comma'>,</span> <span class='lbracket'>[</span><span class='rbracket'>]</span><span class='comma'>,</span> <span class='id identifier rubyid_a'>a</span><span class='period'>.</span><span class='id identifier rubyid_completer'>completer</span><span class='comma'>,</span> <span class='id identifier rubyid_words'>words</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_lines'>lines</span> <span class='op'>&lt;&lt;</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>arg\t</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_a'>a</span><span class='period'>.</span><span class='id identifier rubyid_name'>name</span><span class='embexpr_end'>}</span><span class='tstring_content'>\t</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_a'>a</span><span class='period'>.</span><span class='id identifier rubyid_variadic'>variadic</span> <span class='op'>?</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>variadic</span><span class='tstring_end'>&#39;</span></span> <span class='op'>:</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>single</span><span class='tstring_end'>&#39;</span></span><span class='embexpr_end'>}</span><span class='tstring_content'>\t</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_kind'>kind</span><span class='embexpr_end'>}</span><span class='tstring_content'>\t</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_values'>values</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span> <span class='op'>?</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>-</span><span class='tstring_end'>&#39;</span></span> <span class='op'>:</span> <span class='id identifier rubyid_values'>values</span><span class='embexpr_end'>}</span><span class='tstring_content'>\t</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_clean'>clean</span><span class='period'>.</span><span class='lparen'>(</span><span class='id identifier rubyid_a'>a</span><span class='period'>.</span><span class='id identifier rubyid_description'>description</span><span class='rparen'>)</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
   <span class='kw'>end</span>
   <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_lines'>lines</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>\n</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='embexpr_end'>}</span><span class='tstring_content'>\n</span><span class='tstring_end'>&quot;</span></span>
@@ -2200,15 +2608,15 @@
       <pre class="lines">
 
 
-1076
-1077
-1078
-1079
-1080
-1081</pre>
+1210
+1211
+1212
+1213
+1214
+1215</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 1076</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 1210</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_completion_script'>completion_script</span><span class='lparen'>(</span><span class='id identifier rubyid_shell'>shell</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_template'>template</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="../Clyops.html#COMPLETION_SCRIPTS-constant" title="Clyops::COMPLETION_SCRIPTS (constant)">COMPLETION_SCRIPTS</a></span></span><span class='lbracket'>[</span><span class='id identifier rubyid_shell'>shell</span><span class='rbracket'>]</span>
@@ -2296,27 +2704,27 @@
       <pre class="lines">
 
 
-700
-701
-702
-703
-704
-705
-706
-707
-708
-709
-710
-711
-712
-713
-714
-715
-716
-717</pre>
+761
+762
+763
+764
+765
+766
+767
+768
+769
+770
+771
+772
+773
+774
+775
+776
+777
+778</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 700</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 761</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_emit'>emit</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='comma'>,</span> <span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_decl'>decl</span> <span class='op'>=</span> <span class='id identifier rubyid_find_role'>find_role</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='rparen'>)</span>
@@ -2405,14 +2813,14 @@
       <pre class="lines">
 
 
-729
-730
-731
-732
-733</pre>
+790
+791
+792
+793
+794</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 729</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 790</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_exclusive'>exclusive</span><span class='lparen'>(</span><span class='op'>*</span><span class='id identifier rubyid_longs'>longs</span><span class='rparen'>)</span> <span class='op'>=</span> <span class='id identifier rubyid_add_constraint'>add_constraint</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>exclusive</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_longs'>longs</span><span class='rparen'>)</span>
 <span class='comment'># When the first option is given, the others must be too.
@@ -2488,10 +2896,10 @@
       <pre class="lines">
 
 
-948</pre>
+1082</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 948</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 1082</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_explicitly_set?'>explicitly_set?</span><span class='lparen'>(</span><span class='id identifier rubyid_long'>long</span><span class='rparen'>)</span> <span class='op'>=</span> <span class='qwords_beg'>%w[</span><span class='tstring_content'>cli</span><span class='words_sep'> </span><span class='tstring_content'>config</span><span class='words_sep'> </span><span class='tstring_content'>env</span><span class='tstring_end'>]</span></span><span class='period'>.</span><span class='id identifier rubyid_include?'>include?</span><span class='lparen'>(</span><span class='id identifier rubyid_source'>source</span><span class='lparen'>(</span><span class='id identifier rubyid_long'>long</span><span class='rparen'>)</span><span class='rparen'>)</span></pre>
     </td>
@@ -2563,12 +2971,12 @@
       <pre class="lines">
 
 
-691
-692
-693</pre>
+752
+753
+754</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 691</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 752</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_fd_open'>fd_open</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_find_role'>find_role</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='rparen'>)</span> <span class='op'>?</span> <span class='id identifier rubyid_mapped_fd'>mapped_fd</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='rparen'>)</span> <span class='op'>:</span> <span class='kw'>nil</span>
@@ -2642,12 +3050,12 @@
       <pre class="lines">
 
 
-722
-723
-724</pre>
+783
+784
+785</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 722</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 783</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_forward_fds'>forward_fds</span><span class='lparen'>(</span><span class='op'>*</span><span class='id identifier rubyid_names'>names</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_names'>names</span><span class='period'>.</span><span class='id identifier rubyid_filter_map'>filter_map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_n'>n</span><span class='op'>|</span> <span class='lparen'>(</span><span class='id identifier rubyid_fd'>fd</span> <span class='op'>=</span> <span class='id identifier rubyid_mapped_fd'>mapped_fd</span><span class='lparen'>(</span><span class='id identifier rubyid_n'>n</span><span class='rparen'>)</span><span class='rparen'>)</span> <span class='op'>&amp;&amp;</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_n'>n</span><span class='embexpr_end'>}</span><span class='tstring_content'>:</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_fd'>fd</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span> <span class='rbrace'>}</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>,</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -2721,10 +3129,10 @@
       <pre class="lines">
 
 
-935</pre>
+1069</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 935</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 1069</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_get'>get</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='rparen'>)</span> <span class='op'>=</span> <span class='ivar'>@values</span><span class='lbracket'>[</span><span class='id identifier rubyid_name'>name</span><span class='rbracket'>]</span></pre>
     </td>
@@ -2776,13 +3184,13 @@
       <pre class="lines">
 
 
-1067
-1068
-1069
-1070</pre>
+1201
+1202
+1203
+1204</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 1067</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 1201</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_json_schema'>json_schema</span>
   <span class='id identifier rubyid_ensure_help'>ensure_help</span>
@@ -2857,10 +3265,10 @@
       <pre class="lines">
 
 
-738</pre>
+799</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 738</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 799</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_one_of'>one_of</span><span class='lparen'>(</span><span class='op'>*</span><span class='id identifier rubyid_longs'>longs</span><span class='rparen'>)</span> <span class='op'>=</span> <span class='id identifier rubyid_add_constraint'>add_constraint</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>oneOf</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_longs'>longs</span><span class='rparen'>)</span></pre>
     </td>
@@ -3038,14 +3446,14 @@
       <pre class="lines">
 
 
-807
-808
-809
-810
-811</pre>
+922
+923
+924
+925
+926</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 807</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 922</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_opt'>opt</span><span class='lparen'>(</span><span class='id identifier rubyid_var'>var</span><span class='comma'>,</span> <span class='id identifier rubyid_long'>long</span><span class='comma'>,</span> <span class='id identifier rubyid_short'>short</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_default'>default</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_description'>description</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_group'>group</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Options</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_rule'>rule</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='id identifier rubyid_kind'>kind</span> <span class='op'>=</span> <span class='id identifier rubyid_default'>default</span> <span class='op'>==</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>flag</span><span class='tstring_end'>&quot;</span></span> <span class='op'>?</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>flag</span><span class='tstring_end'>&quot;</span></span> <span class='op'>:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>value</span><span class='tstring_end'>&quot;</span></span>
@@ -3209,12 +3617,12 @@
       <pre class="lines">
 
 
-821
-822
-823</pre>
+936
+937
+938</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 821</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 936</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_opt_array'>opt_array</span><span class='lparen'>(</span><span class='id identifier rubyid_var'>var</span><span class='comma'>,</span> <span class='id identifier rubyid_long'>long</span><span class='comma'>,</span> <span class='id identifier rubyid_short'>short</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_description'>description</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_group'>group</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Options</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_rule'>rule</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='id identifier rubyid_add'>add</span><span class='lparen'>(</span><span class='const'>Option</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='id identifier rubyid_var'>var</span><span class='comma'>,</span> <span class='id identifier rubyid_long'>long</span><span class='comma'>,</span> <span class='id identifier rubyid_short'>short</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>array</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='kw'>false</span><span class='comma'>,</span> <span class='id identifier rubyid_description'>description</span><span class='comma'>,</span> <span class='id identifier rubyid_group'>group</span><span class='comma'>,</span> <span class='id identifier rubyid_rule'>rule</span><span class='comma'>,</span> <span class='lbracket'>[</span><span class='rbracket'>]</span><span class='comma'>,</span> <span class='kw'>false</span><span class='rparen'>)</span><span class='rparen'>)</span>
@@ -3290,52 +3698,52 @@
       <pre class="lines">
 
 
-849
-850
-851
-852
-853
-854
-855
-856
-857
-858
-859
-860
-861
-862
-863
-864
-865
-866
-867
-868
-869
-870
-871
-872
-873
-874
-875
-876
-877
-878
-879
-880
-881
-882
-883
-884
-885
-886
-887
-888
-889
-890
-891</pre>
+964
+965
+966
+967
+968
+969
+970
+971
+972
+973
+974
+975
+976
+977
+978
+979
+980
+981
+982
+983
+984
+985
+986
+987
+988
+989
+990
+991
+992
+993
+994
+995
+996
+997
+998
+999
+1000
+1001
+1002
+1003
+1004
+1005
+1006</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 849</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 964</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_parse'>parse</span><span class='lparen'>(</span><span class='id identifier rubyid_argv'>argv</span> <span class='op'>=</span> <span class='const'>ARGV</span><span class='rparen'>)</span>
   <span class='ivar'>@raw</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
@@ -3483,13 +3891,13 @@
       <pre class="lines">
 
 
-781
-782
-783
-784</pre>
+842
+843
+844
+845</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 781</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 842</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_require_command'>require_command</span><span class='lparen'>(</span><span class='id identifier rubyid_command'>command</span><span class='comma'>,</span> <span class='id identifier rubyid_description'>description</span><span class='comma'>,</span> <span class='id identifier rubyid_install_hint'>install_hint</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='ivar'>@commands</span> <span class='op'>&lt;&lt;</span> <span class='lbracket'>[</span><span class='id identifier rubyid_command'>command</span><span class='comma'>,</span> <span class='id identifier rubyid_description'>description</span><span class='comma'>,</span> <span class='id identifier rubyid_install_hint'>install_hint</span><span class='rbracket'>]</span>
@@ -3580,13 +3988,13 @@
       <pre class="lines">
 
 
-734
-735
-736
-737</pre>
+795
+796
+797
+798</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 734</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 795</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_requires'>requires</span><span class='lparen'>(</span><span class='id identifier rubyid_long'>long</span><span class='comma'>,</span> <span class='op'>*</span><span class='id identifier rubyid_longs'>longs</span><span class='rparen'>)</span> <span class='op'>=</span> <span class='id identifier rubyid_add_constraint'>add_constraint</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>requires</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='lbracket'>[</span><span class='id identifier rubyid_long'>long</span><span class='comma'>,</span> <span class='op'>*</span><span class='id identifier rubyid_longs'>longs</span><span class='rbracket'>]</span><span class='rparen'>)</span>
 <span class='comment'># At least one of these options must be given.
@@ -3742,19 +4150,19 @@
       <pre class="lines">
 
 
-677
-678
-679
-680
-681
-682
-683
-684
-685
-686</pre>
+738
+739
+740
+741
+742
+743
+744
+745
+746
+747</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 677</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 738</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_role'>role</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='comma'>,</span> <span class='id identifier rubyid_direction'>direction</span><span class='comma'>,</span> <span class='id identifier rubyid_description'>description</span><span class='comma'>,</span> <span class='id identifier rubyid_content_type'>content_type</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_schema'>schema</span> <span class='op'>=</span> <span class='kw'>nil</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_raise'>raise</span> <span class='const'><span class='object_link'><a href="DefinitionError.html" title="Clyops::DefinitionError (class)">DefinitionError</a></span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Invalid role name &#39;</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_name'>name</span><span class='embexpr_end'>}</span><span class='tstring_content'>&#39;</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>unless</span> <span class='id identifier rubyid_name'>name</span><span class='period'>.</span><span class='id identifier rubyid_match?'>match?</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="../Clyops.html#ROLE_NAME-constant" title="Clyops::ROLE_NAME (constant)">ROLE_NAME</a></span></span><span class='rparen'>)</span>
@@ -3783,7 +4191,7 @@
 </h3><div class="docstring">
   <div class="discussion">
     
-<p>Parse like a CLI: handles –help, –help-json-schema, –completion and –bash-completion, prints errors and exits on failure. Returns the values.</p>
+<p>Parse like a CLI: handles –help, –help-json-schema, –completion, –bash-completion and –complete-values, prints errors and exits on failure. Returns the values.</p>
 
 
   </div>
@@ -3837,47 +4245,83 @@
       <pre class="lines">
 
 
-897
-898
-899
-900
-901
-902
-903
-904
-905
-906
-907
-908
-909
-910
-911
-912
-913
-914
-915
-916
-917
-918
-919
-920
-921
-922
-923
-924
-925
-926
-927
-928</pre>
+1013
+1014
+1015
+1016
+1017
+1018
+1019
+1020
+1021
+1022
+1023
+1024
+1025
+1026
+1027
+1028
+1029
+1030
+1031
+1032
+1033
+1034
+1035
+1036
+1037
+1038
+1039
+1040
+1041
+1042
+1043
+1044
+1045
+1046
+1047
+1048
+1049
+1050
+1051
+1052
+1053
+1054
+1055
+1056
+1057
+1058
+1059
+1060
+1061
+1062</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 897</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 1013</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run'>run</span><span class='lparen'>(</span><span class='id identifier rubyid_argv'>argv</span> <span class='op'>=</span> <span class='const'>ARGV</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_argv'>argv</span> <span class='op'>=</span> <span class='id identifier rubyid_argv'>argv</span><span class='period'>.</span><span class='id identifier rubyid_to_a'>to_a</span>
   <span class='id identifier rubyid_head'>head</span> <span class='op'>=</span> <span class='id identifier rubyid_argv'>argv</span><span class='period'>.</span><span class='id identifier rubyid_include?'>include?</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='op'>?</span> <span class='id identifier rubyid_argv'>argv</span><span class='lbracket'>[</span><span class='int'>0</span><span class='op'>...</span><span class='id identifier rubyid_argv'>argv</span><span class='period'>.</span><span class='id identifier rubyid_index'>index</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='rbracket'>]</span> <span class='op'>:</span> <span class='id identifier rubyid_argv'>argv</span>
   <span class='kw'>if</span> <span class='id identifier rubyid_head'>head</span><span class='period'>.</span><span class='id identifier rubyid_include?'>include?</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--help-json-schema</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
     <span class='gvar'>$stdout</span><span class='period'>.</span><span class='id identifier rubyid_write'>write</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_json_schema'>json_schema</span><span class='embexpr_end'>}</span><span class='tstring_content'>\n</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_exit'>exit</span><span class='lparen'>(</span><span class='int'>0</span><span class='rparen'>)</span>
+  <span class='kw'>end</span>
+  <span class='kw'>if</span> <span class='lparen'>(</span><span class='id identifier rubyid_at'>at</span> <span class='op'>=</span> <span class='id identifier rubyid_head'>head</span><span class='period'>.</span><span class='id identifier rubyid_index'>index</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--complete-values</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_ensure_help'>ensure_help</span>
+    <span class='id identifier rubyid_name'>name</span><span class='comma'>,</span> <span class='id identifier rubyid_prefix'>prefix</span><span class='comma'>,</span> <span class='id identifier rubyid_limit'>limit</span><span class='comma'>,</span> <span class='id identifier rubyid_offset'>offset</span> <span class='op'>=</span> <span class='id identifier rubyid_argv'>argv</span><span class='lbracket'>[</span><span class='lparen'>(</span><span class='id identifier rubyid_at'>at</span> <span class='op'>+</span> <span class='int'>1</span><span class='rparen'>)</span><span class='op'>..</span><span class='lparen'>(</span><span class='id identifier rubyid_at'>at</span> <span class='op'>+</span> <span class='int'>4</span><span class='rparen'>)</span><span class='rbracket'>]</span>
+    <span class='kw'>unless</span> <span class='id identifier rubyid_offset'>offset</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_limit'>limit</span><span class='period'>.</span><span class='id identifier rubyid_match?'>match?</span><span class='lparen'>(</span><span class='tstring'><span class='regexp_beg'>/</span><span class='tstring_content'>\A[0-9]+\z</span><span class='regexp_end'>/</span></span><span class='rparen'>)</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_offset'>offset</span><span class='period'>.</span><span class='id identifier rubyid_match?'>match?</span><span class='lparen'>(</span><span class='tstring'><span class='regexp_beg'>/</span><span class='tstring_content'>\A[0-9]+\z</span><span class='regexp_end'>/</span></span><span class='rparen'>)</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_limit'>limit</span><span class='period'>.</span><span class='id identifier rubyid_to_i'>to_i</span> <span class='op'>&gt;=</span> <span class='int'>1</span> <span class='op'>&amp;&amp;</span>
+           <span class='id identifier rubyid_limit'>limit</span><span class='period'>.</span><span class='id identifier rubyid_to_i'>to_i</span> <span class='op'>&lt;=</span> <span class='int'>1_000_000_000</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_offset'>offset</span><span class='period'>.</span><span class='id identifier rubyid_to_i'>to_i</span> <span class='op'>&lt;=</span> <span class='int'>1_000_000_000</span>
+      <span class='const'><span class='object_link'><a href="../Clyops.html" title="Clyops (module)">Clyops</a></span></span><span class='period'>.</span><span class='id identifier rubyid_die'><span class='object_link'><a href="../Clyops.html#die-class_method" title="Clyops.die (method)">die</a></span></span><span class='lparen'>(</span><span class='int'>1</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>LIMIT and OFFSET must be integers (LIMIT &gt;= 1)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
+    <span class='kw'>end</span>
+    <span class='id identifier rubyid_rest'>rest</span> <span class='op'>=</span> <span class='id identifier rubyid_argv'>argv</span><span class='period'>.</span><span class='id identifier rubyid_drop'>drop</span><span class='lparen'>(</span><span class='id identifier rubyid_at'>at</span> <span class='op'>+</span> <span class='int'>5</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_words'>words</span> <span class='op'>=</span> <span class='id identifier rubyid_rest'>rest</span><span class='period'>.</span><span class='id identifier rubyid_include?'>include?</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='op'>?</span> <span class='id identifier rubyid_rest'>rest</span><span class='lbracket'>[</span><span class='lparen'>(</span><span class='id identifier rubyid_rest'>rest</span><span class='period'>.</span><span class='id identifier rubyid_index'>index</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='op'>+</span> <span class='int'>1</span><span class='rparen'>)</span><span class='op'>..</span><span class='rbracket'>]</span> <span class='op'>:</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
+    <span class='id identifier rubyid_page'>page</span> <span class='op'>=</span> <span class='kw'>begin</span>
+      <span class='id identifier rubyid_complete_values'>complete_values</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='comma'>,</span> <span class='id identifier rubyid_prefix'>prefix</span><span class='comma'>,</span> <span class='id identifier rubyid_limit'>limit</span><span class='period'>.</span><span class='id identifier rubyid_to_i'>to_i</span><span class='comma'>,</span> <span class='id identifier rubyid_offset'>offset</span><span class='period'>.</span><span class='id identifier rubyid_to_i'>to_i</span><span class='comma'>,</span> <span class='id identifier rubyid_words'>words</span><span class='rparen'>)</span>
+    <span class='kw'>rescue</span> <span class='const'>ArgumentError</span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_e'>e</span>
+      <span class='const'><span class='object_link'><a href="../Clyops.html" title="Clyops (module)">Clyops</a></span></span><span class='period'>.</span><span class='id identifier rubyid_die'><span class='object_link'><a href="../Clyops.html#die-class_method" title="Clyops.die (method)">die</a></span></span><span class='lparen'>(</span><span class='int'>1</span><span class='comma'>,</span> <span class='id identifier rubyid_e'>e</span><span class='period'>.</span><span class='id identifier rubyid_message'>message</span><span class='rparen'>)</span>
+    <span class='kw'>end</span>
+    <span class='id identifier rubyid_utf8'>utf8</span> <span class='op'>=</span> <span class='id identifier rubyid_page'>page</span><span class='period'>.</span><span class='id identifier rubyid_values'>values</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_v'>v</span><span class='op'>|</span> <span class='id identifier rubyid_v'>v</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span><span class='period'>.</span><span class='id identifier rubyid_force_encoding'>force_encoding</span><span class='lparen'>(</span><span class='const'>Encoding</span><span class='op'>::</span><span class='const'>UTF_8</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_scrub'>scrub</span> <span class='rbrace'>}</span>
+    <span class='gvar'>$stdout</span><span class='period'>.</span><span class='id identifier rubyid_write'>write</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='embexpr_beg'>#{</span><span class='const'>JSON</span><span class='period'>.</span><span class='id identifier rubyid_generate'>generate</span><span class='lparen'>(</span><span class='lbrace'>{</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>values</span><span class='tstring_end'>&#39;</span></span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_utf8'>utf8</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&#39;</span><span class='tstring_content'>more</span><span class='tstring_end'>&#39;</span></span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_page'>page</span><span class='period'>.</span><span class='id identifier rubyid_more'>more</span> <span class='rbrace'>}</span><span class='rparen'>)</span><span class='embexpr_end'>}</span><span class='tstring_content'>\n</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
     <span class='id identifier rubyid_exit'>exit</span><span class='lparen'>(</span><span class='int'>0</span><span class='rparen'>)</span>
   <span class='kw'>end</span>
   <span class='kw'>if</span> <span class='id identifier rubyid_head'>head</span><span class='period'>.</span><span class='id identifier rubyid_include?'>include?</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--bash-completion</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -3974,13 +4418,13 @@
       <pre class="lines">
 
 
-944
-945
-946
-947</pre>
+1078
+1079
+1080
+1081</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 944</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 1078</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_set?'>set?</span><span class='lparen'>(</span><span class='id identifier rubyid_long'>long</span><span class='rparen'>)</span> <span class='op'>=</span> <span class='id identifier rubyid_source'>source</span><span class='lparen'>(</span><span class='id identifier rubyid_long'>long</span><span class='rparen'>)</span> <span class='op'>==</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>cli</span><span class='tstring_end'>&quot;</span></span>
 <span class='comment'># Whether the option came from CLI, config, or environment rather than a default.
@@ -4071,14 +4515,14 @@
       <pre class="lines">
 
 
-770
-771
-772
-773
-774</pre>
+831
+832
+833
+834
+835</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 770</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 831</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_set_config'>set_config</span><span class='lparen'>(</span><span class='id identifier rubyid_option'>option</span><span class='comma'>,</span> <span class='id identifier rubyid_prefixes'>prefixes</span><span class='rparen'>)</span>
   <span class='ivar'>@config_option</span> <span class='op'>=</span> <span class='id identifier rubyid_option'>option</span>
@@ -4154,13 +4598,13 @@
       <pre class="lines">
 
 
-643
-644
-645
-646</pre>
+704
+705
+706
+707</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 643</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 704</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_set_description'>set_description</span><span class='lparen'>(</span><span class='id identifier rubyid_text'>text</span><span class='rparen'>)</span> <span class='op'>=</span> <span class='id identifier rubyid_tap'>tap</span> <span class='lbrace'>{</span> <span class='ivar'>@description</span> <span class='op'>=</span> <span class='id identifier rubyid_text'>text</span> <span class='rbrace'>}</span>
 <span class='comment'># Set the final help text and return this CLI.
@@ -4235,14 +4679,14 @@
       <pre class="lines">
 
 
-652
-653
-654
-655
-656</pre>
+713
+714
+715
+716
+717</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 652</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 713</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_set_effects'>set_effects</span><span class='lparen'>(</span><span class='op'>*</span><span class='id identifier rubyid_effects'>effects</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_effects'>effects</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_e'>e</span><span class='op'>|</span> <span class='id identifier rubyid_raise'>raise</span> <span class='const'><span class='object_link'><a href="DefinitionError.html" title="Clyops::DefinitionError (class)">DefinitionError</a></span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Unknown effect &#39;</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_e'>e</span><span class='embexpr_end'>}</span><span class='tstring_content'>&#39;</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>unless</span> <span class='const'>EFFECTS</span><span class='period'>.</span><span class='id identifier rubyid_include?'>include?</span><span class='lparen'>(</span><span class='id identifier rubyid_e'>e</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
@@ -4318,10 +4762,10 @@
       <pre class="lines">
 
 
-647</pre>
+708</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 647</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 708</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_set_epilog'>set_epilog</span><span class='lparen'>(</span><span class='id identifier rubyid_text'>text</span><span class='rparen'>)</span> <span class='op'>=</span> <span class='id identifier rubyid_tap'>tap</span> <span class='lbrace'>{</span> <span class='ivar'>@epilog</span> <span class='op'>=</span> <span class='id identifier rubyid_text'>text</span> <span class='rbrace'>}</span></pre>
     </td>
@@ -4409,16 +4853,16 @@
       <pre class="lines">
 
 
-790
-791
-792
-793
-794
-795
-796</pre>
+851
+852
+853
+854
+855
+856
+857</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 790</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 851</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_set_path_search'>set_path_search</span><span class='lparen'>(</span><span class='id identifier rubyid_long'>long</span><span class='comma'>,</span> <span class='id identifier rubyid_dirs'>dirs</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_opt'>opt</span> <span class='op'>=</span> <span class='ivar'>@by_long</span><span class='period'>.</span><span class='id identifier rubyid_fetch'>fetch</span><span class='lparen'>(</span><span class='id identifier rubyid_long'>long</span><span class='rparen'>)</span>
@@ -4514,14 +4958,14 @@
       <pre class="lines">
 
 
-662
-663
-664
-665
-666</pre>
+723
+724
+725
+726
+727</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 662</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 723</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_set_stdin'>set_stdin</span><span class='lparen'>(</span><span class='id identifier rubyid_description'>description</span><span class='comma'>,</span> <span class='id identifier rubyid_content_type'>content_type</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='op'>=</span> <span class='id identifier rubyid_tap'>tap</span> <span class='lbrace'>{</span> <span class='ivar'>@stdin</span> <span class='op'>=</span> <span class='lbrace'>{</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>description</span><span class='tstring_end'>&quot;</span></span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_description'>description</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>contentType</span><span class='tstring_end'>&quot;</span></span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_content_type'>content_type</span> <span class='rbrace'>}</span> <span class='rbrace'>}</span>
 <span class='comment'># What the program writes on stdout; undeclared means text.
@@ -4615,10 +5059,10 @@
       <pre class="lines">
 
 
-667</pre>
+728</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 667</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 728</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_set_stdout'>set_stdout</span><span class='lparen'>(</span><span class='id identifier rubyid_description'>description</span><span class='comma'>,</span> <span class='id identifier rubyid_content_type'>content_type</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='op'>=</span> <span class='id identifier rubyid_tap'>tap</span> <span class='lbrace'>{</span> <span class='ivar'>@stdout</span> <span class='op'>=</span> <span class='lbrace'>{</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>description</span><span class='tstring_end'>&quot;</span></span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_description'>description</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>contentType</span><span class='tstring_end'>&quot;</span></span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_content_type'>content_type</span> <span class='rbrace'>}</span> <span class='rbrace'>}</span></pre>
     </td>
@@ -4690,13 +5134,13 @@
       <pre class="lines">
 
 
-940
-941
-942
-943</pre>
+1074
+1075
+1076
+1077</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 940</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 1074</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_source'>source</span><span class='lparen'>(</span><span class='id identifier rubyid_long'>long</span><span class='rparen'>)</span> <span class='op'>=</span> <span class='ivar'>@sources</span><span class='period'>.</span><span class='id identifier rubyid_fetch'>fetch</span><span class='lparen'>(</span><span class='id identifier rubyid_long'>long</span><span class='period'>.</span><span class='id identifier rubyid_delete_prefix'>delete_prefix</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>unset</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
 <span class='comment'># Whether the option came from the command line.
@@ -4751,106 +5195,106 @@
       <pre class="lines">
 
 
-967
-968
-969
-970
-971
-972
-973
-974
-975
-976
-977
-978
-979
-980
-981
-982
-983
-984
-985
-986
-987
-988
-989
-990
-991
-992
-993
-994
-995
-996
-997
-998
-999
-1000
-1001
-1002
-1003
-1004
-1005
-1006
-1007
-1008
-1009
-1010
-1011
-1012
-1013
-1014
-1015
-1016
-1017
-1018
-1019
-1020
-1021
-1022
-1023
-1024
-1025
-1026
-1027
-1028
-1029
-1030
-1031
-1032
-1033
-1034
-1035
-1036
-1037
-1038
-1039
-1040
-1041
-1042
-1043
-1044
-1045
-1046
-1047
-1048
-1049
-1050
-1051
-1052
-1053
-1054
-1055
-1056
-1057
-1058
-1059
-1060
-1061
-1062
-1063</pre>
+1101
+1102
+1103
+1104
+1105
+1106
+1107
+1108
+1109
+1110
+1111
+1112
+1113
+1114
+1115
+1116
+1117
+1118
+1119
+1120
+1121
+1122
+1123
+1124
+1125
+1126
+1127
+1128
+1129
+1130
+1131
+1132
+1133
+1134
+1135
+1136
+1137
+1138
+1139
+1140
+1141
+1142
+1143
+1144
+1145
+1146
+1147
+1148
+1149
+1150
+1151
+1152
+1153
+1154
+1155
+1156
+1157
+1158
+1159
+1160
+1161
+1162
+1163
+1164
+1165
+1166
+1167
+1168
+1169
+1170
+1171
+1172
+1173
+1174
+1175
+1176
+1177
+1178
+1179
+1180
+1181
+1182
+1183
+1184
+1185
+1186
+1187
+1188
+1189
+1190
+1191
+1192
+1193
+1194
+1195
+1196
+1197</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 967</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 1101</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_usage'>usage</span>
   <span class='id identifier rubyid_ensure_help'>ensure_help</span>
@@ -4998,19 +5442,19 @@
       <pre class="lines">
 
 
-952
-953
-954
-955
-956
-957
-958
-959
-960
-961</pre>
+1086
+1087
+1088
+1089
+1090
+1091
+1092
+1093
+1094
+1095</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 952</span>
+      <pre class="code"><span class="info file"># File 'lib/clyops.rb', line 1086</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_values_json'>values_json</span>
   <span class='id identifier rubyid_out'>out</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
@@ -5032,7 +5476,7 @@
 </div>
 
       <div id="footer">
-  Generated on Fri Oct 30 14:59:11 2026 by
+  Generated on Tue Nov 10 22:54:09 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.38 (ruby-3.3.13).
 </div>

@@ -86,6 +86,12 @@ exec clyops-dispatch --root /absolute/path/to/clyops/examples/scripts --name ops
 or <code>ops --completion fish &gt; ~/.config/fish/completions/ops.fish</code>.
 The dispatcher completes directory groups and tool names, then the selected
 tool's own options. Inspect <code>ops --help</code> for the command names it discovered.</p>
+<h2 id="values-only-the-tool-knows">Values only the tool knows</h2>
+<p>A tool can list values when Tab is pressed, such as the instances registered in
+a directory, with <code>complete(name, fn)</code> (see the
+<a href="/guide.html#completion-values-from-your-program">guide</a>). The completion scripts
+need no change: they ask the tool for its records each time, and the tool runs
+its function then.</p>
 <h2 id="inspect-and-troubleshoot">Inspect and troubleshoot</h2>
 <p><code>plan.py --completion bash</code> prints shell source; <code>plan.py --bash-completion</code>
 prints the tab-separated records the generated completion script consumes.

@@ -65,10 +65,10 @@
   },
   {
     "name": "brotli-libs",
-    "version": "1.1.0-r2",
+    "version": "1.1.1-r0",
     "license": "MIT",
     "origin": "brotli",
-    "source_commit": "bdeb5ac39445d803f7d97bb9b3cf9171d9a35f52",
+    "source_commit": "2e2e1c66200dbbb50a717171d1df57829ff4c264",
     "upstream": "https://github.com/google/brotli"
   },
   {
@@ -89,10 +89,10 @@
   },
   {
     "name": "c-ares",
-    "version": "1.34.8-r0",
+    "version": "1.34.9-r0",
     "license": "MIT",
     "origin": "c-ares",
-    "source_commit": "40d4af1c03fd0a11bcd6dd687181b78c5cf6c4c9",
+    "source_commit": "dbc05e4ef8f0c86d93ce3d4933d28ab5d39241f4",
     "upstream": "https://c-ares.org/"
   },
   {
@@ -121,10 +121,10 @@
   },
   {
     "name": "curl",
-    "version": "8.14.1-r2",
+    "version": "8.14.1-r3",
     "license": "curl",
     "origin": "curl",
-    "source_commit": "2c79595339118c69c0809dbff53ad71c90beba48",
+    "source_commit": "4277a10b6f212864a4c88d3cae7192383f9badcb",
     "upstream": "https://curl.se/"
   },
   {
@@ -409,10 +409,10 @@
   },
   {
     "name": "libcurl",
-    "version": "8.14.1-r2",
+    "version": "8.14.1-r3",
     "license": "curl",
     "origin": "curl",
-    "source_commit": "2c79595339118c69c0809dbff53ad71c90beba48",
+    "source_commit": "4277a10b6f212864a4c88d3cae7192383f9badcb",
     "upstream": "https://curl.se/"
   },
   {
@@ -457,10 +457,10 @@
   },
   {
     "name": "libexpat",
-    "version": "2.8.4-r0",
+    "version": "2.10.0-r0",
     "license": "MIT",
     "origin": "expat",
-    "source_commit": "d46a3884017c3c180ea5fa36585135b4da608fcb",
+    "source_commit": "2e1e6064c0baf5021dc86573ddc4a338dde12bc0",
     "upstream": "https://libexpat.github.io/"
   },
   {
@@ -849,10 +849,10 @@
   },
   {
     "name": "linux-virt",
-    "version": "6.12.112-r0",
+    "version": "6.12.115-r0",
     "license": "GPL-2.0-only",
     "origin": "linux-lts",
-    "source_commit": "62d50affefb6f5aa5a810f573855b767a0a07486",
+    "source_commit": "7b58d3c9957ce2c95ee19af6f89241b818af5b3a",
     "upstream": "https://www.kernel.org"
   },
   {
@@ -985,42 +985,42 @@
   },
   {
     "name": "pcre2",
-    "version": "10.43-r0",
+    "version": "10.43-r1",
     "license": "BSD-3-Clause",
     "origin": "pcre2",
-    "source_commit": "0826e91f0c743946bdc6ffa51fe90479bf4a83da",
+    "source_commit": "b5677eddd475c9745d9e89050108d6b2c6c0c438",
     "upstream": "https://pcre.org/"
   },
   {
     "name": "pyc",
-    "version": "3.12.15-r0",
+    "version": "3.12.16-r0",
     "license": "PSF-2.0",
     "origin": "python3",
-    "source_commit": "73cda94eb86770bcf80392a179d7543ba805b0e8",
+    "source_commit": "c8a95d62be52f67eea6f352d9407de796446df71",
     "upstream": "https://www.python.org/"
   },
   {
     "name": "python3",
-    "version": "3.12.15-r0",
+    "version": "3.12.16-r0",
     "license": "PSF-2.0",
     "origin": "python3",
-    "source_commit": "73cda94eb86770bcf80392a179d7543ba805b0e8",
+    "source_commit": "c8a95d62be52f67eea6f352d9407de796446df71",
     "upstream": "https://www.python.org/"
   },
   {
     "name": "python3-pyc",
-    "version": "3.12.15-r0",
+    "version": "3.12.16-r0",
     "license": "PSF-2.0",
     "origin": "python3",
-    "source_commit": "73cda94eb86770bcf80392a179d7543ba805b0e8",
+    "source_commit": "c8a95d62be52f67eea6f352d9407de796446df71",
     "upstream": "https://www.python.org/"
   },
   {
     "name": "python3-pycache-pyc0",
-    "version": "3.12.15-r0",
+    "version": "3.12.16-r0",
     "license": "PSF-2.0",
     "origin": "python3",
-    "source_commit": "73cda94eb86770bcf80392a179d7543ba805b0e8",
+    "source_commit": "c8a95d62be52f67eea6f352d9407de796446df71",
     "upstream": "https://www.python.org/"
   },
   {
