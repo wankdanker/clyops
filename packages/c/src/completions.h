@@ -307,7 +307,7 @@ static const char* const CLYOPS_COMPLETION_FISH[] = {
     "            set skipnext 0\n",
     "        else if test $endopts -eq 0; and test \"$w\" = --\n",
     "            set endopts 1\n",
-    "        else if test $endopts -eq 0; and string match -q -- '-?*' $w\n",
+    "        else if test $endopts -eq 0; and string match -qr -- '^-.' $w\n",
     "            set -l i (contains -i -- $w $onames)\n",
     "            test -n \"$i\"; and test \"$otypes[$i]\" = value; and set skipnext 1\n",
     "        else\n",

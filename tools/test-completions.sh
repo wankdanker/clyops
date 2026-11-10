@@ -108,6 +108,7 @@ EOF
     check fish "demo --col"        "--color "              "$(fish_complete "demo --col")"
     check fish "demo --color "     "always auto never "    "$(fish_complete "demo --color ")"
     check fish "demo in.txt "      "fast slow "            "$(fish_complete "demo in.txt ")"
+    check fish "demo -v in.txt "   "fast slow "            "$(fish_complete "demo -v in.txt ")"
     check fish "demo --enabled "   "false true "           "$(fish_complete "demo --enabled ")"
     check fish "demo -d "          "conf/ data/ "          "$(fish_complete "demo -d ")"
     check fish "demo --exec clyopsprog" "clyopsprogx "     "$(fish_complete "demo --exec clyopsprog")"
