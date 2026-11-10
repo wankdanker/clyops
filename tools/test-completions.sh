@@ -38,8 +38,12 @@ export PATH="$work/bin:$work/dispatch:$PATH" DEMO_ROOT="$work/root" XDG_CACHE_HO
 cd "$work/root" || exit 1
 
 failures=0
+first_fish_failure=""
 check() { # shell line expected actual
-    if [[ "$3" == "$4" ]]; then echo "ok - $1: [$2]"; else echo "not ok - $1: [$2] expected [$3], got [$4]"; failures=$((failures + 1)); fi
+    if [[ "$3" == "$4" ]]; then echo "ok - $1: [$2]"; else echo "not ok - $1: [$2] expected [$3], got [$4]"; failures=$((failures + 1))
+        [[ "$1" == fish && -z "$first_fish_failure" ]] && first_fish_failure="${2% (*)}"
+    fi
+    return 0
 }
 
 # Root mode: the same tree run as an alias or function, with no definition file.
@@ -120,6 +124,12 @@ EOF
     check fish "tools media tasks db "     "migrate status "       "$(fish_complete "tools media tasks db ")"
     check fish "rt (alias) "               "hello media tools "    "$(fish_complete "rt " "$root_alias")"
     check fish "rt (alias) media demo in.txt " "fast slow "        "$(fish_complete "rt media demo in.txt " "$root_alias")"
+    # Show how the first failing line was completed, to debug fish versions not at hand.
+    if [[ -n "$first_fish_failure" ]]; then
+        echo "# $(fish --version): trace of [$first_fish_failure]"
+        printf '%s --completion fish | source\nset fish_trace 1\ncomplete -C %q\n' "${first_fish_failure%% *}" "$first_fish_failure" \
+            | fish --no-config 2>&1 | head -150 | sed 's/^/#   /'
+    fi
 else
     echo "skip - fish not installed"
 fi

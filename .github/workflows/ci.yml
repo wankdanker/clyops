@@ -90,8 +90,10 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python: ["3.9", "3.11", "3.13"]
+        python: ["3.11", "3.13"]
         include:
+          # The oldest supported Python; ubuntu-latest (26.04) has no build of it.
+          - { os: ubuntu-24.04, python: "3.9" }
           - { os: macos-latest, python: "3.13" }
     runs-on: ${{ matrix.os }}
     # A hung step fails here, not at the runner\'s 6-hour limit (#47).
