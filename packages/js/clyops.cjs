@@ -190,6 +190,7 @@ complete -c __CLYOPS_PROG__ -f -a '(__clyops___CLYOPS_FUNC___complete)'
 };
 
 // packages/js/src/index.ts
+var MAX_VALUES_SLOT = 1e9;
 var SHELL_COMPLETION_LIMIT = 1e3;
 var EFFECTS = ["read-only", "idempotent", "destructive", "network"];
 var ROLE_NAME = /^[A-Za-z][A-Za-z0-9_.-]*$/;
@@ -1317,7 +1318,7 @@ var Cli = class _Cli {
       this.ensureHelp();
       const [name, prefix, limitText, offsetText] = argv.slice(valuesAt + 1, valuesAt + 5);
       const after = argv.indexOf("--", valuesAt + 5);
-      if (offsetText === void 0 || !/^[0-9]+$/.test(limitText) || !/^[0-9]+$/.test(offsetText) || Number(limitText) < 1) {
+      if (offsetText === void 0 || !/^[0-9]+$/.test(limitText) || !/^[0-9]+$/.test(offsetText) || Number(limitText) < 1 || Number(limitText) > MAX_VALUES_SLOT || Number(offsetText) > MAX_VALUES_SLOT) {
         die(1, "LIMIT and OFFSET must be integers (LIMIT >= 1)");
       }
       let page;

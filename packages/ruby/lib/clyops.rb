@@ -1020,7 +1020,8 @@ module Clyops
       if (at = head.index("--complete-values"))
         ensure_help
         name, prefix, limit, offset = argv[(at + 1)..(at + 4)]
-        unless offset && limit.match?(/\A[0-9]+\z/) && offset.match?(/\A[0-9]+\z/) && limit.to_i >= 1
+        unless offset && limit.match?(/\A[0-9]+\z/) && offset.match?(/\A[0-9]+\z/) && limit.to_i >= 1 &&
+               limit.to_i <= 1_000_000_000 && offset.to_i <= 1_000_000_000
           Clyops.die(1, "LIMIT and OFFSET must be integers (LIMIT >= 1)")
         end
         rest = argv.drop(at + 5)

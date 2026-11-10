@@ -492,6 +492,97 @@
     }
   },
   {
+    "name": "values: the limit may be 1000000000",
+    "args": [
+      "--complete-values",
+      "host",
+      "",
+      "1000000000",
+      "0"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;beta"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "{\"values\":[\"alpha\",\"beta\"],\"more\":false}\n"
+    }
+  },
+  {
+    "name": "values: a paged completer may be asked for 1000000000",
+    "args": [
+      "--complete-values",
+      "rest",
+      "",
+      "1000000000",
+      "1000000000"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;beta"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "{\"values\":[],\"more\":false}\n"
+    }
+  },
+  {
+    "name": "values: the limit may not exceed 1000000000",
+    "args": [
+      "--complete-values",
+      "host",
+      "",
+      "1000000001",
+      "0"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;beta"
+    },
+    "expect": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": [
+        "LIMIT and OFFSET must be integers (LIMIT >= 1)"
+      ]
+    }
+  },
+  {
+    "name": "values: an offset past 2^64 is an error",
+    "args": [
+      "--complete-values",
+      "host",
+      "",
+      "5",
+      "99999999999999999999"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;beta"
+    },
+    "expect": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": [
+        "LIMIT and OFFSET must be integers (LIMIT >= 1)"
+      ]
+    }
+  },
+  {
+    "name": "values: leading zeros are allowed",
+    "args": [
+      "--complete-values",
+      "host",
+      "",
+      "0000000000001",
+      "0"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;beta"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "{\"values\":[\"alpha\"],\"more\":true}\n"
+    }
+  },
+  {
     "name": "values: after -- it is an argument",
     "args": [
       "in.txt",

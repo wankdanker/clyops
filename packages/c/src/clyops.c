@@ -1475,15 +1475,16 @@ const char* clyops_error(const clyops_t* cli) { return cli->error; }
 
 static char* values_page_json(const clyops_values_page_t* page);
 
-/* A non-negative decimal integer (digits only), saturating at INT_MAX - 1; -1 when it isn't one. */
+/* A decimal integer from 0 to 1000000000 (digits only, spec section 9.3); -1 when it isn't one. */
 static int slot_int(const char* s) {
     if (!s || !*s) return -1;
     long long n = 0;
     for (; *s; s++) {
         if (*s < '0' || *s > '9') return -1;
-        if (n < INT_MAX) n = n * 10 + (*s - '0');
+        n = n * 10 + (*s - '0');
+        if (n > 1000000000LL) n = 1000000001LL;
     }
-    return n >= INT_MAX ? INT_MAX - 1 : (int)n;
+    return n > 1000000000LL ? -1 : (int)n;
 }
 
 /* --complete-values NAME PREFIX LIMIT OFFSET [-- WORDS...] at argv[at] (spec section 9.3); exits. */
@@ -2222,6 +2223,39 @@ static void completion_kind(sbuf* b, const char* rule, const svec* dirs) {
  * was registered as paged. `shell` also drops values the completion scripts would split. Returns 0
  * and fills `page`, or -1 when the completer fails.
  */
+typedef struct {
+    const char* value;
+    size_t index;
+} indexed_value;
+
+/* Order by value, then by position. */
+static int indexed_value_cmp(const void* a, const void* b) {
+    const indexed_value* x = a;
+    const indexed_value* y = b;
+    int c = strcmp(x->value, y->value);
+    return c ? c : (x->index > y->index) - (x->index < y->index);
+}
+
+/* Flag each value that repeats an earlier one, in O(n log n): sort (value, position) pairs, then
+   mark all but the first of each run of equal values. Returns a calloc'd array, or NULL when the
+   list is empty or memory runs out. */
+static char* repeated_values(char** v, size_t n) {
+    if (!n) return NULL;
+    indexed_value* order = malloc(n * sizeof *order);
+    char* repeated = calloc(n, 1);
+    if (!order || !repeated) {
+        free(order);
+        free(repeated);
+        return NULL;
+    }
+    for (size_t i = 0; i < n; i++) order[i] = (indexed_value){v[i], i};
+    qsort(order, n, sizeof *order, indexed_value_cmp);
+    for (size_t i = 1; i < n; i++)
+        if (streq(order[i].value, order[i - 1].value)) repeated[order[i].index] = 1;
+    free(order);
+    return repeated;
+}
+
 static int list_values(clyops_completer_t fn, void* data, int paged, int nwords, const char* const* words,
                        const char* prefix, int limit, int offset, int shell, clyops_values_page_t* page) {
     static const char* const none[] = {NULL};
@@ -2242,11 +2276,13 @@ static int list_values(clyops_completer_t fn, void* data, int paged, int nwords,
     }
     svec kept = {0};
     size_t matched = 0;
+    char* repeated = repeated_values(out.list.v, out.list.len);
     for (size_t i = 0; i < out.list.len; i++) {
         const char* v = out.list.v[i];
         if (!*v || (shell && strpbrk(v, ", \t\r\n"))) continue;
         int dup = 0;
-        for (size_t k = 0; k < i && !dup; k++) dup = streq(out.list.v[k], v);
+        if (repeated) dup = repeated[i];
+        else for (size_t k = 0; k < i && !dup; k++) dup = streq(out.list.v[k], v);
         if (dup) continue;
         if (!paged) {
             if (!starts(v, req.prefix)) continue;
@@ -2258,6 +2294,7 @@ static int list_values(clyops_completer_t fn, void* data, int paged, int nwords,
         }
         sv_push(&kept, xstrdup(v));
     }
+    free(repeated);
     sv_free(&out.list);
     page->values = kept.v;
     page->count = kept.len;

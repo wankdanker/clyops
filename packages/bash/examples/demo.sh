@@ -7,8 +7,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/../clyops.sh"
 demo_hosts() {
     echo "completer ran" >&2
     [[ -v DEMO_HOSTS ]] || return 1
-    local IFS=';' h
-    for h in $DEMO_HOSTS; do printf '%s\n' "$h"; done
+    local -a hosts=()
+    IFS=';' read -ra hosts <<< "$DEMO_HOSTS"
+    (( ${#hosts[@]} )) && printf '%s\n' "${hosts[@]}"
     (( $# > 0 )) && echo "words-$#"
     return 0
 }

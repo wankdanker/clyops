@@ -1087,7 +1087,7 @@ clyops_run() {
             local _c_rest=("$@")
             while [[ "${_c_rest[0]}" != --complete-values ]]; do _c_rest=("${_c_rest[@]:1}"); done
             local _c_slots=("${_c_rest[@]:1:4}") _c_words=("${_c_rest[@]:5}")
-            if (( ${#_c_slots[@]} < 4 )) || [[ ! "${_c_slots[2]}" =~ ^[0-9]+$ || ! "${_c_slots[3]}" =~ ^[0-9]+$ ]] || (( 10#${_c_slots[2]} < 1 )); then
+            if (( ${#_c_slots[@]} < 4 )) || ! _clyops_values_slot "${_c_slots[2]}" || ! _clyops_values_slot "${_c_slots[3]}" || (( 10#${_c_slots[2]} < 1 )); then
                 die 1 "LIMIT and OFFSET must be integers (LIMIT >= 1)"
             fi
             while (( ${#_c_words[@]} )) && [[ "${_c_words[0]}" != -- ]]; do _c_words=("${_c_words[@]:1}"); done
@@ -1590,6 +1590,13 @@ _clyops_completer_values() {
     _clyops_list_values "$fn" "$paged" "" 1000 0 1 "$@" || return 1
     local IFS=,
     _r="choice"$'\t'"${_CLYOPS_VALS[*]:--}"
+}
+
+# A --complete-values LIMIT or OFFSET (spec section 9.3): digits, from 0 to 1000000000.
+_clyops_values_slot() {
+    [[ "$1" =~ ^[0-9]+$ ]] || return 1
+    local n="${1#"${1%%[!0]*}"}"
+    (( ${#n} <= 10 )) && (( 10#${n:-0} <= 1000000000 ))
 }
 
 # Usage: clyops_complete_values <name> <prefix> <limit> <offset> [word...]

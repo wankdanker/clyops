@@ -674,8 +674,10 @@ whitespace. The program prints one line of JSON to stdout and exits 0:
 Errors are logged (section 11) and exit with status 1:
 
 * `LIMIT and OFFSET must be integers (LIMIT >= 1)` when `LIMIT` isn't an
-  integer of at least 1 or `OFFSET` isn't a non-negative integer, or a slot is
-  missing;
+  integer of at least 1 or `OFFSET` isn't a non-negative integer (both written
+  in decimal digits only), when either is more than 1000000000, or when a slot
+  is missing. The bound keeps the limit a paged completer is asked for (one
+  more) within a 32-bit integer in every language;
 * `No completer for 'NAME'` when `NAME` has no completer at the selected
   command, including when the words don't reach a command that takes options;
 * `Completer for 'NAME' failed` when the completer fails.

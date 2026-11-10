@@ -955,7 +955,7 @@ fn list_values(c: &Completer, words: &[String], prefix: &str, limit: usize, offs
     let mut seen = HashSet::new();
     let mut values: Vec<String> = list
         .into_iter()
-        .filter(|v| !v.is_empty() && !(shell && v.contains([',', ' ', '\t', '\r', '\n'])) && seen.insert(v.clone()))
+        .filter(|v| !(v.is_empty() || shell && v.contains([',', ' ', '\t', '\r', '\n'])) && seen.insert(v.clone()))
         .collect();
     if !c.paged {
         values = values.into_iter().filter(|v| v.starts_with(prefix)).skip(offset).collect();
@@ -2036,7 +2036,10 @@ impl Cli {
             let argv: Vec<&str> = argv.iter().map(AsRef::as_ref).collect();
             let slot = |i: usize| argv.get(at + i).copied();
             let number = |text: Option<&str>| {
-                text.filter(|t| !t.is_empty() && t.bytes().all(|b| b.is_ascii_digit())).and_then(|t| t.parse::<usize>().ok())
+                // From 0 to 1000000000 (spec section 9.3).
+                text.filter(|t| !t.is_empty() && t.bytes().all(|b| b.is_ascii_digit()))
+                    .and_then(|t| t.parse::<usize>().ok())
+                    .filter(|n| *n <= 1_000_000_000)
             };
             let (Some(name), Some(prefix), Some(limit), Some(offset)) = (slot(1), slot(2), number(slot(3)), number(slot(4)))
             else {

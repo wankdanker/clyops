@@ -1302,7 +1302,9 @@ class Cli:
             self._ensure_help()
             at = head.index("--complete-values")
             slots = argv[at + 1:at + 5]
-            if len(slots) < 4 or not all(re.fullmatch(r"[0-9]+", t) for t in slots[2:]) or int(slots[2]) < 1:
+            # LIMIT and OFFSET: decimal digits, at most 1000000000 (spec section 9.3).
+            in_range = all(re.fullmatch(r"[0-9]+", t) and int(t) <= 1_000_000_000 for t in slots[2:])
+            if len(slots) < 4 or not in_range or int(slots[2]) < 1:
                 die(1, "LIMIT and OFFSET must be integers (LIMIT >= 1)")
             rest = argv[at + 5:]
             words = rest[rest.index("--") + 1:] if "--" in rest else []

@@ -58,6 +58,9 @@ interface CompleterDef {
   paged: boolean;
 }
 
+/** The largest LIMIT and OFFSET `--complete-values` takes (spec section 9.3). */
+const MAX_VALUES_SLOT = 1_000_000_000;
+
 /** The completion records' request limit (spec section 9.2). */
 const SHELL_COMPLETION_LIMIT = 1000;
 
@@ -1248,7 +1251,8 @@ export class Cli {
       this.ensureHelp();
       const [name, prefix, limitText, offsetText] = argv.slice(valuesAt + 1, valuesAt + 5);
       const after = argv.indexOf('--', valuesAt + 5);
-      if (offsetText === undefined || !/^[0-9]+$/.test(limitText) || !/^[0-9]+$/.test(offsetText) || Number(limitText) < 1) {
+      if (offsetText === undefined || !/^[0-9]+$/.test(limitText) || !/^[0-9]+$/.test(offsetText) || Number(limitText) < 1
+        || Number(limitText) > MAX_VALUES_SLOT || Number(offsetText) > MAX_VALUES_SLOT) {
         die(1, 'LIMIT and OFFSET must be integers (LIMIT >= 1)');
       }
       let page: ValuesPage;

@@ -1397,11 +1397,10 @@ public class Cli {
 
     /** A run of digits as an int, saturating below Integer.MAX_VALUE. */
     private static int slotInt(String digits) {
-        try {
-            return (int) Math.min(Long.parseLong(digits), Integer.MAX_VALUE - 1L);
-        } catch (NumberFormatException e) {
-            return Integer.MAX_VALUE - 1;
-        }
+        // From 0 to 1000000000 (spec section 9.3); -1 otherwise.
+        if (!digits.matches("[0-9]+")) return -1;
+        String n = digits.replaceFirst("^0+(?=.)", "");
+        return n.length() > 10 || Long.parseLong(n) > 1_000_000_000L ? -1 : Integer.parseInt(n);
     }
 
     /**
@@ -1419,7 +1418,7 @@ public class Cli {
         if (valuesAt >= 0) {
             ensureHelp();
             List<String> slots = all.subList(valuesAt + 1, Math.min(valuesAt + 5, all.size()));
-            if (slots.size() < 4 || !slots.get(2).matches("[0-9]+") || !slots.get(3).matches("[0-9]+") || slotInt(slots.get(2)) < 1) {
+            if (slots.size() < 4 || slotInt(slots.get(2)) < 1 || slotInt(slots.get(3)) < 0) {
                 Log.die(1, "LIMIT and OFFSET must be integers (LIMIT >= 1)");
             }
             int after = all.subList(valuesAt + 5, all.size()).indexOf("--");

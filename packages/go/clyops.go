@@ -1842,7 +1842,7 @@ func (c *Cli) runCompleteValues(rest []string) {
 			return -1
 		}
 		n, err := strconv.Atoi(s)
-		if err != nil {
+		if err != nil || n > 1000000000 {
 			return -1
 		}
 		return n
