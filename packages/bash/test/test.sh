@@ -166,5 +166,30 @@ check "complete: unknown names and flags are programming errors" "Unknown option
     run 'clyops_complete nope f' | sed 's/.*\] //'
     run 'clyops_opt FAST fast f flag F; clyops_complete fast f' | sed 's/.*\] //'; } | paste -sd'|' -)"
 
+check "complete: --complete-values pages for the completer, keeping spaces" '{"values":["alpha","a b"],"more":true}|{"values":["albert"],"more":false}' "$({ run '
+    list() { printf "%s\n" alpha beta "a b" albert alpha; }
+    clyops_opt NAME name "" optional "Name"
+    clyops_complete name list
+    clyops_run --complete-values name a 2 0'
+    run 'list() { printf "%s\n" alpha beta "a b" albert; }; clyops_opt NAME name "" optional "Name"; clyops_complete name list; clyops_run --complete-values name al 5 1'; } | paste -sd'|' -)"
+
+check "complete: a paged completer gets the request" '{"values":["x:q:3:4:-n"],"more":false}' "$(run '
+    list() { echo "x:$CLYOPS_COMPLETE_PREFIX:$CLYOPS_COMPLETE_LIMIT:$CLYOPS_COMPLETE_OFFSET:$*"; }
+    clyops_opt NAME name "" optional "Name"
+    clyops_complete name list paged
+    clyops_run --complete-values name q 2 4 -- -n')"
+
+check "complete: registering again replaces the completer" '{"values":["two"],"more":false}' "$(run '
+    a() { echo one; }; b() { echo two; }
+    clyops_opt NAME name "" optional "Name"
+    clyops_complete name a paged
+    clyops_complete name b
+    clyops_run --complete-values name "" 5 0')"
+
+check "complete: --complete-values errors" "No completer for 'nope'|Completer for 'name' failed|LIMIT and OFFSET must be integers (LIMIT >= 1)" "$({
+    run 'clyops_opt NAME name "" optional "Name"; clyops_run --complete-values nope "" 5 0' | sed 's/.*\] //'
+    run 'f() { return 1; }; clyops_opt NAME name "" optional "Name"; clyops_complete name f; clyops_run --complete-values name "" 5 0' | sed 's/.*\] //'
+    run 'clyops_opt NAME name "" optional "Name"; clyops_run --complete-values name "" 0 0' | sed 's/.*\] //'; } | paste -sd'|' -)"
+
 if (( failures )); then echo "$failures failed"; exit 1; fi
 echo "all passed"

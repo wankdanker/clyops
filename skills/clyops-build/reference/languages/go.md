@@ -27,8 +27,13 @@ cli.ArgVariadic(NAME, description, rule)
 
 Metadata: `SetDescription`, `SetEpilog`, `SetConfig(option, prefixes)`,
 `SetPathSearch(long, dirs)`,
-`Complete(name, func(words []string) ([]string, error))` (completion values,
-§9.2; an error or panic keeps the rule's completion),
+`Complete(name, func(req clyops.CompleteRequest) ([]string, error))`
+(completion values, §9.2; `req` has `Words`, `Prefix`, `Limit`, `Offset`, the
+library filters by prefix and pages; an error or panic keeps the rule's
+completion), `CompletePaged(name, fn)` (same, but `fn` applies prefix, offset
+and limit itself, e.g. in SQL; `Limit` is one more than the page, 0 = no
+limit), `CompleteValues(name, prefix, limit, offset, words)` (a
+`ValuesPage{Values, More}`, what `--complete-values` prints, §9.3),
 `RequireCommand(cmd, description, hint)`,
 `SetEffects(effects...)`, `SetStdin(description, contentType)`,
 `SetStdout(description, contentType)`, `Exclusive(longs...)`,

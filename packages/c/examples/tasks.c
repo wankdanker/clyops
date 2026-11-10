@@ -6,17 +6,18 @@
 #include "clyops.h"
 
 /* Completers (spec section 9.2). */
-static int urls(const char* const* words, int nwords, clyops_values_t* out, void* userdata) {
-    (void)words;
-    (void)nwords;
+static int urls(const clyops_complete_request_t* req, clyops_values_t* out, void* userdata) {
+    (void)req;
     (void)userdata;
     clyops_values_add(out, "sqlite:app.db");
     clyops_values_add(out, "pg:main");
     return 0;
 }
 
-static int targets(const char* const* words, int nwords, clyops_values_t* out, void* userdata) {
+static int targets(const clyops_complete_request_t* req, clyops_values_t* out, void* userdata) {
     (void)userdata;
+    const char* const* words = req->words;
+    int nwords = req->nwords;
     clyops_values_add(out, "v1");
     clyops_values_add(out, "v2");
     for (int i = 0; i < nwords; i++) {

@@ -193,7 +193,7 @@ test('MCP at /mcp, behind the API key', { timeout: 60_000 }, async () => {
   const client = new Client({ name: 'test', version: '1' });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`)));
   try {
-    assert.deepEqual((await client.listTools()).tools.map((t) => t.name), ['slow', 'media_demo']);
+    assert.deepEqual((await client.listTools()).tools.map((t) => t.name), ['slow', 'media_demo', 'list_values']);
     const result = await client.callTool({ name: 'media_demo', arguments: { input: 'in.txt', count: 2 } });
     assert.equal(result.structuredContent.values.COUNT, 2);
   } finally {
@@ -204,7 +204,7 @@ test('MCP at /mcp, behind the API key', { timeout: 60_000 }, async () => {
   await assert.rejects(new Client({ name: 'test', version: '1' }).connect(new StreamableHTTPClientTransport(kurl)), /missing or wrong API key/);
   const keyedClient = new Client({ name: 'test', version: '1' });
   await keyedClient.connect(new StreamableHTTPClientTransport(kurl, { requestInit: { headers: { authorization: 'Bearer sekret' } } }));
-  assert.equal((await keyedClient.listTools()).tools.length, 2);
+  assert.equal((await keyedClient.listTools()).tools.length, 3);
   await keyedClient.close();
 });
 
@@ -454,7 +454,7 @@ test('named keys: per-key tools, jobs and MCP; audit names the key', { timeout: 
 
     const client = new Client({ name: 'test', version: '1' });
     await client.connect(new StreamableHTTPClientTransport(new URL(`${s.at}/mcp`), { requestInit: { headers: as('c1') } }));
-    assert.deepEqual((await client.listTools()).tools.map((t) => t.name).sort(), ['media_demo', 'media_png']);
+    assert.deepEqual((await client.listTools()).tools.map((t) => t.name).sort(), ['list_values', 'media_demo', 'media_png']);
     await client.callTool({ name: 'media_png', arguments: { stdin: 'x' } });
     await client.close();
     for (let i = 0; i < 50 && entries.length < 2; i += 1) await new Promise((r) => setTimeout(r, 50));
@@ -861,4 +861,42 @@ process.stdout.write([v.REF, v.KIND, v.COUNT].join(' '));
   assert.deepEqual(input.properties.ref, { contentMediaType: 'application/json', description: 'A reference to nothing' });
   assert.deepEqual(input.properties.count, { type: 'integer', contentMediaType: 'application/json', description: 'Count' });
   assertOpenApi31(await (await fetch(`${s.at}/openapi.json`)).json());
+});
+
+test('POST /values lists a dynamic input\'s values a page at a time (spec section 13)', async () => {
+  const root = tree();
+  // A database-like paged completer: it gets the prefix, limit and offset, and the other inputs as words.
+  jsTool(root, 'hosts', `const cli = new Cli({ name: 'hosts' });
+const rows = ['alpha', 'albert', 'beta', 'big one'];
+cli.opt('REGION', 'region', '', 'eu', 'Region');
+cli.opt('HOST', 'host', '', 'optional', 'Host');
+cli.opt('PLAIN', 'plain', '', 'optional', 'Not dynamic');
+cli.complete('host', ({ words, prefix, limit, offset }) => [...rows.filter((r) => r.startsWith(prefix)).slice(offset, offset + limit), 'w:' + words.join('+')].slice(0, limit), { paged: true });
+cli.run();
+`);
+  const s = await serve({ root, cwd: tmpdir(), keys: { reader: { key: 'r', deny: ['hosts'] }, admin: { key: 'a' } } });
+  const post = (path, body, key = 'a') => fetch(`${s.at}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` }, body: JSON.stringify(body) });
+  try {
+    let res = await post('/values/hosts', { name: 'host', prefix: 'al', limit: 1 });
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { values: ['alpha'], more: true });
+    res = await post('/values/hosts', { name: 'host', prefix: 'b', limit: 5, input: { region: 'us', host: 'ignored' } });
+    assert.deepEqual(await res.json(), { values: ['beta', 'big one', 'w:--region+us'], more: false });
+    res = await post('/values/hosts', { name: 'host', prefix: 'al', limit: 1, offset: 1 });
+    assert.deepEqual((await res.json()).values, ['albert']);
+    res = await post('/values/hosts', { name: 'plain' });
+    assert.equal(res.status, 400);
+    assert.match((await res.json()).error, /plain has no values to list/);
+    res = await post('/values/hosts', { name: 'host', limit: 5000 });
+    assert.equal(res.status, 400);
+    res = await post('/values/hosts', { name: 'host' }, 'r');
+    assert.equal(res.status, 403);
+    // Only tools with a dynamic input get the endpoint; the schema says which inputs are.
+    assert.equal((await post('/values/hello', { name: 'x' })).status, 404);
+    const doc = await (await fetch(`${s.at}/openapi.json`, { headers: { authorization: 'Bearer a' } })).json();
+    assert.ok(doc.paths['/values/hosts'].post);
+    assert.ok(!doc.paths['/values/media/demo'] || doc.paths['/values/media/demo'].post);
+  } finally {
+    s.close();
+  }
 });

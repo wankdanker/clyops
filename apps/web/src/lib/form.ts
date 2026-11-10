@@ -5,6 +5,26 @@ const ajv = new Ajv({ allErrors: true, strict: false });
 // The form checks on every change; compile each tool's input schema once.
 const validators = new WeakMap<object, { input: JsonSchema; validate: ValidateFunction }>();
 
+/** How many of a dynamic input's values the form suggests at once (spec section 13). */
+export const VALUES_SHOWN = 50;
+
+/**
+ * Suggestions for a dynamic input: asks `list` for the values matching what is typed, waiting
+ * `delay` ms after the last keystroke, and drops answers to earlier keystrokes. Failures suggest nothing.
+ */
+export function valueSuggester(list: (prefix: string) => Promise<{ values: string[]; more: boolean }>, onvalues: (values: string[], more: boolean) => void, delay = 250) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let asked = 0;
+  return (prefix: string, now = false) => {
+    clearTimeout(timer);
+    const ask = () => {
+      const mine = ++asked;
+      list(prefix).then((page) => { if (mine === asked) onvalues(page.values, page.more); }, () => { if (mine === asked) onvalues([], false); });
+    };
+    if (now) ask(); else timer = setTimeout(ask, delay);
+  };
+}
+
 /** Convert a scalar control's text without turning an empty numeric input into zero. */
 export function controlValue(value: string, schema: ValueSpec): unknown {
   if (schema.type === 'integer' || schema.type === 'number') return value === '' ? '' : Number(value);

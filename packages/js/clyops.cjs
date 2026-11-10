@@ -190,6 +190,7 @@ complete -c __CLYOPS_PROG__ -f -a '(__clyops___CLYOPS_FUNC___complete)'
 };
 
 // packages/js/src/index.ts
+var SHELL_COMPLETION_LIMIT = 1e3;
 var EFFECTS = ["read-only", "idempotent", "destructive", "network"];
 var ROLE_NAME = /^[A-Za-z][A-Za-z0-9_.-]*$/;
 var COLORS = {
@@ -612,18 +613,20 @@ function completionKind(rule, searchDirs) {
   if (rule) return ["none", ""];
   return ["default", ""];
 }
+function listValues(c, words, prefix, limit, offset, shell) {
+  const list = c.fn(c.paged ? { words: [...words], prefix, limit: limit + 1, offset } : { words: [...words], prefix, limit: 0, offset: 0 });
+  if (!Array.isArray(list)) throw new Error("A completer must return a list of strings");
+  const seen = /* @__PURE__ */ new Set();
+  for (const v of list) if (typeof v === "string" && v !== "" && !(shell && /[, \t\r\n]/.test(v))) seen.add(v);
+  let values = [...seen];
+  if (!c.paged) values = values.filter((v) => v.startsWith(prefix)).slice(offset);
+  return { values: values.slice(0, limit), more: values.length > limit };
+}
 function completionRecord(rule, searchDirs, completer, words) {
   if (completer) {
-    let list;
     try {
-      list = completer([...words]);
+      return ["choice", listValues(completer, words, "", SHELL_COMPLETION_LIMIT, 0, true).values.join(",")];
     } catch {
-      list = void 0;
-    }
-    if (Array.isArray(list)) {
-      const seen = /* @__PURE__ */ new Set();
-      for (const v of list) if (typeof v === "string" && v !== "" && !/[, \t\r\n]/.test(v)) seen.add(v);
-      return ["choice", [...seen].join(",")];
     }
   }
   return completionKind(rule, searchDirs);
@@ -855,17 +858,53 @@ var Cli = class _Cli {
     return this;
   }
   /**
-   * List the values to offer when completing the value option or argument
-   * `name` of this level (spec section 9.2). The function runs only for
-   * --bash-completion, gets the words typed after the commands and returns
-   * strings; it doesn't validate anything.
+   * List the values of the value option or argument `name` of this level
+   * (spec section 9.2), for shell completion and `--complete-values`. The
+   * function gets a request (the words typed after the commands, a prefix, a
+   * limit and an offset) and returns strings. The library keeps the values
+   * starting with the prefix and pages them, unless `paged` is set: then the
+   * function applies the prefix, offset and limit itself, as a database query
+   * can. It doesn't validate anything. Registering a name again replaces it.
    */
-  complete(name, fn) {
+  complete(name, fn, options = {}) {
     const target = this.byLong.get(name) ?? this.args.find((a) => a.name === name);
     if (!target) throw new Error(`Unknown option or argument '${name}' for complete`);
     if ("kind" in target && target.kind === "flag") throw new Error(`Flag --${name} takes no value to complete`);
-    target.completer = fn;
+    target.completer = { fn, paged: options.paged === true };
     return this;
+  }
+  /**
+   * A page of the values of `name` (spec section 9.3): an option of the chain
+   * selected by `words` (nearest first) or an argument of that command. Throws
+   * `No completer for 'NAME'` or `Completer for 'NAME' failed`.
+   */
+  completeValues(name, prefix, limit, offset, words = []) {
+    const selected = this.followWords(words);
+    let completer;
+    if (selected) {
+      for (let n = selected.node; n && !completer; n = n.parent) completer = n.byLong.get(name)?.completer;
+      completer ??= selected.node.args.find((a) => a.name === name)?.completer;
+    }
+    if (!completer) throw new Error(`No completer for '${name}'`);
+    try {
+      return listValues(completer, words.slice(selected?.skip ?? 0), prefix, limit, offset, false);
+    } catch {
+      throw new Error(`Completer for '${name}' failed`);
+    }
+  }
+  /** The command `words` select and how many words name it, or undefined when they stop at a command group (spec section 9). */
+  followWords(words) {
+    let node = this;
+    let skip = 0;
+    if (this.children.length === 0) return { node, skip };
+    for (const w of words) {
+      const child = node.children.find((c) => c.word === w);
+      if (!child) break;
+      node = child;
+      skip++;
+    }
+    if (node.children.length > 0 && skip < words.length && !words[skip].startsWith("-")) return void 0;
+    return { node, skip };
   }
   /** Fallback dirs (relative to root) for bare relative values of a path option. */
   setPathSearch(long, dirs) {
@@ -1273,6 +1312,23 @@ var Cli = class _Cli {
       process.stdout.write(this.jsonSchema() + "\n");
       process.exit(0);
     }
+    const valuesAt = head.indexOf("--complete-values");
+    if (valuesAt >= 0) {
+      this.ensureHelp();
+      const [name, prefix, limitText, offsetText] = argv.slice(valuesAt + 1, valuesAt + 5);
+      const after = argv.indexOf("--", valuesAt + 5);
+      if (offsetText === void 0 || !/^[0-9]+$/.test(limitText) || !/^[0-9]+$/.test(offsetText) || Number(limitText) < 1) {
+        die(1, "LIMIT and OFFSET must be integers (LIMIT >= 1)");
+      }
+      let page;
+      try {
+        page = this.completeValues(name, prefix, Number(limitText), Number(offsetText), after >= 0 ? argv.slice(after + 1) : []);
+      } catch (err) {
+        die(1, "%s", err.message);
+      }
+      process.stdout.write(JSON.stringify(page) + "\n");
+      process.exit(0);
+    }
     if (head.includes("--bash-completion")) {
       this.ensureHelp();
       process.stdout.write(this.completionData(end >= 0 ? argv.slice(end + 1) : []));
@@ -1492,16 +1548,10 @@ var Cli = class _Cli {
   completionData(words = []) {
     const clean = (s) => s.replace(/[\t\n]/g, " ");
     const lines = ["#clyops-completion 1"];
-    let node = this;
+    const selected = this.followWords(words);
+    if (!selected) return lines.join("\n") + "\n";
+    const { node, skip } = selected;
     if (this.children.length > 0) {
-      let skip = 0;
-      for (const w of words) {
-        const child = node.children.find((c) => c.word === w);
-        if (!child) break;
-        node = child;
-        skip++;
-      }
-      if (node.children.length > 0 && skip < words.length && !words[skip].startsWith("-")) return lines.join("\n") + "\n";
       lines.push(`skip	${skip}`);
       words = words.slice(skip);
       for (const c of node.children) lines.push(`cmd	${c.word}	${clean(c.description)}`);

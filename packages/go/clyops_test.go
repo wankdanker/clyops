@@ -351,7 +351,7 @@ func completionLine(t *testing.T, data, prefix string) string {
 }
 
 func TestCompleteRegistrationErrors(t *testing.T) {
-	none := func([]string) ([]string, error) { return nil, nil }
+	none := func(CompleteRequest) ([]string, error) { return nil, nil }
 	mustPanic(t, "unknown option or argument 'nope' for complete", func() { newTestCli().Complete("nope", none) })
 	mustPanic(t, "flag --fast takes no value to complete", func() { newTestCli().Complete("fast", none) })
 }
@@ -359,16 +359,19 @@ func TestCompleteRegistrationErrors(t *testing.T) {
 func TestCompletersFillCompletionRecords(t *testing.T) {
 	calls := 0
 	cli := newTestCli()
-	cli.Complete("count", func(words []string) ([]string, error) {
+	cli.Complete("count", func(req CompleteRequest) ([]string, error) {
 		calls++
+		if req.Prefix != "" || req.Limit != 0 || req.Offset != 0 {
+			t.Errorf("request %#v", req)
+		}
 		list := []string{"b", "", "a,b", "a b", "x\ty", "b", "c"}
-		for _, w := range words {
+		for _, w := range req.Words {
 			list = append(list, "w:"+w)
 		}
 		return list, nil
 	})
-	cli.Complete("file", func([]string) ([]string, error) { return nil, nil })
-	cli.Complete("tag", func([]string) ([]string, error) { return []string{"x"}, errors.New("no tags") })
+	cli.Complete("file", func(CompleteRequest) ([]string, error) { return nil, nil })
+	cli.Complete("tag", func(CompleteRequest) ([]string, error) { return []string{"x"}, errors.New("no tags") })
 	if r := cli.Parse([]string{"x", "-n", "3"}); r.Status != "ok" {
 		t.Fatalf("%#v", r)
 	}
@@ -393,7 +396,7 @@ func TestCompletersFillCompletionRecords(t *testing.T) {
 
 func TestPanickingCompleterKeepsTheRule(t *testing.T) {
 	cli := newTestCli()
-	cli.Complete("file", func([]string) ([]string, error) { panic("boom") })
+	cli.Complete("file", func(CompleteRequest) ([]string, error) { panic("boom") })
 	if got := completionLine(t, cli.CompletionData(), "arg\tfile"); got != "arg\tfile\tsingle\tfile\t-\tFile" {
 		t.Fatal(got)
 	}
@@ -403,10 +406,12 @@ func TestCompletersGetTheWordsAfterTheCommands(t *testing.T) {
 	cli := New()
 	cli.Name, cli.Env = "m", map[string]string{}
 	cli.Opt("CONFIG", "config", "c", "optional", "Config")
-	cli.Complete("config", func(words []string) ([]string, error) { return []string{"top-" + strings.Join(words, "+")}, nil })
+	cli.Complete("config", func(req CompleteRequest) ([]string, error) {
+		return []string{"top-" + strings.Join(req.Words, "+")}, nil
+	})
 	migrate := cli.Command("db", "Database").Command("migrate", "Migrate")
 	migrate.Arg("name", "Name", "all")
-	migrate.Complete("name", func(words []string) ([]string, error) { return words, nil })
+	migrate.Complete("name", func(req CompleteRequest) ([]string, error) { return req.Words, nil })
 	data := cli.CompletionData("db", "migrate", "a", "b")
 	for _, want := range []string{"skip\t2", "opt\t--config\t-c\tvalue\tchoice\ttop-a+b\tConfig", "arg\tname\tsingle\tchoice\ta,b\tName"} {
 		if got := completionLine(t, data, want[:strings.LastIndex(want, "\t")]); got != want {
@@ -417,7 +422,7 @@ func TestCompletersGetTheWordsAfterTheCommands(t *testing.T) {
 
 func TestSchemaMarksDynamicValues(t *testing.T) {
 	cli := newTestCli()
-	cli.Complete("count", func([]string) ([]string, error) { return nil, nil })
+	cli.Complete("count", func(CompleteRequest) ([]string, error) { return nil, nil })
 	var doc struct {
 		Arguments []map[string]any `json:"arguments"`
 		Options   []map[string]any `json:"options"`
@@ -437,4 +442,88 @@ func TestSchemaMarksDynamicValues(t *testing.T) {
 	if !strings.Contains(compact, `"secret":false,"dynamic":true`) || !strings.Contains(compact, `"schema":null,"dynamic":false`) {
 		t.Fatal(compact)
 	}
+}
+
+func checkPage(t *testing.T, got ValuesPage, err error, want ...string) {
+	t.Helper()
+	more := want[len(want)-1] == "more"
+	if more {
+		want = want[:len(want)-1]
+	}
+	if err != nil || !reflect.DeepEqual(got, ValuesPage{Values: append([]string{}, want...), More: more}) {
+		t.Fatalf("got %#v, %v; want %q more=%v", got, err, want, more)
+	}
+}
+
+func checkError(t *testing.T, err error, want string) {
+	t.Helper()
+	if err == nil || err.Error() != want {
+		t.Fatalf("got %v, want %q", err, want)
+	}
+}
+
+func TestCompleteValuesPagesForTheCompleterUnlessItIsPaged(t *testing.T) {
+	all := []string{"alpha", "beta", "albert", "has space", "a,b", "alpha", ""}
+	cli := newTestCli().Complete("count", func(CompleteRequest) ([]string, error) { return all, nil })
+	page, err := cli.CompleteValues("count", "", 10, 0, nil)
+	checkPage(t, page, err, "alpha", "beta", "albert", "has space", "a,b")
+	page, err = cli.CompleteValues("count", "al", 1, 0, nil)
+	checkPage(t, page, err, "alpha", "more")
+	page, err = cli.CompleteValues("count", "al", 1, 1, nil)
+	checkPage(t, page, err, "albert")
+
+	var seen []CompleteRequest
+	paged := newTestCli().CompletePaged("count", func(req CompleteRequest) ([]string, error) {
+		seen = append(seen, req)
+		return []string{"x", "y", "z"}[:req.Limit], nil
+	})
+	page, err = paged.CompleteValues("count", "q", 2, 40, []string{"-f"})
+	checkPage(t, page, err, "x", "y", "more")
+	if want := []CompleteRequest{{Words: []string{"-f"}, Prefix: "q", Limit: 3, Offset: 40}}; !reflect.DeepEqual(seen, want) {
+		t.Fatalf("%#v", seen)
+	}
+	// Registering again replaces the completer and its mode.
+	paged.Complete("count", func(CompleteRequest) ([]string, error) { return []string{"only"}, nil })
+	page, err = paged.CompleteValues("count", "", 5, 0, nil)
+	checkPage(t, page, err, "only")
+
+	_, err = newTestCli().CompleteValues("count", "", 5, 0, nil)
+	checkError(t, err, "No completer for 'count'")
+	failing := newTestCli().Complete("count", func(CompleteRequest) ([]string, error) { return nil, errors.New("x") })
+	_, err = failing.CompleteValues("count", "", 5, 0, nil)
+	checkError(t, err, "Completer for 'count' failed")
+	failing.Complete("count", func(CompleteRequest) ([]string, error) { panic("boom") })
+	_, err = failing.CompleteValues("count", "", 5, 0, nil)
+	checkError(t, err, "Completer for 'count' failed")
+
+	// Shell completion keeps at most 1000 values.
+	many := newTestCli().Complete("count", func(CompleteRequest) ([]string, error) {
+		var list []string
+		for i := 0; i < 1500; i++ {
+			list = append(list, "v"+strconv.Itoa(i))
+		}
+		return list, nil
+	})
+	if n := len(strings.Split(strings.Split(completionLine(t, many.CompletionData(), "opt\t--count"), "\t")[5], ",")); n != 1000 {
+		t.Fatalf("%d values", n)
+	}
+}
+
+func TestCompleteValuesFollowsCommands(t *testing.T) {
+	cli := New()
+	cli.Name, cli.Env = "t", map[string]string{}
+	db := cli.Command("db", "Database")
+	db.Opt("URL", "url", "", "optional", "URL")
+	db.Complete("url", func(CompleteRequest) ([]string, error) { return []string{"pg:main"}, nil })
+	migrate := db.Command("migrate", "Migrate")
+	migrate.Arg("target", "Target", "")
+	migrate.Complete("target", func(req CompleteRequest) ([]string, error) { return req.Words, nil })
+	page, err := cli.CompleteValues("url", "", 5, 0, []string{"db", "migrate"})
+	checkPage(t, page, err, "pg:main")
+	page, err = cli.CompleteValues("target", "", 5, 0, []string{"db", "migrate", "-n", "x"})
+	checkPage(t, page, err, "-n", "x")
+	_, err = cli.CompleteValues("target", "", 5, 0, []string{"db"})
+	checkError(t, err, "No completer for 'target'")
+	_, err = cli.CompleteValues("url", "", 5, 0, nil)
+	checkError(t, err, "No completer for 'url'")
 }

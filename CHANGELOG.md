@@ -7,12 +7,20 @@ section here.
 
 ### Added
 
-- `complete(name, fn)` (Bash: `clyops_complete name function`) lists completion values at Tab
-  time, such as the instances registered in a directory, in every language (spec section 9.2).
-  The function gets the words typed so far and runs only for `--bash-completion`. A failure falls
-  back to the rule's completion, and nothing is validated against the list. The completion
-  scripts are unchanged. `--help-json-schema` gains `"dynamic"` on arguments and options, which
-  older consumers can ignore.
+- `complete(name, fn)` (Bash: `clyops_complete name function`) lists an option's or argument's
+  values when they are asked for, such as the instances registered in a directory or the distinct
+  values of a database column, in every language (spec sections 9.2 and 9.3). The function gets
+  the words typed so far, a prefix, a limit and an offset. By default the library filters and
+  pages what it returns; registered as paged, it does that itself, so a query fetches only one
+  page. Shells offer the values on Tab, with no change to the completion scripts, and
+  `prog --complete-values NAME PREFIX LIMIT OFFSET -- WORDS` prints a page as JSON. Nothing is
+  validated against the list. `--help-json-schema` gains `"dynamic"` on arguments and options,
+  which older consumers can ignore.
+- clyops-api: `POST /values/<tool words>` lists a dynamic input's values a page at a time, given
+  the other inputs so far and a prefix. clyops-tools: `completeValues`.
+- clyops-mcp: a `list_values` tool, listed when a served tool has a dynamic input, which each such
+  input's description points to.
+- Web runner: dynamic inputs suggest the tool's values as you type.
 
 ## [0.12.2] - 2026-10-30
 

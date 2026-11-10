@@ -58,7 +58,7 @@ final class Json {
         }
     }
 
-    private static void string(StringBuilder out, String s) {
+    static void string(StringBuilder out, String s) {
         out.append('"');
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);

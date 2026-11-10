@@ -1,12 +1,21 @@
 // The conformance demo CLI in TypeScript, importing the published package
 // entry point so the shipped type declarations are exercised too.
-import { Cli } from 'clyops';
+import { Cli, type CompleteRequest } from 'clyops';
 
-// Completer (spec section 9.2): the DEMO_HOSTS entries, then words-N. Fails when DEMO_HOSTS is unset.
-function hosts(words: string[]): string[] {
+// Completers (spec section 9.2): the DEMO_HOSTS entries, then words-N. They fail when DEMO_HOSTS is unset.
+function demoHosts(words: string[]): string[] {
   process.stderr.write('completer ran\n');
   if (process.env.DEMO_HOSTS === undefined) throw new Error('DEMO_HOSTS is unset');
   return [...process.env.DEMO_HOSTS.split(';'), ...(words.length > 0 ? [`words-${words.length}`] : [])];
+}
+// Library-paged: the library keeps the values starting with the prefix and pages them.
+function hosts({ words }: CompleteRequest): string[] {
+  return demoHosts(words);
+}
+// Paged: applies the request's prefix, offset and limit itself.
+function pagedHosts({ words, prefix, limit, offset }: CompleteRequest): string[] {
+  const matching = demoHosts(words).filter((h) => h.startsWith(prefix)).slice(offset);
+  return limit > 0 ? matching.slice(0, limit) : matching;
 }
 
 const cli = new Cli({ name: 'demo', root: process.env.DEMO_ROOT });
@@ -60,7 +69,7 @@ cli.optArray('INCLUDE', 'include', 'I',           'Include directory',     'File
 cli.setConfig('config', 'demo:,shared:');
 cli.setPathSearch('config', 'conf');
 cli.complete('host', hosts);
-cli.complete('rest', hosts);
+cli.complete('rest', pagedHosts, { paged: true });
 cli.exclusive('endpoint', 'addr');
 cli.requires('dest', 'src');
 

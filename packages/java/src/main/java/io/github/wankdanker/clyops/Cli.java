@@ -504,21 +504,42 @@ public class Cli {
         return new String[] {rule.isEmpty() ? "default" : "none", ""};
     }
 
+    /** A registered completer and who pages it (spec section 9.2). */
+    private record CompleterDef(Completer fn, boolean paged) {}
+
+    /** The completion records' request limit (spec section 9.2). */
+    private static final int SHELL_COMPLETION_LIMIT = 1000;
+
+    /**
+     * Ask a completer for a page of values (spec section 9.2): the library pages unless the
+     * completer was registered as paged. {@code shell} also drops values the completion scripts
+     * would split. Throws when the completer fails.
+     */
+    private static ValuesPage listValues(CompleterDef c, List<String> words, String prefix, int limit, int offset, boolean shell) throws Exception {
+        CompleteRequest request = c.paged()
+            ? new CompleteRequest(words, prefix, limit < Integer.MAX_VALUE ? limit + 1 : limit, offset)
+            : new CompleteRequest(words, prefix, 0, 0);
+        List<String> list = c.fn().complete(request);
+        if (list == null) throw new IllegalStateException("A completer must return a list of strings");
+        Set<String> seen = new LinkedHashSet<>();
+        for (String v : list) {
+            if (v != null && !v.isEmpty() && !(shell && UNLISTABLE.matcher(v).find())) seen.add(v);
+        }
+        List<String> values = new ArrayList<>(seen);
+        if (!c.paged()) {
+            values.removeIf(v -> !v.startsWith(prefix));
+            values = values.subList(Math.min(offset, values.size()), values.size());
+        }
+        return new ValuesPage(values.subList(0, Math.min(limit, values.size())), values.size() > limit);
+    }
+
     /** The kind and values of a completion record, asking the completer first (spec section 9.2). */
-    private static String[] completionRecord(String rule, List<String> searchDirs, Completer completer, List<String> words) {
+    private static String[] completionRecord(String rule, List<String> searchDirs, CompleterDef completer, List<String> words) {
         if (completer != null) {
-            List<String> list;
             try {
-                list = completer.complete(new ArrayList<>(words));
+                return new String[] {"choice", String.join(",", listValues(completer, words, "", SHELL_COMPLETION_LIMIT, 0, true).values())};
             } catch (Exception e) {
-                list = null;
-            }
-            if (list != null) {
-                Set<String> seen = new LinkedHashSet<>();
-                for (String v : list) {
-                    if (v != null && !v.isEmpty() && !UNLISTABLE.matcher(v).find()) seen.add(v);
-                }
-                return new String[] {"choice", String.join(",", seen)};
+                // keep the rule's completion
             }
         }
         return completionKind(rule, searchDirs);
@@ -536,7 +557,7 @@ public class Cli {
         String rule;
         List<String> searchDirs = List.of();
         boolean secret;
-        Completer completer;
+        CompleterDef completer;
 
         Option(String var, String lng, String shrt, String kind, String def, boolean required, String description, String group, String rule) {
             this.var = var; this.lng = lng; this.shrt = shrt; this.kind = kind; this.def = def;
@@ -574,7 +595,7 @@ public class Cli {
     private final Map<String, Option> byLong = new HashMap<>();
     private final Map<String, Option> byShort = new HashMap<>();
     private final List<Argument> args = new ArrayList<>();
-    private final Map<String, Completer> argCompleters = new HashMap<>();
+    private final Map<String, CompleterDef> argCompleters = new HashMap<>();
     private final List<Command> commands = new ArrayList<>();
     private String configOption = "";
     private List<String> configPrefixes = List.of();
@@ -907,23 +928,77 @@ public class Cli {
     }
 
     /**
-     * List the values to offer when completing the value option or argument {@code name} of this
-     * level (spec section 9.2; options are looked up first). The completer runs only for
-     * {@code --bash-completion}, gets the words typed after the commands and doesn't validate
-     * anything.
+     * List the values of the value option or argument {@code name} of this level (spec section
+     * 9.2; options are looked up first), for shell completion and {@code --complete-values}. The
+     * completer gets a {@link CompleteRequest} and returns strings; the library keeps the values
+     * starting with the prefix and pages them. It doesn't validate anything. Registering a name
+     * again replaces its completer.
      */
     public Cli complete(String name, Completer completer) {
+        return complete(name, false, completer);
+    }
+
+    /**
+     * Like {@link #complete(String, Completer)}; when {@code paged} is true the completer applies
+     * the request's prefix, offset and limit itself (as a database query can) and is asked for one
+     * more than the limit wanted, so the library only truncates.
+     */
+    public Cli complete(String name, boolean paged, Completer completer) {
+        CompleterDef def = new CompleterDef(completer, paged);
         Option opt = byLong.get(name);
         if (opt != null) {
             if (opt.kind.equals("flag")) throw new IllegalArgumentException("Flag --" + name + " takes no value to complete");
-            opt.completer = completer;
+            opt.completer = def;
             return this;
         }
         if (args.stream().noneMatch(a -> a.name().equals(name))) {
             throw new IllegalArgumentException("Unknown option or argument '" + name + "' for complete");
         }
-        argCompleters.put(name, completer);
+        argCompleters.put(name, def);
         return this;
+    }
+
+    /**
+     * A page of the values of {@code name} (spec section 9.3): an option of the chain selected by
+     * {@code words} (nearest command first) or an argument of that command. {@code words} are the
+     * words typed after the program name. Throws {@link IllegalArgumentException}
+     * {@code No completer for 'NAME'} or {@link IllegalStateException}
+     * {@code Completer for 'NAME' failed}.
+     */
+    public ValuesPage completeValues(String name, String prefix, int limit, int offset, List<String> words) {
+        Selected selected = followWords(words);
+        CompleterDef completer = null;
+        if (selected != null) {
+            for (Cli n = selected.node(); n != null && completer == null; n = n.parent) {
+                Option o = n.byLong.get(name);
+                if (o != null) completer = o.completer;
+            }
+            if (completer == null) completer = selected.node().argCompleters.get(name);
+        }
+        if (completer == null) throw new IllegalArgumentException("No completer for '" + name + "'");
+        try {
+            return listValues(completer, words.subList(selected.skip(), words.size()), prefix, Math.max(limit, 0), Math.max(offset, 0), false);
+        } catch (Exception e) {
+            throw new IllegalStateException("Completer for '" + name + "' failed", e);
+        }
+    }
+
+    /** The command some words select and how many words name it. */
+    private record Selected(Cli node, int skip) {}
+
+    /** The command {@code words} select, or null when they stop at a command group (spec section 9). */
+    private Selected followWords(List<String> words) {
+        Cli node = this;
+        int skip = 0;
+        if (children.isEmpty()) return new Selected(node, skip);
+        for (String w : words) {
+            Cli child = node.children.stream().filter(c -> c.word.equals(w)).findFirst().orElse(null);
+            if (child == null) break;
+            node = child;
+            skip++;
+        }
+        if (!node.children.isEmpty() && skip < words.size() && !words.get(skip).startsWith("-")) return null;
+        return new Selected(node, skip);
     }
 
     /**
@@ -1320,15 +1395,49 @@ public class Cli {
         return out;
     }
 
+    /** A run of digits as an int, saturating below Integer.MAX_VALUE. */
+    private static int slotInt(String digits) {
+        try {
+            return (int) Math.min(Long.parseLong(digits), Integer.MAX_VALUE - 1L);
+        } catch (NumberFormatException e) {
+            return Integer.MAX_VALUE - 1;
+        }
+    }
+
     /**
-     * Parse like a CLI: handles --help, --help-json-schema, --completion and --bash-completion,
-     * prints errors and exits on failure. Returns the values.
+     * Parse like a CLI: handles --help, --help-json-schema, --completion, --bash-completion and
+     * --complete-values, prints errors and exits on failure. Returns the values.
      */
     public Values run(String... argv) {
         List<String> all = Arrays.asList(argv);
         List<String> head = all.contains("--") ? all.subList(0, all.indexOf("--")) : all;
         if (head.contains("--help-json-schema")) {
             System.out.println(jsonSchema());
+            System.exit(0);
+        }
+        int valuesAt = head.indexOf("--complete-values");
+        if (valuesAt >= 0) {
+            ensureHelp();
+            List<String> slots = all.subList(valuesAt + 1, Math.min(valuesAt + 5, all.size()));
+            if (slots.size() < 4 || !slots.get(2).matches("[0-9]+") || !slots.get(3).matches("[0-9]+") || slotInt(slots.get(2)) < 1) {
+                Log.die(1, "LIMIT and OFFSET must be integers (LIMIT >= 1)");
+            }
+            int after = all.subList(valuesAt + 5, all.size()).indexOf("--");
+            List<String> words = after >= 0 ? all.subList(valuesAt + 5 + after + 1, all.size()) : List.of();
+            ValuesPage page = null;
+            try {
+                page = completeValues(slots.get(0), slots.get(1), slotInt(slots.get(2)), slotInt(slots.get(3)), words);
+            } catch (RuntimeException e) {
+                Log.die(1, "%s", e.getMessage());
+            }
+            StringBuilder out = new StringBuilder("{\"values\":[");
+            for (int i = 0; i < page.values().size(); i++) {
+                if (i > 0) out.append(',');
+                Json.string(out, page.values().get(i));
+            }
+            out.append("],\"more\":").append(page.more()).append('}');
+            System.out.println(out);
+            System.out.flush();
             System.exit(0);
         }
         if (head.contains("--bash-completion")) {
@@ -1622,16 +1731,11 @@ public class Cli {
     public String completionData(List<String> words) {
         ensureHelp();
         List<String> lines = new ArrayList<>(List.of("#clyops-completion 1"));
-        Cli node = this;
+        Selected selected = followWords(words);
+        if (selected == null) return lines.get(0) + "\n";
+        Cli node = selected.node();
         if (!children.isEmpty()) {
-            int skip = 0;
-            for (String w : words) {
-                Cli child = node.children.stream().filter(c -> c.word.equals(w)).findFirst().orElse(null);
-                if (child == null) break;
-                node = child;
-                skip++;
-            }
-            if (!node.children.isEmpty() && skip < words.size() && !words.get(skip).startsWith("-")) return lines.get(0) + "\n";
+            int skip = selected.skip();
             lines.add("skip\t" + skip);
             words = words.subList(skip, words.size());
             for (Cli c : node.children) lines.add("cmd\t" + c.word + "\t" + clean(c.description));

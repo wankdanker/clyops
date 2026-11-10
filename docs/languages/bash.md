@@ -60,10 +60,13 @@ each has its own help (`mytool db migrate --help`), schema and completion. See t
 
 ## Completion values from your program
 
-`clyops_complete NAME FUNCTION` lists the values to offer when completing an
-option or argument, read when the user presses Tab, for values only the
-program can find, such as the instances registered in a directory. The
-function prints one value per line:
+`clyops_complete NAME FUNCTION` lists an option's or argument's values for values
+only the program can find, such as the instances registered in a directory.
+Shells offer them on Tab, and the API, MCP server and web runner list them on
+demand (`--complete-values`). The function prints one value per line. Its
+arguments are the words typed after the command words, and
+`CLYOPS_COMPLETE_PREFIX`, `CLYOPS_COMPLETE_LIMIT` (0: no limit) and
+`CLYOPS_COMPLETE_OFFSET` are set:
 
 ```bash
 list_instances() { local f; for f in /var/lib/myapp/instances/*.json; do [[ -e "$f" ]] && basename "$f" .json; done; }
@@ -71,11 +74,19 @@ clyops_opt      INSTANCE instance i "" "Instance to target"
 clyops_complete instance list_instances
 ```
 
-The function runs only for `--bash-completion`, on every Tab, so keep it quick.
-Its arguments are the words typed after the command words, for completers that
-depend on another option. A non-zero exit keeps the rule's completion. It
-doesn't validate: check the value after `clyops_run` if only listed values are
-allowed. See the [spec](../../spec/SPEC.md) section 9.2.
+By default the function may print everything: the library keeps the values that
+start with the prefix and pages them. For thousands of values, add `paged` and
+apply the prefix, offset and limit yourself:
+
+```bash
+customers() { sqlite3 app.db "SELECT DISTINCT name FROM customers WHERE name LIKE '${CLYOPS_COMPLETE_PREFIX//\'/\'\'}%' ORDER BY name LIMIT $CLYOPS_COMPLETE_LIMIT OFFSET $CLYOPS_COMPLETE_OFFSET"; }
+clyops_complete customer customers paged
+```
+
+The function runs only when values are asked for, on every Tab, so keep it quick
+and read-only. A non-zero exit keeps the rule's shell completion. It doesn't
+validate: check the value after `clyops_run` if only listed values are allowed.
+See the [spec](../../spec/SPEC.md) sections 9.2 and 9.3.
 
 ## Parsing and errors
 

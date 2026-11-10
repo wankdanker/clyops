@@ -1,7 +1,7 @@
 // An HTTP API over a directory of clyops tools: one POST endpoint per tool,
 // validated and documented from its --help-json-schema.
 import {
-  allowed, checkableInputSchema, closedInputs, closedKeys, closedRequirement, InputError, inputKeys, isTextType, loadTools, publicSchema, runTool, startTool, tail,
+  allowed, checkableInputSchema, closedInputs, completeValues, closedKeys, closedRequirement, InputError, inputKeys, isTextType, loadTools, publicSchema, runTool, startTool, tail,
   SchemaFetchError, toJsonSchema, watchTools, type InputPolicy, type SchemaFetchOptions,
   type AuditEntry, type Command, type Group, type RunResult, type Tool, type ToolFilter, type ToolResult, type ToolRunOptions,
 } from 'clyops-tools';
@@ -123,6 +123,22 @@ const JobSchema = z.object({
 }).passthrough();
 
 const ErrorSchema = z.object({ error: z.string(), issues: z.unknown().optional() });
+
+/** The most values one `POST /values/...` call may ask for (spec section 13). */
+export const MAX_VALUES_LIMIT = 1000;
+const ValuesRequestSchema = z.object({
+  name: z.string().openapi({ description: 'The input key of a dynamic input (its schema entry has `"dynamic": true`)' }),
+  input: z.record(z.string(), z.unknown()).optional().openapi({ description: 'The other inputs given so far; the tool may narrow its values by them' }),
+  prefix: z.string().optional().openapi({ description: 'The text being completed (default: empty)' }),
+  limit: z.number().int().min(1).max(MAX_VALUES_LIMIT).optional().openapi({ description: `The most values to return (default: 100, at most ${MAX_VALUES_LIMIT})` }),
+  offset: z.number().int().min(0).optional().openapi({ description: 'How many matching values to skip (default: 0)' }),
+});
+const ValuesPageSchema = z.object({ values: z.array(z.string()), more: z.boolean().openapi({ description: 'Whether values beyond the limit were left out' }) });
+
+/** The path listing a tool's input values: `/tools/a/b` -> `/values/a/b`. */
+export function valuesPath(tool: { /** Path of the tool's run endpoint. */ path: string }): string {
+  return tool.path.replace(/^\/tools\//, '/values/');
+}
 const json = (schema: z.ZodType, description: string) => ({ description, content: { 'application/json': { schema } } });
 
 type ApiResult = ToolResult & { stdoutEncoding?: 'base64'; stdoutUrl?: string; meta?: unknown; progress?: Record<string, unknown> };
@@ -349,8 +365,9 @@ export async function createApi(opts: ApiOptions) {
   // A key only sees and runs the tools it may.
   app.use((req: Request, res: Response, next: NextFunction) => {
     const caller = res.locals.caller as Caller | undefined;
-    const tool = api.tools.find((t) => t.path === req.path);
+    const tool = api.tools.find((t) => t.path === req.path || valuesPath(t) === req.path);
     if (tool && caller?.filter && !allowed(tool, caller.filter)) return void res.status(403).json({ error: `this key may not run ${tool.words.join(' ')}` });
+    if (tool && req.path !== tool.path) return next();
     // Say why a closed input is refused, before the schema calls it unknown.
     const set = tool && req.method === 'POST' && req.is('application/json') && req.body && typeof req.body === 'object'
       ? closedKeys(tool.schema, closedOf(opts, tool), req.body as Record<string, unknown>) : [];
@@ -719,6 +736,37 @@ function buildRoutes(opts: ApiOptions, ctx: Ctx, tree: Group, tools: ApiTool[]) 
         }
       },
     );
+    // Inputs whose values the tool lists on demand (spec sections 9.3 and 13).
+    if (schema.arguments.some((a) => a.dynamic) || schema.options.some((o) => o.dynamic)) {
+      router.post(
+        {
+          path: valuesPath(tool),
+          operationId: `${tool.words.join('_').replace(/[^A-Za-z0-9_]/g, '_')}_values`,
+          summary: `List values of an input of ${tool.words.join(' ')}`,
+          description: 'Runs the tool with `--complete-values` to list the values of an input marked `"dynamic": true` in its schema, '
+            + 'narrowed by the other inputs given so far and the prefix being typed, a page at a time.',
+          tags: [tag],
+          body: ValuesRequestSchema,
+          responses: {
+            200: json(ValuesPageSchema, 'A page of values'),
+            400: json(ErrorSchema, 'Not a dynamic input, or invalid input'),
+            403: json(ErrorSchema, 'The API key may not run this tool'),
+            502: json(ErrorSchema, 'The tool failed to list values'),
+          },
+        },
+        async (req: Request, res: Response, next: NextFunction) => {
+          try {
+            const body = req.body as z.infer<typeof ValuesRequestSchema>;
+            res.json(await completeValues(tool, body.name, body.input ?? {}, {
+              prefix: body.prefix, limit: body.limit, offset: body.offset, cwd: opts.cwd, within: opts.within,
+              positionalsOrder: opts.positionalsOrder, closed: closedOf(opts, tool),
+            }));
+          } catch (err) {
+            next(err);
+          }
+        },
+      );
+    }
   }
 
   const JobParams = z.object({ id: z.string() });

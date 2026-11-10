@@ -13,7 +13,7 @@ db.complete('url', () => ['sqlite:app.db', 'pg:main']);
 const migrate = db.command('migrate', 'Apply migrations');
 migrate.arg('target', 'Target version', 'latest');
 migrate.opt('DRY_RUN', 'dry-run', 'n', 'flag', 'Show what would run');
-migrate.complete('target', (words: string[]) => ['v1', 'v2', ...words.map((w) => `w:${w}`)]);
+migrate.complete('target', ({ words }) => ['v1', 'v2', ...words.map((w) => `w:${w}`)]);
 migrate.setEffects('destructive');
 migrate.role('plan', 'out', 'Migration plan', 'text/plain');
 const status = db.command('status', 'Show migration status');

@@ -890,15 +890,40 @@ fn completion_kind(rule: &str, dirs: &[String]) -> (&'static str, String) {
     }
 }
 
-/// What a completer returns: the values to offer, or an error that keeps the rule's completion
-/// (spec section 9.2).
+/// What a completer is asked for (spec section 9.2).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CompleteRequest {
+    /// The words typed after the program's command words.
+    pub words: Vec<String>,
+    /// The text being completed; empty for shell completion.
+    pub prefix: String,
+    /// The most values wanted; 0 means no limit.
+    pub limit: usize,
+    /// How many matching values to skip.
+    pub offset: usize,
+}
+
+/// A page of values (spec section 9.3).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ValuesPage {
+    /// The values, at most the limit asked for.
+    pub values: Vec<String>,
+    /// Whether values beyond the limit were left out.
+    pub more: bool,
+}
+
+/// What a completer returns: the values, or an error that keeps the rule's shell completion and
+/// makes `--complete-values` fail (spec section 9.2).
 pub type CompleteResult = Result<Vec<String>, Box<dyn std::error::Error>>;
 
-type CompleterFn = dyn Fn(&[String]) -> CompleteResult + Send + Sync;
+type CompleterFn = dyn Fn(&CompleteRequest) -> CompleteResult + Send + Sync;
 
-/// A registered completer (spec section 9.2).
+/// A registered completer (spec section 9.2): the function, and whether it pages itself.
 #[derive(Clone)]
-struct Completer(std::sync::Arc<CompleterFn>);
+struct Completer {
+    f: std::sync::Arc<CompleterFn>,
+    paged: bool,
+}
 
 // A completer only runs inside `catch_unwind` (with `AssertUnwindSafe`), so it doesn't take
 // unwind safety away from `Cli`.
@@ -907,24 +932,44 @@ impl std::panic::RefUnwindSafe for Completer {}
 
 impl std::fmt::Debug for Completer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Completer")
+        f.write_str(if self.paged { "Completer(paged)" } else { "Completer" })
     }
+}
+
+/// The completion records' request limit (spec section 9.2).
+const SHELL_COMPLETION_LIMIT: usize = 1000;
+
+/// Ask a completer for a page of values (spec section 9.2): the library pages unless the
+/// completer was registered as paged. `shell` also drops values the completion scripts would
+/// split. `None` when the completer returns an error or panics.
+fn list_values(c: &Completer, words: &[String], prefix: &str, limit: usize, offset: usize, shell: bool) -> Option<ValuesPage> {
+    let request = if c.paged {
+        CompleteRequest { words: words.to_vec(), prefix: prefix.to_string(), limit: limit.saturating_add(1), offset }
+    } else {
+        CompleteRequest { words: words.to_vec(), prefix: prefix.to_string(), limit: 0, offset: 0 }
+    };
+    let list = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| (c.f)(&request))) {
+        Ok(Ok(list)) => list,
+        _ => return None,
+    };
+    let mut seen = HashSet::new();
+    let mut values: Vec<String> = list
+        .into_iter()
+        .filter(|v| !v.is_empty() && !(shell && v.contains([',', ' ', '\t', '\r', '\n'])) && seen.insert(v.clone()))
+        .collect();
+    if !c.paged {
+        values = values.into_iter().filter(|v| v.starts_with(prefix)).skip(offset).collect();
+    }
+    let more = values.len() > limit;
+    values.truncate(limit);
+    Some(ValuesPage { values, more })
 }
 
 /// The kind and values of a completion record, asking the completer first (spec section 9.2).
 /// A completer that returns an error or panics keeps the rule's kind and values.
 fn completion_record(rule: &str, dirs: &[String], completer: Option<&Completer>, words: &[String]) -> (&'static str, String) {
-    if let Some(Completer(f)) = completer {
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(words)));
-        if let Ok(Ok(list)) = result {
-            let mut seen: Vec<String> = Vec::new();
-            for v in list {
-                if !v.is_empty() && !v.contains([',', ' ', '\t', '\r', '\n']) && !seen.contains(&v) {
-                    seen.push(v);
-                }
-            }
-            return ("choice", seen.join(","));
-        }
+    if let Some(page) = completer.and_then(|c| list_values(c, words, "", SHELL_COMPLETION_LIMIT, 0, true)) {
+        return ("choice", page.values.join(","));
     }
     completion_kind(rule, dirs)
 }
@@ -1410,27 +1455,90 @@ impl Cli {
         self
     }
 
-    /// List the values to offer when completing the value option, array option or
-    /// positional argument `name` of this level (options are looked up first; spec
-    /// section 9.2). The function runs only while answering `--bash-completion`, gets
-    /// the words typed after the commands, and doesn't validate anything; returning an
-    /// error (or panicking) keeps the rule's completion. Panics on an unknown name or a flag.
+    /// List the values of the value option, array option or positional argument `name` of this
+    /// level (options are looked up first; spec section 9.2), for shell completion and
+    /// `--complete-values`. The function gets a [`CompleteRequest`] (the words typed after the
+    /// commands, a prefix, a limit and an offset) and returns strings; the library keeps the
+    /// values starting with the prefix and pages them. It doesn't validate anything, and
+    /// returning an error (or panicking) keeps the rule's completion. Registering a name again
+    /// replaces its completer. Panics on an unknown name or a flag.
     pub fn complete<F>(&mut self, name: &str, f: F) -> &mut Self
     where
-        F: Fn(&[String]) -> CompleteResult + Send + Sync + 'static,
+        F: Fn(&CompleteRequest) -> CompleteResult + Send + Sync + 'static,
     {
-        let completer = Some(Completer(std::sync::Arc::new(f)));
+        self.set_completer(name, Completer { f: std::sync::Arc::new(f), paged: false })
+    }
+
+    /// [`Cli::complete`] for a completer that applies the request's prefix, offset and limit
+    /// itself, as a database query can (spec section 9.2). It is asked for one more value than
+    /// wanted, so the library can tell whether more remain; the library only truncates.
+    pub fn complete_paged<F>(&mut self, name: &str, f: F) -> &mut Self
+    where
+        F: Fn(&CompleteRequest) -> CompleteResult + Send + Sync + 'static,
+    {
+        self.set_completer(name, Completer { f: std::sync::Arc::new(f), paged: true })
+    }
+
+    fn set_completer(&mut self, name: &str, completer: Completer) -> &mut Self {
         if let Some(opt) = self.options.iter_mut().find(|o| o.long == name) {
             if opt.kind == Kind::Flag {
                 panic!("Flag --{name} takes no value to complete");
             }
-            opt.completer = completer;
+            opt.completer = Some(completer);
         } else if let Some(arg) = self.args.iter_mut().find(|a| a.name == name) {
-            arg.completer = completer;
+            arg.completer = Some(completer);
         } else {
             panic!("Unknown option or argument '{name}' for complete");
         }
         self
+    }
+
+    /// A page of the values of `name` (spec section 9.3): an option of the chain the command
+    /// words in `words` select (the nearest level first) or an argument of that command. Errors
+    /// are `No completer for 'NAME'` and `Completer for 'NAME' failed`.
+    pub fn complete_values(
+        &self,
+        name: &str,
+        prefix: &str,
+        limit: usize,
+        offset: usize,
+        words: &[&str],
+    ) -> Result<ValuesPage, String> {
+        let words: Vec<String> = words.iter().map(|w| w.to_string()).collect();
+        let selected = self.follow_words(&words);
+        let completer = selected.as_ref().and_then(|(chain, _)| {
+            chain
+                .iter()
+                .find_map(|n| n.options.iter().find(|o| o.long == name).and_then(|o| o.completer.as_ref()))
+                .or_else(|| chain[0].args.iter().find(|a| a.name == name).and_then(|a| a.completer.as_ref()))
+        });
+        let Some(completer) = completer else {
+            return Err(format!("No completer for '{name}'"));
+        };
+        let skip = selected.as_ref().map_or(0, |(_, skip)| *skip);
+        list_values(completer, &words[skip..], prefix, limit, offset, false)
+            .ok_or_else(|| format!("Completer for '{name}' failed"))
+    }
+
+    /// The chain of commands `words` select (the selected command first) and how many words
+    /// name them, or `None` when they stop at a command group (spec section 9).
+    fn follow_words(&self, words: &[String]) -> Option<(Vec<&Cli>, usize)> {
+        let mut chain = vec![self];
+        let mut skip = 0;
+        if self.children.is_empty() {
+            return Some((chain, skip));
+        }
+        for w in words {
+            match chain[0].children.iter().find(|c| c.word == *w) {
+                Some(c) => chain.insert(0, c),
+                None => break,
+            }
+            skip += 1;
+        }
+        if !chain[0].children.is_empty() && skip < words.len() && !words[skip].starts_with('-') {
+            return None;
+        }
+        Some((chain, skip))
     }
 
     /// Register an option. `default` is a value, "flag", "optional", or "" (required).
@@ -1907,8 +2015,8 @@ impl Cli {
         Ok(())
     }
 
-    /// Parse `std::env::args()` like a CLI: handles --help, --help-json-schema and
-    /// --bash-completion, prints errors and exits on failure. Returns the values.
+    /// Parse `std::env::args()` like a CLI: handles --help, --help-json-schema, --completion,
+    /// --bash-completion and --complete-values, prints errors and exits on failure. Returns the values.
     pub fn run(&mut self) -> Values {
         let argv: Vec<String> = std::env::args().skip(1).collect();
         self.run_with(&argv)
@@ -1918,11 +2026,46 @@ impl Cli {
     pub fn run_with<S: AsRef<str>>(&mut self, argv: &[S]) -> Values {
         let head = argv.iter().map(AsRef::as_ref).take_while(|a| *a != "--");
         let words: Vec<&str> = argv.iter().map(AsRef::as_ref).skip_while(|a| *a != "--").skip(1).collect();
-        for a in head {
-            if a == "--help-json-schema" {
-                println!("{}", self.json_schema());
-                std::process::exit(0);
+        let head: Vec<&str> = head.collect();
+        if head.contains(&"--help-json-schema") {
+            println!("{}", self.json_schema());
+            std::process::exit(0);
+        }
+        if let Some(at) = head.iter().position(|a| *a == "--complete-values") {
+            self.ensure_help();
+            let argv: Vec<&str> = argv.iter().map(AsRef::as_ref).collect();
+            let slot = |i: usize| argv.get(at + i).copied();
+            let number = |text: Option<&str>| {
+                text.filter(|t| !t.is_empty() && t.bytes().all(|b| b.is_ascii_digit())).and_then(|t| t.parse::<usize>().ok())
+            };
+            let (Some(name), Some(prefix), Some(limit), Some(offset)) = (slot(1), slot(2), number(slot(3)), number(slot(4)))
+            else {
+                die(1, "LIMIT and OFFSET must be integers (LIMIT >= 1)")
+            };
+            if limit < 1 {
+                die(1, "LIMIT and OFFSET must be integers (LIMIT >= 1)");
             }
+            let words: &[&str] = match argv.iter().skip(at + 5).position(|a| *a == "--") {
+                Some(i) => &argv[at + 5 + i + 1..],
+                None => &[],
+            };
+            match self.complete_values(name, prefix, limit, offset, words) {
+                Ok(page) => {
+                    let mut out = String::from("{\"values\":[");
+                    for (i, v) in page.values.iter().enumerate() {
+                        if i > 0 {
+                            out.push(',');
+                        }
+                        json_str(v, &mut out);
+                    }
+                    let _ = write!(out, "],\"more\":{}}}", page.more);
+                    println!("{out}");
+                    std::process::exit(0);
+                }
+                Err(message) => die(1, &message),
+            }
+        }
+        for a in head {
             if a == "--bash-completion" {
                 print!("{}", self.completion_data_for(&words));
                 std::process::exit(0);
@@ -2345,20 +2488,11 @@ impl Cli {
         self.ensure_help();
         let clean = |s: &str| s.replace(['\t', '\n'], " ");
         let mut out = String::from("#clyops-completion 1\n");
-        let mut chain = vec![&*self];
         let mut words: Vec<String> = words.iter().map(|w| w.to_string()).collect();
+        let Some((chain, skip)) = self.follow_words(&words) else {
+            return out;
+        };
         if !self.children.is_empty() {
-            let mut skip = 0;
-            for w in &words {
-                match chain[0].children.iter().find(|c| c.word == *w) {
-                    Some(c) => chain.insert(0, c),
-                    None => break,
-                }
-                skip += 1;
-            }
-            if !chain[0].children.is_empty() && skip < words.len() && !words[skip].starts_with('-') {
-                return out;
-            }
             let _ = writeln!(out, "skip\t{skip}");
             words.drain(..skip);
             for c in &chain[0].children {

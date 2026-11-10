@@ -41,6 +41,8 @@ declare -A _CLYOPS_INDEX=()     # long -> registration index (names the per-opti
 _CLYOPS_ARGS=() _CLYOPS_ARG_DESC=() _CLYOPS_ARG_DEFAULT=() _CLYOPS_ARG_RULE=()
 _CLYOPS_VARIADIC=""             # index of the variadic argument, if any
 declare -A _CLYOPS_COMPLETER=() _CLYOPS_ARG_COMPLETER=()   # long / argument name -> completer function
+declare -A _CLYOPS_PAGED=() _CLYOPS_ARG_PAGED=()           # ... -> 1 when the completer pages itself
+_CLYOPS_VALS=() _CLYOPS_MORE=""                            # _clyops_list_values results
 
 _CLYOPS_CMDS=() _CLYOPS_CMD_DESC=() _CLYOPS_CMD_HINT=() _CLYOPS_CMD_OWNER=()
 declare -A _CLYOPS_SECRET=()    # long -> 1 for secret options
@@ -324,21 +326,27 @@ clyops_path_search() {
     [[ -n "${_CLYOPS_RULE[$1]}" ]] || _CLYOPS_RULE[$1]="path"
 }
 
-# Usage: clyops_complete <long|argument> <function>
-# The function lists the values to offer when completing the value option or
-# argument (spec section 9.2): it runs only for --bash-completion, gets the
-# words typed after the commands as its arguments and prints one value per
-# line. A non-zero exit keeps the rule's completion. It doesn't validate.
+# Usage: clyops_complete <long|argument> <function> [paged]
+# The function lists the values of the value option or argument (spec section
+# 9.2), for shell completion and --complete-values. Its arguments are the words
+# typed after the commands; CLYOPS_COMPLETE_PREFIX, CLYOPS_COMPLETE_LIMIT (0: no
+# limit) and CLYOPS_COMPLETE_OFFSET are set, and it prints one value per line.
+# The library keeps the values starting with the prefix and pages them, unless
+# "paged" is given: then the function applies the prefix, offset and limit
+# itself (a database query can). A non-zero exit is a failure. It doesn't
+# validate. Registering a name again replaces it.
 clyops_complete() {
     _clyops_record clyops_complete "$@" && return 0
+    local _c_paged=""
+    case "${3:-}" in "") ;; paged) _c_paged=1 ;; *) _clyops_fatal "clyops_complete: unknown mode '$3' (expected paged)" ;; esac
     if [[ -v "_CLYOPS_KIND[$1]" && "${_CLYOPS_OWNER[$1]}" == "$_CLYOPS_SEL" ]]; then
         [[ "${_CLYOPS_KIND[$1]}" == flag ]] && _clyops_fatal "Flag --$1 takes no value to complete"
-        _CLYOPS_COMPLETER[$1]="$2"
+        _CLYOPS_COMPLETER[$1]="$2"; _CLYOPS_PAGED[$1]="$_c_paged"
         return 0
     fi
     local _c_a
     for _c_a in "${_CLYOPS_ARGS[@]}"; do
-        [[ "$_c_a" == "$1" ]] && { _CLYOPS_ARG_COMPLETER[$1]="$2"; return 0; }
+        [[ "$_c_a" == "$1" ]] && { _CLYOPS_ARG_COMPLETER[$1]="$2"; _CLYOPS_ARG_PAGED[$1]="$_c_paged"; return 0; }
     done
     _clyops_fatal "Unknown option or argument '$1' for complete"
 }
@@ -1075,6 +1083,17 @@ clyops_run() {
     for _c_arg in "$@"; do
         [[ "$_c_arg" == -- ]] && break
         if [[ "$_c_arg" == --help-json-schema ]]; then clyops_json_schema; exit 0; fi
+        if [[ "$_c_arg" == --complete-values ]]; then
+            local _c_rest=("$@")
+            while [[ "${_c_rest[0]}" != --complete-values ]]; do _c_rest=("${_c_rest[@]:1}"); done
+            local _c_slots=("${_c_rest[@]:1:4}") _c_words=("${_c_rest[@]:5}")
+            if (( ${#_c_slots[@]} < 4 )) || [[ ! "${_c_slots[2]}" =~ ^[0-9]+$ || ! "${_c_slots[3]}" =~ ^[0-9]+$ ]] || (( 10#${_c_slots[2]} < 1 )); then
+                die 1 "LIMIT and OFFSET must be integers (LIMIT >= 1)"
+            fi
+            while (( ${#_c_words[@]} )) && [[ "${_c_words[0]}" != -- ]]; do _c_words=("${_c_words[@]:1}"); done
+            clyops_complete_values "${_c_slots[0]}" "${_c_slots[1]}" "$(( 10#${_c_slots[2]} ))" "$(( 10#${_c_slots[3]} ))" "${_c_words[@]:1}" || die 1 "$_CLYOPS_ERROR"
+            exit 0
+        fi
         if [[ "$_c_arg" == --bash-completion ]]; then
             local _c_words=("$@")
             while (( ${#_c_words[@]} )) && [[ "${_c_words[0]}" != -- ]]; do _c_words=("${_c_words[@]:1}"); done
@@ -1538,19 +1557,69 @@ _clyops_completion_kind() { # rule search-dirs -> _r "kind<TAB>values"
     _r="$kind"$'\t'"${values:--}"
 }
 
-# Run completer $1 with the words $2... (spec section 9.2): _r "choice<TAB>values",
+# Ask completer $1 (paged when $2 is set) for a page of values (spec section 9.2):
+# prefix $3, limit $4, offset $5; $6 set drops values the completion scripts
+# would split; the words follow. Sets _CLYOPS_VALS and _CLYOPS_MORE (1 or ""),
 # or fails when the completer does.
-_clyops_completer_values() {
-    local fn="$1" out line values=""
-    shift
-    out=$("$fn" "$@") || return 1
+_clyops_list_values() {
+    local fn="$1" paged="$2" prefix="$3" limit="$4" offset="$5" shell="$6" out line
+    shift 6
+    local rlimit=0 roffset=0
+    [[ -n "$paged" ]] && { rlimit=$(( limit + 1 )); roffset="$offset"; }
+    out=$(CLYOPS_COMPLETE_PREFIX="$prefix" CLYOPS_COMPLETE_LIMIT="$rlimit" CLYOPS_COMPLETE_OFFSET="$roffset" "$fn" "$@") || return 1
     local -A seen=()
+    local -a vals=()
     while IFS= read -r line; do
-        [[ -z "$line" || "$line" == *[,$' \t\r']* || -v "seen[$line]" ]] && continue
-        seen[$line]=1
-        values+="${values:+,}$line"
+        [[ -z "$line" || -n "${seen["$line"]+x}" ]] && continue
+        [[ -n "$shell" && "$line" == *[,$' \t\r']* ]] && continue
+        seen["$line"]=1
+        [[ -z "$paged" && "$line" != "$prefix"* ]] && continue
+        vals+=("$line")
     done <<< "$out"
-    _r="choice"$'\t'"${values:--}"
+    [[ -z "$paged" ]] && vals=("${vals[@]:offset}")
+    _CLYOPS_MORE=""
+    (( ${#vals[@]} > limit )) && _CLYOPS_MORE=1
+    _CLYOPS_VALS=("${vals[@]:0:limit}")
+}
+
+# Completer $1 (paged when $2 is set) as a completion record: _r "choice<TAB>values",
+# or fails when the completer does. The words follow.
+_clyops_completer_values() {
+    local fn="$1" paged="$2"
+    shift 2
+    _clyops_list_values "$fn" "$paged" "" 1000 0 1 "$@" || return 1
+    local IFS=,
+    _r="choice"$'\t'"${_CLYOPS_VALS[*]:--}"
+}
+
+# Usage: clyops_complete_values <name> <prefix> <limit> <offset> [word...]
+# Print a page of the values of an option or argument as JSON (spec section 9.3):
+# {"values":[...],"more":false}. The words select the command. Fails with a
+# message in _CLYOPS_ERROR: No completer for 'NAME' / Completer for 'NAME' failed.
+clyops_complete_values() {
+    local name="$1" prefix="$2" limit="$3" offset="$4" fn="" paged="" i
+    shift 4
+    local words=("$@") skip=0
+    _clyops_ensure_help
+    if [[ -n "${_CLYOPS_CMD_KIDS[:]:-}" ]]; then
+        _clyops_walk "$@"
+        skip="$_r"
+        if [[ -n "${_CLYOPS_CMD_KIDS[:$_CLYOPS_SEL]:-}" ]] && (( skip < $# )) && [[ "${words[skip]}" != -* ]]; then
+            _CLYOPS_ERROR="No completer for '$name'"; return 1
+        fi
+        words=("${words[@]:skip}")
+    fi
+    if [[ -v "_CLYOPS_KIND[$name]" && -n "${_CLYOPS_COMPLETER[$name]:-}" ]]; then
+        fn="${_CLYOPS_COMPLETER[$name]}"; paged="${_CLYOPS_PAGED[$name]:-}"
+    else
+        for i in "${_CLYOPS_ARGS[@]}"; do
+            [[ "$i" == "$name" && -n "${_CLYOPS_ARG_COMPLETER[$name]:-}" ]] && { fn="${_CLYOPS_ARG_COMPLETER[$name]}"; paged="${_CLYOPS_ARG_PAGED[$name]:-}"; }
+        done
+    fi
+    [[ -n "$fn" ]] || { _CLYOPS_ERROR="No completer for '$name'"; return 1; }
+    _clyops_list_values "$fn" "$paged" "$prefix" "$limit" "$offset" "" "${words[@]}" || { _CLYOPS_ERROR="Completer for '$name' failed"; return 1; }
+    _clyops_json_list "${_CLYOPS_VALS[@]}"
+    printf '{"values":%s,"more":%s}\n' "$_r" "$([[ -n "$_CLYOPS_MORE" ]] && echo true || echo false)"
 }
 
 # Tab-separated completion records (spec section 9). The arguments are the
@@ -1578,7 +1647,7 @@ clyops_completion_data() {
         if [[ "${_CLYOPS_KIND[$long]}" == flag ]]; then
             printf 'opt\t--%s\t%s\tflag\tnone\t-\t%s\n' "$long" "${short:--}" "$desc"
         else
-            if [[ -z "${_CLYOPS_COMPLETER[$long]:-}" ]] || ! _clyops_completer_values "${_CLYOPS_COMPLETER[$long]}" "${words[@]}"; then
+            if [[ -z "${_CLYOPS_COMPLETER[$long]:-}" ]] || ! _clyops_completer_values "${_CLYOPS_COMPLETER[$long]}" "${_CLYOPS_PAGED[$long]:-}" "${words[@]}"; then
                 _clyops_search_dirs "$long"
                 _clyops_completion_kind "${_CLYOPS_RULE[$long]}" "$_r"
             fi
@@ -1588,7 +1657,7 @@ clyops_completion_data() {
     done
     for (( i = 0; i < ${#_CLYOPS_ARGS[@]}; i++ )); do
         desc="${_CLYOPS_ARG_DESC[i]//$'\t'/ }"; desc="${desc//$'\n'/ }"
-        if [[ -z "${_CLYOPS_ARG_COMPLETER[${_CLYOPS_ARGS[i]}]:-}" ]] || ! _clyops_completer_values "${_CLYOPS_ARG_COMPLETER[${_CLYOPS_ARGS[i]}]}" "${words[@]}"; then
+        if [[ -z "${_CLYOPS_ARG_COMPLETER[${_CLYOPS_ARGS[i]}]:-}" ]] || ! _clyops_completer_values "${_CLYOPS_ARG_COMPLETER[${_CLYOPS_ARGS[i]}]}" "${_CLYOPS_ARG_PAGED[${_CLYOPS_ARGS[i]}]:-}" "${words[@]}"; then
             _clyops_completion_kind "${_CLYOPS_ARG_RULE[i]}" ""
         fi
         printf 'arg\t%s\t%s\t%s\t%s\n' "${_CLYOPS_ARGS[i]}" "$([[ "$i" == "$_CLYOPS_VARIADIC" ]] && echo variadic || echo single)" "$_r" "$desc"

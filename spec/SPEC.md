@@ -82,7 +82,12 @@ resolves to a list.
 * `complete(NAME, FN)`: a function that lists the values to offer when
   completing the value option, array option or positional argument `NAME` of
   this level (options are looked up first). It runs only while answering
-  `--bash-completion` (section 9.2) and does not validate anything.
+  `--bash-completion` and `--complete-values` (sections 9.2 and 9.3) and
+  does not validate anything. The library applies the prefix, offset and limit
+  of a request to the values it returns; registered as *paged*
+  (`complete(NAME, FN, paged)`, spelled per language), the completer applies
+  them itself. Registering a completer for a name again replaces the earlier
+  one, mode included.
 * `root`: base directory for default/env path values and relative search dirs.
   Defaults to the current working directory.
 * `name`: program name shown in usage. Defaults to the basename of `argv[0]`.
@@ -216,7 +221,8 @@ Options are looked up in the chain selected so far, the deepest command first.
 
 1. If `argv` (before any `--`) contains `--help-json-schema`, print the JSON
    schema (section 8) to stdout and exit 0. Likewise `--bash-completion`
-   prints completion data (section 9), and `--completion SHELL` prints the
+   prints completion data (section 9), `--complete-values` lists an input's
+   values (section 9.3), and `--completion SHELL` prints the
    shell's completion script (section 9); an unknown or missing shell is an
    error, `Unknown shell 'SHELL' (expected bash, zsh or fish)`, exit 1.
 2. Register the built-in help option (1.4), then scan the command line (2).
@@ -593,27 +599,86 @@ the records above, so they never go stale:
 ### 9.2 Dynamic values
 
 A completer (`complete(NAME, FN)`, 1.3) lists values the program only knows
-at completion time, such as the instances registered in a directory. While
-answering `--bash-completion`, and at no other time, the program calls it for
-each record it prints of an option or argument that has one, passing the words
-after `--` that follow the `skip` words (all of them when there is no `skip`
-record), so it can look at what was typed before. It returns a list of strings
-(in Bash, the function prints one per line and its arguments are the words).
+when they are asked for, such as the instances registered in a directory or the
+distinct values of a database column. It is called only while answering
+`--bash-completion` or `--complete-values` (9.3), never for a normal run, help
+or the schema, with a **request** of four fields:
 
-The record's kind becomes `choice` and its values the returned strings, in
-order, comma-joined, after dropping strings that are empty or contain a comma,
-space, tab, carriage return or line feed, and later duplicates. The shell
-filters them by what is being typed, so the completer doesn't need to. When
-the completer fails (throws, panics, returns an error, or in Bash exits with a
-non-zero status) the record keeps the kind and values of its rule (the table
-above). An empty list gives `choice` with values `-`, offering nothing. A
-completer must not write to standard output, except in Bash, where that is how
-it returns; the completion scripts discard standard error.
+| Field | Meaning |
+| --- | --- |
+| `words` | the words after `--` that follow the `skip` words (all of them when there is no `skip`), so it can look at what was typed before |
+| `prefix` | the text being completed; empty for `--bash-completion` |
+| `limit` | the most values wanted; `0` means no limit |
+| `offset` | how many matching values to skip |
+
+It returns a list of strings. Bash passes `words` as the function's arguments
+and the rest in the exported variables `CLYOPS_COMPLETE_PREFIX`,
+`CLYOPS_COMPLETE_LIMIT` and `CLYOPS_COMPLETE_OFFSET`, and the function prints
+one value per line. Other languages pass one request value (an object, struct
+or record). A completer must not write to standard output, except in Bash,
+where that is how it returns.
+
+**Who pages.** A completer is registered in one of two modes:
+
+* **Library-paged** (the default): the completer may return every value. It is
+  called with `prefix`, `offset 0` and `limit 0`. The library keeps the values
+  that start with `prefix` (compared exactly, case-sensitive), then skips
+  `offset` of them and keeps `limit`.
+* **Completer-paged** (`complete(NAME, FN, paged)`, spelled per language,
+  1.3): the completer promises to apply `prefix` (matching however it likes,
+  for example a substring or a case-insensitive match), `offset` and `limit`
+  itself, for example in an SQL query. It is called with `limit` one more than
+  wanted, so the library can tell whether more remain; the library only
+  truncates.
+
+In both modes the library first drops values that aren't strings, are empty or
+repeat an earlier one. The result is the kept values and `more`: whether
+values beyond `limit` were left out.
+
+**Completion records.** For `--bash-completion` the request is `prefix ""`,
+`offset 0` and `limit 1000`, and the library also drops values containing a
+comma, space, tab, carriage return or line feed, because the completion scripts
+split on them. The record's kind becomes `choice` and its values the kept
+values comma-joined in order; an empty list gives values `-`, offering
+nothing. The shell filters them by what is being typed. When the completer
+fails (throws, panics, returns an error, or in Bash exits with a non-zero
+status) the record keeps the kind and values of its rule (the table above).
+The completion scripts discard standard error.
 
 A completer runs on every completion request, for every record that has one,
-so it should be quick. It doesn't change parsing: the value is validated by the
-option's rule as usual, so a program that only accepts the listed values checks
-that itself after `run`.
+so it should be quick and change nothing. It doesn't change parsing: the value
+is validated by the option's rule as usual, so a program that only accepts the
+listed values checks that itself after `run`.
+
+### 9.3 Listing values (`--complete-values`)
+
+Tooling (the HTTP API, MCP server and web runner) asks a program for one input's
+values with
+
+```
+prog --complete-values NAME PREFIX LIMIT OFFSET [-- WORDS...]
+```
+
+handled like `--bash-completion`, before parsing, when it appears before any
+`--`. All four slots are required; `PREFIX` may be empty. `WORDS` are followed
+through the commands as for `--bash-completion` (section 9), and `NAME` is an
+option of the selected command's chain (the nearest level first) or an argument
+of the selected command. The completer gets the request of 9.2 with `LIMIT` and
+`OFFSET`, and values are kept as 9.2 says, **including** values with commas or
+whitespace. The program prints one line of JSON to stdout and exits 0:
+
+```json
+{"values":["alpha","beta gamma"],"more":true}
+```
+
+Errors are logged (section 11) and exit with status 1:
+
+* `LIMIT and OFFSET must be integers (LIMIT >= 1)` when `LIMIT` isn't an
+  integer of at least 1 or `OFFSET` isn't a non-negative integer, or a slot is
+  missing;
+* `No completer for 'NAME'` when `NAME` has no completer at the selected
+  command, including when the words don't reach a command that takes options;
+* `Completer for 'NAME' failed` when the completer fails.
 
 ## 10. Resolved values as JSON
 
@@ -861,6 +926,16 @@ a required option from its environment or a config file. Each pair of
 `exclusive` options becomes an `allOf` entry `{"not": {"required": [A, B], …}}`
 (a flag given as `false` or a `null` value doesn't count); the other
 relationships are left to the tool, like required options.
+
+**Listing values.** A server can offer the values of an input whose
+schema entry is `"dynamic": true` (section 9.2). It takes the input's key, the
+other inputs given so far, a prefix, a limit and an offset, turns the other
+inputs into words as above (leaving out ones it can't place, such as an
+argument after a missing one, and closed inputs), and runs
+`prog --complete-values NAME PREFIX LIMIT OFFSET -- COMMAND-WORDS... WORDS...`
+(section 9.3), answering `{"values": [...], "more": BOOL}`. Asking for an input
+that isn't dynamic, or is closed, is an error naming it. A server caps the
+limit (the reference servers default to 100 and allow at most 1000).
 
 ## 14. Roles on file descriptors
 

@@ -8,12 +8,23 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from clyops import Cli  # noqa: E402
 
 
-def hosts(words):
-    """Completer (spec section 9.2): the DEMO_HOSTS entries, then words-N. Fails when DEMO_HOSTS is unset."""
+def demo_hosts(words):
+    """Completers (spec section 9.2): the DEMO_HOSTS entries, then words-N. They fail when DEMO_HOSTS is unset."""
     sys.stderr.write("completer ran\n")
     if "DEMO_HOSTS" not in os.environ:
         raise RuntimeError("DEMO_HOSTS is unset")
     return os.environ["DEMO_HOSTS"].split(";") + ([f"words-{len(words)}"] if words else [])
+
+
+def hosts(request):
+    """Library-paged: the library keeps the values starting with the prefix and pages them."""
+    return demo_hosts(request.words)
+
+
+def paged_hosts(request):
+    """Paged: applies the request's prefix, offset and limit itself."""
+    matching = [h for h in demo_hosts(request.words) if h.startswith(request.prefix)][request.offset:]
+    return matching[:request.limit] if request.limit > 0 else matching
 
 
 cli = Cli(name="demo", root=os.environ.get("DEMO_ROOT"))
@@ -67,7 +78,7 @@ cli.opt_array("INCLUDE", "include", "I",          "Include directory",     "File
 cli.set_config("config", "demo:,shared:")
 cli.set_path_search("config", "conf")
 cli.complete("host", hosts)
-cli.complete("rest", hosts)
+cli.complete("rest", paged_hosts, paged=True)
 cli.exclusive("endpoint", "addr")
 cli.requires("dest", "src")
 

@@ -32,7 +32,7 @@ Registration:
 | `clyops_description`, `clyops_epilog`, `clyops_name`, `clyops_root` | text |
 | `clyops_config` | `option prefix[,prefix…]` |
 | `clyops_path_search` | `long dir[:dir…]` |
-| `clyops_complete` | `name function`: completion values at Tab time, one per line |
+| `clyops_complete` | `name function [paged]`: values on demand (Tab, `--complete-values`), one per line |
 | `clyops_require_command` | `command description [install-hint]` |
 
 `clyops_run "$@"` parses and assigns the variables, exiting on `--help` or errors.

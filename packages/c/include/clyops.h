@@ -66,20 +66,53 @@ void clyops_path_search(clyops_t* cli, const char* long_name, const char* dirs);
 
 /** The values a completer returns; add to it with clyops_values_add. Owned by the library. */
 typedef struct clyops_values clyops_values_t;
+/** What a completer is asked for (spec section 9.2). Borrowed for the duration of the call. */
+typedef struct {
+    const char* const* words; /**< The words typed after the program's command words. */
+    int nwords; /**< Number of words. */
+    const char* prefix; /**< The text being completed; empty for shell completion. */
+    int limit; /**< The most values wanted; 0 means no limit. */
+    int offset; /**< How many matching values to skip. */
+} clyops_complete_request_t;
 /**
- * Lists the values to offer when completing an option or argument (spec section 9.2). Gets the
- * words typed after the program's commands and the userdata given to clyops_complete, adds values
- * to `out` and returns 0; a non-zero return keeps the rule's completion. Must not write to stdout.
+ * Lists the values of an option or argument (spec section 9.2). Gets the request and the userdata
+ * given at registration, adds values to `out` and returns 0; a non-zero return keeps the rule's
+ * shell completion and makes --complete-values fail. Must not write to stdout.
  */
-typedef int (*clyops_completer_t)(const char* const* words, int nwords, clyops_values_t* out, void* userdata);
+typedef int (*clyops_completer_t)(const clyops_complete_request_t* req, clyops_values_t* out, void* userdata);
 /** Append a copy of `value` to a completer's result. The library drops unusable values and duplicates. */
 void clyops_values_add(clyops_values_t* out, const char* value);
 /**
  * Register a completer for the value or array option `name` (looked up first) or the positional
- * argument `name` of this level. It runs only for --bash-completion and doesn't validate anything.
- * An unknown name or a flag prints a message and exit(2).
+ * argument `name` of this level. It runs only for --bash-completion and --complete-values and
+ * doesn't validate anything. The library keeps the values starting with the request's prefix and
+ * pages them, so the completer is called with limit 0 and offset 0. Registering a name again
+ * replaces its completer. An unknown name or a flag prints a message and exit(2).
  */
 void clyops_complete(clyops_t* cli, const char* name, clyops_completer_t fn, void* userdata);
+/**
+ * Like clyops_complete, but the completer applies the request's prefix, offset and limit itself
+ * (as an SQL query can). It is called with one more than the limit wanted; the library only
+ * truncates.
+ */
+void clyops_complete_paged(clyops_t* cli, const char* name, clyops_completer_t fn, void* userdata);
+
+/** A page of values (spec section 9.3); free it with clyops_values_page_free. */
+typedef struct {
+    char** values; /**< The values, at most the limit asked for. */
+    size_t count; /**< Number of values. */
+    int more; /**< Nonzero when values beyond the limit were left out. */
+} clyops_values_page_t;
+/**
+ * A page of the values of `name` (spec section 9.3): an option of the chain the words select
+ * (nearest command first) or an argument of that command. `words` are the words typed after the
+ * program name. Returns 0 and fills `page`, or -1 with clyops_error() holding
+ * "No completer for 'NAME'" or "Completer for 'NAME' failed" (and `page` empty).
+ */
+int clyops_complete_values(clyops_t* cli, const char* name, const char* prefix, int limit, int offset,
+                           int nwords, const char* const* words, clyops_values_page_t* page);
+/** Free a page's values and reset it. */
+void clyops_values_page_free(clyops_values_page_t* page);
 
 /** What running the program does: a NULL-terminated list of read-only, idempotent, destructive, network. */
 void clyops_set_effects(clyops_t* cli, const char* const* effects);
@@ -174,8 +207,8 @@ void clyops_add_arg_variadic(clyops_t* cli, const char* name, clyops_meta_t meta
 /** Parse without exiting. On CLYOPS_ERROR, clyops_error() holds the message. */
 clyops_status_t clyops_parse(clyops_t* cli, int argc, char** argv);
 /**
- * Parse like a CLI: handles --help, --help-json-schema, --bash-completion and
- * --completion, prints errors and exits on failure. argv[0] is the program.
+ * Parse like a CLI: handles --help, --help-json-schema, --bash-completion,
+ * --complete-values and --completion, prints errors and exits on failure. argv[0] is the program.
  */
 void clyops_run(clyops_t* cli, int argc, char** argv);
 /** Borrowed error text from the last parse; valid until the CLI changes or is freed. */

@@ -16,6 +16,7 @@ import { mcpHttpHandler, mcpProgress } from '../dist/index.js';
 const repo = fileURLToPath(new URL('../../..', import.meta.url));
 const cli = fileURLToPath(new URL('../dist/cli.js', import.meta.url));
 // The schema file the demo's --shape names (json:shape.json), as the "json schema" conformance case writes it.
+process.env.DEMO_HOSTS = 'alpha;albert;beta'; // the demo's completers list these (spec/conformance/README.md)
 const shapeSchema = JSON.parse(readFileSync(join(repo, 'spec/conformance/cases.json'), 'utf8')).find((c) => c.name === 'json schema').files['shape.json'];
 
 function tree() {
@@ -31,8 +32,20 @@ function tree() {
 // The same checks over either transport.
 async function exercise(client) {
   const { tools } = await client.listTools();
-  assert.deepEqual(tools.map((t) => t.name), ['media_demo']);
+  assert.deepEqual(tools.map((t) => t.name), ['media_demo', 'list_values']);
   const demo = tools[0];
+  // Dynamic inputs (spec section 9.2) point at list_values, which lists their values a page at a time.
+  assert.match(demo.inputSchema.properties.host.description, /list_values tool \(tool: "media_demo", name: "host"\)/);
+  assert.deepEqual(tools[1].inputSchema.properties.tool.enum, ['media_demo']);
+  assert.equal(tools[1].annotations.readOnlyHint, true);
+  const page = await client.callTool({ name: 'list_values', arguments: { tool: 'media_demo', name: 'host', prefix: 'al', limit: 1 } });
+  assert.equal(page.isError, undefined, JSON.stringify(page.content));
+  assert.deepEqual(page.structuredContent, { values: ['alpha'], more: true });
+  const next = await client.callTool({ name: 'list_values', arguments: { tool: 'media_demo', name: 'rest', prefix: '', limit: 10, offset: 1, input: { input: 'in.txt' } } });
+  assert.deepEqual(next.structuredContent, { values: ['albert', 'beta', 'words-1'], more: false });
+  const notDynamic = await client.callTool({ name: 'list_values', arguments: { tool: 'media_demo', name: 'count' } });
+  assert.equal(notDynamic.isError, true);
+  assert.match(notDynamic.content[0].text, /count has no values to list/);
   assert.equal(demo.title, 'media demo');
   assert.match(demo.description, /^Demo program/);
   assert.deepEqual(demo.inputSchema.required, ['input']);
@@ -73,7 +86,7 @@ async function exercise(client) {
   assert.match(unknown.content[0].text, /Unknown tool: nope/);
 }
 
-const env = { PATH: process.env.PATH, KEY: 'k' };
+const env = { PATH: process.env.PATH, KEY: 'k', DEMO_HOSTS: process.env.DEMO_HOSTS };
 
 test('stdio server', { timeout: 60_000 }, async () => {
   const root = tree();
@@ -97,20 +110,20 @@ test('stdio server picks up new and removed tools', { timeout: 60_000 }, async (
   await client.connect(new StdioClientTransport({ command: process.execPath, args: [cli, '--root', root], env, stderr: 'pipe' }));
   try {
     const names = async () => (await client.listTools()).tools.map((t) => t.name);
-    assert.deepEqual(await names(), ['media_demo']);
+    assert.deepEqual(await names(), ['media_demo', 'list_values']);
 
     let notified = next();
     writeFileSync(join(root, 'media/again'), readFileSync(join(root, 'media/demo')));
     chmodSync(join(root, 'media/again'), 0o755);
     await notified;
-    assert.deepEqual(await names(), ['media_again', 'media_demo']);
+    assert.deepEqual(await names(), ['media_again', 'media_demo', 'list_values']);
     const run = await client.callTool({ name: 'media_again', arguments: { input: 'in.txt' } });
     assert.equal(run.isError, false);
 
     notified = next();
     rmSync(join(root, 'media/demo'));
     await notified;
-    assert.deepEqual(await names(), ['media_again']);
+    assert.deepEqual(await names(), ['media_again', 'list_values']);
   } finally {
     await client.close();
   }
@@ -169,7 +182,12 @@ process.stdin.pipe(process.stdout);
   try {
     const { tools } = await client.listTools();
     const by = Object.fromEntries(tools.map((t) => [t.name, t]));
-    assert.deepEqual(Object.keys(by).sort(), ['media_demo', 'media_png', 'tasks_db_migrate', 'tasks_db_status', 'tasks_send']);
+    assert.deepEqual(Object.keys(by).sort(), ['list_values', 'media_demo', 'media_png', 'tasks_db_migrate', 'tasks_db_status', 'tasks_send']);
+    // A command's values: the parent's option and the command's own argument, given the command words.
+    const targets = await client.callTool({ name: 'list_values', arguments: { tool: 'tasks_db_migrate', name: 'target', input: { dry_run: true } } });
+    assert.deepEqual(targets.structuredContent, { values: ['v1', 'v2', 'w:--dry-run'], more: false });
+    const urls = await client.callTool({ name: 'list_values', arguments: { tool: 'tasks_db_status', name: 'url' } });
+    assert.deepEqual(urls.structuredContent, { values: ['sqlite:app.db', 'pg:main'], more: false });
     assert.deepEqual(by.tasks_db_migrate.annotations, { destructiveHint: true });
     assert.deepEqual(by.tasks_db_status.annotations, { readOnlyHint: true });
     assert.deepEqual(by.tasks_send.annotations, { openWorldHint: true });
@@ -210,8 +228,8 @@ test('read-only and allow/deny limit the tools served', { timeout: 60_000 }, asy
       await client.close();
     }
   };
-  assert.deepEqual(await names('--read-only'), ['tasks_db_status']);
-  assert.deepEqual(await names('--allow', 'tasks/**', '--deny', 'tasks/db/migrate'), ['tasks_db_status', 'tasks_send']);
+  assert.deepEqual(await names('--read-only'), ['list_values', 'tasks_db_status']);
+  assert.deepEqual(await names('--allow', 'tasks/**', '--deny', 'tasks/db/migrate'), ['list_values', 'tasks_db_status', 'tasks_send']);
 });
 
 test('stdio positional-order option reaches tool execution', async () => {

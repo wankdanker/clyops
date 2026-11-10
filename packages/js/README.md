@@ -28,7 +28,7 @@ process). `parse()` does the same work without exiting and returns `{ status: 'o
 Values are typed: `PORT` is a number, flags are booleans, array options and variadics are arrays.
 
 Other API: `source(long)`, `isSet(long)`, `isExplicitlySet(long)`, `usage()`, `jsonSchema()`,
-`completionScript(shell)`, `valuesJson()`, `setPathSearch(long, dirs)`, `complete(name, fn)` (completion values at Tab time), `requireCommand(cmd, desc, hint)`,
+`completionScript(shell)`, `valuesJson()`, `setPathSearch(long, dirs)`, `complete(name, fn, { paged })` and `completeValues(...)` (values on demand), `requireCommand(cmd, desc, hint)`,
 and the logging helpers `info`, `warn`, `error`, `success`, `die`.
 
 **Single file.** `clyops.cjs` (in this package, and on npm) is the whole library as one dependency-free

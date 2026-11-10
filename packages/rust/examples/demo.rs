@@ -1,14 +1,25 @@
 //! The conformance demo CLI (spec/conformance/README.md) in Rust.
-use clyops::{Cli, CompleteResult};
+use clyops::{Cli, CompleteRequest, CompleteResult};
 
-/// Completer (spec section 9.2): the DEMO_HOSTS entries, then words-N. Fails when DEMO_HOSTS is unset.
-fn hosts(words: &[String]) -> CompleteResult {
+/// The DEMO_HOSTS entries, then words-N (spec section 9.2). Fails when DEMO_HOSTS is unset.
+fn demo_hosts(words: &[String]) -> CompleteResult {
     eprintln!("completer ran");
     let mut list: Vec<String> = std::env::var("DEMO_HOSTS")?.split(';').map(String::from).collect();
     if !words.is_empty() {
         list.push(format!("words-{}", words.len()));
     }
     Ok(list)
+}
+
+/// Library-paged completer: the library keeps the values starting with the prefix and pages them.
+fn hosts(request: &CompleteRequest) -> CompleteResult {
+    demo_hosts(&request.words)
+}
+
+/// Paged completer: applies the request's prefix, offset and limit itself.
+fn paged_hosts(request: &CompleteRequest) -> CompleteResult {
+    let matching = demo_hosts(&request.words)?.into_iter().filter(|h| h.starts_with(&request.prefix)).skip(request.offset);
+    Ok(if request.limit > 0 { matching.take(request.limit).collect() } else { matching.collect() })
 }
 
 // Keep one registration per line; rustfmt would split the chains.
@@ -65,7 +76,7 @@ fn main() {
     cli.config("config", "demo:,shared:");
     cli.path_search("config", "conf");
     cli.complete("host", hosts);
-    cli.complete("rest", hosts);
+    cli.complete_paged("rest", paged_hosts);
     cli.exclusive(&["endpoint", "addr"]);
     cli.requires("dest", &["src"]);
 

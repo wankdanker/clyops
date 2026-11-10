@@ -6,7 +6,7 @@ import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv
 import type { JsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/types.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
-  checkableInputSchema, closedInputs, closedRequirement, InputError, isTextType, parseJsonInputs, publicSchema, runTool, tail, toJsonSchema,
+  checkableInputSchema, closedInputs, closedRequirement, completeValues, InputError, inputKeys, ValuesError, isTextType, parseJsonInputs, publicSchema, runTool, tail, toJsonSchema,
   type AuditEntry, type InputPolicy, type JsonSchema, type Tool, type ToolResult,
 } from 'clyops-tools';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -113,10 +113,11 @@ export function mcpProgress(update: Record<string, unknown>, last: number): { pr
 const validator = new AjvJsonSchemaValidator();
 // Keyed by the closed inputs too, since servers with different policies can share tools.
 const prepared = new WeakMap<Tool, Map<string, { inputSchema: JsonSchema; validate: JsonSchemaValidator<Record<string, unknown>> }>>();
-function prepare(tool: Tool, closed: string[] = []) {
+function prepare(tool: Tool, closed: string[] = [], valuesTool = VALUES_TOOL) {
   let byClosed = prepared.get(tool);
   if (!byClosed) prepared.set(tool, (byClosed = new Map()));
-  let entry = byClosed.get(closed.join('\n'));
+  const cacheKey = `${valuesTool}\n${closed.join('\n')}`;
+  let entry = byClosed.get(cacheKey);
   if (!entry) {
     // A json input whose schema doesn't compile is served unchecked, not failing tools/list.
     const inputSchema = checkableInputSchema(toJsonSchema(publicSchema(tool.schema, closed)), (schema) => validator.getValidator(schema as never), (key, err) => process.emitWarning(
@@ -128,10 +129,48 @@ function prepare(tool: Tool, closed: string[] = []) {
       const what = [stdin.description, stdin.contentType && `(${stdin.contentType})`].filter(Boolean).join(' ');
       properties.stdin = { type: 'string', description: `Standard input${what ? `: ${what}` : ''}${text ? '' : ', base64-encoded'}`, ...(text ? {} : { contentEncoding: 'base64' }) };
     }
+    // Inputs whose values the tool lists on demand (spec section 9.3) say how to ask.
+    for (const item of dynamicInputs(tool, closed)) {
+      const key = inputKeys(item).find((k) => k in properties);
+      const property = key === undefined ? undefined : properties[key];
+      if (property) property.description = `${property.description ? `${property.description} ` : ''}Its values can be listed with the ${valuesTool} tool (tool: "${toolName(tool)}", name: "${key}").`;
+    }
     entry = { inputSchema, validate: validator.getValidator<Record<string, unknown>>(inputSchema as never) };
-    byClosed.set(closed.join('\n'), entry);
+    byClosed.set(cacheKey, entry);
   }
   return entry;
+}
+
+/** The MCP tool that lists an input's values (spec section 13), unless a served tool already has the name. */
+export const VALUES_TOOL = 'list_values';
+/** The most values one `list_values` call may ask for. */
+export const MAX_VALUES_LIMIT = 1000;
+
+/** The dynamic inputs (spec section 9.2) of a tool that callers may set. */
+function dynamicInputs(tool: Tool, closed: string[]) {
+  return [...tool.schema.arguments, ...tool.schema.options.filter((o) => o.name !== 'help')].filter((i) => i.dynamic && !closed.includes(i.name));
+}
+
+/** The name of the values tool among `served`: `list_values`, or `clyops_list_values` when a tool has that name. */
+function valuesToolName(served: { tool: Tool }[]): string {
+  return served.some(({ tool }) => toolName(tool) === VALUES_TOOL) ? `clyops_${VALUES_TOOL}` : VALUES_TOOL;
+}
+
+/** The values tool's input schema, naming the tools that have dynamic inputs. */
+function valuesInputSchema(tools: string[]): JsonSchema {
+  return {
+    type: 'object',
+    properties: {
+      tool: { type: 'string', enum: tools, description: 'The tool whose input to list values for' },
+      name: { type: 'string', description: 'The input to list values for, as named in that tool\'s input schema' },
+      input: { type: 'object', description: 'The other inputs given so far, as for calling the tool; the tool may narrow its values by them' },
+      prefix: { type: 'string', description: 'The text being completed (default: empty)' },
+      limit: { type: 'integer', minimum: 1, maximum: MAX_VALUES_LIMIT, description: 'The most values to return (default: 100)' },
+      offset: { type: 'integer', minimum: 0, description: 'How many matching values to skip, for the next page (default: 0)' },
+    },
+    required: ['tool', 'name'],
+    additionalProperties: false,
+  };
 }
 
 /** The tools `opts` serves, with the inputs its policy closes: not those whose required argument is closed. */
@@ -160,18 +199,36 @@ function annotations(tool: Tool) {
 export function createMcpServer(opts: McpOptions): Server {
   const server = new Server({ name: opts.name, version: opts.version ?? '0.0.0' }, { capabilities: { tools: { listChanged: true } }, instructions: opts.instructions });
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: servedTools(opts).map(({ tool, closed }) => ({
-      name: toolName(tool),
-      title: tool.words.join(' '),
-      description: [tool.schema.description, tool.schema.epilog].filter(Boolean).join('\n\n'),
-      inputSchema: prepare(tool, closed).inputSchema as { type: 'object'; [key: string]: unknown },
-      ...annotations(tool),
-    })),
-  }));
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    const all = servedTools(opts);
+    const valuesTool = valuesToolName(all);
+    const dynamic = all.filter(({ tool, closed }) => dynamicInputs(tool, closed).length > 0).map(({ tool }) => toolName(tool));
+    return {
+      tools: [
+        ...all.map(({ tool, closed }) => ({
+          name: toolName(tool),
+          title: tool.words.join(' '),
+          description: [tool.schema.description, tool.schema.epilog].filter(Boolean).join('\n\n'),
+          inputSchema: prepare(tool, closed, valuesTool).inputSchema as { type: 'object'; [key: string]: unknown },
+          ...annotations(tool),
+        })),
+        ...(dynamic.length ? [{
+          name: valuesTool,
+          title: 'List values',
+          description: 'List the values an input of another tool accepts or suggests, such as the names of existing records, '
+            + 'narrowed by the prefix being typed and the other inputs given so far, a page at a time. '
+            + 'Inputs that offer this say so in their description. `more` is true when there are further pages: ask again with a larger offset.',
+          inputSchema: valuesInputSchema(dynamic) as { type: 'object'; [key: string]: unknown },
+          annotations: { readOnlyHint: true, idempotentHint: true },
+        }] : []),
+      ],
+    };
+  });
 
   server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-    const served = servedTools(opts).find(({ tool }) => toolName(tool) === request.params.name);
+    const all = servedTools(opts);
+    if (request.params.name === valuesToolName(all)) return listValues(opts, all, request.params.arguments ?? {}, extra.signal);
+    const served = all.find(({ tool }) => toolName(tool) === request.params.name);
     if (!served) return { content: [{ type: 'text', text: `Unknown tool: ${request.params.name}` }], isError: true };
     const { tool, closed } = served;
     // A json input given as a string is its JSON text: its parsed value is what the schema checks,
@@ -215,6 +272,27 @@ export function createMcpServer(opts: McpOptions): Server {
   });
 
   return server;
+}
+
+/** Answer a `list_values` call (spec section 13). */
+async function listValues(opts: McpOptions, served: { tool: Tool; closed: string[] }[], args: Record<string, unknown>, signal: AbortSignal): Promise<CallToolResult> {
+  const fail = (text: string): CallToolResult => ({ content: [{ type: 'text', text }], isError: true });
+  const dynamic = served.filter(({ tool, closed }) => dynamicInputs(tool, closed).length > 0);
+  const checked = validator.getValidator<{ tool: string; name: string; input?: Record<string, unknown>; prefix?: string; limit?: number; offset?: number }>(
+    valuesInputSchema(dynamic.map(({ tool }) => toolName(tool))) as never)(args);
+  if (!checked.valid) return fail(`Invalid arguments: ${checked.errorMessage}`);
+  const { tool: name, name: key, input, prefix, limit, offset } = checked.data;
+  const found = dynamic.find(({ tool }) => toolName(tool) === name);
+  if (!found) return fail(`Unknown tool: ${name}`);
+  try {
+    const page = await completeValues(found.tool, key, input ?? {}, {
+      prefix, limit, offset, cwd: opts.cwd, within: opts.within, positionalsOrder: opts.positionalsOrder, closed: found.closed, signal,
+    });
+    return { content: [{ type: 'text', text: JSON.stringify(page) }], structuredContent: { ...page } };
+  } catch (err) {
+    if (err instanceof InputError || err instanceof ValuesError) return fail(err.message);
+    throw err;
+  }
 }
 
 /**

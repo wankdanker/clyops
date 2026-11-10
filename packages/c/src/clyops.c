@@ -197,6 +197,7 @@ typedef struct {
     svec search; /* absolute search dirs, computed per parse */
     clyops_completer_t completer; /* spec section 9.2; NULL when none */
     void* completer_data;
+    int completer_paged;
     /* per parse */
     int has;
     char* raw;
@@ -210,6 +211,7 @@ typedef struct {
     int variadic;
     clyops_completer_t completer; /* spec section 9.2; NULL when none */
     void* completer_data;
+    int completer_paged;
     int has;
     char* raw;
     svec list;
@@ -595,22 +597,32 @@ void clyops_values_add(clyops_values_t* out, const char* value) {
     if (out && value) sv_push(&out->list, xstrdup(value));
 }
 
-void clyops_complete(clyops_t* cli, const char* name, clyops_completer_t fn, void* userdata) {
+static void register_completer(clyops_t* cli, const char* name, clyops_completer_t fn, void* userdata, int paged) {
     opt_t* o = find_opt(cli, name);
     if (o) {
         if (o->kind == K_FLAG) clyops_die(2, "Flag --%s takes no value to complete", name);
         o->completer = fn;
         o->completer_data = userdata;
+        o->completer_paged = paged;
         return;
     }
     for (size_t i = 0; i < cli->nargs; i++) {
         if (streq(cli->args[i].name, name)) {
             cli->args[i].completer = fn;
             cli->args[i].completer_data = userdata;
+            cli->args[i].completer_paged = paged;
             return;
         }
     }
     clyops_die(2, "Unknown option or argument '%s' for complete", name);
+}
+
+void clyops_complete(clyops_t* cli, const char* name, clyops_completer_t fn, void* userdata) {
+    register_completer(cli, name, fn, userdata, 0);
+}
+
+void clyops_complete_paged(clyops_t* cli, const char* name, clyops_completer_t fn, void* userdata) {
+    register_completer(cli, name, fn, userdata, 1);
 }
 
 /* A JSON grammar check (spec section 5): each step advances *p past what it read. */
@@ -1461,6 +1473,39 @@ clyops_status_t clyops_parse(clyops_t* cli, int argc, char** argv) {
 
 const char* clyops_error(const clyops_t* cli) { return cli->error; }
 
+static char* values_page_json(const clyops_values_page_t* page);
+
+/* A non-negative decimal integer (digits only), saturating at INT_MAX - 1; -1 when it isn't one. */
+static int slot_int(const char* s) {
+    if (!s || !*s) return -1;
+    long long n = 0;
+    for (; *s; s++) {
+        if (*s < '0' || *s > '9') return -1;
+        if (n < INT_MAX) n = n * 10 + (*s - '0');
+    }
+    return n >= INT_MAX ? INT_MAX - 1 : (int)n;
+}
+
+/* --complete-values NAME PREFIX LIMIT OFFSET [-- WORDS...] at argv[at] (spec section 9.3); exits. */
+static void run_complete_values(clyops_t* cli, int argc, char** argv, int at) {
+    ensure_help(cli);
+    int limit = at + 3 < argc ? slot_int(argv[at + 3]) : -1;
+    int offset = at + 4 < argc ? slot_int(argv[at + 4]) : -1;
+    if (limit < 1 || offset < 0) clyops_die(1, "LIMIT and OFFSET must be integers (LIMIT >= 1)");
+    int after = at + 5;
+    while (after < argc && !streq(argv[after], "--")) after++;
+    int nwords = after < argc ? argc - after - 1 : 0;
+    clyops_values_page_t page;
+    if (clyops_complete_values(cli, argv[at + 1], argv[at + 2], limit, offset, nwords, (const char* const*)(argv + after + (after < argc)), &page) != 0)
+        clyops_die(1, "%s", cli->error);
+    char* out = values_page_json(&page);
+    clyops_values_page_free(&page);
+    fputs(out, stdout);
+    fputc('\n', stdout);
+    free(out);
+    exit(0);
+}
+
 void clyops_run(clyops_t* cli, int argc, char** argv) {
     if (!cli->name) {
         const char* base = argc > 0 ? strrchr(argv[0], '/') : NULL;
@@ -1474,6 +1519,7 @@ void clyops_run(clyops_t* cli, int argc, char** argv) {
             while (end < argc && !streq(argv[end], "--")) end++;
             out = end < argc ? clyops_completion_data_for(cli, argc - end - 1, argv + end + 1) : clyops_completion_data(cli);
         }
+        else if (streq(argv[i], "--complete-values")) run_complete_values(cli, argc, argv, i);
         else if (streq(argv[i], "--completion")) {
             const char* shell = i + 1 < argc ? argv[i + 1] : "";
             out = clyops_completion_script(cli, shell);
@@ -1593,6 +1639,18 @@ static void json_str(sbuf* b, const char* s) {
         else sb_putc(b, (char)c);
     }
     sb_putc(b, '"');
+}
+
+/* A page of values as compact JSON (spec section 9.3). */
+static char* values_page_json(const clyops_values_page_t* page) {
+    sbuf b = {0};
+    sb_put(&b, "{\"values\":[");
+    for (size_t i = 0; i < page->count; i++) {
+        if (i) sb_putc(&b, ',');
+        json_str(&b, page->values[i]);
+    }
+    sb_printf(&b, "],\"more\":%s}", page->more ? "true" : "false");
+    return sb_take(&b);
 }
 
 /* Typed JSON for one value (spec section 10). */
@@ -2156,30 +2214,122 @@ static void completion_kind(sbuf* b, const char* rule, const svec* dirs) {
     free(values.s);
 }
 
-/* The kind and values of a completion record, asking the completer first (spec section 9.2). */
-static void completion_record(sbuf* b, const char* rule, const svec* dirs, clyops_completer_t fn, void* data, int nwords, char** words) {
-    if (fn) {
-        char* none[] = {NULL};
-        clyops_values_t out = {0};
-        if (fn((const char* const*)(words ? words : none), nwords, &out, data) == 0) {
-            sbuf values = {0};
-            for (size_t i = 0; i < out.list.len; i++) {
-                const char* v = out.list.v[i];
-                if (!*v || strpbrk(v, ", \t\r\n")) continue;
-                int dup = 0;
-                for (size_t k = 0; k < i && !dup; k++) dup = streq(out.list.v[k], v);
-                if (dup) continue;
-                if (values.len) sb_putc(&values, ',');
-                sb_put(&values, v);
-            }
-            sb_printf(b, "choice\t%s", values.len ? values.s : "-");
-            free(values.s);
-            sv_free(&out.list);
-            return;
-        }
+/* The completion records' request limit (spec section 9.2). */
+#define SHELL_COMPLETION_LIMIT 1000
+
+/*
+ * Ask a completer for a page of values (spec section 9.2): the library pages unless the completer
+ * was registered as paged. `shell` also drops values the completion scripts would split. Returns 0
+ * and fills `page`, or -1 when the completer fails.
+ */
+static int list_values(clyops_completer_t fn, void* data, int paged, int nwords, const char* const* words,
+                       const char* prefix, int limit, int offset, int shell, clyops_values_page_t* page) {
+    static const char* const none[] = {NULL};
+    if (limit < 0) limit = 0;
+    if (offset < 0) offset = 0;
+    clyops_complete_request_t req = {words && nwords > 0 ? words : none, nwords > 0 ? nwords : 0, prefix ? prefix : "", 0, 0};
+    if (paged) {
+        req.limit = limit < INT_MAX ? limit + 1 : limit;
+        req.offset = offset;
+    }
+    clyops_values_t out = {0};
+    page->values = NULL;
+    page->count = 0;
+    page->more = 0;
+    if (fn(&req, &out, data) != 0) {
         sv_free(&out.list);
+        return -1;
+    }
+    svec kept = {0};
+    size_t matched = 0;
+    for (size_t i = 0; i < out.list.len; i++) {
+        const char* v = out.list.v[i];
+        if (!*v || (shell && strpbrk(v, ", \t\r\n"))) continue;
+        int dup = 0;
+        for (size_t k = 0; k < i && !dup; k++) dup = streq(out.list.v[k], v);
+        if (dup) continue;
+        if (!paged) {
+            if (!starts(v, req.prefix)) continue;
+            if (matched++ < (size_t)offset) continue;
+        }
+        if (kept.len >= (size_t)limit) {
+            page->more = 1;
+            break;
+        }
+        sv_push(&kept, xstrdup(v));
+    }
+    sv_free(&out.list);
+    page->values = kept.v;
+    page->count = kept.len;
+    return 0;
+}
+
+void clyops_values_page_free(clyops_values_page_t* page) {
+    if (!page) return;
+    for (size_t i = 0; i < page->count; i++) free(page->values[i]);
+    free(page->values);
+    page->values = NULL;
+    page->count = 0;
+    page->more = 0;
+}
+
+/* The kind and values of a completion record, asking the completer first (spec section 9.2). */
+static void completion_record(sbuf* b, const char* rule, const svec* dirs, clyops_completer_t fn, void* data, int paged, int nwords, char** words) {
+    clyops_values_page_t page;
+    if (fn && list_values(fn, data, paged, nwords, (const char* const*)words, "", SHELL_COMPLETION_LIMIT, 0, 1, &page) == 0) {
+        sb_put(b, "choice\t");
+        for (size_t i = 0; i < page.count; i++) {
+            if (i) sb_putc(b, ',');
+            sb_put(b, page.values[i]);
+        }
+        if (!page.count) sb_putc(b, '-');
+        clyops_values_page_free(&page);
+        return;
     }
     completion_kind(b, rule, dirs);
+}
+
+/*
+ * The command `words` select and how many words name it (spec section 9), or NULL when they stop
+ * at a command group.
+ */
+static clyops_t* follow_words(clyops_t* cli, int nwords, const char* const* words, int* skip) {
+    clyops_t* node = cli;
+    *skip = 0;
+    if (!cli->nkids) return node;
+    for (clyops_t* kid; *skip < nwords && (kid = find_kid(node, words[*skip])); (*skip)++) node = kid;
+    if (node->nkids && *skip < nwords && words[*skip][0] != '-') return NULL;
+    return node;
+}
+
+int clyops_complete_values(clyops_t* cli, const char* name, const char* prefix, int limit, int offset,
+                           int nwords, const char* const* words, clyops_values_page_t* page) {
+    page->values = NULL;
+    page->count = 0;
+    page->more = 0;
+    if (nwords < 0 || !words) nwords = 0;
+    int skip = 0;
+    const clyops_t* node = follow_words(cli, nwords, words, &skip);
+    clyops_completer_t fn = NULL;
+    void* data = NULL;
+    int paged = 0;
+    for (const clyops_t* c = node; c && !fn; c = c == cli ? NULL : c->parent) {
+        const opt_t* o = find_opt(c, name);
+        if (o && o->completer) fn = o->completer, data = o->completer_data, paged = o->completer_paged;
+    }
+    for (size_t i = 0; node && !fn && i < node->nargs; i++) {
+        const arg_t* a = &node->args[i];
+        if (streq(a->name, name) && a->completer) fn = a->completer, data = a->completer_data, paged = a->completer_paged;
+    }
+    if (!fn) {
+        set_error(cli, fmt("No completer for '%s'", name));
+        return -1;
+    }
+    if (list_values(fn, data, paged, nwords - skip, words ? words + skip : NULL, prefix, limit, offset, 0, page) != 0) {
+        set_error(cli, fmt("Completer for '%s' failed", name));
+        return -1;
+    }
+    return 0;
 }
 
 static char* clean(const char* s) {
@@ -2200,14 +2350,11 @@ char* clyops_completion_data_for(clyops_t* cli, int nwords, char** words) {
     }
     sbuf b = {0};
     sb_put(&b, "#clyops-completion 1\n");
-    cli->selected = cli;
+    int skip = 0;
+    clyops_t* selected = follow_words(cli, nwords, (const char* const*)words, &skip);
+    cli->selected = selected ? selected : cli;
+    if (!selected) return sb_take(&b);
     if (cli->nkids) {
-        int skip = 0;
-        for (clyops_t* kid; skip < nwords && (kid = find_kid(cli->selected, words[skip])); skip++) cli->selected = kid;
-        if (cli->selected->nkids && skip < nwords && words[skip][0] != '-') {
-            cli->selected = cli;
-            return sb_take(&b);
-        }
         sb_printf(&b, "skip\t%d\n", skip);
         words += skip;
         nwords -= skip;
@@ -2228,7 +2375,7 @@ char* clyops_completion_data_for(clyops_t* cli, int nwords, char** words) {
             sb_printf(&b, "opt\t--%s\t%s\tflag\tnone\t-\t%s\n", o->long_name, shs, desc);
         } else {
             sb_printf(&b, "opt\t--%s\t%s\tvalue\t", o->long_name, shs);
-            completion_record(&b, o->rule, &o->search, o->completer, o->completer_data, nwords, words);
+            completion_record(&b, o->rule, &o->search, o->completer, o->completer_data, o->completer_paged, nwords, words);
             sb_printf(&b, "\t%s\n", desc);
         }
         if (bool_like(o)) sb_printf(&b, "opt\t--no-%s\t-\tflag\tnone\t-\t%s\n", o->long_name, desc);
@@ -2238,7 +2385,7 @@ char* clyops_completion_data_for(clyops_t* cli, int nwords, char** words) {
         const arg_t* a = &node->args[i];
         char* desc = clean(a->desc);
         sb_printf(&b, "arg\t%s\t%s\t", a->name, a->variadic ? "variadic" : "single");
-        completion_record(&b, a->rule, NULL, a->completer, a->completer_data, nwords, words);
+        completion_record(&b, a->rule, NULL, a->completer, a->completer_data, a->completer_paged, nwords, words);
         sb_printf(&b, "\t%s\n", desc);
         free(desc);
     }

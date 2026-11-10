@@ -33,7 +33,7 @@ typed values (Integer, Float, true/false, String, Array) that also reads as meth
 `parse(argv)` is the non-exiting variant and returns a `ParseResult`.
 
 Also: `source`, `set?`, `explicitly_set?`, `usage`, `json_schema`, `completion_script`,
-`values_json`, `set_path_search`, `complete(name) { |words| ... }` (completion values at Tab time), `require_command`, `Clyops.validate`, `Clyops.resolve_path`,
+`values_json`, `set_path_search`, `complete(name, paged: false) { |request| ... }` and `complete_values` (completion values for Tab and `--complete-values`), `require_command`, `Clyops.validate`, `Clyops.resolve_path`,
 `Clyops.describe_rule`, `Clyops.wrap_text`, and the logging helpers `Clyops.info`, `warn`,
 `error`, `success`, `die` and `silent=`. Registration mistakes (an unknown rule, a duplicate
 option) raise `Clyops::DefinitionError`.

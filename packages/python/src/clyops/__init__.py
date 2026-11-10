@@ -18,12 +18,13 @@ import shutil
 import sys
 import time
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Mapping, NoReturn, Optional, Sequence, Union
+from typing import Callable, Dict, Iterable, List, Mapping, NoReturn, Optional, Sequence, Tuple, Union
 
 from ._completions import SCRIPTS as _COMPLETION_SCRIPTS
 
 __all__ = [
-    "Cli", "Values", "ParseResult", "ValidationError", "validate", "resolve_path", "describe_rule", "wrap_text",
+    "Cli", "Values", "ParseResult", "CompleteRequest", "ValuesPage", "Completer",
+    "ValidationError", "validate", "resolve_path", "describe_rule", "wrap_text",
     "is_executable", "is_bare_program", "is_json",
     "info", "warn", "error", "success", "die", "set_silent",
 ]
@@ -31,9 +32,42 @@ __version__ = "0.12.2"
 
 Scalar = Union[str, int, float, bool]
 Value = Union[Scalar, List[Scalar], None]
-Completer = Callable[[List[str]], Sequence[str]]
-"""Lists the values to offer when completing an option or argument (spec section 9.2).
-Gets the words typed after the program's commands; raising keeps the rule's completion."""
+
+
+@dataclass(frozen=True)
+class CompleteRequest:
+    """What a completer is asked for (spec section 9.2)."""
+
+    words: List[str]
+    """The words typed after the program's command words."""
+    prefix: str = ""
+    """The text being completed; empty for shell completion."""
+    limit: int = 0
+    """The most values wanted; 0 means no limit."""
+    offset: int = 0
+    """How many matching values to skip."""
+
+
+@dataclass
+class ValuesPage:
+    """A page of values (spec section 9.3)."""
+
+    values: List[str]
+    """The values, at most the limit asked for."""
+    more: bool
+    """Whether values beyond the limit were left out."""
+
+    def to_json(self) -> str:
+        """The page as compact JSON, as `--complete-values` prints it."""
+        return json.dumps({"values": self.values, "more": self.more}, separators=(",", ":"), ensure_ascii=False)
+
+
+Completer = Callable[[CompleteRequest], Iterable[str]]
+"""Lists the values of an option or argument (spec section 9.2). Raising keeps the
+rule's shell completion and makes `--complete-values` fail."""
+
+_SHELL_COMPLETION_LIMIT = 1000
+"""The completion records' request limit (spec section 9.2)."""
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -497,21 +531,40 @@ def _completion_kind(rule: str, search_dirs: Sequence[str]):
     return ("none", "") if rule else ("default", "")
 
 
-def _completion_record(rule: str, search_dirs: Sequence[str], completer: Optional[Completer], words: Sequence[str]):
+@dataclass
+class _CompleterDef:
+    fn: Completer
+    paged: bool
+
+
+def _list_values(c: _CompleterDef, words: Sequence[str], prefix: str, limit: int, offset: int, shell: bool) -> ValuesPage:
+    """Ask a completer for a page of values (spec section 9.2): the library pages unless the
+    completer was registered as paged. `shell` also drops values the completion scripts would
+    split. Raises when the completer fails."""
+    if c.paged:
+        request = CompleteRequest(list(words), prefix, limit + 1, offset)
+    else:
+        request = CompleteRequest(list(words), prefix, 0, 0)
+    listed = c.fn(request)
+    if isinstance(listed, (str, bytes)) or listed is None:
+        raise TypeError("a completer returns a list of strings")
+    seen: Dict[str, None] = {}
+    for v in listed:
+        if isinstance(v, str) and v and not (shell and re.search(r"[, \t\r\n]", v)):
+            seen.setdefault(v, None)
+    values = list(seen)
+    if not c.paged:
+        values = [v for v in values if v.startswith(prefix)][offset:]
+    return ValuesPage(values[:limit], len(values) > limit)
+
+
+def _completion_record(rule: str, search_dirs: Sequence[str], completer: Optional[_CompleterDef], words: Sequence[str]):
     """The kind and values of a completion record, asking the completer first (spec section 9.2)."""
     if completer is not None:
         try:
-            values = completer(list(words))
-            if isinstance(values, (str, bytes)) or values is None:
-                raise TypeError("a completer returns a list of strings")
-            listed = list(values)
+            return "choice", ",".join(_list_values(completer, words, "", _SHELL_COMPLETION_LIMIT, 0, True).values)
         except Exception:
-            return _completion_kind(rule, search_dirs)
-        seen: Dict[str, None] = {}
-        for v in listed:
-            if isinstance(v, str) and v and not re.search(r"[, \t\r\n]", v):
-                seen.setdefault(v, None)
-        return "choice", ",".join(seen)
+            pass  # keep the rule's completion
     return _completion_kind(rule, search_dirs)
 
 
@@ -532,7 +585,7 @@ class _Option:
     rule: str
     search_dirs: List[str] = field(default_factory=list)
     secret: bool = False
-    completer: Optional[Completer] = None
+    completer: Optional[_CompleterDef] = None
 
     @property
     def label(self) -> str:
@@ -551,7 +604,7 @@ class _Arg:
     default: str
     rule: str
     variadic: bool
-    completer: Optional[Completer] = None
+    completer: Optional[_CompleterDef] = None
 
 
 @dataclass
@@ -833,17 +886,60 @@ class Cli:
             opt.rule = "path"
         return self
 
-    def complete(self, name: str, fn: Completer) -> "Cli":
-        """List the values to offer when completing the value option or argument `name` of this
-        level (spec section 9.2). `fn` runs only for --bash-completion, gets the words typed after
-        the commands and returns strings; it doesn't validate anything."""
+    def complete(self, name: str, fn: Completer, paged: bool = False) -> "Cli":
+        """List the values of the value option or argument `name` of this level (spec section
+        9.2), for shell completion and --complete-values. `fn` gets a CompleteRequest (the words
+        typed after the commands, a prefix, a limit and an offset) and returns strings. The
+        library keeps the values starting with the prefix and pages them, unless `paged` is set:
+        then `fn` applies the prefix, offset and limit itself, as a database query can. It
+        doesn't validate anything. Registering a name again replaces it."""
         target: Union[_Option, _Arg, None] = self._by_long.get(name) or next((a for a in self._args if a.name == name), None)
         if target is None:
             raise ValueError(f"Unknown option or argument '{name}' for complete")
         if isinstance(target, _Option) and target.kind == "flag":
             raise ValueError(f"Flag --{name} takes no value to complete")
-        target.completer = fn
+        target.completer = _CompleterDef(fn, paged)
         return self
+
+    def complete_values(self, name: str, prefix: str, limit: int, offset: int,
+                        words: Sequence[str] = ()) -> ValuesPage:
+        """A page of the values of `name` (spec section 9.3): an option of the chain selected by
+        `words` (nearest first) or an argument of that command. Raises ValueError with
+        `No completer for 'NAME'` or `Completer for 'NAME' failed`."""
+        words = list(words)
+        selected = self._follow_words(words)
+        completer: Optional[_CompleterDef] = None
+        if selected is not None:
+            node: Optional[Cli] = selected[0]
+            while node is not None and completer is None:
+                opt = node._by_long.get(name)
+                completer = opt.completer if opt is not None else None
+                node = node._parent
+            if completer is None:
+                arg = next((a for a in selected[0]._args if a.name == name), None)
+                completer = arg.completer if arg is not None else None
+        if completer is None:
+            raise ValueError(f"No completer for '{name}'")
+        try:
+            return _list_values(completer, words[selected[1] if selected else 0:], prefix, limit, offset, False)
+        except Exception:
+            raise ValueError(f"Completer for '{name}' failed") from None
+
+    def _follow_words(self, words: Sequence[str]) -> Optional[Tuple["Cli", int]]:
+        """The command `words` select and how many words name it, or None when they stop at a
+        command group (spec section 9)."""
+        node: Cli = self
+        skip = 0
+        if not self._children:
+            return node, skip
+        for w in words:
+            child = next((c for c in node._children if c._word == w), None)
+            if child is None:
+                break
+            node, skip = child, skip + 1
+        if node._children and skip < len(words) and not words[skip].startswith("-"):
+            return None
+        return node, skip
 
     def opt(self, var: str, long: str, short: str = "", default: str = "", description: str = "",
             group: str = "Options", rule: str = "") -> "Cli":
@@ -1195,12 +1291,26 @@ class Cli:
             self.values["command"] = self.command_path  # type: ignore[assignment]
 
     def run(self, argv: Optional[Sequence[str]] = None) -> Values:
-        """Parse like a CLI: handles --help, --help-json-schema and --bash-completion,
-        prints errors and exits on failure. Returns the values."""
+        """Parse like a CLI: handles --help, --help-json-schema, --bash-completion,
+        --complete-values and --completion, prints errors and exits on failure. Returns the values."""
         argv = list(sys.argv[1:] if argv is None else argv)
         head = argv[:argv.index("--")] if "--" in argv else argv
         if "--help-json-schema" in head:
             sys.stdout.write(self.json_schema() + "\n")
+            sys.exit(0)
+        if "--complete-values" in head:
+            self._ensure_help()
+            at = head.index("--complete-values")
+            slots = argv[at + 1:at + 5]
+            if len(slots) < 4 or not all(re.fullmatch(r"[0-9]+", t) for t in slots[2:]) or int(slots[2]) < 1:
+                die(1, "LIMIT and OFFSET must be integers (LIMIT >= 1)")
+            rest = argv[at + 5:]
+            words = rest[rest.index("--") + 1:] if "--" in rest else []
+            try:
+                page = self.complete_values(slots[0], slots[1], int(slots[2]), int(slots[3]), words)
+            except ValueError as err:
+                die(1, str(err))
+            sys.stdout.write(page.to_json() + "\n")
             sys.exit(0)
         if "--bash-completion" in head:
             sys.stdout.write(self.completion_data(argv[argv.index("--") + 1:] if "--" in argv else []))
@@ -1422,16 +1532,11 @@ class Cli:
             return s.replace("\t", " ").replace("\n", " ")
 
         lines = ["#clyops-completion 1"]
-        node: Cli = self
+        selected = self._follow_words(words)
+        if selected is None:
+            return lines[0] + "\n"
+        node, skip = selected
         if self._children:
-            skip = 0
-            for w in words:
-                child = next((c for c in node._children if c._word == w), None)
-                if child is None:
-                    break
-                node, skip = child, skip + 1
-            if node._children and skip < len(words) and not words[skip].startswith("-"):
-                return lines[0] + "\n"
             lines.append(f"skip\t{skip}")
             words = words[skip:]
             lines += [f"cmd\t{c._word}\t{clean(c.description)}" for c in node._children]

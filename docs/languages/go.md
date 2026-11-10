@@ -68,13 +68,13 @@ each has its own help (`mytool db migrate --help`), schema and completion. See t
 
 ## Completion values from your program
 
-`Complete(name, fn)` lists the values to offer when completing an option or
-argument, read when the user presses Tab, for values only the program can
-find, such as the instances registered in a directory:
+`Complete(name, fn)` lists the values of an option or argument, read when the
+user presses Tab and by tooling (`--complete-values`), for values only the
+program can find, such as the instances registered in a directory:
 
 ```go
 cli.Opt("INSTANCE", "instance", "i", "", "Instance to target")
-cli.Complete("instance", func(words []string) ([]string, error) {
+cli.Complete("instance", func(clyops.CompleteRequest) ([]string, error) {
 	files, err := filepath.Glob("/var/lib/myapp/instances/*.json")
 	for i, f := range files {
 		files[i] = strings.TrimSuffix(filepath.Base(f), ".json")
@@ -83,11 +83,48 @@ cli.Complete("instance", func(words []string) ([]string, error) {
 })
 ```
 
-The function (`clyops.Completer`) runs only for `--bash-completion`, on every
-Tab, so keep it quick. `words` are the words typed after the command words, for
-completers that depend on another option. Returning an error, or panicking,
-keeps the rule's completion. It doesn't validate: check the value after `Run` if
-only listed values are allowed. See the [spec](../../spec/SPEC.md) section 9.2.
+The function (`clyops.Completer`) runs only for `--bash-completion` and
+`--complete-values`, so keep it quick. The `clyops.CompleteRequest` carries
+`Words` (the words typed after the command words, for completers that depend on
+another option), `Prefix`, `Limit` and `Offset`. The library keeps the values
+that start with `Prefix` and pages them, so a completer can ignore those and
+return every value. Returning an error, or panicking, keeps the rule's
+completion. It doesn't validate: check the value after `Run` if only listed
+values are allowed.
+
+For a long list, register with `CompletePaged` and apply the prefix, offset and
+limit yourself, for example in a query. `Limit` is one more than the page (so
+the library can tell whether more remain) and `0` means no limit; the library
+only truncates:
+
+```go
+cli.CompletePaged("customer", func(req clyops.CompleteRequest) ([]string, error) {
+	limit := int64(req.Limit)
+	if limit == 0 {
+		limit = -1 // SQLite: no limit
+	}
+	rows, err := db.Query("SELECT name FROM customers WHERE name LIKE ? || '%' ORDER BY name LIMIT ? OFFSET ?",
+		req.Prefix, limit, req.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		names = append(names, name)
+	}
+	return names, rows.Err()
+})
+```
+
+`cli.CompleteValues(name, prefix, limit, offset, words)` returns a
+`clyops.ValuesPage{Values, More}`, and `mytool --complete-values NAME PREFIX
+LIMIT OFFSET -- WORDS...` prints it as JSON for the HTTP API, MCP server and web
+runner. See the [spec](../../spec/SPEC.md) sections 9.2 and 9.3.
 
 ## Parsing and errors
 

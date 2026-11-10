@@ -62,21 +62,39 @@ each has its own help (`mytool db migrate --help`), schema and completion. See t
 
 ## Completion values from your program
 
-`complete(name, fn)` lists the values to offer when completing an option or
-argument, read when the user presses Tab, for values only the program can
-find, such as the instances registered in a directory:
+`complete(name, fn)` lists the values of an option or argument that only the
+program can find, such as the instances registered in a directory. They are
+offered when the user presses Tab, and to tooling that asks with
+`--complete-values` (the HTTP API, MCP server and web runner):
 
 ```python
 from pathlib import Path
 cli.opt("INSTANCE", "instance", "i", "", "Instance to target")
-cli.complete("instance", lambda words: sorted(p.stem for p in Path("/var/lib/myapp/instances").glob("*.json")))
+cli.complete("instance", lambda request: sorted(p.stem for p in Path("/var/lib/myapp/instances").glob("*.json")))
 ```
 
-The function runs only for `--bash-completion`, on every Tab, so keep it quick.
-`words` are the words typed after the command words, for completers that depend
-on another option. Raising keeps the rule's completion. It doesn't validate: check
-the value after `run` if only listed values are allowed. See the
-[spec](../../spec/SPEC.md) section 9.2.
+`fn` gets a frozen `CompleteRequest`: `words` (the words typed after the command
+words, for completers that depend on another option), `prefix`, `limit` (0 means
+no limit) and `offset`. By default it may return every value and the library
+keeps the ones starting with `prefix` and pages them. With `paged=True` it
+applies `prefix`, `offset` and `limit` itself, which suits a database:
+
+```python
+import sqlite3
+def hosts(request):
+    with sqlite3.connect("app.db") as db:
+        rows = db.execute("SELECT DISTINCT name FROM hosts WHERE name LIKE ? ORDER BY name LIMIT ? OFFSET ?",
+                          (request.prefix + "%", request.limit or -1, request.offset))
+        return [name for (name,) in rows]
+cli.complete("host", hosts, paged=True)
+```
+
+The function runs only for `--bash-completion` and `--complete-values`, so keep
+it quick. Raising keeps the rule's shell completion. `prog --complete-values
+host al 10 0` prints `{"values":[...],"more":false}`; in code,
+`cli.complete_values("host", "al", 10, 0)` returns a `ValuesPage` (`values`,
+`more`). It doesn't validate: check the value after `run` if only listed values
+are allowed. See the [spec](../../spec/SPEC.md) sections 9.2 and 9.3.
 
 ## Parsing and errors
 

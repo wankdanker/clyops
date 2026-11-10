@@ -25,7 +25,7 @@ info(f"sending {args.SRC} to {args.HOST}:{args.PORT}")
 `group` and `rule` can also be passed by keyword (`rule="port"`). `run()` returns a dict of typed
 values that also allows attribute access; `parse()` is the non-exiting variant and returns a
 `ParseResult`. Also: `source`, `is_set`, `is_explicitly_set`, `usage`, `json_schema`,
-`completion_script`, `values_json`, `set_path_search`, `complete(name, fn)` (completion values at Tab time), `require_command`, and the logging helpers
+`completion_script`, `values_json`, `set_path_search`, `complete(name, fn, paged=False)` and `complete_values` (completion values for Tab and `--complete-values`), `require_command`, and the logging helpers
 `info`, `warn`, `error`, `success`, `die`.
 
 ## Commands, relationships, secrets, effects and I/O

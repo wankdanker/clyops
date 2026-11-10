@@ -8,7 +8,7 @@ Key facts for agents:
 - Precedence is command line > config file > environment variable (named after the option's variable) > default. Pass secrets through the environment, never on the command line.
 - Exit status 1 means invalid input or a runtime failure, with an exact message on stderr. Exit status 2 (Bash and C) means the tool itself is misdefined.
 - When writing a tool, register everything before `run` and do no work until `run` returns: it exits early for help, schema, completion and every validation error, and tooling probes tools with those flags.
-- To complete values only the program can list at Tab time (instances in a registry directory, for example), register `complete(name, fn)` (Bash: `clyops_complete name function`). It runs only for `--bash-completion`, must be quick, and doesn't validate; the schema marks such options `"dynamic": true`.
+- To offer values only the program can list (instances in a registry directory, distinct values of a database column), register `complete(name, fn)` (Bash: `clyops_complete name function`). The function gets `words`, `prefix`, `limit` and `offset`; register it paged to apply them itself. It runs only for `--bash-completion` and `--complete-values NAME PREFIX LIMIT OFFSET -- WORDS`, must be quick, and doesn't validate; the schema marks such inputs `"dynamic": true`, and the HTTP API (`POST /values/...`) and MCP server (`list_values`) list them on demand.
 - Tools served over MCP (`clyops-mcp --root DIR`) are already validated against their schema; declared effects become MCP tool annotations.
 
 ## Agent skills

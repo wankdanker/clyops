@@ -30,8 +30,13 @@ cli.arg_variadic(NAME, description, rule);
 
 Metadata: `description`, `epilog`, `config(option, prefixes)`,
 `path_search(long, dirs)`,
-`complete(name, |words| Ok(vec![...]))` (completion values, §9.2; returns
-`CompleteResult`, an error or panic keeps the rule's completion),
+`complete(name, |req| Ok(vec![...]))` (completion values, §9.2; `req` is a
+`&CompleteRequest { words, prefix, limit, offset }`, the library filters by
+prefix and pages; returns `CompleteResult`, an error or panic keeps the rule's
+completion), `complete_paged(name, f)` (same, but `f` applies prefix, offset
+and limit itself, e.g. in SQL; `limit` is one more than the page, 0 = no
+limit), `complete_values(name, prefix, limit, offset, &words)` (a `ValuesPage
+{ values, more }`, what `--complete-values` prints, §9.3),
 `require_command(cmd, description, hint)`,
 `effects(&[...])`, `stdin(description, content_type)`,
 `stdout(description, content_type)`, `exclusive(&[...])`,

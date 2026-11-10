@@ -76,21 +76,31 @@ each has its own help (`mytool db migrate --help`), schema and completion. See t
 
 ## Completion values from your program
 
-`complete(name, fn)` lists the values to offer when completing an option or
-argument, read when the user presses Tab, for values only the program can
-find, such as the instances registered in a directory:
+`complete(name, fn)` lists an option's or argument's values for values only the
+program can find, such as the instances registered in a directory. Shells offer
+them on Tab, and the API, MCP server and web runner list them on demand
+(`--complete-values`). The function gets a request, `{ words, prefix, limit, offset }`,
+where `words` are the words typed after the command words:
 
 ```js
 const fs = require('node:fs');
 cli.opt('INSTANCE', 'instance', 'i', '', 'Instance to target');
-cli.complete('instance', (words) => fs.readdirSync('/var/lib/myapp/instances').filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)));
+cli.complete('instance', () => fs.readdirSync('/var/lib/myapp/instances').filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)));
 ```
 
-The function runs only for `--bash-completion`, on every Tab, so keep it quick.
-`words` are the words typed after the command words, for completers that depend
-on another option. Throwing keeps the rule's completion. It doesn't validate: check
-the value after `run` if only listed values are allowed. See the
-[spec](../../spec/SPEC.md) section 9.2.
+By default the function may return everything: the library keeps the values that
+start with `prefix` and pages them. For thousands of values, register it
+`{ paged: true }` and apply the prefix, offset and limit yourself:
+
+```js
+cli.complete('customer', ({ prefix, limit, offset }) => db.prepare('SELECT DISTINCT name FROM customers WHERE name LIKE ? ORDER BY name LIMIT ? OFFSET ?').all(prefix + '%', limit || -1, offset).map((r) => r.name), { paged: true });
+```
+
+The function runs only when values are asked for, on every Tab, so keep it quick
+and read-only. Throwing keeps the rule's shell completion. It doesn't validate:
+check the value after `run` if only listed values are allowed.
+`cli.completeValues(name, prefix, limit, offset, words)` returns a page,
+`{ values, more }`. See the [spec](../../spec/SPEC.md) sections 9.2 and 9.3.
 
 ## Parsing and errors
 

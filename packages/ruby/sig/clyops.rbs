@@ -3,7 +3,31 @@ module Clyops
   type value = scalar | Array[scalar] | nil
   # A completer (spec section 9.2): a Proc, lambda, Method or any object with #call.
   interface _Completer
-    def call: (Array[String] words) -> Array[String]
+    def call: (CompleteRequest request) -> Array[String]
+  end
+
+  # What a completer is asked for (spec section 9.2).
+  class CompleteRequest < Struct[untyped]
+    attr_accessor words: Array[String]
+    attr_accessor prefix: String
+    attr_accessor limit: Integer
+    attr_accessor offset: Integer
+    def initialize: (words: Array[String], prefix: String, limit: Integer, offset: Integer) -> void
+  end
+
+  # A page of values (spec section 9.3).
+  class ValuesPage < Struct[untyped]
+    attr_accessor values: Array[String]
+    attr_accessor more: bool
+    def initialize: (values: Array[String], more: bool) -> void
+    def to_json: (*untyped args) -> String
+  end
+
+  # A registered completer and its mode.
+  class CompleterDef < Struct[untyped]
+    attr_accessor fn: _Completer
+    attr_accessor paged: bool
+    def initialize: (_Completer fn, bool paged) -> void
   end
 
   VERSION: String
@@ -35,7 +59,8 @@ module Clyops
   def self.wrap_text: (String text, Integer width) -> Array[String]
   def self.pretty_json: (untyped value) -> String
   def self.completion_kind: (String rule, Array[String] search_dirs) -> [String, String]
-  def self.completion_record: (String rule, Array[String] search_dirs, _Completer? completer, Array[String] words) -> [String, String]
+  def self.list_values: (CompleterDef completer, Array[String] words, String prefix, Integer limit, Integer offset, bool shell) -> ValuesPage
+  def self.completion_record: (String rule, Array[String] search_dirs, CompleterDef? completer, Array[String] words) -> [String, String]
 
   class ParseResult < Struct[untyped]
     attr_accessor status: String
@@ -75,8 +100,9 @@ module Clyops
     def set_config: (String option, String prefixes) -> Cli
     def require_command: (String command, String description, ?String install_hint) -> Cli
     def set_path_search: (String long, String | Array[String] dirs) -> Cli
-    def complete: (String name, _Completer callable) -> Cli
-                | (String name) { (Array[String] words) -> Array[String] } -> Cli
+    def complete: (String name, _Completer callable, ?paged: bool) -> Cli
+                | (String name, ?paged: bool) { (CompleteRequest request) -> Array[String] } -> Cli
+    def complete_values: (String name, String prefix, Integer limit, Integer offset, ?Array[String] words) -> ValuesPage
     def opt: (String var, String long, ?String short, ?String default, ?String description, ?String group, ?String rule) -> Cli
     def opt_array: (String var, String long, ?String short, ?String description, ?String group, ?String rule) -> Cli
     def arg: (String name, ?String description, ?String default, ?String rule) -> Cli

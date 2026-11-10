@@ -69,11 +69,16 @@ python3 tools/conformance.py js -k config   # cases whose name contains "config"
   * `progress` `out` `Progress, one JSON object per line` `application/x-ndjson`,
     schema `{"type":"object","properties":{"pct":{"type":"number"}}}`
   * `extra` `in` `Extra lines to process` `text/plain`
-* completers (spec section 9.2) on `host` and on `rest`, sharing one function:
-  it writes `completer ran` and a line feed to standard error, then fails
-  (throws, returns an error, or exits 1 in Bash) when `DEMO_HOSTS` is unset.
-  Otherwise it returns the `DEMO_HOSTS` entries split on `;`, followed by
-  `words-N` when it was given N > 0 words.
+* completers (spec section 9.2), each writing `completer ran` and a line feed
+  to standard error, then failing (throwing, returning an error, or exiting 1
+  in Bash) when `DEMO_HOSTS` is unset. Otherwise each builds a list: the
+  `DEMO_HOSTS` entries split on `;`, followed by `words-N` when it was given
+  N > 0 words.
+  * on `host`, library-paged: it returns that list and ignores the rest of the
+    request;
+  * on `rest`, paged: it keeps the entries that start with the request's
+    prefix, skips its offset and keeps at most its limit (all when the limit
+    is 0).
 * after a successful parse, before printing, the demo calls
   `emit("meta", "{\"extra\":true}")` when `fdOpen("extra")` finds it and
   `emit("meta", "{\"extra\":false}")` otherwise, then

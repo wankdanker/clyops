@@ -1,18 +1,30 @@
 // The conformance demo CLI (spec/conformance/README.md) in Java.
 import io.github.wankdanker.clyops.Cli;
+import io.github.wankdanker.clyops.CompleteRequest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 public class Demo {
-    // Completer (spec section 9.2): the DEMO_HOSTS entries, then words-N. Fails when DEMO_HOSTS is unset.
-    static List<String> hosts(List<String> words) {
+    // Completers (spec section 9.2): the DEMO_HOSTS entries, then words-N. They fail when DEMO_HOSTS is unset.
+    static List<String> demoHosts(List<String> words) {
         System.err.println("completer ran");
         String env = System.getenv("DEMO_HOSTS");
         if (env == null) throw new IllegalStateException("DEMO_HOSTS is unset");
         List<String> out = new ArrayList<>(Arrays.asList(env.split(";", -1)));
         if (!words.isEmpty()) out.add("words-" + words.size());
         return out;
+    }
+
+    // Library-paged: the library keeps the values starting with the prefix and pages them.
+    static List<String> hosts(CompleteRequest req) {
+        return demoHosts(req.words());
+    }
+
+    // Paged: applies the request's prefix, offset and limit itself.
+    static List<String> pagedHosts(CompleteRequest req) {
+        List<String> matching = demoHosts(req.words()).stream().filter(h -> h.startsWith(req.prefix())).skip(req.offset()).toList();
+        return req.limit() > 0 ? matching.subList(0, Math.min(req.limit(), matching.size())) : matching;
     }
 
     public static void main(String[] argv) {
@@ -66,7 +78,7 @@ public class Demo {
         cli.setConfig("config", "demo:,shared:");
         cli.setPathSearch("config", "conf");
         cli.complete("host", Demo::hosts);
-        cli.complete("rest", Demo::hosts);
+        cli.complete("rest", true, Demo::pagedHosts);
         cli.exclusive("endpoint", "addr");
         cli.requires("dest", "src");
 

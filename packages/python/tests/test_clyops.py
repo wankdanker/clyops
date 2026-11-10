@@ -4,7 +4,16 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
-from clyops import Cli, ValidationError, describe_rule, resolve_path, validate, wrap_text  # noqa: E402
+from clyops import (  # noqa: E402
+    Cli,
+    CompleteRequest,
+    ValidationError,
+    ValuesPage,
+    describe_rule,
+    resolve_path,
+    validate,
+    wrap_text,
+)
 
 
 def make():
@@ -200,11 +209,11 @@ class CliTest(unittest.TestCase):
     def test_complete_values_sanitized_with_fallback(self):
         calls = []
 
-        def values(words):
-            calls.append(words)
+        def values(request):
+            calls.append(request)
             return ["a", "", "b c", "d,e", "f\tg", "a", "h"]
 
-        def fails(words):
+        def fails(request):
             raise RuntimeError("no")
 
         cli = make()
@@ -221,19 +230,64 @@ class CliTest(unittest.TestCase):
         self.assertIn("opt\t--count\t-n\tvalue\tchoice\ta,h\tCount\n", data)
         self.assertIn("opt\t--tag\t-t\tvalue\tchoice\t-\tTags\n", data)
         self.assertIn("arg\tfile\tsingle\tfile\t-\tFile\n", data)
-        self.assertEqual(calls, [["x", "y"]])
+        self.assertEqual(calls, [CompleteRequest(["x", "y"], "", 0, 0)])
 
     def test_complete_gets_words_after_commands(self):
         cli = Cli(name="m", env={})
         cli.opt("HOST", "host", "", "optional", "Host")
-        cli.complete("host", lambda words: ["top"] + words)
+        cli.complete("host", lambda request: ["top"] + request.words)
         migrate = cli.command("db", "Database").command("migrate", "Migrate")
         migrate.arg("name", "Name", "all")
-        migrate.complete("name", lambda words: [f"w:{w}" for w in words])
+        migrate.complete("name", lambda request: [f"w:{w}" for w in request.words])
         data = cli.completion_data(["db", "migrate", "--host", "x"])
         self.assertIn("skip\t2\n", data)
         self.assertIn("opt\t--host\t-\tvalue\tchoice\ttop,--host,x\tHost\n", data)
         self.assertIn("arg\tname\tsingle\tchoice\tw:--host,w:x\tName\n", data)
+
+    def test_complete_values_pages_unless_paged(self):
+        everything = ["alpha", "beta", "albert", "has space", "a,b", "alpha", ""]
+        cli = make().complete("count", lambda request: everything)
+        page = ValuesPage(["alpha", "beta", "albert", "has space", "a,b"], False)
+        self.assertEqual(cli.complete_values("count", "", 10, 0), page)
+        self.assertEqual(cli.complete_values("count", "al", 1, 0), ValuesPage(["alpha"], True))
+        self.assertEqual(cli.complete_values("count", "al", 1, 1), ValuesPage(["albert"], False))
+        seen = []
+
+        def paged_values(request):
+            seen.append(request)
+            return ["x", "y", "z"][:request.limit]
+
+        paged = make().complete("count", paged_values, paged=True)
+        self.assertEqual(paged.complete_values("count", "q", 2, 40, ["-f"]), ValuesPage(["x", "y"], True))
+        self.assertEqual(seen, [CompleteRequest(["-f"], "q", 3, 40)])
+        # Registering again replaces the completer and its mode.
+        paged.complete("count", lambda request: ["only"])
+        self.assertEqual(paged.complete_values("count", "", 5, 0), ValuesPage(["only"], False))
+        self.assertEqual(paged.complete_values("count", "", 5, 0).to_json(), '{"values":["only"],"more":false}')
+        with self.assertRaisesRegex(ValueError, "^No completer for 'count'$"):
+            make().complete_values("count", "", 5, 0)
+
+        def fails(request):
+            raise RuntimeError("x")
+
+        with self.assertRaisesRegex(ValueError, "^Completer for 'count' failed$"):
+            make().complete("count", fails).complete_values("count", "", 5, 0)
+        # Shell completion keeps at most 1000 values.
+        many = make().complete("count", lambda request: [f"v{i}" for i in range(1500)])
+        line = next(x for x in many.completion_data().split("\n") if x.startswith("opt\t--count"))
+        self.assertEqual(len(line.split("\t")[5].split(",")), 1000)
+
+    def test_complete_values_follows_commands(self):
+        cli = Cli(name="t", env={})
+        db = cli.command("db", "Database")
+        db.opt("URL", "url", "", "optional", "URL").complete("url", lambda request: ["pg:main"])
+        db.command("migrate", "Migrate").arg("target", "Target").complete("target", lambda request: request.words)
+        self.assertEqual(cli.complete_values("url", "", 5, 0, ["db", "migrate"]), ValuesPage(["pg:main"], False))
+        self.assertEqual(cli.complete_values("target", "", 5, 0, ["db", "migrate", "-n", "x"]), ValuesPage(["-n", "x"], False))
+        with self.assertRaisesRegex(ValueError, "^No completer for 'target'$"):
+            cli.complete_values("target", "", 5, 0, ["db"])
+        with self.assertRaisesRegex(ValueError, "^No completer for 'url'$"):
+            cli.complete_values("url", "", 5, 0, [])
 
 
 if __name__ == "__main__":

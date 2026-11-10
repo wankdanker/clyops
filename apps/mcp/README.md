@@ -73,6 +73,15 @@ Tools run in `--cwd` (default: where the server was started, which for most clie
 project the agent is working in), so relative paths resolve there. Options can also be set as
 `CLYOPS_MCP_<OPTION>` in the environment.
 
+### Listing values
+
+When a served tool has an input marked `"dynamic": true` (spec section 9.2), the
+server adds one more tool, `list_values` (`clyops_list_values` if a tool already has
+that name). Given `tool`, the input `name`, the other `input`s so far, a `prefix`,
+`limit` and `offset`, it runs the tool with `--complete-values` and answers
+`{"values": [...], "more": false}`. Each dynamic input's description points at it,
+so an agent can look up valid names before calling the tool.
+
 ## Security
 
 The agent can run any tool the server offers with any arguments its schema accepts. Offer only

@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import ToolForm from '$lib/ToolForm.svelte';
   import Result from '$lib/Result.svelte';
-  import { progressView } from '$lib/form';
+  import { progressView, VALUES_SHOWN } from '$lib/form';
   import { ApiClient, type ToolSummary, type ToolDescription, type Job, type RunResult } from '$lib/client';
   import '../app.css';
 
@@ -144,7 +144,7 @@
     {#if !client}<section class="welcome"><p class="eyebrow">YOUR TOOLS, WITH A FACE</p><h1>Small tools.<br><span>Ready to run.</span></h1><p>Connect to a clyops API to browse its tools, fill validated inputs, and follow their results.</p><div class="welcome-command"><span>START YOUR SERVER</span><code>clyops-api --root ./scripts</code><small>Then open its /ui/ page. Protected servers ask for a key.</small></div></section>
     {:else if loadingTool}<p class="loading" role="status">Loading tool interface…</p>
     {:else if selected && description}<header class="tool-header"><p class="eyebrow">{selected.words.slice(0,-1).join(' / ') || 'TOOLS'} / EXECUTE</p><h1>{selected.words.at(-1)}</h1><p>{description.schema.description}</p><div class="effect-badges">{#each description.schema.effects ?? [] as effect}<span class:destructive={effect === 'destructive'}>{effect}</span>{/each}<code>{selected.path}</code></div></header>
-      {#key selected.path}<ToolForm schema={description.schema} inputSchema={description.input} api={client.base} tool={selected.path} {busy} onrun={run}/>{/key}
+      {#key selected.path}<ToolForm schema={description.schema} inputSchema={description.input} api={client.base} tool={selected.path} {busy} onrun={run} listValues={(name, prefix, input) => client ? client.values(selected!.path, { name, prefix, input, limit: VALUES_SHOWN }) : Promise.reject(new Error('Not connected'))}/>{/key}
     {:else}<section class="welcome"><h1>No tools yet.</h1><p>Add executable clyops tools to the API's directory, then refresh the tool list.</p></section>{/if}
     {#if activeJob}{@const current = jobs.find(job => job.job_id === activeJob)}{@const shown = progressView(current?.progress)}<section class="active-job" role="status"><div><span class="eyebrow">BACKGROUND EXECUTION</span><p>{current?.status ?? 'pending'} · {activeJob}</p>{#if current?.progress}<div class="job-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={shown.fraction === undefined ? undefined : Math.round(shown.fraction * 100)} aria-label={shown.label ?? 'Progress'}><span>{shown.label ?? 'Working'}{shown.fraction === undefined ? '' : ` · ${Math.round(shown.fraction * 100)}%`}</span><div class="bar"><div style:width={shown.fraction === undefined ? '100%' : `${shown.fraction * 100}%`} class:indeterminate={shown.fraction === undefined}></div></div></div>{:else if current?.stage}<p class="job-stage">{current.stage}</p>{/if}<small>Output is available when the job finishes.</small></div><button type="button" class="secondary danger" onclick={() => activeJob && cancel(activeJob)}>Cancel job</button></section>{/if}
     {#if lastResult}<Result result={lastResult} name={resultName} contentType={resultType} ondownload={download}/>{/if}

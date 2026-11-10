@@ -11,8 +11,8 @@ import (
 	clyops "github.com/wankdanker/clyops/packages/go"
 )
 
-// hosts is a completer (spec section 9.2): the DEMO_HOSTS entries, then words-N. Fails when DEMO_HOSTS is unset.
-func hosts(words []string) ([]string, error) {
+// demoHosts is the DEMO_HOSTS entries, then words-N (spec section 9.2). It fails when DEMO_HOSTS is unset.
+func demoHosts(words []string) ([]string, error) {
 	fmt.Fprintln(os.Stderr, "completer ran")
 	list, ok := os.LookupEnv("DEMO_HOSTS")
 	if !ok {
@@ -23,6 +23,30 @@ func hosts(words []string) ([]string, error) {
 		values = append(values, fmt.Sprintf("words-%d", len(words)))
 	}
 	return values, nil
+}
+
+// hosts is a library-paged completer: the library keeps the values starting with the prefix and pages them.
+func hosts(req clyops.CompleteRequest) ([]string, error) {
+	return demoHosts(req.Words)
+}
+
+// pagedHosts is a paged completer: it applies the request's prefix, offset and limit itself.
+func pagedHosts(req clyops.CompleteRequest) ([]string, error) {
+	all, err := demoHosts(req.Words)
+	if err != nil {
+		return nil, err
+	}
+	var matching []string
+	for _, h := range all {
+		if strings.HasPrefix(h, req.Prefix) {
+			matching = append(matching, h)
+		}
+	}
+	matching = matching[min(req.Offset, len(matching)):]
+	if req.Limit > 0 && len(matching) > req.Limit {
+		matching = matching[:req.Limit]
+	}
+	return matching, nil
 }
 
 func main() {
@@ -78,7 +102,7 @@ func main() {
 	cli.SetConfig("config", "demo:,shared:")
 	cli.SetPathSearch("config", "conf")
 	cli.Complete("host", hosts)
-	cli.Complete("rest", hosts)
+	cli.CompletePaged("rest", pagedHosts)
 	cli.Exclusive("endpoint", "addr")
 	cli.Requires("dest", "src")
 

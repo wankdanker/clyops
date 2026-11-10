@@ -25,7 +25,7 @@ cli.argVariadic(NAME, description, rule);
 
 Trailing `group` and `rule` are optional. Metadata: `setDescription`,
 `setEpilog`, `setConfig(option, prefixes)`, `setPathSearch(long, dirs)`,
-`complete(name, (words) => string[])` (completion values, §9.2),
+`complete(name, ({ words, prefix, limit, offset }) => string[], { paged })` (values on demand, §9.2),
 `requireCommand(cmd, description, hint)`, `setEffects(...effects)`,
 `setStdin(description, contentType)`, `setStdout(description, contentType)`,
 `exclusive(...longs)`, `requires(...longs)`, `oneOf(...longs)`,

@@ -4,10 +4,17 @@
 # The conformance demo CLI (spec/conformance/README.md) in Ruby.
 require_relative "../lib/clyops"
 
-# Completer (spec section 9.2): the DEMO_HOSTS entries, then words-N. Fails when DEMO_HOSTS is unset.
-hosts = lambda do |words|
+# Completers (spec section 9.2): the DEMO_HOSTS entries, then words-N. They fail when DEMO_HOSTS is unset.
+demo_hosts = lambda do |words|
   $stderr.write("completer ran\n")
   ENV.fetch("DEMO_HOSTS").split(";", -1) + (words.empty? ? [] : ["words-#{words.length}"])
+end
+# Library-paged: the library keeps the values starting with the prefix and pages them.
+hosts = ->(request) { demo_hosts.(request.words) }
+# Paged: applies the request's prefix, offset and limit itself.
+paged_hosts = lambda do |request|
+  matching = demo_hosts.(request.words).select { |h| h.start_with?(request.prefix) }.drop(request.offset)
+  request.limit.positive? ? matching.take(request.limit) : matching
 end
 
 cli = Clyops::Cli.new(name: "demo", root: ENV["DEMO_ROOT"])
@@ -61,7 +68,7 @@ cli.opt_array "INCLUDE", "include", "I",          "Include directory",     "File
 cli.set_config("config", "demo:,shared:")
 cli.set_path_search("config", "conf")
 cli.complete("host", hosts)
-cli.complete("rest", hosts)
+cli.complete("rest", paged_hosts, paged: true)
 cli.exclusive("endpoint", "addr")
 cli.requires("dest", "src")
 
