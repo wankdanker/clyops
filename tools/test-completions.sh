@@ -41,7 +41,7 @@ failures=0
 first_fish_failure=""
 check() { # shell line expected actual
     if [[ "$3" == "$4" ]]; then echo "ok - $1: [$2]"; else echo "not ok - $1: [$2] expected [$3], got [$4]"; failures=$((failures + 1))
-        [[ "$1" == fish && -z "$first_fish_failure" ]] && first_fish_failure="${2% (*)}"
+        [[ "$1" == fish && -z "$first_fish_failure" ]] && first_fish_failure="${2%(*)}"
     fi
     return 0
 }
@@ -128,7 +128,7 @@ EOF
     if [[ -n "$first_fish_failure" ]]; then
         echo "# $(fish --version): trace of [$first_fish_failure]"
         printf '%s --completion fish | source\nset fish_trace 1\ncomplete -C %q\n' "${first_fish_failure%% *}" "$first_fish_failure" \
-            | fish --no-config 2>&1 | head -150 | sed 's/^/#   /'
+            | fish --no-config 2>&1 | grep -v -e '-> set -a ' -e '-> test .* = -$' -e '-> continue$' | tail -120 | sed 's/^/#   /'
     fi
 else
     echo "skip - fish not installed"
