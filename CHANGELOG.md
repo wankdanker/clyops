@@ -5,6 +5,15 @@ section here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Bash completion of values containing `:` or `@`, such as dynamic values like `zone:eu:a` or
+  `pg:main`. Readline splits words at those characters (`COMP_WORDBREAKS`), so the script
+  completed only the text after the last one, counted the pieces as positional arguments, and
+  passed them split to the program and its completer. The script now joins the pieces and offers
+  each value from where readline replaces it. Dispatchers built with `clyops-dispatch` use the same
+  script. Zsh and fish were not affected.
+
 ## [0.13.0] - 2026-11-10
 
 Programs can list an input's values when they are asked for: shells offer them on Tab, and the

@@ -57,7 +57,10 @@ bash_complete() { # line [setup]
 shopt -s expand_aliases
 ${2:-}
 eval "\$($prog --completion bash)"
-COMP_WORDS=($1); [[ "$1" == *" " ]] && COMP_WORDS+=(""); COMP_CWORD=\$(( \${#COMP_WORDS[@]} - 1 ))
+# Split like readline: at whitespace, and around runs of the word-break characters : = @.
+COMP_LINE=$(printf %q "$1"); COMP_POINT=\${#COMP_LINE}
+read -ra COMP_WORDS <<< "\$(sed -E 's/([:=@]+)/ \\1 /g' <<< "\$COMP_LINE")"
+[[ "\$COMP_LINE" == *" " || -z "\$COMP_LINE" ]] && COMP_WORDS+=(""); COMP_CWORD=\$(( \${#COMP_WORDS[@]} - 1 ))
 _clyops_$prog
 printf '%s\n' "\${COMPREPLY[@]}" | sort | tr '\n' ' '
 EOF
@@ -90,6 +93,23 @@ check bash "demo --host (completer)"       "alpha beta words-1 "     "$(bash_com
 check bash "tasks db migrate (completer)"  "v1 v2 "                  "$(bash_complete "tasks db migrate ")"
 check bash "tasks db migrate -n (completer)" "v1 v2 w:-n "           "$(bash_complete "tasks db migrate -n ")"
 check bash "tools media tasks db migrate -n (completer)" "v1 v2 w:-n " "$(bash_complete "tools media tasks db migrate -n ")"
+# Values with ":" (and "@"), which readline splits words at (COMP_WORDBREAKS): replies
+# are what follows the last break, the text readline replaces.
+zones="export DEMO_HOSTS='zone:eu:a;zone:eu:b;zone:us:a'"
+check bash "demo in.txt fast zone (colon)"        "zone:eu:a zone:eu:b zone:us:a " "$(bash_complete "demo in.txt fast zone" "$zones")"
+check bash "demo in.txt fast zone:e (colon)"      "eu:a eu:b "              "$(bash_complete "demo in.txt fast zone:e" "$zones")"
+check bash "demo in.txt fast zone:eu: (colon)"    "a b "                    "$(bash_complete "demo in.txt fast zone:eu:" "$zones")"
+check bash "demo -v in.txt fast zone:u (colon)"   "us:a "                   "$(bash_complete "demo -v in.txt fast zone:u" "$zones")"
+# A new word after a value with colons: the completer gets the whole words (words-3).
+check bash "demo in.txt fast zone:eu:a  (colon)"  "words-3 zone:eu:a zone:eu:b zone:us:a " "$(bash_complete "demo in.txt fast zone:eu:a " "$zones")"
+check bash "demo --host zone:eu:a (colon)"        "a "                      "$(bash_complete "demo --host zone:eu:a" "$zones")"
+check bash "demo --host=zone:us: (colon)"         "a "                      "$(bash_complete "demo --host=zone:us:" "$zones")"
+check bash "tasks db --url pg: (colon)"           "main "                   "$(bash_complete "tasks db --url pg:")"
+check bash "tasks db --url=sqlite:a (colon)"      "app.db "                 "$(bash_complete "tasks db --url=sqlite:a")"
+check bash "tasks db --url=pg:main -v --u (colon)" "--url "                 "$(bash_complete "tasks db --url=pg:main -v --u")"
+check bash "tools media demo in.txt fast zone:eu: (colon)" "a b "           "$(bash_complete "tools media demo in.txt fast zone:eu:" "$zones")"
+check bash "tools media demo -v in.txt fast zone:e (colon)" "eu:a eu:b "    "$(bash_complete "tools media demo -v in.txt fast zone:e" "$zones")"
+check bash "tools media tasks db --url=pg:m (colon)" "main "                "$(bash_complete "tools media tasks db --url=pg:m")"
 check bash "tasks db --u"                  "--url "                  "$(bash_complete "tasks db --u")"
 check bash "tasks send --email a@b.co --w" "--webhook "              "$(bash_complete "tasks send --email a@b.co --w")"
 check bash "tools media tasks db "         "migrate status "         "$(bash_complete "tools media tasks db ")"
@@ -121,6 +141,7 @@ EOF
     check fish "tasks db "                 "migrate status "       "$(fish_complete "tasks db ")"
     check fish "tasks db migrate --d"      "--dry-run "            "$(fish_complete "tasks db migrate --d")"
     check fish "tasks db migrate -n (completer)" "v1 v2 w:-n "     "$(fish_complete "tasks db migrate -n ")"
+    check fish "tasks db --url pg: (colon)"   "pg:main "              "$(fish_complete "tasks db --url pg:")"
     check fish "tools media tasks db migrate (completer)" "v1 v2 "  "$(fish_complete "tools media tasks db migrate ")"
     check fish "tools media tasks db "     "migrate status "       "$(fish_complete "tools media tasks db ")"
     check fish "rt (alias) "               "hello media tools "    "$(fish_complete "rt " "$root_alias")"
