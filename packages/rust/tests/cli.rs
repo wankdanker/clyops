@@ -245,3 +245,75 @@ fn role_scope_and_help() {
     assert!(usage.contains("\nOutput [plan]: Migration plan\n"), "{usage}");
     assert!(!usage.contains("[progress]"));
 }
+
+#[test]
+#[should_panic(expected = "Unknown option or argument 'nope' for complete")]
+fn complete_unknown_name_panics() {
+    make().complete("nope", |_| Ok(Vec::new()));
+}
+
+#[test]
+#[should_panic(expected = "Flag --fast takes no value to complete")]
+fn complete_flag_panics() {
+    make().complete("fast", |_| Ok(Vec::new()));
+}
+
+fn record<'a>(data: &'a str, prefix: &str) -> &'a str {
+    data.lines().find(|l| l.starts_with(prefix)).unwrap_or_else(|| panic!("no record {prefix} in {data}"))
+}
+
+#[test]
+fn completers_fill_completion_records() {
+    let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counter = calls.clone();
+    let mut cli = make();
+    cli.complete("count", move |words| {
+        counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let mut list: Vec<String> = ["b", "", "a,b", "a b", "x\ty", "b", "c"].iter().map(|s| s.to_string()).collect();
+        list.extend(words.iter().map(|w| format!("w:{w}")));
+        Ok(list)
+    });
+    cli.complete("file", |_| Ok(Vec::new()));
+    cli.complete("tag", |_| Err("no tags".into()));
+    assert_eq!(cli.parse(&["x", "-n", "3"]), Parsed::Ok);
+    let _ = (cli.usage(), cli.json_schema());
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0, "only completion runs a completer");
+    let data = cli.completion_data_for(&["x", "y"]);
+    assert_eq!(record(&data, "opt\t--count"), "opt\t--count\t-n\tvalue\tchoice\tb,c,w:x,w:y\tCount");
+    assert_eq!(record(&data, "arg\tfile"), "arg\tfile\tsingle\tchoice\t-\tFile");
+    assert_eq!(record(&data, "opt\t--tag"), "opt\t--tag\t-t\tvalue\tdefault\t-\tTags");
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+
+#[test]
+fn panicking_completer_keeps_the_rule() {
+    let mut cli = make();
+    cli.complete("file", |_| panic!("boom"));
+    let data = cli.completion_data();
+    assert_eq!(record(&data, "arg\tfile"), "arg\tfile\tsingle\tfile\t-\tFile");
+}
+
+#[test]
+fn completers_get_the_words_after_the_commands() {
+    let mut cli = Cli::new();
+    cli.name("m").env(Vec::new());
+    cli.opt("CONFIG", "config", "c", "optional", "Config");
+    cli.complete("config", |words| Ok(vec![format!("top-{}", words.join("+"))]));
+    let migrate = cli.command("db", "Database").command("migrate", "Migrate");
+    migrate.arg("name", "Name", "all", "");
+    migrate.complete("name", |words| Ok(words.to_vec()));
+    let data = cli.completion_data_for(&["db", "migrate", "a", "b"]);
+    assert_eq!(record(&data, "skip"), "skip\t2");
+    assert_eq!(record(&data, "opt\t--config"), "opt\t--config\t-c\tvalue\tchoice\ttop-a+b\tConfig");
+    assert_eq!(record(&data, "arg\tname"), "arg\tname\tsingle\tchoice\ta,b\tName");
+}
+
+#[test]
+fn schema_marks_dynamic_values() {
+    let mut cli = make();
+    cli.complete("count", |_| Ok(Vec::new()));
+    let compact: String = cli.json_schema().split_whitespace().collect();
+    assert!(compact.contains(r#""name":"file","description":"File","required":true,"isVariadic":false,"default":"","validation":"path","schema":null,"dynamic":false"#), "{compact}");
+    assert!(compact.contains(r#""secret":false,"dynamic":true"#), "{compact}");
+    assert!(compact.contains(r#""name":"tag","#) && compact.matches(r#""dynamic":true"#).count() == 1, "{compact}");
+}

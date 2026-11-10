@@ -29,7 +29,10 @@ cli.arg_variadic(NAME, description, rule);
 ```
 
 Metadata: `description`, `epilog`, `config(option, prefixes)`,
-`path_search(long, dirs)`, `require_command(cmd, description, hint)`,
+`path_search(long, dirs)`,
+`complete(name, |words| Ok(vec![...]))` (completion values, §9.2; returns
+`CompleteResult`, an error or panic keeps the rule's completion),
+`require_command(cmd, description, hint)`,
 `effects(&[...])`, `stdin(description, content_type)`,
 `stdout(description, content_type)`, `exclusive(&[...])`,
 `requires(first, &[rest...])`, `one_of(&[...])`, `command(name, description)`.

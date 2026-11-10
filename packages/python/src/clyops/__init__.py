@@ -18,7 +18,7 @@ import shutil
 import sys
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Mapping, NoReturn, Optional, Sequence, Union
+from typing import Callable, Dict, List, Mapping, NoReturn, Optional, Sequence, Union
 
 from ._completions import SCRIPTS as _COMPLETION_SCRIPTS
 
@@ -31,6 +31,9 @@ __version__ = "0.12.2"
 
 Scalar = Union[str, int, float, bool]
 Value = Union[Scalar, List[Scalar], None]
+Completer = Callable[[List[str]], Sequence[str]]
+"""Lists the values to offer when completing an option or argument (spec section 9.2).
+Gets the words typed after the program's commands; raising keeps the rule's completion."""
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -494,6 +497,24 @@ def _completion_kind(rule: str, search_dirs: Sequence[str]):
     return ("none", "") if rule else ("default", "")
 
 
+def _completion_record(rule: str, search_dirs: Sequence[str], completer: Optional[Completer], words: Sequence[str]):
+    """The kind and values of a completion record, asking the completer first (spec section 9.2)."""
+    if completer is not None:
+        try:
+            values = completer(list(words))
+            if isinstance(values, (str, bytes)) or values is None:
+                raise TypeError("a completer returns a list of strings")
+            listed = list(values)
+        except Exception:
+            return _completion_kind(rule, search_dirs)
+        seen: Dict[str, None] = {}
+        for v in listed:
+            if isinstance(v, str) and v and not re.search(r"[, \t\r\n]", v):
+                seen.setdefault(v, None)
+        return "choice", ",".join(seen)
+    return _completion_kind(rule, search_dirs)
+
+
 # ---------------------------------------------------------------------------
 # Cli
 # ---------------------------------------------------------------------------
@@ -511,6 +532,7 @@ class _Option:
     rule: str
     search_dirs: List[str] = field(default_factory=list)
     secret: bool = False
+    completer: Optional[Completer] = None
 
     @property
     def label(self) -> str:
@@ -529,6 +551,7 @@ class _Arg:
     default: str
     rule: str
     variadic: bool
+    completer: Optional[Completer] = None
 
 
 @dataclass
@@ -808,6 +831,18 @@ class Cli:
         opt.search_dirs = [os.path.normpath(os.path.join(self.root, d)) for d in items if d]
         if not opt.rule:
             opt.rule = "path"
+        return self
+
+    def complete(self, name: str, fn: Completer) -> "Cli":
+        """List the values to offer when completing the value option or argument `name` of this
+        level (spec section 9.2). `fn` runs only for --bash-completion, gets the words typed after
+        the commands and returns strings; it doesn't validate anything."""
+        target: Union[_Option, _Arg, None] = self._by_long.get(name) or next((a for a in self._args if a.name == name), None)
+        if target is None:
+            raise ValueError(f"Unknown option or argument '{name}' for complete")
+        if isinstance(target, _Option) and target.kind == "flag":
+            raise ValueError(f"Flag --{name} takes no value to complete")
+        target.completer = fn
         return self
 
     def opt(self, var: str, long: str, short: str = "", default: str = "", description: str = "",
@@ -1348,7 +1383,7 @@ class Cli:
             "arguments": [{
                 "name": a.name, "description": a.description, "required": not a.variadic and not a.default,
                 "isVariadic": a.variadic, "default": a.default, "validation": a.rule,
-                "schema": _rule_schema(a.rule, self.root, a.name),
+                "schema": _rule_schema(a.rule, self.root, a.name), "dynamic": a.completer is not None,
             } for a in self._args],
             "options": [{
                 "name": o.long, "shortName": o.short, "variableName": o.var, "description": o.description,
@@ -1356,6 +1391,7 @@ class Cli:
                 "isFlag": o.kind == "flag", "isArray": o.kind == "array", "required": o.required,
                 "validation": o.rule, "choices": o.rule[7:].split(",") if o.rule.startswith("choice:") else [],
                 "schema": _rule_schema(o.rule, self.root, f"--{o.long}"), "secret": o.secret,
+                "dynamic": o.completer is not None,
             } for o in self._options],
             **({} if self._parent else {"config": {"option": self._config_option, "prefixes": list(self._config_prefixes)}
                                         if self._config_option else None}),
@@ -1397,6 +1433,7 @@ class Cli:
             if node._children and skip < len(words) and not words[skip].startswith("-"):
                 return lines[0] + "\n"
             lines.append(f"skip\t{skip}")
+            words = words[skip:]
             lines += [f"cmd\t{c._word}\t{clean(c.description)}" for c in node._children]
         options: List[_Option] = []
         current: Optional[Cli] = node
@@ -1408,12 +1445,12 @@ class Cli:
             if o.kind == "flag":
                 lines.append(f"opt\t--{o.long}\t{short}\tflag\tnone\t-\t{clean(o.description)}")
             else:
-                kind, values = _completion_kind(o.rule, o.search_dirs)
+                kind, values = _completion_record(o.rule, o.search_dirs, o.completer, words)
                 lines.append(f"opt\t--{o.long}\t{short}\tvalue\t{kind}\t{values or '-'}\t{clean(o.description)}")
             if o.bool_like:
                 lines.append(f"opt\t--no-{o.long}\t-\tflag\tnone\t-\t{clean(o.description)}")
         for a in node._args:
-            kind, values = _completion_kind(a.rule, [])
+            kind, values = _completion_record(a.rule, [], a.completer, words)
             arity = "variadic" if a.variadic else "single"
             lines.append(f"arg\t{a.name}\t{arity}\t{kind}\t{values or '-'}\t{clean(a.description)}")
         return "\n".join(lines) + "\n"

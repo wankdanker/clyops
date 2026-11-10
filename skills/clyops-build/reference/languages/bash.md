@@ -25,6 +25,7 @@ the tool.
 | `clyops_name`, `clyops_description`, `clyops_epilog`, `clyops_root` | text |
 | `clyops_config` | `option prefix[,prefix…]` |
 | `clyops_path_search` | `long dir[:dir…]` |
+| `clyops_complete` | `name function`: the function prints completion values, one per line; its arguments are the words typed (§9.2) |
 | `clyops_require_command` | `command description [install-hint]` |
 | `clyops_effects` | `effect...` |
 | `clyops_stdin`, `clyops_stdout` | `description content-type` |

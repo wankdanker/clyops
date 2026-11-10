@@ -34,7 +34,10 @@ cli.argVariadic(NAME, description, rule);
 ```
 
 Metadata: `setDescription`, `setEpilog`, `setConfig(option, prefixes)`,
-`setPathSearch(long, dirs)`, `requireCommand(cmd, description, hint)`,
+`setPathSearch(long, dirs)`,
+`complete(name, words -> List.of(...))` (completion values, §9.2; a
+`Completer` that may throw, which keeps the rule's completion),
+`requireCommand(cmd, description, hint)`,
 `setEffects(effects...)`, `setStdin(description, contentType)`,
 `setStdout(description, contentType)`, `exclusive(longs...)`,
 `requires(longs...)`, `oneOf(longs...)`, `command(name, description)`.

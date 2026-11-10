@@ -504,6 +504,28 @@ public class Cli {
         return new String[] {rule.isEmpty() ? "default" : "none", ""};
     }
 
+    /** The kind and values of a completion record, asking the completer first (spec section 9.2). */
+    private static String[] completionRecord(String rule, List<String> searchDirs, Completer completer, List<String> words) {
+        if (completer != null) {
+            List<String> list;
+            try {
+                list = completer.complete(new ArrayList<>(words));
+            } catch (Exception e) {
+                list = null;
+            }
+            if (list != null) {
+                Set<String> seen = new LinkedHashSet<>();
+                for (String v : list) {
+                    if (v != null && !v.isEmpty() && !UNLISTABLE.matcher(v).find()) seen.add(v);
+                }
+                return new String[] {"choice", String.join(",", seen)};
+            }
+        }
+        return completionKind(rule, searchDirs);
+    }
+
+    private static final Pattern UNLISTABLE = Pattern.compile("[, \\t\\r\\n]");
+
     // -----------------------------------------------------------------------
     // Registration
     // -----------------------------------------------------------------------
@@ -514,6 +536,7 @@ public class Cli {
         String rule;
         List<String> searchDirs = List.of();
         boolean secret;
+        Completer completer;
 
         Option(String var, String lng, String shrt, String kind, String def, boolean required, String description, String group, String rule) {
             this.var = var; this.lng = lng; this.shrt = shrt; this.kind = kind; this.def = def;
@@ -551,6 +574,7 @@ public class Cli {
     private final Map<String, Option> byLong = new HashMap<>();
     private final Map<String, Option> byShort = new HashMap<>();
     private final List<Argument> args = new ArrayList<>();
+    private final Map<String, Completer> argCompleters = new HashMap<>();
     private final List<Command> commands = new ArrayList<>();
     private String configOption = "";
     private List<String> configPrefixes = List.of();
@@ -879,6 +903,26 @@ public class Cli {
         for (String d : dirs.split(":")) if (!d.isEmpty()) list.add(normpath(root, d));
         opt.searchDirs = list;
         if (opt.rule.isEmpty()) opt.rule = "path";
+        return this;
+    }
+
+    /**
+     * List the values to offer when completing the value option or argument {@code name} of this
+     * level (spec section 9.2; options are looked up first). The completer runs only for
+     * {@code --bash-completion}, gets the words typed after the commands and doesn't validate
+     * anything.
+     */
+    public Cli complete(String name, Completer completer) {
+        Option opt = byLong.get(name);
+        if (opt != null) {
+            if (opt.kind.equals("flag")) throw new IllegalArgumentException("Flag --" + name + " takes no value to complete");
+            opt.completer = completer;
+            return this;
+        }
+        if (args.stream().noneMatch(a -> a.name().equals(name))) {
+            throw new IllegalArgumentException("Unknown option or argument '" + name + "' for complete");
+        }
+        argCompleters.put(name, completer);
         return this;
     }
 
@@ -1500,6 +1544,7 @@ public class Cli {
             m.put("default", a.def());
             m.put("validation", a.rule());
             m.put("schema", ruleSchema(a.rule(), root, a.name()));
+            m.put("dynamic", argCompleters.containsKey(a.name()));
             argList.add(m);
         }
         out.put("arguments", argList);
@@ -1526,6 +1571,7 @@ public class Cli {
             m.put("choices", r.startsWith("choice:") ? splitAll(r.substring(7), ",") : List.of());
             m.put("schema", ruleSchema(r, root, "--" + o.lng));
             m.put("secret", o.secret);
+            m.put("dynamic", o.completer != null);
             optList.add(m);
         }
         out.put("options", optList);
@@ -1587,6 +1633,7 @@ public class Cli {
             }
             if (!node.children.isEmpty() && skip < words.size() && !words.get(skip).startsWith("-")) return lines.get(0) + "\n";
             lines.add("skip\t" + skip);
+            words = words.subList(skip, words.size());
             for (Cli c : node.children) lines.add("cmd\t" + c.word + "\t" + clean(c.description));
         }
         List<Option> options = new ArrayList<>();
@@ -1597,13 +1644,13 @@ public class Cli {
             if (o.kind.equals("flag")) {
                 lines.add("opt\t--" + o.lng + "\t" + shrt + "\tflag\tnone\t-\t" + desc);
             } else {
-                String[] k = completionKind(o.rule, o.searchDirs);
+                String[] k = completionRecord(o.rule, o.searchDirs, o.completer, words);
                 lines.add("opt\t--" + o.lng + "\t" + shrt + "\tvalue\t" + k[0] + "\t" + (k[1].isEmpty() ? "-" : k[1]) + "\t" + desc);
             }
             if (o.boolLike()) lines.add("opt\t--no-" + o.lng + "\t-\tflag\tnone\t-\t" + desc);
         }
         for (Argument a : node.args) {
-            String[] k = completionKind(a.rule(), List.of());
+            String[] k = completionRecord(a.rule(), List.of(), node.argCompleters.get(a.name()), words);
             lines.add("arg\t" + a.name() + "\t" + (a.variadic() ? "variadic" : "single") + "\t" + k[0] + "\t" + (k[1].isEmpty() ? "-" : k[1]) + "\t" + clean(a.description()));
         }
         return String.join("\n", lines) + "\n";

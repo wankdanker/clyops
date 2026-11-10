@@ -529,13 +529,34 @@ module Clyops
     rule.empty? ? ["default", ""] : ["none", ""]
   end
 
+  # Return the kind and values of a completion record, asking the completer first (spec section 9.2).
+  # @param rule [String] Validation rule.
+  # @param search_dirs [Array<String>] The search dirs value.
+  # @param completer [#call, nil] The registered completer, if any.
+  # @param words [Array<String>] Words typed after the program's commands.
+  # @return [Array<String>] the documented result.
+  def completion_record(rule, search_dirs, completer, words)
+    if completer
+      list = begin
+        completer.call(words.dup)
+      rescue StandardError, ScriptError
+        nil
+      end
+      if list.is_a?(Array)
+        values = list.select { |v| v.is_a?(String) && !v.empty? && !v.match?(/[, \t\r\n]/) }.uniq
+        return ["choice", values.join(",")]
+      end
+    end
+    completion_kind(rule, search_dirs)
+  end
+
   # -------------------------------------------------------------------------
   # Cli
   # -------------------------------------------------------------------------
 
   # @private
   Option = Struct.new(:var, :long, :short, :kind, :default, :required, :description, :group, :rule, :search_dirs,
-                      :secret) do
+                      :secret, :completer) do
     def label
       head = short.empty? ? "    --#{long}" : "-#{short}, --#{long}"
       kind == "flag" ? head : "#{head}=<value>"
@@ -547,7 +568,7 @@ module Clyops
   end
 
   # @private
-  Arg = Struct.new(:name, :description, :default, :rule, :variadic)
+  Arg = Struct.new(:name, :description, :default, :rule, :variadic, :completer)
 
   # status is "ok", "help" or "error".
   ParseResult = Struct.new(:status, :error, :show_usage, :detail) do
@@ -792,6 +813,26 @@ module Clyops
       items = dirs.is_a?(String) ? dirs.split(":") : dirs
       opt.search_dirs = items.reject(&:empty?).map { |d| Clyops.normpath(@root, d) }
       opt.rule = "path" if opt.rule.empty?
+      self
+    end
+
+    # List the values to offer when completing the value option or argument `name` of this level
+    # (spec section 9.2). The completer runs only for --bash-completion, gets the words typed after
+    # the commands and returns strings; it doesn't validate anything.
+    # @param name [String] Long option name without --, or positional argument name.
+    # @param callable [#call, nil] The completer, when no block is given.
+    # @yieldparam words [Array<String>] Words typed after the program's commands.
+    # @yieldreturn [Array<String>] Values to offer.
+    # @return [Clyops::Cli] this CLI or the new child command.
+    def complete(name, callable = nil, &block)
+      fn = callable || block
+      raise ArgumentError, "complete needs a callable or a block" unless fn.respond_to?(:call)
+
+      target = @by_long[name] || @args.find { |a| a.name == name }
+      raise DefinitionError, "Unknown option or argument '#{name}' for complete" unless target
+      raise DefinitionError, "Flag --#{name} takes no value to complete" if target.is_a?(Option) && target.kind == "flag"
+
+      target.completer = fn
       self
     end
 
@@ -1101,6 +1142,7 @@ module Clyops
         return "#{lines[0]}\n" if !node.children.empty? && skip < words.length && !words[skip].start_with?("-")
 
         lines << "skip\t#{skip}"
+        words = words.drop(skip)
         node.children.each { |c| lines << "cmd\t#{c.word}\t#{clean.(c.description)}" }
       end
       options = []
@@ -1114,13 +1156,13 @@ module Clyops
         if o.kind == "flag"
           lines << "opt\t--#{o.long}\t#{short}\tflag\tnone\t-\t#{clean.(o.description)}"
         else
-          kind, values = Clyops.completion_kind(o.rule, o.search_dirs)
+          kind, values = Clyops.completion_record(o.rule, o.search_dirs, o.completer, words)
           lines << "opt\t--#{o.long}\t#{short}\tvalue\t#{kind}\t#{values.empty? ? '-' : values}\t#{clean.(o.description)}"
         end
         lines << "opt\t--no-#{o.long}\t-\tflag\tnone\t-\t#{clean.(o.description)}" if o.bool_like?
       end
       node.args.each do |a|
-        kind, values = Clyops.completion_kind(a.rule, [])
+        kind, values = Clyops.completion_record(a.rule, [], a.completer, words)
         lines << "arg\t#{a.name}\t#{a.variadic ? 'variadic' : 'single'}\t#{kind}\t#{values.empty? ? '-' : values}\t#{clean.(a.description)}"
       end
       "#{lines.join("\n")}\n"
@@ -1169,14 +1211,15 @@ module Clyops
         "arguments" => @args.map do |a|
           { "name" => a.name, "description" => a.description, "required" => !a.variadic && a.default.empty?,
             "isVariadic" => a.variadic, "default" => a.default, "validation" => a.rule,
-            "schema" => Clyops.rule_schema(a.rule, @root, a.name) }
+            "schema" => Clyops.rule_schema(a.rule, @root, a.name), "dynamic" => !a.completer.nil? }
         end,
         "options" => @options.map do |o|
           { "name" => o.long, "shortName" => o.short, "variableName" => o.var, "description" => o.description,
             "default" => o.kind == "flag" ? "false" : o.default, "group" => o.group, "type" => type_of.(o),
             "isFlag" => o.kind == "flag", "isArray" => o.kind == "array", "required" => o.required,
             "validation" => o.rule, "choices" => o.rule.start_with?("choice:") ? o.rule[7..].split(",", -1) : [],
-            "schema" => Clyops.rule_schema(o.rule, @root, "--#{o.long}"), "secret" => o.secret }
+            "schema" => Clyops.rule_schema(o.rule, @root, "--#{o.long}"), "secret" => o.secret,
+            "dynamic" => !o.completer.nil? }
         end,
         **(@parent ? {} : { "config" => @config_option.empty? ? nil : { "option" => @config_option, "prefixes" => @config_prefixes.dup } }),
         "requiredCommands" => @commands.map { |c, d, h| { "command" => c, "description" => d, "installHint" => h } },

@@ -81,6 +81,11 @@ check bash "rt (alias) media demo --color " "always auto never "     "$(bash_com
 check bash "tasks "                        "db send "                "$(bash_complete "tasks ")"
 check bash "tasks db "                     "migrate status "         "$(bash_complete "tasks db ")"
 check bash "tasks db migrate --d"          "--dry-run "              "$(bash_complete "tasks db migrate --d")"
+# Values from the program's completers (spec section 9.2).
+check bash "demo --host (completer)"       "alpha beta words-1 "     "$(bash_complete "demo --host " "export DEMO_HOSTS='alpha;beta'")"
+check bash "tasks db migrate (completer)"  "v1 v2 "                  "$(bash_complete "tasks db migrate ")"
+check bash "tasks db migrate -n (completer)" "v1 v2 w:-n "           "$(bash_complete "tasks db migrate -n ")"
+check bash "tools media tasks db migrate -n (completer)" "v1 v2 w:-n " "$(bash_complete "tools media tasks db migrate -n ")"
 check bash "tasks db --u"                  "--url "                  "$(bash_complete "tasks db --u")"
 check bash "tasks send --email a@b.co --w" "--webhook "              "$(bash_complete "tasks send --email a@b.co --w")"
 check bash "tools media tasks db "         "migrate status "         "$(bash_complete "tools media tasks db ")"
@@ -110,6 +115,8 @@ EOF
     check fish "tasks "                    "db send "              "$(fish_complete "tasks ")"
     check fish "tasks db "                 "migrate status "       "$(fish_complete "tasks db ")"
     check fish "tasks db migrate --d"      "--dry-run "            "$(fish_complete "tasks db migrate --d")"
+    check fish "tasks db migrate -n (completer)" "v1 v2 w:-n "     "$(fish_complete "tasks db migrate -n ")"
+    check fish "tools media tasks db migrate (completer)" "v1 v2 "  "$(fish_complete "tools media tasks db migrate ")"
     check fish "tools media tasks db "     "migrate status "       "$(fish_complete "tools media tasks db ")"
     check fish "rt (alias) "               "hello media tools "    "$(fish_complete "rt " "$root_alias")"
     check fish "rt (alias) media demo in.txt " "fast slow "        "$(fish_complete "rt media demo in.txt " "$root_alias")"
@@ -157,6 +164,7 @@ EOF
     zsh_offers "tasks " db send "Database tasks"
     zsh_offers "tasks db " migrate status
     zsh_offers "tasks db migrate --d" --dry-run
+    zsh_offers "tasks db migrate -n " v1 v2 w:-n
     zsh_offers "tools media tasks db " migrate status
     # zsh expands aliases before completing, so root mode uses a function there.
     zsh_setup=$root_function

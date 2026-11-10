@@ -2,6 +2,7 @@ package clyops
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"reflect"
@@ -335,5 +336,105 @@ func TestRoleLookupFollowsTheSelectedCommand(t *testing.T) {
 	usage := cli.Usage()
 	if !strings.Contains(usage, "\nOutput [plan]: Migration plan\n") || strings.Contains(usage, "[progress]") {
 		t.Fatal(usage)
+	}
+}
+
+func completionLine(t *testing.T, data, prefix string) string {
+	t.Helper()
+	for _, line := range strings.Split(data, "\n") {
+		if strings.HasPrefix(line, prefix) {
+			return line
+		}
+	}
+	t.Fatalf("no record %q in %q", prefix, data)
+	return ""
+}
+
+func TestCompleteRegistrationErrors(t *testing.T) {
+	none := func([]string) ([]string, error) { return nil, nil }
+	mustPanic(t, "unknown option or argument 'nope' for complete", func() { newTestCli().Complete("nope", none) })
+	mustPanic(t, "flag --fast takes no value to complete", func() { newTestCli().Complete("fast", none) })
+}
+
+func TestCompletersFillCompletionRecords(t *testing.T) {
+	calls := 0
+	cli := newTestCli()
+	cli.Complete("count", func(words []string) ([]string, error) {
+		calls++
+		list := []string{"b", "", "a,b", "a b", "x\ty", "b", "c"}
+		for _, w := range words {
+			list = append(list, "w:"+w)
+		}
+		return list, nil
+	})
+	cli.Complete("file", func([]string) ([]string, error) { return nil, nil })
+	cli.Complete("tag", func([]string) ([]string, error) { return []string{"x"}, errors.New("no tags") })
+	if r := cli.Parse([]string{"x", "-n", "3"}); r.Status != "ok" {
+		t.Fatalf("%#v", r)
+	}
+	_, _ = cli.Usage(), cli.JSONSchema()
+	if calls != 0 {
+		t.Fatal("only completion runs a completer")
+	}
+	data := cli.CompletionData("x", "y")
+	for prefix, want := range map[string]string{
+		"opt\t--count": "opt\t--count\t-n\tvalue\tchoice\tb,c,w:x,w:y\tCount",
+		"arg\tfile":    "arg\tfile\tsingle\tchoice\t-\tFile",
+		"opt\t--tag":   "opt\t--tag\t-t\tvalue\tdefault\t-\tTags",
+	} {
+		if got := completionLine(t, data, prefix); got != want {
+			t.Fatalf("got %q, want %q", got, want)
+		}
+	}
+	if calls != 1 {
+		t.Fatalf("calls %d", calls)
+	}
+}
+
+func TestPanickingCompleterKeepsTheRule(t *testing.T) {
+	cli := newTestCli()
+	cli.Complete("file", func([]string) ([]string, error) { panic("boom") })
+	if got := completionLine(t, cli.CompletionData(), "arg\tfile"); got != "arg\tfile\tsingle\tfile\t-\tFile" {
+		t.Fatal(got)
+	}
+}
+
+func TestCompletersGetTheWordsAfterTheCommands(t *testing.T) {
+	cli := New()
+	cli.Name, cli.Env = "m", map[string]string{}
+	cli.Opt("CONFIG", "config", "c", "optional", "Config")
+	cli.Complete("config", func(words []string) ([]string, error) { return []string{"top-" + strings.Join(words, "+")}, nil })
+	migrate := cli.Command("db", "Database").Command("migrate", "Migrate")
+	migrate.Arg("name", "Name", "all")
+	migrate.Complete("name", func(words []string) ([]string, error) { return words, nil })
+	data := cli.CompletionData("db", "migrate", "a", "b")
+	for _, want := range []string{"skip\t2", "opt\t--config\t-c\tvalue\tchoice\ttop-a+b\tConfig", "arg\tname\tsingle\tchoice\ta,b\tName"} {
+		if got := completionLine(t, data, want[:strings.LastIndex(want, "\t")]); got != want {
+			t.Fatalf("got %q, want %q", got, want)
+		}
+	}
+}
+
+func TestSchemaMarksDynamicValues(t *testing.T) {
+	cli := newTestCli()
+	cli.Complete("count", func([]string) ([]string, error) { return nil, nil })
+	var doc struct {
+		Arguments []map[string]any `json:"arguments"`
+		Options   []map[string]any `json:"options"`
+	}
+	if err := json.Unmarshal([]byte(cli.JSONSchema()), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc.Arguments[0]["dynamic"] != false {
+		t.Fatalf("%#v", doc.Arguments[0])
+	}
+	for _, o := range doc.Options {
+		if o["dynamic"] != (o["name"] == "count") {
+			t.Fatalf("%#v", o)
+		}
+	}
+	compact := strings.Join(strings.Fields(cli.JSONSchema()), "")
+	if !strings.Contains(compact, `"secret":false,"dynamic":true`) || !strings.Contains(compact, `"schema":null,"dynamic":false`) {
+		t.Fatal(compact)
 	}
 }

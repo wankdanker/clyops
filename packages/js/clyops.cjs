@@ -612,6 +612,22 @@ function completionKind(rule, searchDirs) {
   if (rule) return ["none", ""];
   return ["default", ""];
 }
+function completionRecord(rule, searchDirs, completer, words) {
+  if (completer) {
+    let list;
+    try {
+      list = completer([...words]);
+    } catch {
+      list = void 0;
+    }
+    if (Array.isArray(list)) {
+      const seen = /* @__PURE__ */ new Set();
+      for (const v of list) if (typeof v === "string" && v !== "" && !/[, \t\r\n]/.test(v)) seen.add(v);
+      return ["choice", [...seen].join(",")];
+    }
+  }
+  return completionKind(rule, searchDirs);
+}
 function isBoolLike(opt) {
   return opt.kind === "flag" || ["bool", "choice:true,false", "choice:false,true"].includes(opt.validation);
 }
@@ -836,6 +852,19 @@ var Cli = class _Cli {
   /** Declare an external executable required at parse time; description and install hint explain a missing dependency. */
   requireCommand(command, description, installHint = "") {
     this.commands.push({ command, description, installHint });
+    return this;
+  }
+  /**
+   * List the values to offer when completing the value option or argument
+   * `name` of this level (spec section 9.2). The function runs only for
+   * --bash-completion, gets the words typed after the commands and returns
+   * strings; it doesn't validate anything.
+   */
+  complete(name, fn) {
+    const target = this.byLong.get(name) ?? this.args.find((a) => a.name === name);
+    if (!target) throw new Error(`Unknown option or argument '${name}' for complete`);
+    if ("kind" in target && target.kind === "flag") throw new Error(`Flag --${name} takes no value to complete`);
+    target.completer = fn;
     return this;
   }
   /** Fallback dirs (relative to root) for bare relative values of a path option. */
@@ -1412,7 +1441,8 @@ var Cli = class _Cli {
         isVariadic: a.variadic,
         default: a.defaultValue,
         validation: a.validation,
-        schema: ruleSchema(a.validation, this.root, a.name)
+        schema: ruleSchema(a.validation, this.root, a.name),
+        dynamic: a.completer !== void 0
       })),
       options: this.options.map((o) => ({
         name: o.long,
@@ -1428,7 +1458,8 @@ var Cli = class _Cli {
         validation: o.validation,
         choices: o.validation.startsWith("choice:") ? o.validation.slice(7).split(",") : [],
         schema: ruleSchema(o.validation, this.root, `--${o.long}`),
-        secret: o.secret
+        secret: o.secret,
+        dynamic: o.completer !== void 0
       })),
       ...this.parent ? {} : { config: this.configOption ? { option: this.configOption, prefixes: this.configPrefixes } : null },
       requiredCommands: this.commands.map((c) => ({ command: c.command, description: c.description, installHint: c.installHint })),
@@ -1472,6 +1503,7 @@ var Cli = class _Cli {
       }
       if (node.children.length > 0 && skip < words.length && !words[skip].startsWith("-")) return lines.join("\n") + "\n";
       lines.push(`skip	${skip}`);
+      words = words.slice(skip);
       for (const c of node.children) lines.push(`cmd	${c.word}	${clean(c.description)}`);
     }
     const options = [];
@@ -1482,12 +1514,12 @@ var Cli = class _Cli {
         lines.push(`opt	--${o.long}	${o.short ? "-" + o.short : "-"}	flag	none	-	${clean(o.description)}`, noLine);
         continue;
       }
-      const [kind, values] = completionKind(o.validation, o.searchDirs);
+      const [kind, values] = completionRecord(o.validation, o.searchDirs, o.completer, words);
       lines.push(`opt	--${o.long}	${o.short ? "-" + o.short : "-"}	value	${kind}	${values || "-"}	${clean(o.description)}`);
       if (isBoolLike(o)) lines.push(noLine);
     }
     for (const a of node.args) {
-      const [kind, values] = completionKind(a.validation, []);
+      const [kind, values] = completionRecord(a.validation, [], a.completer, words);
       lines.push(`arg	${a.name}	${a.variadic ? "variadic" : "single"}	${kind}	${values || "-"}	${clean(a.description)}`);
     }
     return lines.join("\n") + "\n";

@@ -189,5 +189,52 @@ class CliTest(unittest.TestCase):
         self.assertIn("\nOutput [plan]: Migration plan\n", cli.usage())
         self.assertNotIn("[progress]", cli.usage())
 
+    def test_complete_registration_errors(self):
+        cli = make()
+        with self.assertRaisesRegex(ValueError, "^Unknown option or argument 'nope' for complete$"):
+            cli.complete("nope", lambda words: [])
+        with self.assertRaisesRegex(ValueError, "^Flag --fast takes no value to complete$"):
+            cli.complete("fast", lambda words: [])
+        self.assertIs(cli.complete("file", lambda words: []).complete("tag", lambda words: []), cli)
+
+    def test_complete_values_sanitized_with_fallback(self):
+        calls = []
+
+        def values(words):
+            calls.append(words)
+            return ["a", "", "b c", "d,e", "f\tg", "a", "h"]
+
+        def fails(words):
+            raise RuntimeError("no")
+
+        cli = make()
+        cli.complete("count", values)
+        cli.complete("tag", lambda words: [])
+        cli.complete("file", fails)
+        self.assertEqual(cli.parse(["x", "-n", "4"]).status, "ok")
+        self.assertEqual(calls, [])
+        schema = json.loads(cli.json_schema())
+        self.assertEqual(calls, [])
+        self.assertEqual([o["dynamic"] for o in schema["options"]], [True, False, True, False])
+        self.assertIs(schema["arguments"][0]["dynamic"], True)
+        data = cli.completion_data(["x", "y"])
+        self.assertIn("opt\t--count\t-n\tvalue\tchoice\ta,h\tCount\n", data)
+        self.assertIn("opt\t--tag\t-t\tvalue\tchoice\t-\tTags\n", data)
+        self.assertIn("arg\tfile\tsingle\tfile\t-\tFile\n", data)
+        self.assertEqual(calls, [["x", "y"]])
+
+    def test_complete_gets_words_after_commands(self):
+        cli = Cli(name="m", env={})
+        cli.opt("HOST", "host", "", "optional", "Host")
+        cli.complete("host", lambda words: ["top"] + words)
+        migrate = cli.command("db", "Database").command("migrate", "Migrate")
+        migrate.arg("name", "Name", "all")
+        migrate.complete("name", lambda words: [f"w:{w}" for w in words])
+        data = cli.completion_data(["db", "migrate", "--host", "x"])
+        self.assertIn("skip\t2\n", data)
+        self.assertIn("opt\t--host\t-\tvalue\tchoice\ttop,--host,x\tHost\n", data)
+        self.assertIn("arg\tname\tsingle\tchoice\tw:--host,w:x\tName\n", data)
+
+
 if __name__ == "__main__":
     unittest.main()

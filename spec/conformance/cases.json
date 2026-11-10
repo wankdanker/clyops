@@ -132,6 +132,123 @@
     }
   },
   {
+    "name": "dynamic: a completer's values replace the rule's kind",
+    "args": [
+      "--bash-completion",
+      "--",
+      "-v",
+      "--host"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha;has space;;a,b;alpha;tab\there;beta"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "@completion-dynamic.txt",
+      "stderr": [
+        "completer ran"
+      ]
+    }
+  },
+  {
+    "name": "dynamic: an empty list offers nothing",
+    "args": [
+      "--bash-completion"
+    ],
+    "env": {
+      "DEMO_HOSTS": ""
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "@completion-dynamic-empty.txt"
+    }
+  },
+  {
+    "name": "dynamic: a failing completer keeps the rule's kind",
+    "args": [
+      "--bash-completion"
+    ],
+    "env": {
+      "DEMO_HOSTS": null
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "@completion.txt"
+    }
+  },
+  {
+    "name": "dynamic: the completer doesn't run when parsing",
+    "args": [
+      "in.txt",
+      "--host",
+      "alpha"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "HOST": "alpha"
+      },
+      "stderrNot": [
+        "completer ran"
+      ]
+    }
+  },
+  {
+    "name": "dynamic: the completer doesn't validate",
+    "args": [
+      "in.txt",
+      "--host",
+      "gamma"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha"
+    },
+    "expect": {
+      "exit": 0,
+      "values": {
+        "HOST": "gamma"
+      }
+    }
+  },
+  {
+    "name": "dynamic: the completer doesn't run for help",
+    "args": [
+      "--help"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "@help.txt",
+      "stderrNot": [
+        "completer ran"
+      ]
+    }
+  },
+  {
+    "name": "dynamic: the completer doesn't run for the schema",
+    "args": [
+      "--help-json-schema"
+    ],
+    "env": {
+      "DEMO_HOSTS": "alpha"
+    },
+    "files": {
+      "shape.json": "{\n  \"type\": \"object\",\n  \"properties\": { \"w\": { \"type\": \"integer\" } }\n}\n"
+    },
+    "expect": {
+      "exit": 0,
+      "stdout": "@schema.json",
+      "stderrNot": [
+        "completer ran"
+      ]
+    }
+  },
+  {
     "name": "bash completion script",
     "args": [
       "--completion",
@@ -2826,6 +2943,22 @@
     "expect": {
       "exit": 0,
       "stdout": "#clyops-completion 1\n"
+    }
+  },
+  {
+    "program": "tasks",
+    "name": "commands: a completer gets the words after the commands",
+    "args": [
+      "--bash-completion",
+      "--",
+      "db",
+      "migrate",
+      "-n",
+      "x"
+    ],
+    "expect": {
+      "exit": 0,
+      "stdout": "@tasks-completion-migrate-words.txt"
     }
   },
   {

@@ -69,6 +69,11 @@ python3 tools/conformance.py js -k config   # cases whose name contains "config"
   * `progress` `out` `Progress, one JSON object per line` `application/x-ndjson`,
     schema `{"type":"object","properties":{"pct":{"type":"number"}}}`
   * `extra` `in` `Extra lines to process` `text/plain`
+* completers (spec section 9.2) on `host` and on `rest`, sharing one function:
+  it writes `completer ran` and a line feed to standard error, then fails
+  (throws, returns an error, or exits 1 in Bash) when `DEMO_HOSTS` is unset.
+  Otherwise it returns the `DEMO_HOSTS` entries split on `;`, followed by
+  `words-N` when it was given N > 0 words.
 * after a successful parse, before printing, the demo calls
   `emit("meta", "{\"extra\":true}")` when `fdOpen("extra")` finds it and
   `emit("meta", "{\"extra\":false}")` otherwise, then
@@ -142,6 +147,9 @@ section 1.7). It prints `{ "values": { …valuesJson()… } }`.
   `Options` `url` and `EMAIL` `email` `e` `optional` `Email address` `Options`
   `email`; `oneOf(webhook, email)`; effects `network`; stdin `Attachment`,
   `application/octet-stream`
+* completers (spec section 9.2): on `db`, for `url`, returning `sqlite:app.db`
+  and `pg:main`; on `migrate`, for `target`, returning `v1`, `v2`, then `w:`
+  followed by each word it was given
 * role `progress` `out` `Progress, one JSON object per line`
   `application/x-ndjson` on the program; `migrate` declares `plan` `out`
   `Migration plan` `text/plain`

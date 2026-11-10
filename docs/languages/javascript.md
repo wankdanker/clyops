@@ -74,6 +74,24 @@ const args = cli.run();                                      // args.command: ['
 each has its own help (`mytool db migrate --help`), schema and completion. See the
 [spec](../../spec/SPEC.md) sections 1.3 to 1.7.
 
+## Completion values from your program
+
+`complete(name, fn)` lists the values to offer when completing an option or
+argument, read when the user presses Tab, for values only the program can
+find, such as the instances registered in a directory:
+
+```js
+const fs = require('node:fs');
+cli.opt('INSTANCE', 'instance', 'i', '', 'Instance to target');
+cli.complete('instance', (words) => fs.readdirSync('/var/lib/myapp/instances').filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)));
+```
+
+The function runs only for `--bash-completion`, on every Tab, so keep it quick.
+`words` are the words typed after the command words, for completers that depend
+on another option. Throwing keeps the rule's completion. It doesn't validate: check
+the value after `run` if only listed values are allowed. See the
+[spec](../../spec/SPEC.md) section 9.2.
+
 ## Parsing and errors
 
 Use `run` for a standalone program: it displays help/schema/completion and exits for those requests, or exits with status 1 on invalid input. Use the non-exiting `parse` variant in libraries and tests; check its outcome before reading resolved values. Registration errors (duplicate names, unknown rules, or commands mixed with positionals) are programming errors, distinct from invalid user input. See the native reference for the language's result and error types.

@@ -41,6 +41,7 @@ non-exiting variant and returns a `ParseResult`.
 
 Also: `Name`, `Root`, `Cwd` and `Env` fields to override the defaults; `Source`, `IsSet`,
 `IsExplicitlySet`, `Usage`, `JSONSchema`, `CompletionScript`, `ValuesJSON`, `SetPathSearch`,
+`Complete(name, fn)` (completion values at Tab time),
 `RequireCommand`, the standalone `Validate`, `ResolvePath`, `DescribeRule` and `WrapText`, and the
 logging helpers `Info`, `Warn`, `Error`, `Success`, `Die` and `SetSilent`. Registering an invalid
 option (unknown rule, duplicate name) panics, since it is a programming error.
@@ -68,6 +69,29 @@ v := cli.Run()                                           // cli.CommandPath() ==
 Commands share the program's options (accepted before or after the command words) and config file;
 each has its own help (`mytool db migrate --help`), schema and completion. See the
 [spec](https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md) sections 1.3 to 1.7.
+
+## Completion values from your program
+
+`Complete(name, fn)` lists the values to offer when completing an option or
+argument, read when the user presses Tab, for values only the program can
+find, such as the instances registered in a directory:
+
+```go
+cli.Opt("INSTANCE", "instance", "i", "", "Instance to target")
+cli.Complete("instance", func(words []string) ([]string, error) {
+	files, err := filepath.Glob("/var/lib/myapp/instances/*.json")
+	for i, f := range files {
+		files[i] = strings.TrimSuffix(filepath.Base(f), ".json")
+	}
+	return files, err
+})
+```
+
+The function (`clyops.Completer`) runs only for `--bash-completion`, on every
+Tab, so keep it quick. `words` are the words typed after the command words, for
+completers that depend on another option. Returning an error, or panicking,
+keeps the rule's completion. It doesn't validate: check the value after `Run` if
+only listed values are allowed. See the [spec](https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md) section 9.2.
 
 ## Documentation
 

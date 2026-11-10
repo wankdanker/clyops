@@ -4,6 +4,12 @@
 # The conformance demo CLI (spec/conformance/README.md) in Ruby.
 require_relative "../lib/clyops"
 
+# Completer (spec section 9.2): the DEMO_HOSTS entries, then words-N. Fails when DEMO_HOSTS is unset.
+hosts = lambda do |words|
+  $stderr.write("completer ran\n")
+  ENV.fetch("DEMO_HOSTS").split(";", -1) + (words.empty? ? [] : ["words-#{words.length}"])
+end
+
 cli = Clyops::Cli.new(name: "demo", root: ENV["DEMO_ROOT"])
 cli.set_description("Demo program for the clyops conformance suite. It registers one of every kind of option and argument so that each implementation can be checked against the same help text, schema and resolved values.")
 cli.set_epilog("Examples:\n  demo in.txt slow a b --tag x --tag y\n  demo in.txt -vc demo.conf")
@@ -54,6 +60,8 @@ cli.opt_array "INCLUDE", "include", "I",          "Include directory",     "File
 
 cli.set_config("config", "demo:,shared:")
 cli.set_path_search("config", "conf")
+cli.complete("host", hosts)
+cli.complete("rest", hosts)
 cli.exclusive("endpoint", "addr")
 cli.requires("dest", "src")
 

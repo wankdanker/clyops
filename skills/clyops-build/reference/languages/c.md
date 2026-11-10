@@ -34,6 +34,9 @@ clyops_arg_variadic(cli, NAME, .description = "...", .rule = "...");
 
 Metadata: `clyops_root`, `clyops_description`, `clyops_epilog`,
 `clyops_config(cli, option, prefixes)`, `clyops_path_search(cli, long, dirs)`,
+`clyops_complete(cli, name, fn, userdata)` (completion values, §9.2; `fn` is a
+`clyops_completer_t`, `int fn(const char* const* words, int nwords, clyops_values_t* out, void* userdata)`,
+adds with `clyops_values_add(out, value)` and returns 0; non-zero keeps the rule's completion),
 `clyops_require_command(cli, cmd, description, hint)`,
 `clyops_effects(cli, ...)`, `clyops_stdin(cli, description, type)`,
 `clyops_stdout(cli, description, type)`, `clyops_exclusive(cli, ...)`,

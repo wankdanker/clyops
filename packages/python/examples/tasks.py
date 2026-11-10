@@ -15,9 +15,11 @@ cli.role("progress", "out", "Progress, one JSON object per line", "application/x
 
 db = cli.command("db", "Database tasks")
 db.opt("DB_URL", "url", "u", "sqlite:app.db", "Database URL", "Database")
+db.complete("url", lambda words: ["sqlite:app.db", "pg:main"])
 migrate = db.command("migrate", "Apply migrations")
 migrate.arg("target", "Target version", "latest")
 migrate.opt("DRY_RUN", "dry-run", "n", "flag", "Show what would run")
+migrate.complete("target", lambda words: ["v1", "v2"] + [f"w:{w}" for w in words])
 migrate.set_effects("destructive")
 migrate.role("plan", "out", "Migration plan", "text/plain")
 status = db.command("status", "Show migration status")

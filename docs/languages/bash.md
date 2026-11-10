@@ -58,6 +58,25 @@ A command's registrations are recorded and made when the command is selected, so
 each has its own help (`mytool db migrate --help`), schema and completion. See the
 [spec](../../spec/SPEC.md) sections 1.3 to 1.7.
 
+## Completion values from your program
+
+`clyops_complete NAME FUNCTION` lists the values to offer when completing an
+option or argument, read when the user presses Tab, for values only the
+program can find, such as the instances registered in a directory. The
+function prints one value per line:
+
+```bash
+list_instances() { local f; for f in /var/lib/myapp/instances/*.json; do [[ -e "$f" ]] && basename "$f" .json; done; }
+clyops_opt      INSTANCE instance i "" "Instance to target"
+clyops_complete instance list_instances
+```
+
+The function runs only for `--bash-completion`, on every Tab, so keep it quick.
+Its arguments are the words typed after the command words, for completers that
+depend on another option. A non-zero exit keeps the rule's completion. It
+doesn't validate: check the value after `clyops_run` if only listed values are
+allowed. See the [spec](../../spec/SPEC.md) section 9.2.
+
 ## Parsing and errors
 
 Use `clyops_run` for a standalone program: it displays help/schema/completion and exits for those requests, or exits with status 1 on invalid input. Use the non-exiting `clyops_parse` variant in libraries and tests; check its outcome before reading resolved values. Registration errors (duplicate names, unknown rules, or commands mixed with positionals) are programming errors, distinct from invalid user input. See the native reference for the language's result and error types.

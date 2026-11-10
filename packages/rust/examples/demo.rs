@@ -1,5 +1,15 @@
 //! The conformance demo CLI (spec/conformance/README.md) in Rust.
-use clyops::Cli;
+use clyops::{Cli, CompleteResult};
+
+/// Completer (spec section 9.2): the DEMO_HOSTS entries, then words-N. Fails when DEMO_HOSTS is unset.
+fn hosts(words: &[String]) -> CompleteResult {
+    eprintln!("completer ran");
+    let mut list: Vec<String> = std::env::var("DEMO_HOSTS")?.split(';').map(String::from).collect();
+    if !words.is_empty() {
+        list.push(format!("words-{}", words.len()));
+    }
+    Ok(list)
+}
 
 // Keep one registration per line; rustfmt would split the chains.
 #[rustfmt::skip]
@@ -54,6 +64,8 @@ fn main() {
 
     cli.config("config", "demo:,shared:");
     cli.path_search("config", "conf");
+    cli.complete("host", hosts);
+    cli.complete("rest", hosts);
     cli.exclusive(&["endpoint", "addr"]);
     cli.requires("dest", &["src"]);
 

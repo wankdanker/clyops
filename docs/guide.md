@@ -217,6 +217,19 @@ the library. The schema format discriminator is `clyops: 1`. Completion follows
 commands and their inherited options. `valuesJson` is a separate resolved-values
 document, with secrets masked.
 
+### Completion values from your program
+
+`complete(name, fn)` (Bash: `clyops_complete NAME FUNCTION`) lists the values to
+offer for an option or argument when the user presses Tab, for values only the
+program can find at that moment: instances registered in a directory, branches,
+running containers. The function receives the words typed so far (after any
+command words) and returns strings; the shell filters them by what is being
+typed. It runs only for `--bash-completion`, never for a normal run, help or the
+schema, and on every Tab, so keep it quick and read-only. If it fails, the
+option completes as its rule would. It doesn't validate: the option's rule still
+decides what is accepted, so check the value after `run` if only listed values
+are allowed. The schema marks such options and arguments `"dynamic": true`.
+
 ## Logging and helper functions
 
 `info`, `warn`, `error` and `success` write timestamped messages to stderr. `die`

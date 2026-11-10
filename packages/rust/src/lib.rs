@@ -890,6 +890,45 @@ fn completion_kind(rule: &str, dirs: &[String]) -> (&'static str, String) {
     }
 }
 
+/// What a completer returns: the values to offer, or an error that keeps the rule's completion
+/// (spec section 9.2).
+pub type CompleteResult = Result<Vec<String>, Box<dyn std::error::Error>>;
+
+type CompleterFn = dyn Fn(&[String]) -> CompleteResult + Send + Sync;
+
+/// A registered completer (spec section 9.2).
+#[derive(Clone)]
+struct Completer(std::sync::Arc<CompleterFn>);
+
+// A completer only runs inside `catch_unwind` (with `AssertUnwindSafe`), so it doesn't take
+// unwind safety away from `Cli`.
+impl std::panic::UnwindSafe for Completer {}
+impl std::panic::RefUnwindSafe for Completer {}
+
+impl std::fmt::Debug for Completer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Completer")
+    }
+}
+
+/// The kind and values of a completion record, asking the completer first (spec section 9.2).
+/// A completer that returns an error or panics keeps the rule's kind and values.
+fn completion_record(rule: &str, dirs: &[String], completer: Option<&Completer>, words: &[String]) -> (&'static str, String) {
+    if let Some(Completer(f)) = completer {
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(words)));
+        if let Ok(Ok(list)) = result {
+            let mut seen: Vec<String> = Vec::new();
+            for v in list {
+                if !v.is_empty() && !v.contains([',', ' ', '\t', '\r', '\n']) && !seen.contains(&v) {
+                    seen.push(v);
+                }
+            }
+            return ("choice", seen.join(","));
+        }
+    }
+    completion_kind(rule, dirs)
+}
+
 // ---------------------------------------------------------------------------
 // Cli
 // ---------------------------------------------------------------------------
@@ -914,6 +953,7 @@ struct Opt {
     rule: String,
     search_dirs: Vec<String>,
     secret: bool,
+    completer: Option<Completer>,
 }
 
 impl Opt {
@@ -938,6 +978,7 @@ struct Arg {
     default: String,
     rule: String,
     variadic: bool,
+    completer: Option<Completer>,
 }
 
 #[derive(Debug, Clone)]
@@ -1369,6 +1410,29 @@ impl Cli {
         self
     }
 
+    /// List the values to offer when completing the value option, array option or
+    /// positional argument `name` of this level (options are looked up first; spec
+    /// section 9.2). The function runs only while answering `--bash-completion`, gets
+    /// the words typed after the commands, and doesn't validate anything; returning an
+    /// error (or panicking) keeps the rule's completion. Panics on an unknown name or a flag.
+    pub fn complete<F>(&mut self, name: &str, f: F) -> &mut Self
+    where
+        F: Fn(&[String]) -> CompleteResult + Send + Sync + 'static,
+    {
+        let completer = Some(Completer(std::sync::Arc::new(f)));
+        if let Some(opt) = self.options.iter_mut().find(|o| o.long == name) {
+            if opt.kind == Kind::Flag {
+                panic!("Flag --{name} takes no value to complete");
+            }
+            opt.completer = completer;
+        } else if let Some(arg) = self.args.iter_mut().find(|a| a.name == name) {
+            arg.completer = completer;
+        } else {
+            panic!("Unknown option or argument '{name}' for complete");
+        }
+        self
+    }
+
     /// Register an option. `default` is a value, "flag", "optional", or "" (required).
     pub fn opt(&mut self, var: &str, long: &str, short: &str, default: &str, description: &str) -> OptRef<'_> {
         let kind = if default == "flag" { Kind::Flag } else { Kind::Value };
@@ -1420,6 +1484,7 @@ impl Cli {
             rule: String::new(),
             search_dirs: Vec::new(),
             secret: false,
+            completer: None,
         });
         let index = self.options.len() - 1;
         OptRef { cli: self, index }
@@ -1438,6 +1503,7 @@ impl Cli {
             default: default.into(),
             rule: String::new(),
             variadic,
+            completer: None,
         });
         let index = self.args.len() - 1;
         ArgRef { cli: self, index }
@@ -2157,6 +2223,7 @@ impl Cli {
                                 ("default", s(&a.default)),
                                 ("validation", s(&a.rule)),
                                 ("schema", rule_schema(&a.rule, &self.root, &a.name).map(Json::Raw).unwrap_or(Json::Null)),
+                                ("dynamic", Json::Bool(a.completer.is_some())),
                             ])
                         })
                         .collect(),
@@ -2193,6 +2260,7 @@ impl Cli {
                                         .unwrap_or(Json::Null),
                                 ),
                                 ("secret", Json::Bool(o.secret)),
+                                ("dynamic", Json::Bool(o.completer.is_some())),
                             ])
                         })
                         .collect(),
@@ -2278,9 +2346,10 @@ impl Cli {
         let clean = |s: &str| s.replace(['\t', '\n'], " ");
         let mut out = String::from("#clyops-completion 1\n");
         let mut chain = vec![&*self];
+        let mut words: Vec<String> = words.iter().map(|w| w.to_string()).collect();
         if !self.children.is_empty() {
             let mut skip = 0;
-            for w in words {
+            for w in &words {
                 match chain[0].children.iter().find(|c| c.word == *w) {
                     Some(c) => chain.insert(0, c),
                     None => break,
@@ -2291,6 +2360,7 @@ impl Cli {
                 return out;
             }
             let _ = writeln!(out, "skip\t{skip}");
+            words.drain(..skip);
             for c in &chain[0].children {
                 let _ = writeln!(out, "cmd\t{}\t{}", c.word, clean(&c.description));
             }
@@ -2300,7 +2370,7 @@ impl Cli {
             if o.kind == Kind::Flag {
                 let _ = writeln!(out, "opt\t--{}\t{short}\tflag\tnone\t-\t{}", o.long, clean(&o.description));
             } else {
-                let (kind, values) = completion_kind(&o.rule, &o.search_dirs);
+                let (kind, values) = completion_record(&o.rule, &o.search_dirs, o.completer.as_ref(), &words);
                 let values = if values.is_empty() { "-".to_string() } else { values };
                 let _ = writeln!(out, "opt\t--{}\t{short}\tvalue\t{kind}\t{values}\t{}", o.long, clean(&o.description));
             }
@@ -2309,7 +2379,7 @@ impl Cli {
             }
         }
         for a in &chain[0].args {
-            let (kind, values) = completion_kind(&a.rule, &[]);
+            let (kind, values) = completion_record(&a.rule, &[], a.completer.as_ref(), &words);
             let values = if values.is_empty() { "-".to_string() } else { values };
             let arity = if a.variadic { "variadic" } else { "single" };
             let _ = writeln!(out, "arg\t{}\t{arity}\t{kind}\t{values}\t{}", a.name, clean(&a.description));

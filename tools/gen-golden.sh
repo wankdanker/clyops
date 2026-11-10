@@ -21,7 +21,9 @@ args=(--help -c demo.conf); demo > "$golden/help-config.txt"
 python3 -c "import json,sys; c=[c for c in json.load(open(sys.argv[1])) if c['name']=='json schema'][0]; open(sys.argv[2],'w').write(c['files']['shape.json'])" \
     "$here/spec/conformance/cases.json" "$tmp/shape.json"
 args=(--help-json-schema); demo > "$golden/schema.json"
-args=(--bash-completion); demo | sed "s|$tmp|{tmp}|g" > "$golden/completion.txt"
+args=(--bash-completion); demo 2>/dev/null | sed "s|$tmp|{tmp}|g" > "$golden/completion.txt"
+args=(--bash-completion -- -v --host); demo DEMO_HOSTS=$'alpha;has space;;a,b;alpha;tab\there;beta' 2>/dev/null | sed "s|$tmp|{tmp}|g" > "$golden/completion-dynamic.txt"
+args=(--bash-completion); demo DEMO_HOSTS= 2>/dev/null | sed "s|$tmp|{tmp}|g" > "$golden/completion-dynamic-empty.txt"
 
 for shell in bash zsh fish; do
     args=(--completion "$shell"); demo > "$golden/completion-$shell.$shell"
@@ -37,4 +39,5 @@ args=(--help-json-schema); demo > "$golden/tasks-schema.json"
 args=(--bash-completion); demo > "$golden/tasks-completion.txt"
 args=(--bash-completion -- db); demo > "$golden/tasks-completion-db.txt"
 args=(--bash-completion -- db migrate x); demo > "$golden/tasks-completion-migrate.txt"
+args=(--bash-completion -- db migrate -n x); demo > "$golden/tasks-completion-migrate-words.txt"
 echo "wrote goldens from $impl"

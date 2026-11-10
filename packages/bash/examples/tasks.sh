@@ -2,6 +2,10 @@
 # The conformance commands demo (spec/conformance/README.md) in Bash.
 source "$(dirname "${BASH_SOURCE[0]}")/../clyops.sh"
 
+# Completers (spec section 9.2).
+tasks_urls() { printf '%s\n' sqlite:app.db pg:main; }
+tasks_targets() { printf '%s\n' v1 v2; local w; for w in "$@"; do printf 'w:%s\n' "$w"; done; }
+
 clyops_name tasks
 clyops_root "${DEMO_ROOT:-$PWD}"
 clyops_description "Commands demo for the clyops conformance suite."
@@ -11,9 +15,11 @@ clyops_role progress out "Progress, one JSON object per line" application/x-ndjs
 
 clyops_command db "Database tasks"
 clyops_opt DB_URL url u sqlite:app.db "Database URL" Database
+clyops_complete url tasks_urls
 clyops_command "db migrate" "Apply migrations"
 clyops_arg     target "Target version" latest
 clyops_opt     DRY_RUN dry-run n flag "Show what would run"
+clyops_complete target tasks_targets
 clyops_effects destructive
 clyops_role    plan out "Migration plan" text/plain
 clyops_command "db status" "Show migration status"

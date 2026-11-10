@@ -248,3 +248,34 @@ test('file:executable: a program on PATH or an executable file, and its secret f
   }
 });
 
+
+test('complete lists dynamic values for completion only (spec section 9.2)', () => {
+  let calls = 0;
+  const seen = [];
+  const cli = make().complete('count', (words) => { calls++; seen.push(words); return ['a', 'b c', '', 'x,y', 'a', 'b']; })
+    .complete('file', () => { throw new Error('registry unavailable'); });
+  const data = cli.completionData(['-f']);
+  assert.match(data, /^opt\t--count\t-n\tvalue\tchoice\ta,b\tCount$/m);
+  assert.match(data, /^arg\tfile\tsingle\tfile\t-\tFile$/m);
+  assert.deepEqual(seen, [['-f']]);
+  assert.equal(cli.parse(['a.txt', '-n', '5']).status, 'ok');
+  JSON.parse(cli.jsonSchema());
+  assert.equal(calls, 1);
+  const schema = JSON.parse(cli.jsonSchema());
+  assert.equal(schema.options.find((o) => o.name === 'count').dynamic, true);
+  assert.equal(schema.options.find((o) => o.name === 'tag').dynamic, false);
+  assert.equal(schema.arguments[0].dynamic, true);
+  assert.match(make().complete('tag', () => []).completionData(), /^opt\t--tag\t-t\tvalue\tchoice\t-\tTags$/m);
+});
+
+test('complete gets the words after the commands', () => {
+  const cli = new Cli({ name: 't', env: {} });
+  const db = cli.command('db', 'Database');
+  db.arg('target', 'Target').complete('target', (words) => words.map((w) => `w:${w}`));
+  assert.match(cli.completionData(['db', '-x', 'y']), /^arg\ttarget\tsingle\tchoice\tw:-x,w:y\tTarget$/m);
+});
+
+test('complete rejects unknown names and flags', () => {
+  assert.throws(() => make().complete('bogus', () => []), /Unknown option or argument 'bogus' for complete/);
+  assert.throws(() => make().complete('fast', () => []), /Flag --fast takes no value to complete/);
+});

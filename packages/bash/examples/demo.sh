@@ -2,6 +2,16 @@
 # The conformance demo CLI (spec/conformance/README.md) in Bash.
 source "$(dirname "${BASH_SOURCE[0]}")/../clyops.sh"
 
+# Completer (spec section 9.2): the DEMO_HOSTS entries, then words-N. Fails when DEMO_HOSTS is unset.
+demo_hosts() {
+    echo "completer ran" >&2
+    [[ -v DEMO_HOSTS ]] || return 1
+    local IFS=';' h
+    for h in $DEMO_HOSTS; do printf '%s\n' "$h"; done
+    (( $# > 0 )) && echo "words-$#"
+    return 0
+}
+
 clyops_name demo
 clyops_root "${DEMO_ROOT:-$PWD}"
 clyops_description "Demo program for the clyops conformance suite. It registers one of every kind of option and argument so that each implementation can be checked against the same help text, schema and resolved values."
@@ -52,6 +62,8 @@ clyops_opt_array INCLUDE  include  I           "Include directory"     Files    
 
 clyops_config      config "demo:,shared:"
 clyops_path_search config conf
+clyops_complete host demo_hosts
+clyops_complete rest demo_hosts
 clyops_exclusive   endpoint addr
 clyops_requires    dest src
 

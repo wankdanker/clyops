@@ -13,9 +13,11 @@ fn main() {
 
     let db = cli.command("db", "Database tasks");
     db.opt("DB_URL", "url", "u", "sqlite:app.db", "Database URL").group("Database");
+    db.complete("url", |_| Ok(vec!["sqlite:app.db".into(), "pg:main".into()]));
     let migrate = db.command("migrate", "Apply migrations");
     migrate.arg("target", "Target version", "latest", "");
     migrate.opt("DRY_RUN", "dry-run", "n", "flag", "Show what would run");
+    migrate.complete("target", |words| Ok(["v1", "v2"].iter().map(|v| v.to_string()).chain(words.iter().map(|w| format!("w:{w}"))).collect()));
     migrate.effects(&["destructive"]);
     migrate.role("plan", "out", "Migration plan", "text/plain");
     db.command("status", "Show migration status").effects(&["read-only"]);

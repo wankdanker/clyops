@@ -264,6 +264,82 @@ static void test_roles(void) {
     CHECK(in_child(child_scope));
 }
 
+static int completer_calls;
+
+/* Returns the words it got, then values to drop: empty, a comma, a space, a duplicate. */
+static int echo_words(const char* const* words, int nwords, clyops_values_t* out, void* userdata) {
+    completer_calls++;
+    clyops_values_add(out, (const char*)userdata);
+    for (int i = 0; i < nwords; i++) clyops_values_add(out, words[i]);
+    clyops_values_add(out, "");
+    clyops_values_add(out, "a,b");
+    clyops_values_add(out, "a b");
+    clyops_values_add(out, "tab\there");
+    clyops_values_add(out, (const char*)userdata);
+    return 0;
+}
+
+static int failing(const char* const* words, int nwords, clyops_values_t* out, void* userdata) {
+    (void)words, (void)nwords, (void)userdata;
+    completer_calls++;
+    clyops_values_add(out, "ignored");
+    return 1;
+}
+
+static int nothing(const char* const* words, int nwords, clyops_values_t* out, void* userdata) {
+    (void)words, (void)nwords, (void)out, (void)userdata;
+    completer_calls++;
+    return 0;
+}
+
+static void complete_unknown(void) { clyops_complete(make(), "nope", nothing, NULL); }
+static void complete_flag(void) { clyops_complete(make(), "fast", nothing, NULL); }
+
+static void test_complete(void) {
+    CHECK(dies_with(complete_unknown, "Unknown option or argument 'nope' for complete"));
+    CHECK(dies_with(complete_flag, "Flag --fast takes no value to complete"));
+
+    clyops_t* cli = make();
+    clyops_complete(cli, "count", echo_words, "first");
+    clyops_complete(cli, "tag", failing, NULL);
+    clyops_complete(cli, "file", nothing, NULL);
+    completer_calls = 0;
+    char* argv[] = {"a.txt", "--count", "4"};
+    CHECK(clyops_parse(cli, 3, argv) == CLYOPS_OK);
+    char* usage = clyops_usage(cli);
+    char* schema = clyops_json_schema(cli);
+    CHECK(completer_calls == 0);
+    CHECK(strstr(schema, "\"name\": \"file\"") != NULL);
+    CHECK(strstr(schema, "\"schema\": null,\n      \"dynamic\": true\n") != NULL);
+    CHECK(strstr(schema, "\"secret\": false,\n      \"dynamic\": true\n") != NULL);
+    CHECK(strstr(schema, "\"secret\": false,\n      \"dynamic\": false\n") != NULL);
+    char* words[] = {"x", "-v", NULL};
+    char* data = clyops_completion_data_for(cli, 2, words);
+    CHECK(completer_calls == 3);
+    CHECK(strstr(data, "opt\t--count\t-n\tvalue\tchoice\tfirst,x,-v\t") != NULL);
+    CHECK(strstr(data, "opt\t--tag\t-t\tvalue\tdefault\t-\t") != NULL);
+    CHECK(strstr(data, "arg\tfile\tsingle\tchoice\t-\tFile\n") != NULL);
+    free(data);
+    free(usage);
+    free(schema);
+    clyops_free(cli);
+
+    /* With commands, a completer gets the words after them; a parent option uses its own. */
+    clyops_t* m = clyops_new("m");
+    clyops_opt(m, "URL", "url", "optional", .description = "URL");
+    clyops_complete(m, "url", echo_words, "top");
+    clyops_t* db = clyops_command(m, "db", "Database");
+    clyops_arg(db, "name", .default_value = "main");
+    clyops_complete(db, "name", echo_words, "n");
+    char* cwords[] = {"db", "y", NULL};
+    char* cdata = clyops_completion_data_for(m, 2, cwords);
+    CHECK(strstr(cdata, "skip\t1\n") != NULL);
+    CHECK(strstr(cdata, "opt\t--url\t-\tvalue\tchoice\ttop,y\t") != NULL);
+    CHECK(strstr(cdata, "arg\tname\tsingle\tchoice\tn,y\t") != NULL);
+    free(cdata);
+    clyops_free(m);
+}
+
 int main(void) {
     test_roles(); /* first: the CLYOPS_FDS mapping is read by the first parse in a process */
     test_typed_values();
@@ -272,6 +348,7 @@ int main(void) {
     test_output();
     test_secret_and_relationships();
     test_commands();
+    test_complete();
     if (failures) {
         fprintf(stderr, "%d failed\n", failures);
         return 1;

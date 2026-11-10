@@ -138,5 +138,33 @@ check "roles: commands inherit, help lists their own" "2||2|Output [plan]: Migra
     clyops_run "$@"; clyops_fd_open plan
     clyops_usage | grep "\[plan\]"; clyops_usage | grep -c "\[progress\]" || true' db migrate; } | paste -sd'|' -)"
 
+check "complete: dynamic values, sanitized, from the words typed" "opt	--count	-	value	choice	a,b,w:-x	Count|arg	FILE	single	file	-	File" "$(run '
+    list() { printf "%s\n" a "b c" "" "x,y" a b; for w in "$@"; do echo "w:$w"; done; }
+    broken() { echo partial; return 3; }
+    clyops_arg FILE "File" "" path
+    clyops_opt COUNT count "" 1 "Count" Options int
+    clyops_complete count list
+    clyops_complete FILE broken
+    clyops_completion_data -x | grep -E "^(opt	--count|arg)"' | paste -sd'|' -)"
+
+check "complete: commands pass the words after them, schema marks dynamic" "arg	target	single	choice	w:-n	Target|true|false|false" "$({ run '
+    t() { for w in "$@"; do echo "w:$w"; done; }
+    clyops_command db "Database"
+    clyops_arg target "Target"
+    clyops_opt NAME name "" optional "Name"
+    clyops_complete target t
+    clyops_run "$@"' --bash-completion -- db -n | grep ^arg
+    run 'clyops_arg target "Target"; clyops_opt NAME name "" optional "Name"; clyops_complete target t; clyops_run --help-json-schema' | grep '"dynamic"' | sed 's/.*: //'; } | paste -sd'|' -)"
+
+check "complete: the completer doesn't run when parsing" "x" "$(run '
+    t() { echo RAN >&2; }
+    clyops_opt NAME name "" optional "Name"
+    clyops_complete name t
+    clyops_run --name x; echo "$NAME"')"
+
+check "complete: unknown names and flags are programming errors" "Unknown option or argument 'nope' for complete|Flag --fast takes no value to complete" "$({
+    run 'clyops_complete nope f' | sed 's/.*\] //'
+    run 'clyops_opt FAST fast f flag F; clyops_complete fast f' | sed 's/.*\] //'; } | paste -sd'|' -)"
+
 if (( failures )); then echo "$failures failed"; exit 1; fi
 echo "all passed"

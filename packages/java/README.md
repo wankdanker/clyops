@@ -53,7 +53,8 @@ beyond a long), `float*` are `Double`, `bool` and flags are `Boolean`, arrays an
 `List`s. `parse(argv)` is the non-exiting variant and returns a `ParseResult`.
 
 Also: `setRoot`, `setCwd`, `setEnv`, `source`, `isSet`, `isExplicitlySet`, `usage`, `jsonSchema`,
-`completionScript`, `valuesJson`, `setPathSearch`, `requireCommand`, the static `Cli.validate`,
+`completionScript`, `valuesJson`, `setPathSearch`, `complete(name, fn)` (completion values at Tab
+time), `requireCommand`, the static `Cli.validate`,
 `resolvePath`, `describeRule` and `wrapText`, and `Log.info`, `warn`, `error`, `success`, `die`
 and `setSilent`. Registration mistakes (an unknown rule, a duplicate option) throw
 `IllegalArgumentException`.
@@ -96,6 +97,32 @@ sets it to `forwardFds(...)`.
 Commands share the program's options (accepted before or after the command words) and config file;
 each has its own help (`mytool db migrate --help`), schema and completion. See the
 [spec](https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md) sections 1.3 to 1.7.
+
+## Completion values from your program
+
+`complete(name, fn)` lists the values to offer when completing a value option,
+array option or positional argument of that level, read when the user presses
+Tab, for values only the program can find, such as the instances registered in
+a directory:
+
+```java
+cli.opt("INSTANCE", "instance", "i", "", "Instance to target");
+cli.complete("instance", words -> {
+    try (var files = Files.list(Path.of("/var/lib/myapp/instances"))) {
+        return files.map(f -> f.getFileName().toString()).filter(n -> n.endsWith(".json"))
+            .map(n -> n.substring(0, n.length() - 5)).toList();
+    }
+});
+```
+
+The function (`Completer`: `List<String> complete(List<String> words) throws
+Exception`) runs only for `--bash-completion`, on every Tab, so keep it quick
+(each Tab also starts a JVM) and don't print to stdout. `words` are the words
+typed after the command words, for completers that depend on another option.
+Throwing, or returning `null`, keeps the rule's completion. It doesn't
+validate: check the value after `run` if only listed values are allowed.
+Completing an unknown name or a flag throws `IllegalArgumentException`. See the
+[spec](https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md) section 9.2.
 
 ## Documentation
 

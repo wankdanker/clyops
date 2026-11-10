@@ -5,6 +5,15 @@ section here.
 
 ## [Unreleased]
 
+### Added
+
+- `complete(name, fn)` (Bash: `clyops_complete name function`) lists completion values at Tab
+  time, such as the instances registered in a directory, in every language (spec section 9.2).
+  The function gets the words typed so far and runs only for `--bash-completion`. A failure falls
+  back to the rule's completion, and nothing is validated against the list. The completion
+  scripts are unchanged. `--help-json-schema` gains `"dynamic"` on arguments and options, which
+  older consumers can ignore.
+
 ## [0.12.2] - 2026-10-30
 
 A json:SCHEMA input whose schema doesn't compile no longer breaks its tool.

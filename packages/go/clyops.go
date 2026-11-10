@@ -633,6 +633,42 @@ func completionKind(rule string, searchDirs []string) (kind, values string) {
 	return "default", ""
 }
 
+// Completer lists the values to offer when completing an option or argument
+// (spec section 9.2). It gets the words typed after the program's commands;
+// returning an error (or panicking) keeps the rule's completion.
+type Completer func(words []string) ([]string, error)
+
+// completionRecord is the kind and values of a completion record, asking the
+// completer first (spec section 9.2).
+func completionRecord(rule string, searchDirs []string, completer Completer, words []string) (kind, values string) {
+	if completer != nil {
+		if list, ok := callCompleter(completer, words); ok {
+			seen := map[string]bool{}
+			var kept []string
+			for _, v := range list {
+				if v != "" && !strings.ContainsAny(v, ", \t\r\n") && !seen[v] {
+					seen[v] = true
+					kept = append(kept, v)
+				}
+			}
+			return "choice", strings.Join(kept, ",")
+		}
+	}
+	return completionKind(rule, searchDirs)
+}
+
+// callCompleter runs a completer on a copy of words; ok is false when it
+// returns an error or panics.
+func callCompleter(completer Completer, words []string) (list []string, ok bool) {
+	defer func() {
+		if recover() != nil {
+			list, ok = nil, false
+		}
+	}()
+	list, err := completer(append([]string{}, words...))
+	return list, err == nil
+}
+
 // ---------------------------------------------------------------------------
 // Cli
 // ---------------------------------------------------------------------------
@@ -643,6 +679,7 @@ type option struct {
 	description, group, rule         string
 	searchDirs                       []string
 	secret                           bool
+	completer                        Completer
 }
 
 func (o *option) label() string {
@@ -663,6 +700,7 @@ func (o *option) boolLike() bool {
 type argument struct {
 	name, description, def, rule string
 	variadic                     bool
+	completer                    Completer
 }
 
 type command struct{ name, description, hint string }
@@ -1091,6 +1129,28 @@ func (c *Cli) SetPathSearch(long, dirs string) *Cli {
 	return c
 }
 
+// Complete lists the values to offer when completing the value option, array
+// option or positional argument name of this level (options are looked up
+// first; spec section 9.2). fn runs only while answering --bash-completion,
+// gets the words typed after the commands and doesn't validate anything.
+// Panics on an unknown name or a flag.
+func (c *Cli) Complete(name string, fn Completer) *Cli {
+	if opt := c.byLong[name]; opt != nil {
+		if opt.kind == "flag" {
+			panic("clyops: flag --" + name + " takes no value to complete")
+		}
+		opt.completer = fn
+		return c
+	}
+	for _, a := range c.args {
+		if a.name == name {
+			a.completer = fn
+			return c
+		}
+	}
+	panic("clyops: unknown option or argument '" + name + "' for complete")
+}
+
 // Opt registers an option. def is a value, "flag", "optional", or "" (required).
 // groupAndRule is an optional group (default "Options") and validation rule.
 func (c *Cli) Opt(variable, long, short, def, description string, groupAndRule ...string) *Cli {
@@ -1102,23 +1162,23 @@ func (c *Cli) Opt(variable, long, short, def, description string, groupAndRule .
 	if def == "flag" || def == "optional" {
 		value = ""
 	}
-	return c.add(&option{variable, long, short, kind, value, def == "", description, group, rule, nil, false})
+	return c.add(&option{variable, long, short, kind, value, def == "", description, group, rule, nil, false, nil})
 }
 
 // OptArray registers a repeatable option whose values accumulate into a list.
 func (c *Cli) OptArray(variable, long, short, description string, groupAndRule ...string) *Cli {
 	group, rule := groupRule(groupAndRule)
-	return c.add(&option{variable, long, short, "array", "", false, description, group, rule, nil, false})
+	return c.add(&option{variable, long, short, "array", "", false, description, group, rule, nil, false, nil})
 }
 
 // Arg registers a positional argument. An empty def makes it required.
 func (c *Cli) Arg(name, description, def string, rule ...string) *Cli {
-	return c.addArg(&argument{name, description, def, first(rule), false})
+	return c.addArg(&argument{name, description, def, first(rule), false, nil})
 }
 
 // ArgVariadic registers a final positional argument that collects the remaining tokens.
 func (c *Cli) ArgVariadic(name, description string, rule ...string) *Cli {
-	return c.addArg(&argument{name, description, "", first(rule), true})
+	return c.addArg(&argument{name, description, "", first(rule), true, nil})
 }
 
 func groupRule(extra []string) (group, rule string) {
@@ -1182,7 +1242,7 @@ func (c *Cli) ensureHelp() {
 		if c.byShort["h"] != nil {
 			short = ""
 		}
-		c.add(&option{"HELP", "help", short, "flag", "", false, "Show this help message and exit", "Global", "", nil, false})
+		c.add(&option{"HELP", "help", short, "flag", "", false, "Show this help message and exit", "Global", "", nil, false, nil})
 	}
 }
 
@@ -2003,6 +2063,7 @@ type schemaArgument struct {
 	Default     string          `json:"default"`
 	Validation  string          `json:"validation"`
 	Schema      json.RawMessage `json:"schema"`
+	Dynamic     bool            `json:"dynamic"`
 }
 
 type schemaOption struct {
@@ -2020,6 +2081,7 @@ type schemaOption struct {
 	Choices      []string        `json:"choices"`
 	Schema       json.RawMessage `json:"schema"`
 	Secret       bool            `json:"secret"`
+	Dynamic      bool            `json:"dynamic"`
 }
 
 type schemaCommand struct {
@@ -2078,7 +2140,7 @@ func (c *Cli) schemaBody() schemaBody {
 		Constraints: append([]constraint{}, c.constraints...), Stdin: c.stdin, Stdout: c.stdout, Roles: append([]roleDecl{}, c.roles...), Commands: []schemaNode{}}
 	for _, a := range c.args {
 		s.Arguments = append(s.Arguments, schemaArgument{a.name, a.description, !a.variadic && a.def == "", a.variadic, a.def, a.rule,
-			ruleSchema(a.rule, c.root(), a.name)})
+			ruleSchema(a.rule, c.root(), a.name), a.completer != nil})
 	}
 	for _, o := range c.options {
 		def, typ, choices := o.def, "string", []string{}
@@ -2102,7 +2164,7 @@ func (c *Cli) schemaBody() schemaBody {
 			choices = strings.Split(r[7:], ",")
 		}
 		s.Options = append(s.Options, schemaOption{o.long, o.short, o.variable, o.description, def, o.group, typ,
-			o.kind == "flag", o.kind == "array", o.required, r, choices, ruleSchema(r, c.root(), "--"+o.long), o.secret})
+			o.kind == "flag", o.kind == "array", o.required, r, choices, ruleSchema(r, c.root(), "--"+o.long), o.secret, o.completer != nil})
 	}
 	for _, cmd := range c.commands {
 		s.RequiredCommands = append(s.RequiredCommands, schemaCommand{cmd.name, cmd.description, cmd.hint})
@@ -2155,6 +2217,7 @@ func (c *Cli) CompletionData(words ...string) string {
 			return lines[0] + "\n"
 		}
 		lines = append(lines, "skip\t"+strconv.Itoa(skip))
+		words = words[skip:]
 		for _, k := range node.children {
 			lines = append(lines, "cmd\t"+k.word+"\t"+clean(k.description))
 		}
@@ -2171,7 +2234,7 @@ func (c *Cli) CompletionData(words ...string) string {
 		if o.kind == "flag" {
 			lines = append(lines, "opt\t--"+o.long+"\t"+short+"\tflag\tnone\t-\t"+clean(o.description))
 		} else {
-			kind, values := completionKind(o.rule, o.searchDirs)
+			kind, values := completionRecord(o.rule, o.searchDirs, o.completer, words)
 			lines = append(lines, "opt\t--"+o.long+"\t"+short+"\tvalue\t"+kind+"\t"+orDash(values)+"\t"+clean(o.description))
 		}
 		if o.boolLike() {
@@ -2179,7 +2242,7 @@ func (c *Cli) CompletionData(words ...string) string {
 		}
 	}
 	for _, a := range node.args {
-		kind, values := completionKind(a.rule, nil)
+		kind, values := completionRecord(a.rule, nil, a.completer, words)
 		arity := "single"
 		if a.variadic {
 			arity = "variadic"

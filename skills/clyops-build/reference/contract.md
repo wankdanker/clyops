@@ -96,6 +96,19 @@ selected words are available as `command` (e.g. `["db", "migrate"]`). Config is
 the program's. Each command has its own help, schema and completion. Each leaf
 command becomes its own tool in the API and MCP server (`tasks_db_migrate`).
 
+## Dynamic completion values (§9.2)
+
+`complete(NAME, FN)` registers a function that lists the values to offer when
+completing the value option or argument `NAME` of that level (unknown name:
+`Unknown option or argument 'NAME' for complete`; a flag: `Flag --NAME takes no
+value to complete`). It gets the words typed after the command words and
+returns strings; Bash: `clyops_complete NAME FUNCTION`, which gets the words as
+arguments and prints one value per line. It runs only for `--bash-completion`,
+the one exception to "no work before `run`", so it must be quick and change
+nothing. The record becomes `choice` with the values, dropping empty ones and
+ones containing a comma or whitespace; if the function fails, the rule's
+completion is kept. It never validates. The schema has `"dynamic": true`.
+
 ## Parsing (§2)
 
 `--` ends options. `--name=value`, `--name value`, `-n value`, `-nvalue`,

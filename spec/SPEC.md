@@ -79,6 +79,10 @@ resolves to a list.
   that must be on `PATH`.
 * `pathSearch(long, dirs)`: fallback directories for bare relative values of a
   path option (section 6). Tags the option with the `path` rule if it has no rule.
+* `complete(NAME, FN)`: a function that lists the values to offer when
+  completing the value option, array option or positional argument `NAME` of
+  this level (options are looked up first). It runs only while answering
+  `--bash-completion` (section 9.2) and does not validate anything.
 * `root`: base directory for default/env path values and relative search dirs.
   Defaults to the current working directory.
 * `name`: program name shown in usage. Defaults to the basename of `argv[0]`.
@@ -106,7 +110,9 @@ resolves to a list.
 Registering an unknown validation rule, a duplicate long/short name, a
 positional argument after a variadic, an unknown effect (`Unknown effect 'E'`),
 a relationship naming an option that isn't registered (`Unknown option --NAME
-in constraint`), mixing commands and positional arguments on one level
+in constraint`), a completer for a name that is neither an option nor an argument
+of the level (`Unknown option or argument 'NAME' for complete`) or for a flag
+(`Flag --NAME takes no value to complete`), mixing commands and positional arguments on one level
 (`Cannot mix commands and positional arguments`), a role name
 not matching the pattern (`Invalid role name 'R'`), a role registered twice on
 a level (`Duplicate role 'R'`) or a direction other than `in` or `out`
@@ -460,12 +466,12 @@ line of its own).
   "epilog": "…",
   "arguments": [
     { "name": "", "description": "", "required": true, "isVariadic": false, "default": "", "validation": "",
-      "schema": null }
+      "schema": null, "dynamic": false }
   ],
   "options": [
     { "name": "", "shortName": "", "variableName": "", "description": "", "default": "",
       "group": "", "type": "string", "isFlag": false, "isArray": false, "required": false,
-      "validation": "", "choices": [], "schema": null }
+      "validation": "", "choices": [], "schema": null, "dynamic": false }
   ],
   "config": { "option": "config", "prefixes": ["demo:", "shared:"] },
   "requiredCommands": [
@@ -495,7 +501,11 @@ line of its own).
 `json:SCHEMA` rule (section 5), as given inline, `{"$ref": "URL"}` or the
 file's JSON as written, and `null` for every other rule (or a file that
 couldn't be read); a consumer reading the output of an older version without
-`schema` treats it as `null`. Options also have `"secret"` (1.5).
+`schema` treats it as `null`. `dynamic` is `true` when a completer is
+registered (`complete`, 1.3): the program can list values at completion time
+that `choices` doesn't hold, and still accepts any value its rule does; a
+consumer reading the output of an older version without `dynamic` treats it as
+`false`. Options also have `"secret"` (1.5).
 `config` is the declared config file (1.3, section 4): `option` the long name
 of the option holding its path and `prefixes` the line prefixes in the order
 given (empty when every line is read), or `null` when the program declares
@@ -579,6 +589,31 @@ the records above, so they never go stale:
   the variadic argument repeating.
 
 `tools/test-completions.sh` drives the scripts in real bash, zsh and fish.
+
+### 9.2 Dynamic values
+
+A completer (`complete(NAME, FN)`, 1.3) lists values the program only knows
+at completion time, such as the instances registered in a directory. While
+answering `--bash-completion`, and at no other time, the program calls it for
+each record it prints of an option or argument that has one, passing the words
+after `--` that follow the `skip` words (all of them when there is no `skip`
+record), so it can look at what was typed before. It returns a list of strings
+(in Bash, the function prints one per line and its arguments are the words).
+
+The record's kind becomes `choice` and its values the returned strings, in
+order, comma-joined, after dropping strings that are empty or contain a comma,
+space, tab, carriage return or line feed, and later duplicates. The shell
+filters them by what is being typed, so the completer doesn't need to. When
+the completer fails (throws, panics, returns an error, or in Bash exits with a
+non-zero status) the record keeps the kind and values of its rule (the table
+above). An empty list gives `choice` with values `-`, offering nothing. A
+completer must not write to standard output, except in Bash, where that is how
+it returns; the completion scripts discard standard error.
+
+A completer runs on every completion request, for every record that has one,
+so it should be quick. It doesn't change parsing: the value is validated by the
+option's rule as usual, so a program that only accepts the listed values checks
+that itself after `run`.
 
 ## 10. Resolved values as JSON
 

@@ -64,6 +64,23 @@ void clyops_require_command(clyops_t* cli, const char* command, const char* desc
 /** Fallback dirs (colon-separated, relative to root) for bare relative values of a path option. */
 void clyops_path_search(clyops_t* cli, const char* long_name, const char* dirs);
 
+/** The values a completer returns; add to it with clyops_values_add. Owned by the library. */
+typedef struct clyops_values clyops_values_t;
+/**
+ * Lists the values to offer when completing an option or argument (spec section 9.2). Gets the
+ * words typed after the program's commands and the userdata given to clyops_complete, adds values
+ * to `out` and returns 0; a non-zero return keeps the rule's completion. Must not write to stdout.
+ */
+typedef int (*clyops_completer_t)(const char* const* words, int nwords, clyops_values_t* out, void* userdata);
+/** Append a copy of `value` to a completer's result. The library drops unusable values and duplicates. */
+void clyops_values_add(clyops_values_t* out, const char* value);
+/**
+ * Register a completer for the value or array option `name` (looked up first) or the positional
+ * argument `name` of this level. It runs only for --bash-completion and doesn't validate anything.
+ * An unknown name or a flag prints a message and exit(2).
+ */
+void clyops_complete(clyops_t* cli, const char* name, clyops_completer_t fn, void* userdata);
+
 /** What running the program does: a NULL-terminated list of read-only, idempotent, destructive, network. */
 void clyops_set_effects(clyops_t* cli, const char* const* effects);
 /** Declare effects as a variadic list of strings. */

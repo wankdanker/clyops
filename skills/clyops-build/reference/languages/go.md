@@ -26,7 +26,10 @@ cli.ArgVariadic(NAME, description, rule)
 ```
 
 Metadata: `SetDescription`, `SetEpilog`, `SetConfig(option, prefixes)`,
-`SetPathSearch(long, dirs)`, `RequireCommand(cmd, description, hint)`,
+`SetPathSearch(long, dirs)`,
+`Complete(name, func(words []string) ([]string, error))` (completion values,
+§9.2; an error or panic keeps the rule's completion),
+`RequireCommand(cmd, description, hint)`,
 `SetEffects(effects...)`, `SetStdin(description, contentType)`,
 `SetStdout(description, contentType)`, `Exclusive(longs...)`,
 `Requires(longs...)`, `OneOf(longs...)`, `Command(name, description)`.

@@ -55,6 +55,47 @@ The selected command words are the value `"command"` (`clyops_get_count` / `clyo
 each has its own help (`mytool db migrate --help`), schema and completion. See the
 [spec](https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md) sections 1.3 to 1.7.
 
+## Completion values from your program
+
+`clyops_complete(cli, name, fn, userdata)` lists the values to offer when
+completing a value option, array option or positional argument of that level,
+read when the user presses Tab, for values only the program can find, such as
+the instances registered in a directory:
+
+```c
+#include <dirent.h>
+#include <string.h>
+
+/* Instance names: the *.json files in the directory given as userdata. */
+static int instances(const char* const* words, int nwords, clyops_values_t* out, void* dir) {
+    (void)words, (void)nwords;
+    DIR* d = opendir(dir);
+    if (!d) return 1;                                    /* non-zero keeps the rule's completion */
+    for (struct dirent* e; (e = readdir(d));) {
+        size_t n = strlen(e->d_name);
+        if (n <= 5 || strcmp(e->d_name + n - 5, ".json") != 0) continue;
+        char name[256];
+        snprintf(name, sizeof name, "%.*s", (int)(n - 5), e->d_name);
+        clyops_values_add(out, name);                    /* copied */
+    }
+    closedir(d);
+    return 0;
+}
+
+/* in main, with the other registrations: */
+clyops_opt(cli, "INSTANCE", "instance", "", .short_name = 'i', .description = "Instance to target");
+clyops_complete(cli, "instance", instances, "/var/lib/myapp/instances");
+```
+
+The function (`clyops_completer_t`) runs only for `--bash-completion`, on every
+Tab, so keep it quick and don't write to stdout. `words` (`nwords` of them) are
+the words typed after the command words, for completers that depend on another
+option. It adds values with `clyops_values_add` and returns 0; a non-zero
+return keeps the rule's completion. It doesn't validate: check the value after
+`clyops_run` if only listed values are allowed. Completing an unknown name or a
+flag prints an error and exits with status 2. See the
+[spec](https://github.com/wankdanker/clyops/blob/main/spec/SPEC.md) section 9.2.
+
 ## Documentation
 
 Read the [language guide](https://clyops.io/languages/c.html)

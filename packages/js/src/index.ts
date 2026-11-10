@@ -21,6 +21,13 @@ export type Validation =
   | `int:${string}` | `float:${string}` | `string:${string}` | `choice:${string}` | `regex:${string}` | `json:${string}`
   | 'secret' | `secret:${string}`;
 
+/**
+ * Lists the values to offer when completing an option or argument (spec
+ * section 9.2). Gets the words typed after the program's commands; throwing
+ * keeps the rule's completion.
+ */
+export type Completer = (words: string[]) => string[];
+
 /** What running a program does (spec section 1.3). */
 export type Effect = 'read-only' | 'idempotent' | 'destructive' | 'network';
 const EFFECTS = ['read-only', 'idempotent', 'destructive', 'network'];
@@ -96,6 +103,7 @@ interface OptionDef {
   validation: string;
   searchDirs: string[];
   secret: boolean;
+  completer?: Completer;
 }
 
 interface ArgDef {
@@ -104,6 +112,7 @@ interface ArgDef {
   defaultValue: string;
   validation: string;
   variadic: boolean;
+  completer?: Completer;
 }
 
 interface RequiredCommand {
@@ -513,6 +522,20 @@ function completionKind(rule: string, searchDirs: string[]): [string, string] {
   return ['default', ''];
 }
 
+/** The kind and values of a completion record, asking the completer first (spec section 9.2). */
+function completionRecord(rule: string, searchDirs: string[], completer: Completer | undefined, words: string[]): [string, string] {
+  if (completer) {
+    let list: unknown;
+    try { list = completer([...words]); } catch { list = undefined; }
+    if (Array.isArray(list)) {
+      const seen = new Set<string>();
+      for (const v of list) if (typeof v === 'string' && v !== '' && !/[, \t\r\n]/.test(v)) seen.add(v);
+      return ['choice', [...seen].join(',')];
+    }
+  }
+  return completionKind(rule, searchDirs);
+}
+
 function isBoolLike(opt: OptionDef): boolean {
   return opt.kind === 'flag' || ['bool', 'choice:true,false', 'choice:false,true'].includes(opt.validation);
 }
@@ -747,6 +770,20 @@ export class Cli {
   /** Declare an external executable required at parse time; description and install hint explain a missing dependency. */
   requireCommand(command: string, description: string, installHint = ''): this {
     this.commands.push({ command, description, installHint });
+    return this;
+  }
+
+  /**
+   * List the values to offer when completing the value option or argument
+   * `name` of this level (spec section 9.2). The function runs only for
+   * --bash-completion, gets the words typed after the commands and returns
+   * strings; it doesn't validate anything.
+   */
+  complete(name: string, fn: Completer): this {
+    const target = this.byLong.get(name) ?? this.args.find((a) => a.name === name);
+    if (!target) throw new Error(`Unknown option or argument '${name}' for complete`);
+    if ('kind' in target && target.kind === 'flag') throw new Error(`Flag --${name} takes no value to complete`);
+    target.completer = fn;
     return this;
   }
 
@@ -1303,14 +1340,14 @@ export class Cli {
       arguments: this.args.map((a) => ({
         name: a.name, description: a.description, required: !a.variadic && !a.defaultValue,
         isVariadic: a.variadic, default: a.defaultValue, validation: a.validation,
-        schema: ruleSchema(a.validation, this.root, a.name),
+        schema: ruleSchema(a.validation, this.root, a.name), dynamic: a.completer !== undefined,
       })),
       options: this.options.map((o) => ({
         name: o.long, shortName: o.short, variableName: o.varName, description: o.description,
         default: o.kind === 'flag' ? 'false' : o.defaultValue, group: o.group, type: type(o),
         isFlag: o.kind === 'flag', isArray: o.kind === 'array', required: o.required, validation: o.validation,
         choices: o.validation.startsWith('choice:') ? o.validation.slice(7).split(',') : [],
-        schema: ruleSchema(o.validation, this.root, `--${o.long}`), secret: o.secret,
+        schema: ruleSchema(o.validation, this.root, `--${o.long}`), secret: o.secret, dynamic: o.completer !== undefined,
       })),
       ...(this.parent ? {} : { config: this.configOption ? { option: this.configOption, prefixes: this.configPrefixes } : null }),
       requiredCommands: this.commands.map((c) => ({ command: c.command, description: c.description, installHint: c.installHint })),
@@ -1351,6 +1388,7 @@ export class Cli {
       }
       if (node.children.length > 0 && skip < words.length && !words[skip].startsWith('-')) return lines.join('\n') + '\n';
       lines.push(`skip\t${skip}`);
+      words = words.slice(skip);
       for (const c of node.children) lines.push(`cmd\t${c.word}\t${clean(c.description)}`);
     }
     const options: OptionDef[] = [];
@@ -1361,12 +1399,12 @@ export class Cli {
         lines.push(`opt\t--${o.long}\t${o.short ? '-' + o.short : '-'}\tflag\tnone\t-\t${clean(o.description)}`, noLine);
         continue;
       }
-      const [kind, values] = completionKind(o.validation, o.searchDirs);
+      const [kind, values] = completionRecord(o.validation, o.searchDirs, o.completer, words);
       lines.push(`opt\t--${o.long}\t${o.short ? '-' + o.short : '-'}\tvalue\t${kind}\t${values || '-'}\t${clean(o.description)}`);
       if (isBoolLike(o)) lines.push(noLine);
     }
     for (const a of node.args) {
-      const [kind, values] = completionKind(a.validation, []);
+      const [kind, values] = completionRecord(a.validation, [], a.completer, words);
       lines.push(`arg\t${a.name}\t${a.variadic ? 'variadic' : 'single'}\t${kind}\t${values || '-'}\t${clean(a.description)}`);
     }
     return lines.join('\n') + '\n';

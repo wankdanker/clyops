@@ -193,4 +193,57 @@ class CliTest {
         unmapped.emit("progress", "nothing happens");
     }
 
+
+    @Test
+    void completeRegistrationErrors() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> make().complete("nope", w -> List.of()));
+        assertEquals("Unknown option or argument 'nope' for complete", e.getMessage());
+        e = assertThrows(IllegalArgumentException.class, () -> make().complete("fast", w -> List.of()));
+        assertEquals("Flag --fast takes no value to complete", e.getMessage());
+    }
+
+    @Test
+    void completersListValuesOnlyForCompletion() {
+        int[] calls = {0};
+        Cli cli = make();
+        cli.complete("count", w -> {
+            calls[0]++;
+            List<String> out = new java.util.ArrayList<>(List.of("first"));
+            out.addAll(w);
+            out.addAll(java.util.Arrays.asList("", "a,b", "a b", "tab\there", "cr\rx", null, "first"));
+            return out;
+        });
+        cli.complete("tag", w -> {
+            calls[0]++;
+            throw new Exception("unavailable");
+        });
+        cli.complete("file", w -> {
+            calls[0]++;
+            return List.of();
+        });
+        assertEquals("ok", cli.parse("a.txt", "--count", "4").status());
+        cli.usage();
+        String schema = cli.jsonSchema();
+        assertEquals(0, calls[0]);
+        assertTrue(schema.contains("\"schema\": null,\n      \"dynamic\": true\n"), schema);
+        assertTrue(schema.contains("\"secret\": false,\n      \"dynamic\": true\n"), schema);
+        assertTrue(schema.contains("\"secret\": false,\n      \"dynamic\": false\n"), schema);
+        String data = cli.completionData(List.of("x", "-v"));
+        assertEquals(3, calls[0]);
+        assertTrue(data.contains("opt\t--count\t-n\tvalue\tchoice\tfirst,x,-v\t"), data);
+        assertTrue(data.contains("opt\t--tag\t-t\tvalue\tdefault\t-\t"), data);
+        assertTrue(data.contains("arg\tfile\tsingle\tchoice\t-\tFile\n"), data);
+    }
+
+    @Test
+    void completersGetTheWordsAfterTheCommands() {
+        Cli cli = new Cli("m").opt("URL", "url", "", "optional", "URL");
+        cli.complete("url", w -> java.util.stream.Stream.concat(java.util.stream.Stream.of("top"), w.stream()).toList());
+        Cli db = cli.command("db", "Database").arg("name", "Name", "main");
+        db.complete("name", w -> java.util.stream.Stream.concat(java.util.stream.Stream.of("n"), w.stream()).toList());
+        String data = cli.completionData(List.of("db", "y"));
+        assertTrue(data.contains("skip\t1\n"), data);
+        assertTrue(data.contains("opt\t--url\t-\tvalue\tchoice\ttop,y\t"), data);
+        assertTrue(data.contains("arg\tname\tsingle\tchoice\tn,y\t"), data);
+    }
 }

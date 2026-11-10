@@ -11,7 +11,8 @@
       "isVariadic": false,
       "default": "",
       "validation": "path",
-      "schema": null
+      "schema": null,
+      "dynamic": false
     },
     {
       "name": "mode",
@@ -20,7 +21,8 @@
       "isVariadic": false,
       "default": "fast",
       "validation": "choice:fast,slow",
-      "schema": null
+      "schema": null,
+      "dynamic": false
     },
     {
       "name": "rest",
@@ -29,7 +31,8 @@
       "isVariadic": true,
       "default": "",
       "validation": "",
-      "schema": null
+      "schema": null,
+      "dynamic": true
     }
   ],
   "options": [
@@ -47,7 +50,8 @@
       "validation": "path",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "verbose",
@@ -63,7 +67,8 @@
       "validation": "",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "quiet",
@@ -79,7 +84,8 @@
       "validation": "",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "color",
@@ -99,7 +105,8 @@
         "never"
       ],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "out",
@@ -115,7 +122,8 @@
       "validation": "path",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "notes",
@@ -131,7 +139,8 @@
       "validation": "",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "count",
@@ -147,7 +156,8 @@
       "validation": "int:1-10",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "ratio",
@@ -163,7 +173,8 @@
       "validation": "float:0-1",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "enabled",
@@ -179,7 +190,8 @@
       "validation": "bool",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "tag",
@@ -195,7 +207,8 @@
       "validation": "string:1-8",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "no-cache",
@@ -211,7 +224,8 @@
       "validation": "",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "key",
@@ -227,7 +241,8 @@
       "validation": "",
       "choices": [],
       "schema": null,
-      "secret": true
+      "secret": true,
+      "dynamic": false
     },
     {
       "name": "host",
@@ -243,7 +258,8 @@
       "validation": "hostname",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": true
     },
     {
       "name": "port",
@@ -259,7 +275,8 @@
       "validation": "port",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "endpoint",
@@ -275,7 +292,8 @@
       "validation": "url",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "addr",
@@ -291,7 +309,8 @@
       "validation": "ip",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "id",
@@ -307,7 +326,8 @@
       "validation": "uuid",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "email",
@@ -323,7 +343,8 @@
       "validation": "email",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "date",
@@ -339,7 +360,8 @@
       "validation": "date:YYYY-MM-DD",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "code",
@@ -355,7 +377,8 @@
       "validation": "regex:^[A-Z]{3}$",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "level",
@@ -371,7 +394,8 @@
       "validation": "int",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "size",
@@ -387,7 +411,8 @@
       "validation": "string:4",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "payload",
@@ -403,7 +428,8 @@
       "validation": "json",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "filter",
@@ -421,7 +447,8 @@
       "schema": {
         "type": "object"
       },
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "shape",
@@ -444,7 +471,8 @@
           }
         }
       },
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "event",
@@ -462,7 +490,8 @@
       "schema": {
         "$ref": "https://example.com/event.json"
       },
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "data-dir",
@@ -478,7 +507,8 @@
       "validation": "dir:exists",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "src",
@@ -494,7 +524,8 @@
       "validation": "file:exists",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "dest",
@@ -510,7 +541,8 @@
       "validation": "file:writable",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "exec",
@@ -526,7 +558,8 @@
       "validation": "file:executable",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "include",
@@ -542,7 +575,8 @@
       "validation": "path",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     },
     {
       "name": "help",
@@ -558,7 +592,8 @@
       "validation": "",
       "choices": [],
       "schema": null,
-      "secret": false
+      "secret": false,
+      "dynamic": false
     }
   ],
   "config": {

@@ -40,6 +40,7 @@ declare -A _CLYOPS_INDEX=()     # long -> registration index (names the per-opti
 
 _CLYOPS_ARGS=() _CLYOPS_ARG_DESC=() _CLYOPS_ARG_DEFAULT=() _CLYOPS_ARG_RULE=()
 _CLYOPS_VARIADIC=""             # index of the variadic argument, if any
+declare -A _CLYOPS_COMPLETER=() _CLYOPS_ARG_COMPLETER=()   # long / argument name -> completer function
 
 _CLYOPS_CMDS=() _CLYOPS_CMD_DESC=() _CLYOPS_CMD_HINT=() _CLYOPS_CMD_OWNER=()
 declare -A _CLYOPS_SECRET=()    # long -> 1 for secret options
@@ -321,6 +322,25 @@ clyops_path_search() {
     [[ -v "_CLYOPS_KIND[$1]" ]] || _clyops_fatal "clyops_path_search: unknown option --$1"
     _CLYOPS_SEARCH[$1]="$2"
     [[ -n "${_CLYOPS_RULE[$1]}" ]] || _CLYOPS_RULE[$1]="path"
+}
+
+# Usage: clyops_complete <long|argument> <function>
+# The function lists the values to offer when completing the value option or
+# argument (spec section 9.2): it runs only for --bash-completion, gets the
+# words typed after the commands as its arguments and prints one value per
+# line. A non-zero exit keeps the rule's completion. It doesn't validate.
+clyops_complete() {
+    _clyops_record clyops_complete "$@" && return 0
+    if [[ -v "_CLYOPS_KIND[$1]" && "${_CLYOPS_OWNER[$1]}" == "$_CLYOPS_SEL" ]]; then
+        [[ "${_CLYOPS_KIND[$1]}" == flag ]] && _clyops_fatal "Flag --$1 takes no value to complete"
+        _CLYOPS_COMPLETER[$1]="$2"
+        return 0
+    fi
+    local _c_a
+    for _c_a in "${_CLYOPS_ARGS[@]}"; do
+        [[ "$_c_a" == "$1" ]] && { _CLYOPS_ARG_COMPLETER[$1]="$2"; return 0; }
+    done
+    _clyops_fatal "Unknown option or argument '$1' for complete"
 }
 
 _clyops_known_rule() {
@@ -1408,7 +1428,8 @@ _clyops_schema_node() {
         printf '      "required": %s,\n      "isVariadic": %s,\n' "$required" "$variadic"
         _clyops_json_str "${_CLYOPS_ARG_DEFAULT[i]}"; printf '      "default": %s,\n' "$_r"
         _clyops_json_str "${_CLYOPS_ARG_RULE[i]}"; printf '      "validation": %s,\n' "$_r"
-        _clyops_rule_schema "${_CLYOPS_ARG_RULE[i]}" "${_CLYOPS_ARGS[i]}"; printf '      "schema": %s\n    }' "$_r"
+        _clyops_rule_schema "${_CLYOPS_ARG_RULE[i]}" "${_CLYOPS_ARGS[i]}"; printf '      "schema": %s,\n' "$_r"
+        printf '      "dynamic": %s\n    }' "$([[ -n "${_CLYOPS_ARG_COMPLETER[${_CLYOPS_ARGS[i]}]:-}" ]] && echo true || echo false)"
         sep=","
     done
     [[ -n "$sep" ]] && printf '\n  '
@@ -1443,7 +1464,8 @@ _clyops_schema_node() {
         fi
         _clyops_json_list "${choices[@]}"; printf '      "choices": %s,\n' "$_r"
         _clyops_rule_schema "$rule" "--$long"; printf '      "schema": %s,\n' "$_r"
-        printf '      "secret": %s\n    }' "$([[ -n "${_CLYOPS_SECRET[$long]:-}" ]] && echo true || echo false)"
+        printf '      "secret": %s,\n' "$([[ -n "${_CLYOPS_SECRET[$long]:-}" ]] && echo true || echo false)"
+        printf '      "dynamic": %s\n    }' "$([[ -n "${_CLYOPS_COMPLETER[$long]:-}" ]] && echo true || echo false)"
         sep=","
     done
     printf '\n  ],'
@@ -1516,19 +1538,35 @@ _clyops_completion_kind() { # rule search-dirs -> _r "kind<TAB>values"
     _r="$kind"$'\t'"${values:--}"
 }
 
+# Run completer $1 with the words $2... (spec section 9.2): _r "choice<TAB>values",
+# or fails when the completer does.
+_clyops_completer_values() {
+    local fn="$1" out line values=""
+    shift
+    out=$("$fn" "$@") || return 1
+    local -A seen=()
+    while IFS= read -r line; do
+        [[ -z "$line" || "$line" == *[,$' \t\r']* || -v "seen[$line]" ]] && continue
+        seen[$line]=1
+        values+="${values:+,}$line"
+    done <<< "$out"
+    _r="choice"$'\t'"${values:--}"
+}
+
 # Tab-separated completion records (spec section 9). The arguments are the
 # words typed after the program name; a program with commands follows them.
 clyops_completion_data() {
     _clyops_ensure_help
     _clyops_abspath "${_CLYOPS_ROOT:-.}" "$PWD"
     _CLYOPS_ROOT_ABS="$_r"
-    local long desc short i kid
+    local long desc short i kid words=("$@")
     echo "#clyops-completion 1"
     if [[ -n "${_CLYOPS_CMD_KIDS[:]:-}" ]]; then
         _clyops_walk "$@"
-        local skip="$_r" words=("$@")
+        local skip="$_r"
         [[ -n "${_CLYOPS_CMD_KIDS[:$_CLYOPS_SEL]:-}" ]] && (( skip < $# )) && [[ "${words[skip]}" != -* ]] && return 0
         printf 'skip\t%s\n' "$skip"
+        words=("${words[@]:skip}")
         for kid in ${_CLYOPS_CMD_KIDS[:$_CLYOPS_SEL]:-}; do
             desc="${_CLYOPS_CMD_ABOUT[:${_CLYOPS_SEL:+$_CLYOPS_SEL }$kid]}"; desc="${desc//$'\t'/ }"; desc="${desc//$'\n'/ }"
             printf 'cmd\t%s\t%s\n' "$kid" "$desc"
@@ -1540,15 +1578,19 @@ clyops_completion_data() {
         if [[ "${_CLYOPS_KIND[$long]}" == flag ]]; then
             printf 'opt\t--%s\t%s\tflag\tnone\t-\t%s\n' "$long" "${short:--}" "$desc"
         else
-            _clyops_search_dirs "$long"
-            _clyops_completion_kind "${_CLYOPS_RULE[$long]}" "$_r"
+            if [[ -z "${_CLYOPS_COMPLETER[$long]:-}" ]] || ! _clyops_completer_values "${_CLYOPS_COMPLETER[$long]}" "${words[@]}"; then
+                _clyops_search_dirs "$long"
+                _clyops_completion_kind "${_CLYOPS_RULE[$long]}" "$_r"
+            fi
             printf 'opt\t--%s\t%s\tvalue\t%s\t%s\n' "$long" "${short:--}" "$_r" "$desc"
         fi
         _clyops_is_bool_like "$long" && printf 'opt\t--no-%s\t-\tflag\tnone\t-\t%s\n' "$long" "$desc"
     done
     for (( i = 0; i < ${#_CLYOPS_ARGS[@]}; i++ )); do
         desc="${_CLYOPS_ARG_DESC[i]//$'\t'/ }"; desc="${desc//$'\n'/ }"
-        _clyops_completion_kind "${_CLYOPS_ARG_RULE[i]}" ""
+        if [[ -z "${_CLYOPS_ARG_COMPLETER[${_CLYOPS_ARGS[i]}]:-}" ]] || ! _clyops_completer_values "${_CLYOPS_ARG_COMPLETER[${_CLYOPS_ARGS[i]}]}" "${words[@]}"; then
+            _clyops_completion_kind "${_CLYOPS_ARG_RULE[i]}" ""
+        fi
         printf 'arg\t%s\t%s\t%s\t%s\n' "${_CLYOPS_ARGS[i]}" "$([[ "$i" == "$_CLYOPS_VARIADIC" ]] && echo variadic || echo single)" "$_r" "$desc"
     done
 }

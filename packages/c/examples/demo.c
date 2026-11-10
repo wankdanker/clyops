@@ -1,8 +1,36 @@
 /* The conformance demo CLI (spec/conformance/README.md) in C. */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "clyops.h"
+
+/* Completer (spec section 9.2): the DEMO_HOSTS entries, then words-N. Fails when DEMO_HOSTS is unset. */
+static int hosts(const char* const* words, int nwords, clyops_values_t* out, void* userdata) {
+    (void)words;
+    (void)userdata;
+    fputs("completer ran\n", stderr);
+    const char* env = getenv("DEMO_HOSTS");
+    if (!env) return 1;
+    for (const char* p = env;; ) {
+        const char* end = strchr(p, ';');
+        size_t n = end ? (size_t)(end - p) : strlen(p);
+        char* entry = malloc(n + 1);
+        if (!entry) return 1;
+        memcpy(entry, p, n);
+        entry[n] = 0;
+        clyops_values_add(out, entry);
+        free(entry);
+        if (!end) break;
+        p = end + 1;
+    }
+    if (nwords > 0) {
+        char label[32];
+        snprintf(label, sizeof label, "words-%d", nwords);
+        clyops_values_add(out, label);
+    }
+    return 0;
+}
 
 int main(int argc, char** argv) {
     clyops_t* cli = clyops_new("demo");
@@ -55,6 +83,8 @@ int main(int argc, char** argv) {
 
     clyops_config(cli, "config", "demo:,shared:");
     clyops_path_search(cli, "config", "conf");
+    clyops_complete(cli, "host", hosts, NULL);
+    clyops_complete(cli, "rest", hosts, NULL);
     clyops_exclusive(cli, "endpoint", "addr");
     clyops_requires(cli, "dest", "src");
 

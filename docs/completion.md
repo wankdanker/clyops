@@ -93,6 +93,14 @@ or `ops --completion fish > ~/.config/fish/completions/ops.fish`.
 The dispatcher completes directory groups and tool names, then the selected
 tool's own options. Inspect `ops --help` for the command names it discovered.
 
+## Values only the tool knows
+
+A tool can list values when Tab is pressed, such as the instances registered in
+a directory, with `complete(name, fn)` (see the
+[guide](guide.md#completion-values-from-your-program)). The completion scripts
+need no change: they ask the tool for its records each time, and the tool runs
+its function then.
+
 ## Inspect and troubleshoot
 
 `plan.py --completion bash` prints shell source; `plan.py --bash-completion`

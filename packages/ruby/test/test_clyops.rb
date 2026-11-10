@@ -203,4 +203,47 @@ class ClyopsTest < Minitest::Test
     assert_includes cli.usage, "\nOutput [plan]: Migration plan\n"
     refute_includes cli.usage, "[progress]"
   end
+
+  def test_complete_registration_errors
+    cli = make
+    err = assert_raises(Clyops::DefinitionError) { cli.complete("nope") { [] } }
+    assert_equal "Unknown option or argument 'nope' for complete", err.message
+    err = assert_raises(Clyops::DefinitionError) { cli.complete("fast", ->(_words) { [] }) }
+    assert_equal "Flag --fast takes no value to complete", err.message
+    assert_same cli, cli.complete("file") { [] }.complete("tag", ->(_words) { [] })
+  end
+
+  def test_complete_values_sanitized_with_fallback
+    calls = []
+    cli = make
+    cli.complete("count") do |words|
+      calls << words
+      ["a", "", "b c", "d,e", "f\tg", "a", "h"]
+    end
+    cli.complete("tag") { [] }
+    cli.complete("file") { raise "no" }
+    assert_equal "ok", cli.parse(["x", "-n", "4"]).status
+    schema = JSON.parse(cli.json_schema)
+    assert_empty calls
+    assert_equal [true, false, true, false], schema["options"].map { |o| o["dynamic"] }
+    assert_same true, schema["arguments"][0]["dynamic"]
+    data = cli.completion_data(%w[x y])
+    assert_includes data, "opt\t--count\t-n\tvalue\tchoice\ta,h\tCount\n"
+    assert_includes data, "opt\t--tag\t-t\tvalue\tchoice\t-\tTags\n"
+    assert_includes data, "arg\tfile\tsingle\tfile\t-\tFile\n"
+    assert_equal [%w[x y]], calls
+  end
+
+  def test_complete_gets_words_after_commands
+    cli = Clyops::Cli.new(name: "m", env: {})
+    cli.opt "HOST", "host", "", "optional", "Host"
+    cli.complete("host") { |words| ["top"] + words }
+    migrate = cli.command("db", "Database").command("migrate", "Migrate")
+    migrate.arg "name", "Name", "all"
+    migrate.complete("name") { |words| words.map { |w| "w:#{w}" } }
+    data = cli.completion_data(%w[db migrate --host x])
+    assert_includes data, "skip\t2\n"
+    assert_includes data, "opt\t--host\t-\tvalue\tchoice\ttop,--host,x\tHost\n"
+    assert_includes data, "arg\tname\tsingle\tchoice\tw:--host,w:x\tName\n"
+  end
 end

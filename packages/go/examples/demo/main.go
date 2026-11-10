@@ -3,11 +3,27 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	clyops "github.com/wankdanker/clyops/packages/go"
 )
+
+// hosts is a completer (spec section 9.2): the DEMO_HOSTS entries, then words-N. Fails when DEMO_HOSTS is unset.
+func hosts(words []string) ([]string, error) {
+	fmt.Fprintln(os.Stderr, "completer ran")
+	list, ok := os.LookupEnv("DEMO_HOSTS")
+	if !ok {
+		return nil, errors.New("DEMO_HOSTS is unset")
+	}
+	values := strings.Split(list, ";")
+	if len(words) > 0 {
+		values = append(values, fmt.Sprintf("words-%d", len(words)))
+	}
+	return values, nil
+}
 
 func main() {
 	cli := clyops.New()
@@ -61,6 +77,8 @@ func main() {
 
 	cli.SetConfig("config", "demo:,shared:")
 	cli.SetPathSearch("config", "conf")
+	cli.Complete("host", hosts)
+	cli.Complete("rest", hosts)
 	cli.Exclusive("endpoint", "addr")
 	cli.Requires("dest", "src")
 

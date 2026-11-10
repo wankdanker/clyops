@@ -27,6 +27,7 @@ cli.arg_variadic NAME, description, rule = ""
 
 `group` and `rule` are positional. Metadata: `set_description`, `set_epilog`,
 `set_config(option, prefixes)`, `set_path_search(long, dirs)`,
+`complete(name) { |words| [...] }` (or `complete(name, callable)`; completion values, §9.2),
 `require_command(cmd, description, hint)`, `set_effects(*effects)`,
 `set_stdin(description, content_type)`, `set_stdout(description,
 content_type)`, `exclusive(*longs)`, `requires(*longs)`, `one_of(*longs)`,

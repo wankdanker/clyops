@@ -195,6 +195,8 @@ typedef struct {
     char short_name;
     int kind, required, secret;
     svec search; /* absolute search dirs, computed per parse */
+    clyops_completer_t completer; /* spec section 9.2; NULL when none */
+    void* completer_data;
     /* per parse */
     int has;
     char* raw;
@@ -206,6 +208,8 @@ typedef struct {
 typedef struct {
     char *name, *desc, *dflt, *rule;
     int variadic;
+    clyops_completer_t completer; /* spec section 9.2; NULL when none */
+    void* completer_data;
     int has;
     char* raw;
     svec list;
@@ -583,6 +587,30 @@ void clyops_path_search(clyops_t* cli, const char* long_name, const char* dirs) 
     if (!o) clyops_die(2, "clyops_path_search: unknown option --%s", long_name);
     set_str(&o->search_raw, dirs);
     if (empty(o->rule)) set_str(&o->rule, "path");
+}
+
+struct clyops_values { svec list; };
+
+void clyops_values_add(clyops_values_t* out, const char* value) {
+    if (out && value) sv_push(&out->list, xstrdup(value));
+}
+
+void clyops_complete(clyops_t* cli, const char* name, clyops_completer_t fn, void* userdata) {
+    opt_t* o = find_opt(cli, name);
+    if (o) {
+        if (o->kind == K_FLAG) clyops_die(2, "Flag --%s takes no value to complete", name);
+        o->completer = fn;
+        o->completer_data = userdata;
+        return;
+    }
+    for (size_t i = 0; i < cli->nargs; i++) {
+        if (streq(cli->args[i].name, name)) {
+            cli->args[i].completer = fn;
+            cli->args[i].completer_data = userdata;
+            return;
+        }
+    }
+    clyops_die(2, "Unknown option or argument '%s' for complete", name);
 }
 
 /* A JSON grammar check (spec section 5): each step advances *p past what it read. */
@@ -1972,7 +2000,7 @@ static void schema_node(sbuf* b, const clyops_t* cli, const char* root) {
         json_str(b, a->rule);
         sb_put(b, ",\n      \"schema\": ");
         rule_schema(b, a->rule, root, a->name);
-        sb_put(b, "\n    }");
+        sb_printf(b, ",\n      \"dynamic\": %s\n    }", a->completer ? "true" : "false");
     }
     sb_put(b, cli->nargs ? "\n  ],\n  \"options\": [" : "],\n  \"options\": [");
     for (size_t i = 0; i < cli->nopts; i++) {
@@ -2019,7 +2047,7 @@ static void schema_node(sbuf* b, const clyops_t* cli, const char* root) {
         char* label = fmt("--%s", o->long_name);
         rule_schema(b, r, root, label);
         free(label);
-        sb_printf(b, ",\n      \"secret\": %s\n    }", o->secret ? "true" : "false");
+        sb_printf(b, ",\n      \"secret\": %s,\n      \"dynamic\": %s\n    }", o->secret ? "true" : "false", o->completer ? "true" : "false");
     }
     sb_put(b, "\n  ],");
     if (!cli->parent) {
@@ -2128,6 +2156,32 @@ static void completion_kind(sbuf* b, const char* rule, const svec* dirs) {
     free(values.s);
 }
 
+/* The kind and values of a completion record, asking the completer first (spec section 9.2). */
+static void completion_record(sbuf* b, const char* rule, const svec* dirs, clyops_completer_t fn, void* data, int nwords, char** words) {
+    if (fn) {
+        char* none[] = {NULL};
+        clyops_values_t out = {0};
+        if (fn((const char* const*)(words ? words : none), nwords, &out, data) == 0) {
+            sbuf values = {0};
+            for (size_t i = 0; i < out.list.len; i++) {
+                const char* v = out.list.v[i];
+                if (!*v || strpbrk(v, ", \t\r\n")) continue;
+                int dup = 0;
+                for (size_t k = 0; k < i && !dup; k++) dup = streq(out.list.v[k], v);
+                if (dup) continue;
+                if (values.len) sb_putc(&values, ',');
+                sb_put(&values, v);
+            }
+            sb_printf(b, "choice\t%s", values.len ? values.s : "-");
+            free(values.s);
+            sv_free(&out.list);
+            return;
+        }
+        sv_free(&out.list);
+    }
+    completion_kind(b, rule, dirs);
+}
+
 static char* clean(const char* s) {
     char* d = xstrdup(s);
     for (char* p = d; *p; p++) if (*p == '\t' || *p == '\n') *p = ' ';
@@ -2155,6 +2209,8 @@ char* clyops_completion_data_for(clyops_t* cli, int nwords, char** words) {
             return sb_take(&b);
         }
         sb_printf(&b, "skip\t%d\n", skip);
+        words += skip;
+        nwords -= skip;
         for (size_t i = 0; i < cli->selected->nkids; i++) {
             char* desc = clean(cli->selected->kids[i]->description);
             sb_printf(&b, "cmd\t%s\t%s\n", cli->selected->kids[i]->word, desc);
@@ -2172,7 +2228,7 @@ char* clyops_completion_data_for(clyops_t* cli, int nwords, char** words) {
             sb_printf(&b, "opt\t--%s\t%s\tflag\tnone\t-\t%s\n", o->long_name, shs, desc);
         } else {
             sb_printf(&b, "opt\t--%s\t%s\tvalue\t", o->long_name, shs);
-            completion_kind(&b, o->rule, &o->search);
+            completion_record(&b, o->rule, &o->search, o->completer, o->completer_data, nwords, words);
             sb_printf(&b, "\t%s\n", desc);
         }
         if (bool_like(o)) sb_printf(&b, "opt\t--no-%s\t-\tflag\tnone\t-\t%s\n", o->long_name, desc);
@@ -2182,7 +2238,7 @@ char* clyops_completion_data_for(clyops_t* cli, int nwords, char** words) {
         const arg_t* a = &node->args[i];
         char* desc = clean(a->desc);
         sb_printf(&b, "arg\t%s\t%s\t", a->name, a->variadic ? "variadic" : "single");
-        completion_kind(&b, a->rule, NULL);
+        completion_record(&b, a->rule, NULL, a->completer, a->completer_data, nwords, words);
         sb_printf(&b, "\t%s\n", desc);
         free(desc);
     }
