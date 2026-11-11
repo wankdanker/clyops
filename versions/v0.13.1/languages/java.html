@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Java · clyops</title>
+  <link rel="stylesheet" href="/versions/v0.13.1/assets/docs.css">
+  <script defer src="/versions/v0.13.1/assets/search.js"></script>
+</head>
+<body data-search-index="/versions/v0.13.1/search-index.json">
+  <a class="skip" href="#content">Skip to content</a>
+  <header><a href="/versions/v0.13.1/"><strong>clyops</strong></a><span>Documentation · 0.13.1</span><a href="https://github.com/wankdanker/clyops">GitHub</a></header>
+  <div class="shell">
+    <nav aria-label="Documentation">
+      <a href="/versions/v0.13.1/guide.html">Concepts and behavior</a>
+      <a href="/versions/v0.13.1/reference.html">API references</a>
+      <a href="/versions/v0.13.1/examples.html">Clone-and-run examples</a>
+      <a href="/versions/v0.13.1/linux-lab.html">Linux lab in your browser</a>
+      <a href="/versions/v0.13.1/completion.html">Bash, Zsh and Fish completion</a>
+      <h2>Languages</h2>
+      <a href="/versions/v0.13.1/languages/javascript.html">JavaScript / TypeScript</a><a href="/versions/v0.13.1/languages/python.html">Python</a><a href="/versions/v0.13.1/languages/rust.html">Rust</a><a href="/versions/v0.13.1/languages/go.html">Go</a><a href="/versions/v0.13.1/languages/java.html">Java</a><a href="/versions/v0.13.1/languages/ruby.html">Ruby</a><a href="/versions/v0.13.1/languages/c.html">C</a><a href="/versions/v0.13.1/languages/bash.html">Bash</a>
+      <h2>Tools and servers</h2>
+      <a href="/versions/v0.13.1/node-tools.html">Node tools, jobs, API and MCP</a>
+      <a href="/versions/v0.13.1/web-runner.html">Web runner and shared schema</a>
+      <a href="/versions/v0.13.1/applications.html">Dispatcher and desktop runner</a>
+      <a href="/versions/v0.13.1/maintaining.html">Maintaining the docs</a>
+      <a href="/versions/v0.13.1/versions.html">Release documentation</a>
+      <form action="/versions/v0.13.1/search.html" role="search"><label for="search">Search guides</label><input id="search" name="q" type="search"><button>Search</button></form>
+    </nav>
+    <main id="content"><h1 id="java">Java</h1>
+<p>Requires <strong>Java 17+</strong>. <a href="/versions/v0.13.1/reference/java/index.html">Complete API reference</a> · <a href="/versions/v0.13.1/guide.html">Shared behavior</a></p>
+<h2 id="install-and-run">Install and run</h2>
+<pre><code class="language-sh">javac -cp clyops-0.13.1.jar DocsDemo.java
+java -cp .:clyops-0.13.1.jar DocsDemo
+</code></pre>
+<p>Download matching JARs from the <a href="https://github.com/wankdanker/clyops/releases">GitHub release</a>. On Windows, use <code>;</code> instead of <code>:</code> in the classpath. The compile command assumes the source file below has been saved beside the downloaded JAR.</p>
+<p>Save the following as <code>DocsDemo.java</code>:</p>
+<!-- example: DocsDemo.java -->
+<pre><code class="language-java">import io.github.wankdanker.clyops.Cli;
+import io.github.wankdanker.clyops.Values;
+
+public class DocsDemo {
+    public static void main(String[] argv) {
+        Cli cli = new Cli(&quot;docs-demo&quot;);
+        cli.opt(&quot;NAME&quot;, &quot;name&quot;, &quot;n&quot;, &quot;World&quot;, &quot;Who to greet&quot;);
+        cli.opt(&quot;COUNT&quot;, &quot;count&quot;, &quot;c&quot;, &quot;1&quot;, &quot;Repeat count&quot;, &quot;Options&quot;, &quot;int:1-3&quot;);
+        cli.opt(&quot;VERBOSE&quot;, &quot;verbose&quot;, &quot;v&quot;, &quot;flag&quot;, &quot;Verbose output&quot;);
+        Values args = cli.run(argv);
+        System.out.printf(&quot;%s %d %s%n&quot;, args.getString(&quot;NAME&quot;), args.getInt(&quot;COUNT&quot;), args.getBool(&quot;VERBOSE&quot;));
+    }
+}
+</code></pre>
+<pre><code class="language-sh">java -cp .:clyops-0.13.1.jar DocsDemo --name Ada --count 2 --verbose
+# Ada 2 true
+java -cp .:clyops-0.13.1.jar DocsDemo --help
+java -cp .:clyops-0.13.1.jar DocsDemo --help-json-schema
+java -cp .:clyops-0.13.1.jar DocsDemo --count invalid
+# Validation error; exit status 1
+</code></pre>
+<h2 id="editor-support-and-resolved-values">Editor support and resolved values</h2>
+<p>IntelliJ IDEA, Eclipse and Java language servers read compiled signatures. Attach the matching <code>-sources.jar</code> and <code>-javadoc.jar</code> for source navigation and hover documentation. <code>mvn package</code> builds them locally; the next release will attach them alongside the main JAR. Maven Central publication is not configured yet; use the GitHub release artifacts or install the JARs locally.</p>
+<h2 id="commands-relationships-secrets-effects-and-io">Commands, relationships, secrets, effects and I/O</h2>
+<p>Add these registrations before calling <code>run</code>. A CLI level has either subcommands or positional arguments.</p>
+<pre><code class="language-java">Cli db = cli.command(&quot;db&quot;, &quot;Database tasks&quot;);              // a command: mytool db ...
+Cli migrate = db.command(&quot;migrate&quot;, &quot;Apply migrations&quot;);   // mytool db migrate
+migrate.opt(&quot;TO&quot;, &quot;to&quot;, &quot;&quot;, &quot;optional&quot;, &quot;Target version&quot;, &quot;Options&quot;, &quot;int&quot;);
+migrate.setEffects(&quot;destructive&quot;);                         // read-only, idempotent, destructive, network
+cli.opt(&quot;TOKEN&quot;, &quot;token&quot;, &quot;t&quot;, &quot;&quot;, &quot;API token&quot;, &quot;Auth&quot;, &quot;secret&quot;); // masked in help and valuesJson()
+cli.opt(&quot;JSON&quot;, &quot;json&quot;, &quot;&quot;, &quot;flag&quot;, &quot;JSON output&quot;);
+cli.opt(&quot;QUIET&quot;, &quot;quiet&quot;, &quot;&quot;, &quot;flag&quot;, &quot;Quiet output&quot;);
+cli.exclusive(&quot;json&quot;, &quot;quiet&quot;);                            // also requires(&quot;a&quot;, &quot;b&quot;...) and oneOf(&quot;a&quot;, &quot;b&quot;...)
+cli.setStdin(&quot;Audio to transcribe&quot;, &quot;audio/wav&quot;);          // and setStdout(description, contentType)
+cli.role(&quot;progress&quot;, &quot;out&quot;, &quot;Progress&quot;, &quot;application/x-ndjson&quot;);  // then cli.emit(&quot;progress&quot;, &quot;{\&quot;pct\&quot;:50}&quot;)
+cli.run(argv);                                             // cli.commandPath() == [db, migrate]
+</code></pre>
+<p>Roles (<code>role</code>, <code>emit</code>): the JVM can't write to a descriptor number directly, so
+<code>emit</code> reopens <code>/dev/fd/N</code>, which works for pipes and files. For a socket (Node's
+<code>child_process</code> pipes are socketpairs), start the JVM with
+<code>--add-opens java.base/java.io=ALL-UNNAMED</code>; without it, <code>emit</code> warns once and
+writes nothing. Java also can't remove <code>CLYOPS_FDS</code> from its own environment, so
+a program that starts others removes it from <code>ProcessBuilder.environment()</code>, or
+sets it to <code>forwardFds(...)</code>.</p>
+<p>Commands share the program's options (accepted before or after the command words) and config file;
+each has its own help (<code>mytool db migrate --help</code>), schema and completion. See the
+<a href="https://github.com/wankdanker/clyops/blob/452eee9b01d2ccd7ec5571b2b5b5b45fb8780498/spec/SPEC.md">spec</a> sections 1.3 to 1.7.</p>
+<h2 id="completion-values-from-your-program">Completion values from your program</h2>
+<p><code>complete(name, fn)</code> lists the values of a value option, array option or
+positional argument of that level, for values only the program can find, such
+as the instances registered in a directory. They are offered when the user
+presses Tab, and tooling (the HTTP API, MCP server and web runner) reads them
+with <code>--complete-values</code>:</p>
+<pre><code class="language-java">cli.opt(&quot;INSTANCE&quot;, &quot;instance&quot;, &quot;i&quot;, &quot;&quot;, &quot;Instance to target&quot;);
+cli.complete(&quot;instance&quot;, req -&gt; {
+    try (var files = Files.list(Path.of(&quot;/var/lib/myapp/instances&quot;))) {
+        return files.map(f -&gt; f.getFileName().toString()).filter(n -&gt; n.endsWith(&quot;.json&quot;))
+            .map(n -&gt; n.substring(0, n.length() - 5)).toList();
+    }
+});
+</code></pre>
+<p>The function (<code>Completer</code>: <code>List&lt;String&gt; complete(CompleteRequest request) throws Exception</code>) gets a <code>CompleteRequest(words, prefix, limit, offset)</code>:
+<code>words</code> are the words typed after the command words, for completers that depend
+on another option, and <code>prefix</code> is the text being completed. It runs only for
+<code>--bash-completion</code> and <code>--complete-values</code>, so keep it quick (each Tab also
+starts a JVM) and don't print to stdout. Throwing, or returning <code>null</code>, keeps
+the rule's completion. The library drops empty values, <code>null</code>s and duplicates,
+keeps the values starting with <code>prefix</code>, then skips <code>offset</code> and keeps <code>limit</code>,
+so the function may return every value. It doesn't validate: check the value
+after <code>run</code> if only listed values are allowed. Completing an unknown name or a
+flag throws <code>IllegalArgumentException</code>; registering a name again replaces its
+completer.</p>
+<p>When the values come from a database, register with <code>complete(name, true, fn)</code>
+and apply the request yourself. The function is then asked for one more value
+than wanted (<code>limit</code> is never 0 here), so the library can tell whether more
+remain:</p>
+<pre><code class="language-java">cli.complete(&quot;customer&quot;, true, req -&gt; {
+    try (var st = db.prepareStatement(
+            &quot;SELECT name FROM customers WHERE name LIKE ? ESCAPE '\\' ORDER BY name LIMIT ? OFFSET ?&quot;)) {
+        st.setString(1, req.prefix().replace(&quot;%&quot;, &quot;\\%&quot;).replace(&quot;_&quot;, &quot;\\_&quot;) + &quot;%&quot;);
+        st.setInt(2, req.limit());
+        st.setInt(3, req.offset());
+        var names = new ArrayList&lt;String&gt;();
+        try (var rows = st.executeQuery()) {
+            while (rows.next()) names.add(rows.getString(1));
+        }
+        return names;
+    }
+});
+</code></pre>
+<p><code>prog --complete-values NAME PREFIX LIMIT OFFSET -- WORDS...</code> prints one page
+as JSON, <code>{&quot;values&quot;:[...],&quot;more&quot;:false}</code>, and exits; values with spaces or
+commas are kept there, while shell completion drops them and asks for at most
+1000. In code, <code>completeValues(name, prefix, limit, offset, words)</code> returns a
+<code>ValuesPage(values, more)</code>, or throws <code>IllegalArgumentException</code>
+(<code>No completer for 'NAME'</code>) or <code>IllegalStateException</code>
+(<code>Completer for 'NAME' failed</code>). See the <a href="https://github.com/wankdanker/clyops/blob/452eee9b01d2ccd7ec5571b2b5b5b45fb8780498/spec/SPEC.md">spec</a> sections
+9.2 and 9.3.</p>
+<h2 id="parsing-and-errors">Parsing and errors</h2>
+<p>Use <code>run</code> for a standalone program: it displays help/schema/completion and exits for those requests, or exits with status 1 on invalid input. Use the non-exiting <code>parse</code> variant in libraries and tests; check its outcome before reading resolved values. Registration errors (duplicate names, unknown rules, or commands mixed with positionals) are programming errors, distinct from invalid user input. See the native reference for the language's result and error types.</p>
+<h2 id="more-recipes">More recipes</h2>
+<p><a href="/versions/v0.13.1/guide.html">The common guide</a> covers repeatable options, variadics, validation, config files, paths, secrets, constraints, I/O, completion and provenance. The complete reference above covers each public method and helper, including its native signature. Runnable demo and commands examples also live in the package's <code>examples</code> directory.</p>
+</main>
+  </div>
+  <footer>Guides are Markdown. API references come from the published source interfaces.</footer>
+</body>
+</html>
