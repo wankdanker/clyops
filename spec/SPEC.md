@@ -593,6 +593,11 @@ the records above, so they never go stale:
   `/`), host names;
 * positional arguments by position, skipping options and their values, with
   the variadic argument repeating.
+* words and values containing `:` or `@`: bash's readline splits words at
+  the characters in `COMP_WORDBREAKS`, so the bash script joins the pieces no
+  whitespace separates (except around the `=` of `--opt=VALUE`) and offers
+  each value without the part before the word's last such character, which
+  readline keeps.
 
 `tools/test-completions.sh` drives the scripts in real bash, zsh and fish.
 
