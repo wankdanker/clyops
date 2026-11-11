@@ -65,6 +65,17 @@ _clyops_$prog
 printf '%s\n' "\${COMPREPLY[@]}" | sort | tr '\n' ' '
 EOF
 }
+# Like bash_complete, but as completion bridges call it: only COMP_WORDS and COMP_CWORD set.
+bash_complete_words() { # line
+    local prog=${1%% *}
+    bash --norc --noprofile <<EOF 2>&1
+eval "\$($prog --completion bash)"
+unset COMP_LINE COMP_POINT
+COMP_WORDS=($1); [[ "$1" == *" " ]] && COMP_WORDS+=(""); COMP_CWORD=\$(( \${#COMP_WORDS[@]} - 1 ))
+_clyops_$prog
+printf '%s\n' "\${COMPREPLY[@]}" | sort | tr '\n' ' '
+EOF
+}
 check bash "demo --col"         "--color "                 "$(bash_complete "demo --col")"
 check bash "demo --color "      "always auto never "       "$(bash_complete "demo --color ")"
 check bash "demo -c "           "a.conf b.conf conf data in.txt " "$(bash_complete "demo -c ")"
@@ -110,6 +121,9 @@ check bash "tasks db --url=pg:main -v --u (colon)" "--url "                 "$(b
 check bash "tools media demo in.txt fast zone:eu: (colon)" "a b "           "$(bash_complete "tools media demo in.txt fast zone:eu:" "$zones")"
 check bash "tools media demo -v in.txt fast zone:e (colon)" "eu:a eu:b "    "$(bash_complete "tools media demo -v in.txt fast zone:e" "$zones")"
 check bash "tools media tasks db --url=pg:m (colon)" "main "                "$(bash_complete "tools media tasks db --url=pg:m")"
+check bash "tasks db  (no COMP_LINE)"           "migrate status "         "$(bash_complete_words "tasks db ")"
+check bash "demo --color  (no COMP_LINE)"       "always auto never "      "$(bash_complete_words "demo --color ")"
+check bash "tools media  (no COMP_LINE)"        "demo tasks "             "$(bash_complete_words "tools media ")"
 check bash "tasks db --u"                  "--url "                  "$(bash_complete "tasks db --u")"
 check bash "tasks send --email a@b.co --w" "--webhook "              "$(bash_complete "tasks send --email a@b.co --w")"
 check bash "tools media tasks db "         "migrate status "         "$(bash_complete "tools media tasks db ")"
