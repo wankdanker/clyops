@@ -5,6 +5,10 @@ section here.
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-11-11
+
+Bash completion works for values containing `:` or `@`.
+
 ### Fixed
 
 - Bash completion of values containing `:` or `@`, such as dynamic values like `zone:eu:a` or
